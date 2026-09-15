@@ -1,0 +1,1319 @@
+{
+  "schema_version": 2,
+  "generated": "2026-09-15",
+  "notice": "UI-control inventory seeded by Prompt 00 for the first golden path and the principal controls of later milestones. Every row is UNVERIFIED until a production-build browser test and screenshot/trace evidence exist. The audit (VZ-CONTROLS-001) must reconcile this list against implemented routes; unlisted controls are inventory gaps and listed controls without an implementation are dead entries.",
+  "control_count": 59,
+  "controls": [
+    {
+      "id": "shell.nav.explore",
+      "route": "/*",
+      "semantic_icon": "explore",
+      "required_access": "anonymous (if explore enabled for guests)",
+      "action": "navigate to explore",
+      "api_operation": null,
+      "states": [
+        "available",
+        "hidden-when-disabled"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-EXPLORE-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "shell.nav.upload",
+      "route": "/*",
+      "semantic_icon": "upload",
+      "required_access": "authenticated (or guest when guest uploads enabled)",
+      "action": "open uploader",
+      "api_operation": null,
+      "states": [
+        "available",
+        "hidden",
+        "disabled"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-UPLOAD-001",
+        "VZ-UPLOAD-005"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "shell.nav.search",
+      "route": "/*",
+      "semantic_icon": "search",
+      "required_access": "anonymous (if search enabled for guests)",
+      "action": "submit keyword search",
+      "api_operation": "GET /api/v1/search",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-SEARCH-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "shell.nav.notifications",
+      "route": "/*",
+      "semantic_icon": "notifications",
+      "required_access": "authenticated",
+      "action": "open notifications panel; mark read",
+      "api_operation": "GET/PATCH /api/v1/me/notifications",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "badge-count"
+      ],
+      "persistent_effect": "read state per notification",
+      "feature_ids": [
+        "VZ-NOTIFY-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "shell.nav.account",
+      "route": "/*",
+      "semantic_icon": "account",
+      "required_access": "authenticated",
+      "action": "open account menu (library, albums, favorites, settings, sign out)",
+      "api_operation": "POST /api/v1/auth/logout",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "session revoked on sign out",
+      "feature_ids": [
+        "VZ-AUTH-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "setup.claim.submit",
+      "route": "/setup/claim",
+      "semantic_icon": "confirm",
+      "required_access": "anonymous with one-time token while unclaimed",
+      "action": "claim owner account",
+      "api_operation": "POST /api/v1/setup/claim-owner",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "invalid-token",
+        "already-claimed"
+      ],
+      "persistent_effect": "owner user created; token hash consumed",
+      "feature_ids": [
+        "VZ-INSTALL-003"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "auth.login.submit",
+      "route": "/login",
+      "semantic_icon": "sign-in",
+      "required_access": "anonymous",
+      "action": "sign in",
+      "api_operation": "POST /api/v1/auth/login",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "2fa-required",
+        "rate-limited"
+      ],
+      "persistent_effect": "session cookie issued",
+      "feature_ids": [
+        "VZ-AUTH-001",
+        "VZ-AUTH-003"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "auth.signup.submit",
+      "route": "/signup",
+      "semantic_icon": "sign-up",
+      "required_access": "anonymous when registration open",
+      "action": "register",
+      "api_operation": "POST /api/v1/auth/register",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "closed",
+        "approval-pending",
+        "captcha"
+      ],
+      "persistent_effect": "user row (inactive until verified/approved when required)",
+      "feature_ids": [
+        "VZ-AUTH-001",
+        "VZ-AUTH-005"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "upload.picker",
+      "route": "/upload",
+      "semantic_icon": "upload",
+      "required_access": "authenticated or guest",
+      "action": "choose files (keyboard/file picker)",
+      "api_operation": null,
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "none until upload starts",
+      "feature_ids": [
+        "VZ-UPLOAD-003"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "upload.dropzone",
+      "route": "/upload",
+      "semantic_icon": "upload",
+      "required_access": "authenticated or guest",
+      "action": "drop or paste files",
+      "api_operation": null,
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "none until upload starts",
+      "feature_ids": [
+        "VZ-UPLOAD-003"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "upload.url",
+      "route": "/upload",
+      "semantic_icon": "link",
+      "required_access": "authenticated (or guest per setting)",
+      "action": "add remote URL",
+      "api_operation": "POST /api/v1/uploads/from-url",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "blocked-host"
+      ],
+      "persistent_effect": "upload session",
+      "feature_ids": [
+        "VZ-UPLOAD-004"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "upload.start",
+      "route": "/upload",
+      "semantic_icon": "upload",
+      "required_access": "authenticated or guest",
+      "action": "create session + transfer parts + finalize",
+      "api_operation": "POST /api/v1/uploads; PUT parts; POST finalize",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "quota-exceeded",
+        "rejected-type",
+        "oversized",
+        "duplicate"
+      ],
+      "persistent_effect": "asset + original object + processing job",
+      "feature_ids": [
+        "VZ-UPLOAD-001",
+        "VZ-UPLOAD-002",
+        "VZ-QUOTA-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "upload.cancel",
+      "route": "/upload",
+      "semantic_icon": "cancel",
+      "required_access": "uploader",
+      "action": "cancel in-flight upload",
+      "api_operation": "DELETE /api/v1/uploads/{id}",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "session aborted; parts discarded; quota released",
+      "feature_ids": [
+        "VZ-UPLOAD-002"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "upload.retry",
+      "route": "/upload",
+      "semantic_icon": "retry",
+      "required_access": "uploader",
+      "action": "retry failed part/file",
+      "api_operation": "PUT parts",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "no duplicate asset",
+      "feature_ids": [
+        "VZ-UPLOAD-002"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "upload.options.privacy",
+      "route": "/upload",
+      "semantic_icon": "privacy",
+      "required_access": "uploader",
+      "action": "set visibility for batch",
+      "api_operation": "finalize body",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "asset visibility",
+      "feature_ids": [
+        "VZ-UPLOAD-006",
+        "VZ-PRIVACY-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "upload.options.album",
+      "route": "/upload",
+      "semantic_icon": "add-to-album",
+      "required_access": "authenticated",
+      "action": "choose/create album",
+      "api_operation": "finalize body album_id / POST /api/v1/albums",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "album membership",
+      "feature_ids": [
+        "VZ-UPLOAD-006",
+        "VZ-ALBUM-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "upload.options.tags",
+      "route": "/upload",
+      "semantic_icon": "tag",
+      "required_access": "uploader",
+      "action": "add tags",
+      "api_operation": "finalize body tags",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "tags",
+      "feature_ids": [
+        "VZ-UPLOAD-006",
+        "VZ-TAG-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "upload.result.embed",
+      "route": "/upload",
+      "semantic_icon": "embed",
+      "required_access": "uploader (when enabled)",
+      "action": "copy embed/links",
+      "api_operation": null,
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-UPLOAD-009",
+        "VZ-SHARE-002"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "library.grid.item",
+      "route": "/library",
+      "semantic_icon": "photo",
+      "required_access": "owner",
+      "action": "open in viewer",
+      "api_operation": null,
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-LIBRARY-001",
+        "VZ-VIEWER-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "library.select.all",
+      "route": "/library",
+      "semantic_icon": "select",
+      "required_access": "owner",
+      "action": "select all (.) / clear (Z)",
+      "api_operation": null,
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-LIBRARY-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "library.bulk.privacy",
+      "route": "/library",
+      "semantic_icon": "privacy",
+      "required_access": "owner",
+      "action": "bulk set visibility",
+      "api_operation": "POST /api/v1/photos:batch",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "visibility on N assets; caches invalidated",
+      "feature_ids": [
+        "VZ-LIBRARY-001",
+        "VZ-PRIVACY-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "library.bulk.album",
+      "route": "/library",
+      "semantic_icon": "add-to-album",
+      "required_access": "owner",
+      "action": "bulk add to album",
+      "api_operation": "POST /api/v1/albums/{id}/items",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "album membership",
+      "feature_ids": [
+        "VZ-LIBRARY-001",
+        "VZ-ALBUM-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "library.bulk.delete",
+      "route": "/library",
+      "semantic_icon": "delete",
+      "required_access": "owner (when user content delete enabled)",
+      "action": "bulk delete with confirmation",
+      "api_operation": "DELETE /api/v1/photos:batch",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "confirm"
+      ],
+      "persistent_effect": "assets removed; storage cleanup job",
+      "feature_ids": [
+        "VZ-LIBRARY-001",
+        "VZ-ACCOUNT-003"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.viewer.close",
+      "route": "/p/{id}",
+      "semantic_icon": "close",
+      "required_access": "anyone who may view",
+      "action": "close lightbox (Esc) and return focus",
+      "api_operation": null,
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-VIEWER-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.viewer.next",
+      "route": "/p/{id}",
+      "semantic_icon": "next",
+      "required_access": "anyone who may view",
+      "action": "next/previous (arrows)",
+      "api_operation": null,
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-VIEWER-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.viewer.zoom",
+      "route": "/p/{id}",
+      "semantic_icon": "zoom",
+      "required_access": "anyone who may view",
+      "action": "zoom/pan (keyboard alternative)",
+      "api_operation": null,
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-VIEWER-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.favorite",
+      "route": "/p/{id}",
+      "semantic_icon": "favorite",
+      "required_access": "authenticated + may_read_photo",
+      "action": "toggle favorite (L)",
+      "api_operation": "PUT/DELETE /api/v1/photos/{id}/favorite",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized",
+        "selected"
+      ],
+      "persistent_effect": "unique (user_id, media_id) favorite",
+      "feature_ids": [
+        "VZ-FAVORITE-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.rating",
+      "route": "/p/{id}",
+      "semantic_icon": "rating",
+      "required_access": "authenticated + may_read_photo",
+      "action": "set/change/remove 1\u20135 rating",
+      "api_operation": "PUT/DELETE /api/v1/photos/{id}/rating",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized",
+        "selected-value"
+      ],
+      "persistent_effect": "one current rating per user; aggregate updated",
+      "feature_ids": [
+        "VZ-RATING-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.comment.post",
+      "route": "/p/{id}",
+      "semantic_icon": "comment",
+      "required_access": "authenticated + may_comment",
+      "action": "post comment/reply",
+      "api_operation": "POST /api/v1/photos/{id}/comments",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized",
+        "sanitized"
+      ],
+      "persistent_effect": "comment row; notification job",
+      "feature_ids": [
+        "VZ-COMMENT-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.comment.edit",
+      "route": "/p/{id}",
+      "semantic_icon": "edit",
+      "required_access": "comment author",
+      "action": "edit own comment",
+      "api_operation": "PATCH /api/v1/comments/{id}",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "edited_at set",
+      "feature_ids": [
+        "VZ-COMMENT-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.comment.delete",
+      "route": "/p/{id}",
+      "semantic_icon": "delete",
+      "required_access": "comment author or photo owner or moderator",
+      "action": "delete comment",
+      "api_operation": "DELETE /api/v1/comments/{id}",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized",
+        "confirm"
+      ],
+      "persistent_effect": "comment removed",
+      "feature_ids": [
+        "VZ-COMMENT-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.report",
+      "route": "/p/{id}",
+      "semantic_icon": "report",
+      "required_access": "anyone who may view",
+      "action": "report photo/comment",
+      "api_operation": "POST /api/v1/reports",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "report row in moderation queue",
+      "feature_ids": [
+        "VZ-REPORT-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.share",
+      "route": "/p/{id}",
+      "semantic_icon": "share",
+      "required_access": "anyone who may view",
+      "action": "open share dialog (links, embeds, social)",
+      "api_operation": "GET /api/v1/oembed",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-SHARE-001",
+        "VZ-SHARE-002"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.download",
+      "route": "/p/{id}",
+      "semantic_icon": "download",
+      "required_access": "per owner/site permission",
+      "action": "download original/derivative",
+      "api_operation": "GET /api/v1/photos/{id}/download",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "none (audited count)",
+      "feature_ids": [
+        "VZ-DOWNLOAD-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.exif.tab",
+      "route": "/p/{id}",
+      "semantic_icon": "info",
+      "required_access": "anyone who may view (when EXIF shown)",
+      "action": "view Exif tab",
+      "api_operation": "GET /api/v1/photos/{id}/exif",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "hidden-by-policy"
+      ],
+      "persistent_effect": "none",
+      "feature_ids": [
+        "VZ-MEDIA-004"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.privacy",
+      "route": "/p/{id}",
+      "semantic_icon": "privacy",
+      "required_access": "owner",
+      "action": "change visibility",
+      "api_operation": "PATCH /api/v1/photos/{id}",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "visibility; caches/feeds/federation/ipfs reconciled",
+      "feature_ids": [
+        "VZ-PRIVACY-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.add-to-album",
+      "route": "/p/{id}",
+      "semantic_icon": "add-to-album",
+      "required_access": "owner",
+      "action": "add/remove album membership",
+      "api_operation": "POST/DELETE /api/v1/albums/{id}/items",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "membership",
+      "feature_ids": [
+        "VZ-ALBUM-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.edit",
+      "route": "/p/{id}/edit",
+      "semantic_icon": "edit",
+      "required_access": "owner",
+      "action": "edit title/description/alt/tags/category/NSFW/dates",
+      "api_operation": "PATCH /api/v1/photos/{id}",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "metadata",
+      "feature_ids": [
+        "VZ-LIBRARY-002"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "photo.delete",
+      "route": "/p/{id}",
+      "semantic_icon": "delete",
+      "required_access": "owner or moderator",
+      "action": "delete with confirmation",
+      "api_operation": "DELETE /api/v1/photos/{id}",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized",
+        "confirm"
+      ],
+      "persistent_effect": "asset removed; cleanup job; comments/favorites/ratings cascade",
+      "feature_ids": [
+        "VZ-LIBRARY-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "album.create",
+      "route": "/albums",
+      "semantic_icon": "add",
+      "required_access": "authenticated (or guest when guest albums enabled)",
+      "action": "create album (A)",
+      "api_operation": "POST /api/v1/albums",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "album row",
+      "feature_ids": [
+        "VZ-ALBUM-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "album.privacy",
+      "route": "/a/{id}",
+      "semantic_icon": "privacy",
+      "required_access": "album owner",
+      "action": "set public/private/link/password",
+      "api_operation": "PATCH /api/v1/albums/{id}",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "album privacy; grants",
+      "feature_ids": [
+        "VZ-ALBUM-002"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "album.share-grant",
+      "route": "/a/{id}",
+      "semantic_icon": "share",
+      "required_access": "album owner",
+      "action": "create/revoke share grant",
+      "api_operation": "POST/DELETE /api/v1/albums/{id}/grants",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "grant row; revoked grants 404 immediately",
+      "feature_ids": [
+        "VZ-ALBUM-002"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "album.cover",
+      "route": "/a/{id}",
+      "semantic_icon": "cover",
+      "required_access": "album owner",
+      "action": "set cover (H)",
+      "api_operation": "PATCH /api/v1/albums/{id}",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "cover_media_id",
+      "feature_ids": [
+        "VZ-ALBUM-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "album.reorder",
+      "route": "/a/{id}",
+      "semantic_icon": "reorder",
+      "required_access": "album owner",
+      "action": "drag reorder with keyboard alternative",
+      "api_operation": "PUT /api/v1/albums/{id}/order",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "manual order",
+      "feature_ids": [
+        "VZ-ALBUM-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "album.sub.create",
+      "route": "/a/{id}",
+      "semantic_icon": "add",
+      "required_access": "album owner",
+      "action": "create sub-album (J)",
+      "api_operation": "POST /api/v1/albums",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "parent link; cycle-checked",
+      "feature_ids": [
+        "VZ-ALBUM-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "album.delete",
+      "route": "/a/{id}",
+      "semantic_icon": "delete",
+      "required_access": "album owner",
+      "action": "delete album (photos kept)",
+      "api_operation": "DELETE /api/v1/albums/{id}",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized",
+        "confirm"
+      ],
+      "persistent_effect": "album removed; memberships removed",
+      "feature_ids": [
+        "VZ-ALBUM-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "profile.follow",
+      "route": "/u/{username}",
+      "semantic_icon": "follow",
+      "required_access": "authenticated, not blocked",
+      "action": "follow/unfollow",
+      "api_operation": "PUT/DELETE /api/v1/users/{u}/follow",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized",
+        "selected"
+      ],
+      "persistent_effect": "unique follow row",
+      "feature_ids": [
+        "VZ-FOLLOW-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "profile.block",
+      "route": "/u/{username}",
+      "semantic_icon": "block",
+      "required_access": "authenticated",
+      "action": "block/unblock",
+      "api_operation": "PUT/DELETE /api/v1/users/{u}/block",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized",
+        "confirm"
+      ],
+      "persistent_effect": "block row; cleanup job",
+      "feature_ids": [
+        "VZ-BLOCK-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "settings.privacy.defaults",
+      "route": "/settings/privacy",
+      "semantic_icon": "privacy",
+      "required_access": "authenticated",
+      "action": "set default visibility/EXIF/download/comment permissions",
+      "api_operation": "PATCH /api/v1/me/preferences",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "defaults applied to new uploads",
+      "feature_ids": [
+        "VZ-PRIVACY-001",
+        "VZ-MEDIA-004",
+        "VZ-DOWNLOAD-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "settings.api-key.create",
+      "route": "/settings/api",
+      "semantic_icon": "key",
+      "required_access": "authenticated (when user API enabled)",
+      "action": "create/regenerate/revoke API key",
+      "api_operation": "POST/DELETE /api/v1/me/api-keys",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled"
+      ],
+      "persistent_effect": "hashed key; shown once",
+      "feature_ids": [
+        "VZ-AUTH-008"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "settings.2fa.enroll",
+      "route": "/settings/security",
+      "semantic_icon": "shield",
+      "required_access": "authenticated",
+      "action": "enroll/disable TOTP; view recovery codes",
+      "api_operation": "POST /api/v1/auth/2fa/*",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "confirm"
+      ],
+      "persistent_effect": "sealed secret; recovery codes",
+      "feature_ids": [
+        "VZ-AUTH-003"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "settings.account.delete",
+      "route": "/settings/account",
+      "semantic_icon": "delete",
+      "required_access": "authenticated (re-auth)",
+      "action": "delete account",
+      "api_operation": "DELETE /api/v1/me",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "confirm",
+        "re-auth"
+      ],
+      "persistent_effect": "account deletion job",
+      "feature_ids": [
+        "VZ-ACCOUNT-002"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "admin.moderation.approve",
+      "route": "/admin/moderation",
+      "semantic_icon": "approve",
+      "required_access": "manager/admin",
+      "action": "approve pending upload",
+      "api_operation": "POST /api/v1/admin/moderation/uploads/{id}/approve",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "asset published; audit row; uploader notified",
+      "feature_ids": [
+        "VZ-UPLOAD-012",
+        "VZ-MOD-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "admin.moderation.flag",
+      "route": "/admin/moderation",
+      "semantic_icon": "flag",
+      "required_access": "manager/admin",
+      "action": "flag safe (V) / unsafe (F)",
+      "api_operation": "PATCH /api/v1/admin/photos/{id}/safety",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "safety level; audit row",
+      "feature_ids": [
+        "VZ-NSFW-001",
+        "VZ-MOD-001"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "admin.settings.save",
+      "route": "/admin/settings/*",
+      "semantic_icon": "save",
+      "required_access": "admin",
+      "action": "save a settings section",
+      "api_operation": "PATCH /api/v1/admin/settings",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "validation-error"
+      ],
+      "persistent_effect": "settings rows; audit; effective immediately",
+      "feature_ids": [
+        "VZ-ADMIN-002"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "admin.users.role",
+      "route": "/admin/users/{id}",
+      "semantic_icon": "role",
+      "required_access": "admin",
+      "action": "change role / suspend / reset password",
+      "api_operation": "PATCH /api/v1/admin/users/{id}",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized",
+        "last-owner-guard"
+      ],
+      "persistent_effect": "role/status; audit",
+      "feature_ids": [
+        "VZ-ADMIN-USERS-001",
+        "VZ-AUTH-004"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "admin.jobs.retry",
+      "route": "/admin/jobs",
+      "semantic_icon": "retry",
+      "required_access": "admin",
+      "action": "retry failed job",
+      "api_operation": "POST /api/v1/admin/jobs/{id}/retry",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "job requeued; audit",
+      "feature_ids": [
+        "VZ-OPS-006"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "admin.storage.add",
+      "route": "/admin/storage",
+      "semantic_icon": "add",
+      "required_access": "admin",
+      "action": "add storage location",
+      "api_operation": "POST /api/v1/admin/storage-locations",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized",
+        "validation-error",
+        "credential-test"
+      ],
+      "persistent_effect": "location row",
+      "feature_ids": [
+        "VZ-STORAGE-004"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "admin.federation.block",
+      "route": "/admin/federation",
+      "semantic_icon": "block",
+      "required_access": "admin",
+      "action": "block instance",
+      "api_operation": "POST /api/v1/admin/federation/blocks",
+      "states": [
+        "available",
+        "pending",
+        "error",
+        "disabled",
+        "unauthorized"
+      ],
+      "persistent_effect": "block row; audit",
+      "feature_ids": [
+        "VZ-AP-004"
+      ],
+      "browser_test_ids": [],
+      "design_reference": null,
+      "verification_status": "UNVERIFIED"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+# Prompt 00 — product baseline and parity audit
+Use with Fable 5.1, or your preferred planning model. This run defines scope; it does not implement the application.
+
+You are the product architect for Vizra, an original self-hosted photo community. Read AGENTS.md, docs/PRODUCT_CHARTER.md, docs/FEATURE_CATALOG.md, and docs/SOURCE_REGISTER.md. Discover the actual repository state and applicable instructions. Do not assume files or code exist because a plan mentions them.
+
+The non-negotiable stack is Go/Echo/PostgreSQL/sqlc/Redis/Docker; Next.js/TypeScript/Tailwind; Go/PostgreSQL/Redis search with optional ClickHouse analytics. Required outcomes include uploads, native comments, numeric ratings, albums, tags, favorites, robust Flickr-like community features, and the functional union of current Chevereto Free/Lite/Pro. Include S3/AWS/Backblaze, ActivityPub, AT Protocol, and IPFS. Preserve local/external/managed installation choices and backup/recovery requirements.
+
+Research current official Chevereto edition comparison, feature pages, admin/user manuals, API and release documentation; use Flickr's official documentation to clarify proposed community workflows. Capture source URL, version/date, observation date, exact capability and limitations. Do not include unreleased roadmap items as shipped competitor features. Do not claim paid/demo-only behavior was inspected without access. Reimplement behavior independently; no proprietary source/assets or assumed reuse rights.
+
+Turn the seed catalog into an atomic requirement ledger. For every obligation record: stable ID, user/operator outcome, provenance, release profiles, dependencies, success/negative/privacy/recovery cases, API/UI/CLI surfaces, required evidence, implementation status, and verification status. Break broad labels such as 'S3 support' and 'ratings work' into testable requirements. Separate implementation-specific competitor mechanisms from equivalent outcomes; preserve unresolved differences for owner review. Do not silently omit videos, non-S3 storage, embedded upload tools, imports, moderation integrations, multitenancy, or operator features merely because Vizra is called an image gallery.
+
+Define two claims: a tightly specified core release and the full requested application. The latter retains all approved parity and integration obligations. Ratings and native comments are explicit Vizra features even when a reference product uses a different mechanism. Paid edition parity does not automatically require user subscriptions/billing.
+
+Deliver: source register updates; docs/PRODUCT_SPEC.md; docs/quality/features.json; docs/quality/ui-controls.json; release-profile manifests; unresolved questions with conservative proposed decisions; dependency-ordered milestones and the next 8–12 implementable issues. Draft issue bodies locally unless repository writes are authorized. Do not flood GitHub with hundreds of vague tickets.
+
+The initial status is PLANNED/UNVERIFIED, never VERIFIED. Include a baseline-completeness gate: all source sections reconciled, all ambiguous behavior resolved or explicitly blocked, and no unapproved scope reductions. End with the smallest first runnable slice and the exact information needed for its tests. No application code in this run.
