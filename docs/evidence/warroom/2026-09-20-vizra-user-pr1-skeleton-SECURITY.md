@@ -428,3 +428,37 @@ Challenge:
   which is why it is a follow-up and not a blocker. The grep is three lines and
   turns a review-dependent property into a checked one.
 ```
+
+
+---
+
+# Closure check at 9767015444fa8bdbf1a1326f1cc58b41d068ba14 (after fix round 1)
+
+Same reviewer, resumed by the chair 2026-09-20 after the builder pushed the fix. Verbatim, extracted from its transcript by script. **Chair note:** Findings 1 and 2 are CLOSED on this SHA; Findings 3–6 remain queued as later slices (board queue 2a and 5). The `FLOOR` environment-override hardening note joins slice 2a.
+
+**Finding 1: CLOSED. Finding 2: CLOSED.** No new blocking finding. Gate green at `9767015`: `lint` rc=0, `vitest run` 116 passed / 0 skipped (was 50), `require-checks_test.sh` 55 cases / 62 assertions / 0 failed.
+
+**Finding 1 acceptance criteria**
+
+| Criterion | Verdict | Proof (driven through the repo's ESLint 10 + @typescript-eslint/parser, filename `lib/api/fetch.ts`, `allow: ["lib/api/fetch.ts"]`) |
+|---|---|---|
+| Hoisted init errors | MET | `const init: RequestInit = {method,headers,next:{revalidate:60}}; fetch(t,init)` → `unreadable`. Rule now reports rather than returns: `no-identity-headers-in-cached-fetch.mjs:312-315`. |
+| `fetch(url, opts)` non-literal errors | MET | `fetch(t,opts)` → `unreadable`; `fetch(t, c?a:b)` → `unreadable`. |
+| Bare `fetch(url)` silent | MET | SILENT. `no-identity-headers-in-cached-fetch.mjs:306` (`if (!options) return`). |
+| Mutation fails `npm run ci` both spellings | MET | Inline → `revalidated`; hoisted → `unreadable`. Real `viewerFetch` shape stays SILENT, so the rule is not passing by reporting everything. |
+| Docblock lists real limits | MET | `no-identity-headers-in-cached-fetch.mjs:41-57` names unknown header names and cross-call wrappers, and demotes itself to "cheapest layer, not the last one". |
+
+**Re-run of every bypass I filed — all REPORTED, none silent:** post-hoc `opts.next=` / `{...base}` spread / headers spread / `Object.assign` / reassigned `let headers` / computed key / second alias / `new Headers().set()` / headers-from-a-call → all `unreadable`; `const f = fetch` and `const {fetch} = globalThis` → `aliasedFetch` (`no-raw-fetch.mjs:107,138`), now banned in every file including the allow-listed one. Nothing left for the runtime table to have to catch — and it exists anyway (`fetch.test.ts:215-238` asserts `cache === "no-store"` and no `next` across the method/body/upload matrix; `:239` asserts `cookies()` on every path, which is what keeps Next's E831/E846 cache-scope throw armed).
+
+**Finding 2 acceptance criteria**
+
+| Criterion | Verdict | Proof |
+|---|---|---|
+| CODEOWNERS covers the paths | MET | `.github/CODEOWNERS` — `*`, `/.github/`, `/scripts/ci/`, `/eslint-rules/`, `/contracts/`, all `@yegamble`. |
+| Deleting `frontend` fails by name | MET | `require-checks_test.sh:451` → `frontend: missing`. |
+| `?frontend` fails the same step | MET | `:457` → `frontend: marked optional`. |
+| Owner ruleset recorded as separate | MET | Stated as owner action in CODEOWNERS and `AGENTS.md`, not claimed done. |
+
+**Residual on the floor list — acceptable, disclosed.** `check-required-floor.sh` is itself in `scripts/ci/`, so a PR editing the FLOOR and the manifest together goes green. The script says so in its own header. That is the correct stopping point: it is CODEOWNERS-covered, and no in-tree check can gate itself. One hardening note for a later slice, not a hole: `FLOOR=${FLOOR:-…}` rejects empty (falls back) but `FLOOR=" "` passes vacuously — no workflow sets `FLOOR`, so reaching it needs a `.github/` edit; consider dropping the env override.
+
+**The additions:** `boundedSignal` (`lib/api/fetch.ts:118-128`) is correct — ceiling via `Math.min`, floor of 1 ms, caller signal composed with `AbortSignal.any` not replaced, and every degenerate input (unset, empty, non-numeric, zero, negative) falls back to 10 s rather than unbounded (`lib/config.ts:62-70`). `NaN`/negative `timeoutMs` abort immediately — fail-closed. The `adduser -S -u 1001 -G nodejs` fix is right and `docker-build.yml` now asserts `uid=1001(nextjs) gid=1001(nodejs)` at runtime, so the `--chown` is no longer inert. Nothing new to file.
