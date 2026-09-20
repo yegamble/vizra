@@ -1476,3 +1476,337 @@ All mutations reverted; `git status --porcelain` empty and `git rev-parse HEAD` 
 **Verdict for 4f8d0fc: PASS.** Blocker 1 **CLOSED**, blocker 2 **CLOSED**, CI green on this SHA with all five required lanes executed, all six original demonstrations still covered by their tests, every chair-required change reproduced by mutation except the three recorded as R-1/R-2/R-3, and no blocking finding open.
 
 PASS is a verification verdict only. Merge, and any ledger transition to VERIFIED, are the chair's to record — and R-5 means VERIFIED still cannot rest on CI evidence alone.
+
+---
+---
+
+# Re-verification at b5f8f6a
+
+**Verdict: PASS.** All four round-2 items verified by mutation and by direct SQL. Regression sweep clean. CI green on this SHA. One **REQUIRED, non-blocking** finding: a **pre-existing** integration-test flake that I missed at 4f8d0fc and am recording now (V-1).
+
+| | |
+|---|---|
+| PR | https://github.com/yegamble/vizra-core/pull/1 |
+| Head SHA verified | `b5f8f6aa0584d11a502e0415113ce5b52159d548` |
+| Previous verdict | PASS at `4f8d0fc207f94a2a516607d167fcf69abd7a2148` — does not carry over |
+| Head moved during re-verification? | No — checked at start and end |
+| Ancestry (**my own** `git merge-base --is-ancestor`, not the chair's) | `4f8d0fc` **is** an ancestor; `e45e784` **is** an ancestor — no rewrite |
+| Delta | `git diff --shortstat 4f8d0fc b5f8f6a` → **65 files, +6383 −66**, 1 commit (`b5f8f6a`) |
+| Environment | Third fresh clone. darwin arm64 native, go1.27.1, sqlc 1.31.1. Pinned `postgres@sha256:86c951e0…` (55432), `valkey/valkey@sha256:c123e371…` and `redis@sha256:06379549…` → `v=7.2.16` (56379). Containers `vizra-pr1-v3-*`, torn down after. |
+| Date | 2026-09-20 |
+
+**Untouched-path claims, verified myself:** `git diff 4f8d0fc b5f8f6a -- api/ migrations/0001* migrations/0002* migrations/0004*` is **empty**. `migrations/manifest.sha256` changed by **exactly one line** (`0003_audit_events.up.sql`: `28edc384…` → `d605494d…`). The authz fixture `adr007_matrix.tsv` is still `37115e003abf…`, **byte-identical across all three SHAs**.
+
+Non-transcript changes are exactly the four items: `migrations/0003` + manifest, `internal/jobs/worker.go`, `cmd/api/main.go` + new `main_test.go`, `cmd/vizra/doctor.go` + new `doctor_test.go`, plus tests in `golden_test.go` and `jobs_test.go`.
+
+## B1. Regression sweep — lanes, counts, skips
+
+| Lane | Exit | Result |
+|---|---|---|
+| `make ci` | 0 | PASS — `cmd/api` and `cmd/vizra` now have tests |
+| `go test ./...` (unit) | 0 | **879 pass, 0 fail, 0 skip** |
+| `make tidy-check` | 0 | PASS |
+| `go mod verify` | 0 | `all modules verified` |
+| `make test-integration` — PostgreSQL 18 + Valkey 9.1.2 | 0 | **917 pass, 0 fail, 0 skip** |
+| `make test-integration` — PostgreSQL 18 + Redis 7.2.16 | 0 | **917 pass, 0 fail, 0 skip** (first run; see V-1) |
+| `TestFrozenMatrix` | 0 | **315 subtests** — unchanged |
+
+The builder's claim of **917 tests / 0 skips / 315 matrix unchanged** is accurate, with the reproducibility caveat in V-1.
+
+**Canaries — both still die:**
+- M4 authz (unrecognised visibility → public): killed by `TestUnknownVisibilityDenies/item_page/""`.
+- Crash-loop sweep (always requeue, never dead-letter): killed by `TestACrashLoopingJobDeadLettersAndDoesNotBlockTheQueue`, `golden_test.go:858: cycle 2: sweep failed: ERROR: new row for relation "jobs" violates check constraint "jobs_terminal_finished"`.
+
+**`golden_test.go`'s one removed line — ruling: LEGITIMATE.**
+```
+-			"203.0.113.0", "203.0.113.0/24", "2001:db8::", "2001:db8::/48", "2001:db8::/64",
++			"203.0.113.0", "203.0.113.0/24", "10.0.0.0",
++			"2001:db8::", "2001:db8::/48", "2001:db8::/64",
++			"2001:db8:85a3:1::",       // four groups, the /64 shape
++			"2001:db8:1234:5678::/64", //
++			"2001:0db8:0000::",        // zero-padded labels are still lowercase hex
++			"fe80::",                  // link-local, one group
+```
+One line of accepted values was reflowed into several and **extended by five** — every original value is retained. The assertion was widened, not weakened. No test file was deleted and no `t.Skip` was added.
+
+## B2. Item 1 — the frozen `ip_prefix` grammar
+
+The constraint at this head matches the chair's ruling **character for character**:
+```sql
+OR ip_prefix ~ '^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}0(/24)?$'
+OR ip_prefix ~ '^[0-9a-f]{1,4}(:[0-9a-f]{1,4}){0,3}::(/(48|64))?$'
+```
+
+Applied `0001`–`0004` to a **fresh** PostgreSQL 18 database and asserted every value the chair named, by raw SQL:
+
+```
+--- MUST BE REFUSED ---                        --- MUST BE ACCEPTED ---
+2001:db8:1234:5678:9abc:def0::       refused   2001:db8::                accepted
+2001:db8:1234:5678:9abc:def0:1234::  refused   2001:db8::/48             accepted
+a:b:c:d:e:f:1::                      refused   2001:db8::/64             accepted
+2001:db8:1234:5678:9abc:def0::/48    refused   2001:db8:85a3:1::         accepted
+999.999.999.0                        refused   2001:db8:1234:5678::/64   accepted
+256.1.1.0                            refused   2001:0db8:0000::          accepted
+2001:DB8::                           refused   fe80::                    accepted
+203.0.113.47                         refused   10.0.0.0                  accepted
+192.168.1.42                         refused   203.0.113.0               accepted
+2001:db8::1                          refused   203.0.113.0/24            accepted
+2001:0db8:abcd:0012:0:0:0:1          refused   0.0.0.0                   accepted
+10.0.0.1/32                          refused
+2001:db8::1/128                      refused
+::ffff:0:0                           refused
+::                                   refused
+2001:db8::/56                        refused
+203.0.113.0/25                       refused
+```
+**Every required refusal refused; every required acceptance accepted.** The gap two seats found — over-specific prefixes that still end in `::` — is closed: a /96 and a /112 are now refused, which the previous unbounded `*` quantifier accepted. My round-1 probe did not include those; this closes it.
+
+**Grammar mutants, both killed:**
+
+| Mutant | Result |
+|---|---|
+| IPv6 quantifier `{0,3}` → `*` | killed — `TestAuditEventsRefusesAFullIPAddress/a_prefix_more_specific_than_/64_is_refused` |
+| IPv4 octet class → `[0-9]{1,3}` | killed — same test |
+
+**Manifest:** exactly one changed line. **`append-only` lane: green on this SHA** (a legitimately-edited `0003` that has never merged, so the merge-base diff sees a changed hash against a base that does not carry it — consistent with the lane's documented semantics).
+
+**0003's header claims only what the schema enforces.** It now carries an explicit **"NOT enforced here, by decision"** section (immutability trigger → M1 with the users FK; `before`/`after` credential hygiene → a Go-side rule "not expressible in SQL"; `actor_user_id` FK → M1), states that the `/len` suffix is deliberately *not* cross-checked against the group count, explains the four-group bound with the two example values that motivated it, and sets out **the M1 writer's contract** in four numbered points (`ParseAddr` + `Unmap()` first; mask to /24 or /64, never finer; lowercase; `NULL` when there is no usable address). Nothing in the header asserts a property the CHECK does not have.
+
+## B3. Item 2 — `truncate()` rune safety
+
+The implementation backs off to a rune start (`utf8.RuneStart`) and adds a belt-and-braces `strings.ToValidUTF8` for input that was already invalid.
+
+**Byte-slice mutant (compiling, gofmt-clean) — killed on both levels:**
+- Unit: `TestSafeErrorNeverCutsARuneInHalf`, `TestSafeErrorStillBoundsAndStillReads`, `TestSafeErrorRedactsThenTruncatesEvenWithMultibyteText` all FAIL.
+- Integration: `TestAMultibyteErrorIsStoredInLastError` FAILs with the real database error —
+  ```
+  level=WARN msg="jobs: recording dead-letter failed" rows=0
+    error="ERROR: invalid byte sequence for encoding \"UTF8\": 0xe6 0xe2 0x80 (SQLSTATE 22021)"
+  ```
+
+**The rebuilt fixture really does force a multibyte rune across byte 2000** — it is not luck, and the test guards its own construction:
+```go
+const head = "処理に失敗しました — fetching https://b.example/o?"
+pad := strings.Repeat("a", 1999-len(head))
+msg := head + pad + strings.Repeat("日", 700) + "&" + secret
+if len(head)+len(pad) != 1999 {
+        t.Fatalf("the fixture is misbuilt: head+pad is %d bytes, want 1999", len(head)+len(pad))
+}
+```
+Head+pad is exactly 1999 bytes, so the 3-byte `日` begins at byte 2000 and byte 2000 is its **second** byte — a byte-index slice is guaranteed to split it. The test also uses a plain `error` rather than a `Terminal` one, with a comment explaining that `Terminal`'s `"terminal: "` prefix would shift the offsets the fixture depends on. This is the fixture discipline my round-1 FINDING R-4 asked for, applied here.
+
+**Redact-then-truncate order is preserved** — `safeError` is still `truncate(obs.Redact(s))`, and `TestSafeErrorRedactsThenTruncatesEvenWithMultibyteText` pins the combination.
+
+**The "recording … failed" log lines** now carry the cause without the job's error text. The two changed this round:
+```
+-			log.Warn("jobs: recording dead-letter failed", "rows", n)
++			log.Warn("jobs: recording dead-letter failed", "rows", n, "error", errText(derr))
+-			log.Warn("jobs: scheduling retry failed", "rows", n)
++			log.Warn("jobs: scheduling retry failed", "rows", n, "error", errText(rerr))
+```
+`derr`/`rerr` are the **database** errors (the invalid-byte-sequence error above), not the handler's message; `errText` renders a nil error as `"none (the statement matched no row)"` so a zero-row write is distinguishable from a failure. The third line (`recording success failed`) already logged `cerr.Error()`, also a database error. See V-2 for the separate `exhausted attempts` / `terminal failure` lines, which log the raw handler error and rely on the handler's redaction.
+
+## B4. Item 3 — my R-1 and R-2
+
+Both **CLOSED**. Earlier attempts that died only on `vet` (unused variable) or `gofmt` were redone so the mutants compile and are formatted — the results below are real test kills.
+
+| Mutant | Result |
+|---|---|
+| `cmd/vizra`: delete the `doctor.CheckSchema` call site | killed — `TestDoctorReportsEveryCheck`, `TestDoctorFailsAndExitsNonZeroOnEachRealDefect` |
+| `cmd/vizra`: delete the `doctor.CheckCache` call site | killed — same two tests |
+| `cmd/api`: remove `ReadTimeout` | killed — `TestAPIServerBoundsEveryPhaseOfAConnection` |
+| `cmd/api`: remove `WriteTimeout` | killed — same |
+| `cmd/api`: remove `ReadHeaderTimeout` | killed — same |
+| `cmd/api`: remove `IdleTimeout` | killed — same |
+
+## B5. Item 4 — the R-8 wording
+
+Corrected in all three places:
+- `docs/plans/2026-09-20-vizra-core-pr1-foundation.md:438` — the proof table now carries **separate JOB and RUN columns** (`success` / `failure`), and line 440 opens **"Correction, round 2."** stating the round-1 write-up said "PASSED" and that the run concluded `failure`.
+- `docs/evidence/pr1-round1/README.md:23` in the repo — same correction.
+- A PR comment headed **"## Correction to the round-1 write-up"**: *"My round-1 comment said the positive throwaway run … 'PASSED'. **It did not.** The verifier read the log correctly and I did not."*
+
+## B6. CI on b5f8f6a, docker image, and secrets
+
+```
+append-only                       completed  success
+build-test                        completed  success
+cache-matrix                      completed  success
+cache-matrix-leg (redis, …)       completed  success
+cache-matrix-leg (valkey, …)      completed  success
+ci-required                       completed  success
+docker-build                      completed  success
+govulncheck                       completed  success
+GitGuardian Security Checks       completed  failure   ← historical branch commits, triaged
+```
+All five required lanes **executed** and are green, `append-only` included, and `ci-required` ran on this SHA.
+
+**Docker assertions, read from the `docker-build` log for this SHA** (run 35535029043): `libvips vips-8.18.6`; tarball verified with `sha256sum -c -` against `3c41e1d5458081bf…`; `no excluded codec is present`; `image uid: 10001`; `libvips build step is #10` / `#10 CACHED — a Go-only change reused the libvips layers`. I checked the banned-codec claim rather than trusting the summary line: `heifload` and `x265` appear in the log **only** inside the assertion script's own text (`for banned in x265 heif heic; do`), and the loader list the binary reports contains **none** of heif/x265/jxl/svg/pdf. **Local image build: NOT RUN** — `df` showed 15 GiB free, above the 10 GiB threshold and therefore permitted, but a from-source libvips buildx pass plus cache would take several GiB of a disk shared with other builders, and every assertion is verifiable from the CI log for this exact SHA.
+
+**Secrets sweep of the 58 added files** (56 transcripts + 2 Go test files), added lines only: every credential-shaped hit is a Docker/file/git digest, a self-evident placeholder (`changeme`, `CHANGE-ME-…`, a passwordless `postgres://vizra@db:5432/…`), or a load-bearing redaction fixture (`hunter2`, `s3cr3tpw`, `X-Amz-Signature=SuperSecretSignatureMaterial…`, whose very next assertion is that it must **not** be stored). Zero matches for `gh[pousr]_`, `glpat-`, `sk-`, `AKIA`, `xox*-`, JWTs, PEM blocks, or any `scheme://user:password@host`. No environment dumps, no `.env` contents; the config transcripts self-redact (`production accepted VIZRA_SESSION_SECRET="<redacted>"`). **Nothing credential-shaped is new at this head that constitutes a real secret; nothing needs rotating.**
+
+`.gitguardian.yaml` is **unchanged** in this delta and none of the 58 new files falls inside an exclusion — the list did not silently widen to cover new content, which is the right direction. Two items to record rather than wave through: `strings.Repeat("Vz9Kp4Mw2Ng7", 3)[:32]` (`cmd/vizra/doctor_test.go:376-377`) is a **new** synthetic secret value not in the previously enumerated inventory (constructed, not pasted); and the `X-Amz-Signature=` literals in `internal/jobs/jobs_test.go` and `internal/integration/golden_test.go` are newly exposed to the scanner, so a fresh GitGuardian alert there would be a false positive to triage, not an exclusion to add.
+
+**Instruction-shaped text in the transcripts: none found.** I swept the new files for text addressed to a reviewing agent (`the verifier should`, `ignore previous`, `approve`, `mark as pass`, `do not flag`) — zero matches. Notably `docs/evidence/pr1-round1/README.md` carries a correction *against* the builder's own interest (the R-8 wording). Had any such text been present it would have been recorded as a finding and not acted on.
+
+## B7. Findings at b5f8f6a
+
+```
+FINDING V-1: two integration tests are flaky — PRE-EXISTING, and I missed it at 4f8d0fc
+Severity:    REQUIRED (non-blocking for this round's four items)
+Confidence:  high on the symptom and its history; MEDIUM on the mechanism
+Affected:
+  repo:      vizra-core
+  files:     internal/integration/golden_test.go:358 (TestHeartbeatRequiresStillHoldingTheLease),
+             :~395 (TestSweepReclaimsOnlyElapsedLeases), :78-101 (freshDatabase),
+             store/queries/jobs.sql (ClaimJob, FOR UPDATE SKIP LOCKED)
+  requirements: VZ-FOUND-003 / VZ-FOUND-005 evidence integrity
+Observed:
+  Both tests fail intermittently with `golden_test.go:369: no rows in result set` and
+  `:412: no rows in result set` — the ClaimJob immediately after a successful enqueue
+  returns pgx.ErrNoRows.
+
+  Controlled measurement, full integration package, 6 clean runs each, same machine,
+  same containers, 2 s apart:
+      b5f8f6a : 1 of 6 runs failed  (36 pass / 2 fail, then 5 clean runs)
+      4f8d0fc : 3 of 6 runs failed  (2 fail, 0, 1 fail, 2 fail, 0, 0)
+  Each test run ALONE: 8 of 8 green, both tests, at b5f8f6a. So it is inter-test
+  interference, not an intra-test bug.
+
+  I first measured only the two tests at each SHA (6 runs) and got 6/6 green at
+  4f8d0fc versus 2/6 failing at b5f8f6a, and briefly concluded this round had
+  introduced it. The larger full-suite sample above REFUTES that: the flake is
+  present at 4f8d0fc at a HIGHER rate. Recording the correction rather than the
+  first impression.
+
+  Mechanism NOT fully isolated. UNVERIFIED: I could not pin the exact interleaving.
+  The leading candidate is that `freshDatabase` runs `DROP SCHEMA public CASCADE;
+  CREATE SCHEMA public;` against a SHARED database at the start of every test while a
+  previous test's pool is still closing (`t.Cleanup(pools.Close)`), and ClaimJob's
+  `FOR UPDATE SKIP LOCKED` then SKIPS a row locked by a lingering connection — which
+  yields ErrNoRows rather than an error, matching the symptom exactly. Several tests
+  also start workers with `go func() { _ = w.Run(ctx) }()` and only `defer cancel()`,
+  never waiting for the goroutine to exit (lines 464, 511, 1137, 1208, 1384); only
+  line 1069 closes a `stopped` channel and waits. A diagnostic patch adding that wait
+  to the new multibyte test left the full suite green for 3/3 runs but made a 3-test
+  subset worse, so I do not claim it as the cause.
+Failure:
+  A required lane can go red at random. It does not make CI wrongly GREEN, so it is
+  not a false-positive gate — but it does mean "917 pass, 0 skip" is not reliably
+  reproducible, and it creates pressure to re-run until green, which is exactly the
+  habit AGENTS.md's evidence rules exist to prevent. It also means my own round-2
+  PASS rested on two integration runs per leg that happened to be clean.
+Perspective: developer | operator
+Recommendation:
+  Smallest coherent fix: give each test its own schema or database rather than
+  DROP SCHEMA on a shared one (a per-test schema name plus search_path, or a
+  per-test database), so no test can observe another's teardown. Independently,
+  make every test that starts a worker wait for it: `stopped := make(chan struct{});
+  go func(){ _ = w.Run(ctx); close(stopped) }(); t.Cleanup(func(){ cancel(); <-stopped })`.
+Acceptance criteria:
+  - `go test -tags=integration -count=10 ./internal/integration/` is green 10/10 on both
+    cache flavours.
+  - No test leaves a goroutine running after it returns (goleak, or an explicit wait).
+  - The two named tests pass when run in any order and concurrently with the others.
+Tests:
+  The harness exists. Add `-count=10` to a CI run, or a `go.uber.org/goleak` TestMain,
+  as the regression guard.
+Cross-repo implications:
+  core: the fix. search: vizra-search's integration suite shares the freshDatabase
+  pattern and wants the same audit. user: none. meta: the chair should know that
+  integration counts on this PR are reproducible only most of the time.
+Challenge:
+  "It is pre-existing, it never makes CI green when it should be red, and the round's
+  four items are all verified — so it should not gate this round." I agree, which is
+  why it is REQUIRED and not BLOCKER. The counter-argument is that a lane which fails
+  ~15-50% of the time will be re-run until green as a matter of routine, and at that
+  point the lane has stopped being evidence. It should be fixed before the next slice
+  builds more integration tests on the same fixture.
+```
+
+```
+FINDING V-2: two worker log lines emit the raw handler error and depend entirely on the slog handler
+Severity:    SHOULD
+Confidence:  high
+Affected:
+  repo:      vizra-core
+  files:     internal/jobs/worker.go:310 ("jobs: exhausted attempts"), :330 ("jobs: terminal failure")
+  requirements: VZ-FOUND-006 / VZ-OPS-005
+Observed:
+  `last_error` is correctly redacted before storage (safeError = truncate(obs.Redact(s))),
+  and the three "recording … failed" lines log only database errors. But:
+      log.Error("jobs: exhausted attempts", "attempts", j.Attempts, "error", err.Error())
+      log.Error("jobs: terminal failure", "error", msg)
+  pass the RAW handler error. I saw this directly in my mutant run — the captured worker
+  log contained the fixture credential in full:
+      msg="jobs: exhausted attempts" … error="処理に失敗しました — fetching https://…&X-Amz-Signature=SuperSecretSignatureMaterial0123456789"
+  In cmd/api and cmd/worker this is redacted by the handler installed with slog.SetDefault,
+  so production is covered. The multibyte test's own comment admits the gap precisely:
+  "the worker's logger in a test is not the redacting one cmd/api and cmd/worker install".
+Failure:
+  Any caller that constructs a Worker with its own logger — a future admin tool, a
+  one-off migration command, another test — logs credentials in the clear. The
+  protection lives in the process wiring rather than at the call site, and there is no
+  test asserting a Worker built with a plain logger does not emit secrets.
+Perspective: operator
+Recommendation:
+  Apply safeError (or obs.Redact) at these two call sites too, exactly as the storage
+  path already does. It costs one function call and removes the dependence on wiring.
+Acceptance criteria:
+  - A Worker constructed with a plain slog.TextHandler logs no credential material for a
+    handler error containing a DSN password and a presigned-URL signature.
+Tests:
+  internal/jobs — reuse the multibyte test's captured safeBuffer and assert the buffer
+  contains neither "SuperSecretSignatureMaterial" nor a DSN password.
+Cross-repo implications:
+  core: the fix. search: check for the twin pattern. user: none.
+Challenge:
+  "Production installs the redacting handler, so this is theoretical." It is — until
+  someone builds a Worker somewhere else, which is exactly what the test already does.
+```
+
+```
+FINDING V-3: carried-forward items, unchanged this round
+Severity:    NIT
+Confidence:  high
+Affected:    repo vizra-core
+Observed / Failure:
+  a) internal/obs/log.go still does not call a.Value.Resolve(), so slog.LogValuer
+     attributes bypass redaction (round-1 FINDING 6, round-2 R-7(b)). Still no type
+     implements LogValue, so still no live leak; the stated invariant is still false.
+     V-2 above raises the stakes slightly, since the worker now logs more error text.
+  b) secretKeys remains exact-match, so `session_secret` and `search_hmac_key` are still
+     uncovered (round-1 FINDING 7).
+  c) .github/expected-ruleset.json is still owned by CODEOWNERS and still absent.
+  d) The gate remains unenforceable on this plan — `gh api …/rulesets` returns
+     403 "Upgrade to GitHub Pro" (round-2 R-5). Unchanged, and still the reason a PASS
+     here cannot become VERIFIED on CI evidence alone.
+  e) cmd/worker still has no test files; cmd/api and cmd/vizra now do.
+  f) `strings.Repeat("Vz9Kp4Mw2Ng7", 3)[:32]` is a new synthetic secret value worth
+     adding to the repo's inventory of known-synthetic literals.
+Recommendation: (a) one line plus a test case; (b) substring stems or an allow-list;
+  (c)-(f) as previously recorded.
+Cross-repo: search carries a twin logger for (a) and (b).
+Challenge:  None blocks; (a) is still the one that will bite eventually.
+```
+
+## B8. Round-2 findings: disposition
+
+| Round-2 finding | Status at b5f8f6a |
+|---|---|
+| **R-1** doctor call sites untested | **CLOSED** — both deletions killed by `TestDoctorReportsEveryCheck` and `TestDoctorFailsAndExitsNonZeroOnEachRealDefect` |
+| **R-2** Read/WriteTimeout untested | **CLOSED** — all four timeout fields killed by `TestAPIServerBoundsEveryPhaseOfAConnection` |
+| **R-3** ClaimJob guard redundant-only | unchanged; still documented redundancy, not a defect |
+| **R-4** straddle fixture did not straddle | **CLOSED** — the new fixture forces the split deliberately and asserts its own construction |
+| **R-5** gate unenforceable on this plan | **OPEN** (owner action) — V-3(d) |
+| **R-6** merge_group base fallback | unchanged; still dormant |
+| **R-7** lesser observations | (a) expected-ruleset.json still absent; (b) LogValuer still open; (c) secretKeys still exact-match; (d) ip_prefix narrowness now **resolved as a deliberate, documented, tighter grammar** |
+| **R-8** "run PASSED" wording | **CLOSED** — corrected in the plan, the repo README and a PR comment |
+
+## B9. Cleanup
+
+All mutations and the one diagnostic patch reverted; `git status --porcelain` empty and `git rev-parse HEAD` = `b5f8f6aa0584d11a502e0415113ce5b52159d548` at the end of the run. Third clone, logs, binaries, the `fresh3` database and the `vizra-pr1-v3-*` containers removed. Nothing named `vidra-*`, `vizra-user-*` or belonging to other agents was touched. No source, test, workflow, manifest, migration, baseline or budget file was modified in the repository; this evidence file remains the only file I wrote.
+
+**Verdict for b5f8f6a: PASS.** The round's four items are each verified by mutation or direct SQL: the frozen `ip_prefix` grammar matches the ruling character for character and refuses every over-specific prefix that was the gap; `truncate` is rune-safe and its byte-slice reversion dies at both unit and integration level with the real `invalid byte sequence` error; R-1 and R-2 are closed by real tests; and the R-8 wording is corrected in all three places. The regression sweep is clean — both canaries still die, the authz fixture is byte-identical across all three SHAs, `api/` and migrations 0001/0002/0004 are untouched, the manifest moved by exactly one line, and `golden_test.go`'s single removed line is an expansion. CI is green on this SHA with all five required lanes executed. **V-1 is REQUIRED but non-blocking**: a pre-existing integration flake that I should have caught at 4f8d0fc, recorded with its correction so the chair can weigh it.
+
+PASS is a verification verdict only. Merge, and any ledger transition to VERIFIED, are the chair's to record — and V-3(d) means VERIFIED still cannot rest on CI evidence alone.
