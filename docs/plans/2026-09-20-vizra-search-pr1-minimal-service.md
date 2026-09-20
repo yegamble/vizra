@@ -350,3 +350,169 @@ Independent verification of the PR, then the meta PR1 ledger update recording
 `VZ-SEARCH-004` as partially IMPLEMENTED — the service side of the boundary
 only; indexing, ranking, the `sql` fallback in core and the `/admin/search`
 surface all remain PLANNED.
+
+
+---
+
+# Fix round 1 of 2 — verifier FAIL at `7f483ad`
+
+Chair ruling 2026-09-20: verifier **FAIL** plus three blocking security
+findings. Reviews read in full before any edit:
+`docs/evidence/warroom/2026-09-20-vizra-search-pr1-minimal-service-VERIFY.md`
+and `…-SECURITY.md`. Their acceptance criteria were the acceptance bullets for
+this round.
+
+## The blocker, confirmed before fixing
+
+`internal/hmacauth/hmacauth.go` computed the window as
+`now.Sub(time.Unix(ts,0))` with the sign folded. `time.Time.Sub` **saturates at
+`math.MinInt64`** for a far-future argument, and negating `math.MinInt64` yields
+itself — still negative — so `skew > MaxSkew` was false and the request was
+**accepted**. Reproduced against the real verifier at `7f483ad`:
+
+| timestamp | old verdict |
+|---|---|
+| `1789929649` (control, in window) | ACCEPTED 200 |
+| `1789929950` (+301 s) | REJECTED 401 |
+| `4102444800` (2100-01-01) | REJECTED 401 |
+| `11013301708` | **ACCEPTED 200** |
+| `11013301709` | **ACCEPTED 200** |
+| `253402300799` (9999-12-31) | **ACCEPTED 200** |
+| `4611686018427387904` | **ACCEPTED 200** |
+
+The timestamp window is the only replay bound at M0, so a request signed once
+with a far-future timestamp was a credential that never expired. Transcript:
+`F1-timestamp-window-fails-open.txt`.
+
+## The contract moved
+
+`vizra-core` fixed its own copy and tightened the rules. Both files re-vendored
+**byte-identically** at `2b9c540e81960954ee39e6a2aeec027e0f764a67`:
+
+| File | sha256 | bytes |
+|---|---|---|
+| `api/search-internal.openapi.yaml` | `9723a4582e075bab77c2dd802bd1f03f163e1c03af5335aefa2b305b32b0614a` | 24 797 |
+| `api/search-hmac-testvectors.json` | `3b6b0595bc4cf5f85210ad981dc2c42daf1e73b3beaf191b95eecf0923113cb2` | 21 939 |
+
+Each is pinned with its **own** sha256 in `api/CONTRACT-SOURCE.json`, and
+`contract-drift` checks both. Nothing in `vizra-core` was modified; both files
+were read with `git show`.
+
+## What changed, against the required list
+
+| Item | Done |
+|---|---|
+| **A** re-vendor both files, per-file sha256, drift checks both | `api/`, `TestEveryVendoredFileMatchesItsManifest` |
+| **B** new rules exactly; int64 skew after the range check; vector-driven test; magnitude table red then green | `internal/hmacauth`, `testvectors_test.go`, `TestTimestampWindowClosesAcrossTheWholeMagnitudeRange` |
+| **C** verify over `req.URL.EscapedPath()` | `server.go`; `TestTheVerifiedPathIsTheRequestPathNotTheRouteTemplate` on a test-only parameterised route |
+| **D** production ceilings on both knobs, `CheckEnv` agrees | `config.ceilings`, six new config tests |
+| **E** the six surviving mutants killed by tests, no product change | `hardening_test.go`, `TestDefaultsMatchTheCanonicalContract` |
+| **F5** query string refused before verification | `server.go` step 2 |
+| **F6** test named for the limitation | `TestIdenticalRequestsCanStillBeReplayedInsideTheWindowAtM0` |
+| **F7** rotation note | `AGENTS.md` § Known limitations |
+| **F8** loopback `make run`, development boot warning | `Makefile`, `main.go`, three tests |
+| **F9 b,c** latest check-run per name, honest floor comment | `scripts/ci-required-select.sh`, guard comment |
+| `make ci` includes `tidy-check` | `Makefile` |
+
+`" 1789929623 "`, `"+1789929623"` and `"01789929623"` are now refused, as are a
+lowercase method, an uppercase-hex nonce or MAC, a nonce above 128 characters,
+and any duplicated `X-Vizra-*` header.
+
+**No existing test was weakened or deleted.** Two expectations were corrected
+where they had been wrong about the code, and both are recorded: an empty
+timestamp header value is present-but-malformed rather than missing, and the
+ACCEPT vectors are judged against their own timestamps because the vector
+file's header scopes `verifier_now_unix` to the negative vectors.
+
+## Verification
+
+Host `Darwin arm64`, `go1.27.1`, source at `b2ec74a`.
+
+| Command | Exit | Result |
+|---|---|---|
+| `make ci` | 0 | all lanes, now including `tidy-check` |
+| `make test-noskip` | 0 | **314 pass events, 0 skips** (was 187) |
+| `make contract-drift` | 0 | both digests, the fixed numbers read out of the contract, 5 ACCEPT + 24 REJECT vectors |
+| `./scripts/ci-required-guard.sh` | 0 | floor, bare names, job existence, digest pinning |
+| `./scripts/ci-required-select.sh` | 0/1/2 | four cases, see F9 transcript |
+
+## Demonstrations — 18 more, each red then green
+
+`F1` (the blocker, old code vs new), `F1b` range check removed, `F1c` the
+saturating arithmetic restored, `F2a` timestamp reparsed, `F2b` method
+uppercased, `F2c` duplicate headers resolved, `F2d` vectors edited in place,
+`F3` verify over the route template, `F4-S2`…`F4-S7` the six mutants that
+survived the first round, `F5` query string accepted, `F6` ceilings removed,
+`F7` dev warning removed, `F8` `make run` on all interfaces, `F9` the aggregate
+duplicate cases. All in `vizra-search/docs/evidence/m0-demonstrations/`.
+
+## Still open, by the chair's own scheduling
+
+Queued and **not** in this round: the nonce store, multi-key rotation,
+connection/rate caps on the pre-auth body read, and the ruleset (owner action).
+The ruleset remains the only thing that actually closes the self-gating CI gate,
+and `AGENTS.md` and the guard comment now say so plainly instead of implying the
+floor is a control.
+
+
+## Chair addendum, same round
+
+### Production refuses every key this project publishes
+
+The security review of `vizra-core` found that `key_utf8` in the vectors file —
+the file this PR vendors — is exactly 32 bytes of mixed-case alphanumerics with
+**32 distinct byte values**, so it passes every heuristic in the loader. It is
+also the one key whose documentation is a committed file an operator will read
+and copy. Reproduced red against the loader first: the vectors key **and** both
+of this repository's own test key literals all booted production.
+
+Fixed by **exact-value** refusal, never echoing the value, for three classes:
+the dev key (which keeps its own distinct message), the vectors' `key_utf8`, and
+every key literal in this repository's `_test.go` sources. Widening the
+heuristics was rejected as an approach: a rule broad enough to catch that string
+would reject good keys too. `CheckEnv` reports the same refusal, so doctor and
+CI agree with boot. Development still accepts all of them — the vectors have to
+be runnable and `make run` boots with the dev key.
+
+Two tests keep it honest without duplicating a literal:
+
+- `TestTheVectorsPublishedKeyIsStillTheOneWeRefuse` reads `key_utf8` **from the
+  vendored file at test time**, so re-vendoring a changed vectors file cannot
+  silently un-refuse the key.
+- `TestEveryKeyLiteralInThisRepositoryIsRefused` parses every `_test.go` with
+  `go/ast` and fails on any string bound to a key-shaped identifier that
+  production would accept. It scanned 3 literals and reports the count, so a
+  scan that stopped finding anything is itself a failure.
+
+Consequence, and the right one: the three suites that need a production-valid
+key now **generate** one at test time rather than committing it.
+
+### `continue-on-error` is detected by parsing, not grepping
+
+The literal grep was evaded by a quoted key, a capitalised key, or a `${{ }}`
+expression value — and it tripped over its own error message.
+`scripts/check-workflows.py` parses the YAML, matches the key after unquoting
+and case-folding, **ignores the value entirely** (`false` is refused too), and
+fails closed on a workflow it cannot parse. Six negative fixtures in
+`scripts/testdata/` are exercised by the guard on **every run**, so a checker
+that stopped matching is itself a red lane. PyYAML is present on the runner and
+the lane installs it defensively rather than failing on a missing library.
+
+### Core's contract
+
+Re-checked after a fetch at the end of this round:
+`git -C vizra-core log -1 --format=%H origin/feat/m0-foundation -- api/` still
+returns **`2b9c540e81960954ee39e6a2aeec027e0f764a67`**. The sibling warning
+string next to `key_utf8` has not landed, so no re-vendor was needed and the
+recorded SHA is unchanged.
+
+### Addendum demonstrations — 7 more, each red then green
+
+`G1` the vectors key boots production with the exact-value refusal removed ·
+`G2` the constant drifting from the vendored `key_utf8` · `G3` a new committed
+key literal nobody added to the refused set · `G4`/`G5`/`G6` the quoted,
+capitalised and expression spellings of `continue-on-error` · `G7` the workflow
+checker itself neutered.
+
+**Round totals: 25 red/green transcripts, `make ci` exit 0, 320 pass events, 0
+skips** (was 187 at `7f483ad`).
