@@ -288,9 +288,68 @@ was **downloaded** and swept: **182 files, 8 archives unpacked, the sentinel in
 0 members, the request path still readable in 46**. Recorded in
 `vizra-user/docs/evidence/VZ-FOUND-008/ci-artifact-proof.md`.
 
+### Fix round 2 — re-verification FAIL at `44dac20`, closed at `0ac9fb6`
+Round 1 closed four of the verifier's five findings. Re-verification returned
+FAIL "on one line" with three new findings; all three are closed here and
+nothing else was touched.
+
+| Finding | Sev | What was wrong | What closed it |
+|---|---|---|---|
+| 6 | BLOCKER | `/* eslint-disable vizra/no-unguarded-playwright-import */` bought a spec a complete exemption — `npm run ci` 0, the full lane 0 with "20 passed, floor OK", both floor checks 0, the lane guard 0, on a page that 404s and throws. `reportUnusedDisableDirectives` cannot help: the directive is *used*, and the vitest sweep lints through the same ESLint so it inherited the suppression | `linterOptions: { noInlineConfig: true }` on the `e2e/specs/**` + `e2e/demos/**` block — every comment form at once, not the four known today — plus `playwright/test` and `playwright` added to the rule's package list so the unscoped spelling is refused by the rule rather than by a module-loading accident. Two tests pin it: the resolved config must carry the setting, and the behaviour must hold per directive form. `no-console` for demos moved from an inline comment to the config |
+| 7 | REQUIRED | the redact and upload steps both carried a bare `if: failure()`, which is true whenever *any* earlier step failed, so a redactor exiting non-zero published the unredacted tree | `id: redact` on the redaction step and `if: failure() && steps.redact.outcome == 'success'` on the upload; `check-e2e-lane.mjs` asserts that exact relationship (and that the redactor has an id, is not `continue-on-error`, and that gating on "ran" rather than "succeeded" is refused) |
+| 8 | SHOULD | AGENTS.md said no query string leaves the repository and then offered "headers readable" as a feature — reassurance about the uncovered channel | the section now states what IS covered (query strings, fragments, `Location`) and tabulates every channel that is NOT, with where each survives; and adds the hard line — no spec may authenticate, fill a credential or touch a real signed URL until the artifact-privacy slice lands — asserted by `e2e/harness/no-credentials-in-specs.test.ts`, not left as prose |
+
+Channel redaction itself (headers, bodies, DOM, call parameters) was
+**deliberately not attempted**: the chair queued it as its own slice.
+
+#### Commands on `0ac9fb6`
+| Command | Exit | Counts |
+|---|---|---|
+| `npm run ci` | 0 | vitest **10 files / 227 tests**, 0 skipped (was 9/206) |
+| `npm run e2e` (built image, local arm64) | 0 | 18 passed, floor `9/9 9/9` |
+| `node scripts/ci/check-coverage-floor-ran.mjs` | 0 | same, from the report |
+| `npm run e2e:demos` | 0 | **51 halves passed, 0 blocked, 0 failed** (was 39) |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **92 cases / 99 assertions**, 0 failed (was 86/93) |
+| `npx vitest run eslint-rules/no-unguarded-playwright-import.test.mjs` | 0 | 40 cases (was 33) |
+| shellcheck over `scripts/ci/*.sh`, `scripts/e2e/*.sh` | 0 | clean |
+
+New demonstration halves: **D8** gains six (four inline-directive forms, the
+unscoped `playwright/test`, and the exploit failing `npm run ci`); **D7** gains
+four (upload not gated on the redactor, gated on "ran" not "succeeded", redact
+step with no `id`, redact step `continue-on-error`); **D10** is new (a
+credential-handling spec fails the cheap lane).
+
+#### CI on `0ac9fb6a820d50ef030f86f053409b967d2beec8`
+`ci-required` **pass** (2m23s). `e2e`, `guard`, `frontend`, `contract`,
+`docker-build`, `deps-scan`, `image-scan` all pass. GitGuardian still red, see
+below. Logs confirm: `require-checks_test: 92 cases, 99 assertions, 0 failed`;
+the lane guard OK; `e2e coverage floor: OK (desktop-chromium-1440=9/9
+mobile-chromium-390=9/9)`; vitest 10 files / 227 tests. On this green run the
+redact and upload steps are both **skipped**, which is the correct behaviour for
+a lane that did not fail.
+
+#### The redactor-failure gate, proved in GitHub's own evaluator
+No local test can exercise a GitHub `if:` expression. Throwaway branch
+`chore/e2e-redactor-failure-proof` and PR yegamble/vizra-user#5 (based on this
+branch, **never merged**, closed and deleted): a spec that fails for a real
+reason so the artifact steps run, and the redaction step forced to `exit 2`.
+Run <https://github.com/yegamble/vizra-user/actions/runs/35538966116>:
+
+```
+failure  Browser lane (desktop 1440, mobile 390)
+skipped  The coverage floor was actually satisfied
+failure  Redact URL query strings in the artifacts
+skipped  Upload Playwright artifacts
+artifacts: total_count 0
+```
+
+Against run 35536837315 with a healthy redactor: 1,251,268 bytes, 48 files. The
+only difference between the two runs is whether the redaction succeeded.
+Recorded in `vizra-user/docs/evidence/VZ-FOUND-008/ci-redactor-failure-proof.md`.
+
 ### Open item for the chair: the GitGuardian check is red
-**Facts.** GitGuardian scans every commit in the PR, not just the head. The
-first commit (`951f18b`) committed the Next **dev server's** HMR WebSocket URL,
+**Facts.** GitGuardian scans every commit in the PR, not just the head (six at
+`0ac9fb6`). The first commit (`951f18b`) committed the Next **dev server's** HMR WebSocket URL,
 `ws://127.0.0.1:3212/_next/hmr?id=<opaque>`, into the D5 transcript. Two
 findings, unchanged across both pushes because the first commit still carries
 them.
