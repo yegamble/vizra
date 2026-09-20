@@ -1058,3 +1058,256 @@ PASS is not a merge and does not make the ledger entry VERIFIED — the chair re
 
 *Verifier scratch clone `…/scratchpad/vfy-r2/` was deleted after this record was written. Nothing
 outside this evidence file was created or modified in the meta repo, and nothing was pushed.*
+
+---
+---
+
+# Re-verification at `7babbd3`
+
+**Verdict: PASS.** Findings **5, 6, 7 all CLOSED**. **The merge condition is still OPEN** — two
+sentences in the shipped prose overstate the guarantee, falsified by two one-line Makefile edits I
+measured. Docs-only; the controls themselves are verified.
+
+| field | value |
+|---|---|
+| Head SHA verified | `7babbd396a1fcf1a2940c45a8eeeb9d9d2854331` (unchanged before and after) |
+| Ancestry | `e219fc6` **is** an ancestor; one commit since: `7babbd3` |
+| `api/` since `e219fc6` | **byte-unchanged** — blob ids still `848503cca45d…` / `6548d87e1811…`, `CONTRACT-SOURCE.json` `2f83646e…`. **Provenance stands.** |
+| Environment | darwin/arm64, go1.26.2, GNU Make 3.81, uid 501; 14 GiB free |
+
+## 1. Counts — both claims reproduce exactly
+
+| command | exit | result |
+|---|---|---|
+| `make ci` | **0** | all lanes green |
+| `make contract-drift` | **0** | **`324 tests ran across 4 package(s), 0 failures, none deselected`** |
+| `make test-noskip` | **0** | **347 pass events, 0 skips** |
+| `./scripts/ci-required-guard.sh` | **0** | `6 fixtures exercised, floor 6` + `workflow anchor: …` |
+
+## 2. FINDINGS 5 and 6 — **CLOSED**, read across four signals
+
+Every mutation applied with python3 and the file's sha256 printed before/after, so a mutation that
+failed to apply could not masquerade as a pass. Each carries an in-place edit of
+`api/search-internal.openapi.yaml` underneath. `CI job` = the anchor step, then `make contract-drift`.
+
+| mutation | make lane | out-of-make guard | **CI job** | `go test ./internal/httpapi/` |
+|---|---|---|---|---|
+| baseline (no mutation, no drift) | 0 | 0 | 0 | 0 |
+| **F6a** `-` on the `recipe` guard line | **2** | **1** | **1** | **1** |
+| **F6b** `-` on the `ran` guard line | **2** | **1** | **1** | **1** |
+| **F6c** `\|\| true` on the `recipe` guard line | **2** | **1** | **1** | **1** |
+| **F6d** `\|\| true` on the `ran` guard line | **2** | **1** | **1** | **1** |
+| **F5** duplicate target **replacing** the recipe, no guard lines | 0 | **1** | **1** | **1** |
+
+**FINDING 6 is closed outright** — red at *every* signal including the make lane, because `recipe`
+now reads the Makefile **text** (`check_makefile_text`), which is the only place a `-` is visible;
+`make --dry-run` prints the command without it, exactly as the guard's own comment says.
+
+**FINDING 5 is closed at the job**, which is what the finding asked for. `make contract-drift`
+alone remains green for a duplicate target — the guard cannot run when the duplicate has replaced
+the recipe — and that limit is now **disclosed accurately** in the guard docstring and AGENTS.md.
+
+### The workflow anchor
+
+| mutation to `.github/workflows/ci.yml` | `guard workflow` | `ci-required-guard.sh` | `go test ./internal/httpapi/` |
+|---|---|---|---|
+| anchor step **deleted** | **1** — `does not run … as its own step` | **1** | **1** |
+| anchor made **conditional** (`if:`) | **1** — `is conditional (\`if\`), so it can be skipped` | **1** | **1** |
+| anchor marked **continue-on-error** | **1** — `carries \`continue-on-error\`` | **1** | **1** |
+| anchor **moved after** `make contract-drift` | **1** — `runs AFTER \`make contract-drift\` … must run first` | **1** | **1** |
+
+Three independent signals on every one. **No case where all signals were green.**
+
+## 3. Transcript spot-check — the `perl` delimiter trap
+
+The two rows most exposed to the reported `perl -0pi -e "s|…|…|"` collision are the `|| true`
+rows, since the replacement text itself contains `|`. I re-applied both mutations myself with
+python3, printing the file digest before and after:
+
+```
+mutation applied: 5dfbbeeea3e2 -> d16173e55485   (|| true on the recipe guard line)
+mutation applied: 5dfbbeeea3e2 -> c8bafe32973e   (|| true on the ran guard line)
+```
+
+Both genuinely changed the file, and both went red at all four signals — matching the new
+transcript. The `-`-prefix rows likewise applied and went red. The transcript's `L` / `W` / `JOB`
+columns agree with my measurements, and its GREEN 0 baseline (`324 tests`) matches mine.
+
+I hit the same class of failure myself: two of my own workflow mutations silently did not apply
+because I guessed the step's name wrong (`the lane's own shape check` vs the real
+`the lane's own shape, checked outside make`). My harness printed `MUTATION DID NOT APPLY` and I
+re-ran them with the exact text — which is the whole point of the builder's correction, and it is
+the right correction.
+
+## 4. FINDING 7 — **CLOSED**
+
+`expected_reject_fixtures=5` is pinned and compared against the declared rows. Deleting one row:
+
+```
+FIXTURE FLOOR CHANGED: 4 reject-fixture rule(s) are declared;
+  expected_reject_fixtures says 5.
+exit=1
+```
+
+## 5. Tests since `e219fc6` — nothing weakened
+
+Census **168 → 170**; **zero removed**; two added (`TestTheLaneGuardIsAnchoredInTheWorkflow`,
+`TestThisRepositoryPassesItsOwnLaneGuard`). `internal/httpapi/lane_selection_test.go` `+87 −2`, the
+only test file touched. No `t.Skip`/`testing.Short` added. Against base `581d79d`: 162 → 170, zero
+removals.
+
+## 6. CI on `7babbd3` — **PASS**
+
+12 check-runs, all `success`; all 10 manifest lanes ran; `ci-required` on this SHA. The
+`contract-drift` job log shows the anchor as **its own step before make**:
+
+```
+contract-drift | the lane's own shape, checked outside make | Run ./scripts/contract-drift-guard.py recipe
+contract-drift | the lane's own shape, checked outside make | contract-drift lane: 4 package(s) selected with no test-selecting flag (…)
+```
+
+and `ci-required` logs the anchor assertion:
+
+```
+workflow anchor: .github/workflows/ci.yml:jobs.contract-drift runs `./scripts/contract-drift-guard.py recipe`
+unconditionally at step 2, before `make contract-drift` at step 3
+```
+
+CI runs ubuntu-24.04 (GNU make 4.x), so the make-4 path is exercised green there; I can still only
+judge it from that log, not locally.
+
+## 7. THE MERGE CONDITION — **OPEN**
+
+Most of the new prose is exact, and `cmd_workflow`'s own docstring is exactly right:
+
+> "a single Makefile edit that replaces or disarms that line — a duplicate target supplying its own
+> recipe, `SHELL := /usr/bin/true`, `MAKEFLAGS` — removes the check along with the lane"
+
+But the headline claim, in the module docstring and repeated in `AGENTS.md`, contradicts it — see
+FINDING 8. Every other sentence I checked is true as written, including the duplicate-target
+residual and the "second file, second diff" description of the ci.yml path.
+
+---
+
+```
+FINDING 8: the shipped guarantee "what one edit to /Makefile can no longer do"
+           is falsified by two one-line Makefile edits, and the residual's
+           stated backstop does not hold
+Severity:    REQUIRED  (documentation accuracy; no code change needed)
+Confidence:  high
+Status:      the round-2 merge condition, still OPEN
+
+Affected:
+  repo:      vizra-search
+  files:     scripts/contract-drift-guard.py:56-58 and :60-63 (module docstring)
+             AGENTS.md (the "What one edit to /Makefile can no longer do" and
+             "What is not covered" paragraphs)
+  requirements: F7
+
+Observed:
+  Claim A, in both files:
+    "What one edit to /Makefile can no longer do: leave the `contract-drift` CI
+     job green with a vendored file edited in place."
+  Claim B, the disclosed residual:
+    "`SHELL := /usr/bin/true` … makes every recipe a no-op, so `make
+     contract-drift` and the job built on it go green. The drift is still
+     caught, because `test` and `test-noskip` run `go test` directly."
+
+  Measured at this SHA, each a SINGLE line changed in /Makefile, each with a
+  vendored file edited in place, mutation verified by sha256:
+
+    SHELL := /usr/bin/true    CI job = 0   make test = 0   make test-noskip = 0
+    MAKEFLAGS += -i           CI job = 0   make test = 0   make test-noskip = 0
+
+  Claim A is therefore false — twice, and `MAKEFLAGS += -i` is not named as a
+  residual anywhere outside cmd_workflow's docstring.
+
+  Claim B's backstop is also false. CI does not run `go test` directly:
+  .github/workflows/ci.yml runs `- run: make test` and `run: make test-noskip`.
+  Both are make recipes, so a SHELL override or `MAKEFLAGS += -i` no-ops them
+  too. Only a direct `go test ./internal/httpapi/` (which nothing in CI runs)
+  goes red. `.SHELLFLAGS` neutering, by contrast, IS caught (exit 2 everywhere).
+
+Failure:
+  AGENTS.md is the engineering contract. It currently tells a reviewer that no
+  single Makefile edit can leave the drift lane green, and that `test` and
+  `test-noskip` backstop the one disclosed exception. A reviewer applying that
+  rule would under-weight exactly the two one-line diffs that disable every
+  required lane at once. This is the "unsupported readiness claim" AGENTS.md
+  itself says to hunt, and it is the same species of overstatement that produced
+  the round-1 FAIL and the round-2 merge condition.
+
+  Scope, stated plainly: the underlying exposure is generic to any make-driven
+  gate, is equally true of the base branch, and is NOT a regression introduced
+  by this PR. What is wrong is only the claim about it.
+
+Perspective:
+  developer, operator
+
+Recommendation:
+  Documentation only — no code change, and no re-verification of the controls.
+  Replace Claim A with what was actually measured, e.g.: "No single Makefile
+  edit to the `contract-drift` recipe itself — a `-` prefix, `|| true`, or a
+  duplicate target — can leave the CI job green with a vendored file edited in
+  place." Then extend the residual list to say that a `SHELL` override or
+  `MAKEFLAGS += -i` no-ops every recipe in the repository, that CI invokes
+  `test` and `test-noskip` THROUGH make so they are no-opped too, and that the
+  only backstop is human review of the Makefile diff under CODEOWNERS —
+  advisory until the owner's ruleset exists.
+
+Acceptance criteria:
+  - No sentence in scripts/contract-drift-guard.py, AGENTS.md, the Makefile
+    comments or docs/evidence/pr2/README.md asserts a guarantee that
+    `SHELL := /usr/bin/true` or `MAKEFLAGS += -i` falsifies.
+  - The residual paragraph names both, and does not claim `test`/`test-noskip`
+    catch them.
+  - Verifiable by reading the two paragraphs; no lane needs re-running.
+
+Tests:
+  None required — prose. If the team wants it enforced, the smallest mechanical
+  option is a `contract-drift-guard.py` text check refusing a `SHELL`
+  assignment or `MAKEFLAGS` override anywhere in the Makefile, which would make
+  Claim A true rather than merely corrected; that is a larger change and I do
+  not recommend it as a condition of this PR.
+
+Cross-repo implications:
+  core: none | user: none | search: this PR | meta: AGENTS.md wording only
+
+Challenge:
+  The strongest counterargument: the exposure is disclosed in the same file, in
+  cmd_workflow's docstring, in the correct form; the headline sentence is a
+  topic sentence immediately qualified by "Measured for `-`, `|| true`, and a
+  duplicate target"; nobody can stop an owner editing their own Makefile; and
+  the real engineering — three findings closed, verified across four signals —
+  is done. On that reading this is a NIT and the PR should merge. I keep it at
+  REQUIRED for one reason only: the chair made "every sentence exactly true" the
+  explicit merge condition for this round, and two sentences are not.
+```
+
+---
+
+## Verdict at `7babbd3`: **PASS**, with the merge condition OPEN
+
+| item | status |
+|---|---|
+| FINDING 5 — duplicate target replacing the recipe | **CLOSED** — red at the CI job and in `test` via the out-of-make anchor; the make-lane-only limit is now disclosed accurately |
+| FINDING 6 — `-` / `\|\| true` on a guard line | **CLOSED** — red at all four signals, including the make lane |
+| FINDING 7 — fixture floor | **CLOSED** — `FIXTURE FLOOR CHANGED`, exit 1 |
+| **Merge condition — every sentence exactly true** | **OPEN** — FINDING 8 |
+
+The engineering is verified and is genuinely good: the control is anchored outside make, asserted
+from two independent places (`ci-required-guard.sh` and a Go test), the Makefile-text checks close
+the `-` blind spot that no dry-run scan could see, and all four workflow-anchor attacks are red on
+three signals each. Counts reproduce exactly (324 / 347 / 0 skips), CI is green on this SHA with
+the anchor visible in both job logs, and no test was weakened, deleted, renamed or skipped.
+
+What remains is two sentences. Under the war-room merge rule ("no blocking specialist finding is
+open"), FINDING 8 blocks merge until they are corrected — but it is docs-only: **the chair can
+clear it by reading the corrected paragraphs; no lane or demonstration needs re-running, and no
+further verification round is required from me.**
+
+PASS is not a merge and does not make the ledger entry VERIFIED — the chair records those. Head SHA
+`7babbd396a1fcf1a2940c45a8eeeb9d9d2854331` had not moved at the time of writing.
+
+*Verifier scratch clone `…/scratchpad/vfy-r3/` was deleted after this record was written. Nothing
+outside this evidence file was created or modified in the meta repo, and nothing was pushed.*
