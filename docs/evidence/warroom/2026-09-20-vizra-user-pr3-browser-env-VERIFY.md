@@ -2242,3 +2242,488 @@ re-verified. If the chair judges it a follow-up, the honest disposition is merge
 at IMPLEMENTED with FINDING 11 as its own dependency-ready item — not VERIFIED,
 because "a test cannot pass without the guard" is precisely the sentence that is
 still false.
+
+---
+
+# Re-verification at c669e40
+
+**Verdict: PASS.** **FINDING 11 is CLOSED.** No blocking finding. Three REQUIRED
+follow-ups, all narrow, and two sentences in AGENTS.md that are currently false
+and should be corrected before the next UI slice.
+
+| | |
+|---|---|
+| Head SHA verified | `c669e4001738df3f7c7ec3fcf1feaf3c9e41ca4e` — unmoved at start and finish |
+| Ancestry | `git merge-base --is-ancestor f6f1f59… HEAD` → **yes**; one commit |
+| Delta | 65 files, +2992 −747 |
+| Environment | macOS arm64, Node v22.14.0, @playwright/test 1.63.0, Chromium `chromium-1243` (already cached); Docker available, 11 GiB free, local image build **ran** |
+| Clone | fresh, `<scratch>/verify-c669e40/vizra-user`, deleted on completion |
+
+## 1. Counts — every claim matched
+
+| Command | Exit | Result | Claim |
+|---|---|---|---|
+| `npm run ci` | 0 | **12 files / 289 tests / 0 skipped** | 12 / 289 / 0 — **matches** |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **102 cases / 109 assertions / 0 failed** | 102 / 109 — **matches** |
+| `npx playwright test` | 0 | 18 passed; floor `9/9 9/9`; `harness stamp: OK (18 …)` | **matches** |
+| `node scripts/ci/check-coverage-floor-ran.mjs` | 0 | floor + `every succeeding result carried a valid harness stamp (18 verified)` | — |
+| `node scripts/ci/harness-canary.mjs` | 0 | `failed all 3 … with the exact set of record kinds it demonstrates and no others` | — |
+| `npm run e2e:demos` | 0 | **88 halves passed, 0 blocked, 0 failed** | 88 — **matches** |
+
+`git status --porcelain` was empty after the demo run — the two gitignored
+mutant configs are removed on exit.
+
+**No test or demonstration was weakened or deleted.** Numstat over every test,
+rule and spec file shows **zero removed lines**: `browser-errors.test.ts`
++240/−0, `no-unguarded-playwright-import.mjs` +79/−0, its test +72/−0,
+`require-checks_test.sh` unchanged.
+
+## 2. FINDING 11 — **CLOSED**, and the class with it
+
+My exploit verbatim, and eight more shapes, each on the broken-page body (404
+sub-resource + uncaught throw), each with **lint green**:
+
+| Shape | Result |
+|---|---|
+| **my exploit**: `test.extend` overriding `page` with a fresh context | **RED** |
+| a second page in the default context | **RED** |
+| `browser.newContext()` + `newPage()` in the body | **RED** |
+| `browser.newPage()` | **RED** |
+| an overridden `context` fixture | **RED** |
+| an overridden `page` that **navigates inside the fixture** before `provide` (the builder's d13e2 case) | **RED** |
+| a popup via `window.open` | **RED** |
+| an iframe inside a popup | **RED** |
+| a page created in `beforeAll` and reused | **RED** |
+| an overridden `browser` fixture via the built-in `playwright` fixture | **RED** |
+| a context created and **closed before the test ends** | **RED** — records survive the close |
+
+Overriding the merged fixture fails closed at **both** layers, in all three
+spellings I tried — plain, computed key, spread variable: lint RED **and**
+runtime RED (`succeeded WITHOUT the harness stamp`). "Stamped implies guarded"
+now holds.
+
+**No false positives.** An honest `page` override (locale + viewport) on a
+healthy page passes; the per-test allow-list still applies on an overridden
+page; and the real 18 tests ran **five consecutive times**, all exit 0, 18
+passed, 18 stamps, no flake.
+
+## 3. The wrap, and what escapes it
+
+`guardBrowser` wraps `newContext`/`newPage` as **own properties** on the browser
+instance and restores the previous descriptor state in `dispose()`. I verified
+the prototype is untouched and the instance wrapper is a distinct function
+during a test. That restore design is deliberate and correct — and it is also
+the escape:
+
+| Attempt | Result |
+|---|---|
+| `Object.getPrototypeOf(browser).newPage.call(browser)` | **RED** — the prototype's `newPage` calls `this.newContext`, which is the wrapper |
+| `Object.getPrototypeOf(browser).newContext.call(browser)` | **GREEN — unguarded** |
+| `browser.browserType().launch()` | **GREEN — unguarded** |
+| `playwright.chromium.launchPersistentContext(dir)` | **GREEN — unguarded** |
+
+All three need **no Playwright import at all**, so the ESLint rule cannot see
+them. Measured against the **complete** gate, each with only that one spec added:
+
+```
+                              lint    lane   out-of-proc
+prototype newContext          green   0      0     20 passed, floor OK 10/9 10/9, stamp OK (20)
+browser.browserType().launch  green   0      0     20 passed, floor OK 10/9 10/9, stamp OK (20)
+launchPersistentContext       green   0      0     20 passed, floor OK 10/9 10/9, stamp OK (20)
+```
+
+— on a page that 404s a sub-resource and throws on every load (the identical
+body on a guarded page yields `[pageerror]`, `[response] http 404`, `[console]`).
+
+**Would patching the prototype or listening for context creation close it?**
+Prototype patching would close the first, but the prototype is shared by every
+`Browser` in the process and the worker-scoped restore would get harder, not
+easier. The cheaper and more complete answer is to **detect rather than
+prevent**: at teardown, assert that `browser.contexts()` contains no context the
+guard never saw. That closes the prototype route and any future creation path on
+a browser the harness holds, and it needs no monkey-patching at all. The two
+self-launched-browser routes are outside any such check by construction and
+belong to lint: add `.browserType(`, `.launch(` and `.launchPersistentContext(`
+to the rule for `e2e/specs/**`.
+
+**Two other gaps, both minor and both stated honestly here rather than found
+later:**
+
+- **Late errors.** A fault scheduled `0 ms` after the body returns is caught;
+  at `50 ms` and `150 ms` it is missed. The flush window is finite and that is
+  inherent — worth a sentence in AGENTS.md, not a redesign.
+- **The `request` fixture.** An `APIRequestContext` 404 is not a browser signal
+  and is not guarded. I judge that legitimately out of scope — the test asserted
+  the 404 itself — but AGENTS.md does not say so, and "any HTTP >= 400 response
+  fails the test" reads as if it were covered.
+
+## 4. Canary
+
+| Mutation | Canary |
+|---|---|
+| console listener neutered | **exit 1** |
+| weberror listener neutered | **exit 1** |
+| response (HTTP ≥ 400) listener neutered | **exit 1** |
+| `unallowedRecords` body emptied, identifiers left in place (the silent case) | **exit 1** |
+| **fixture's fault type swapped (`console.error` → a 404)** | **exit 1** — the f6f1f59 weakness is closed by the exact-kind-set assertion |
+| **`requestfailed` listener neutered** | **exit 0 — not caught** |
+
+The three fixtures demonstrate `console`, `response`+404 and `pageerror`. None
+produces a `requestfailed` record, so one of the four guarded signal kinds has no
+canary coverage: the kind that catches aborted requests, connection refused and
+DNS failures could be removed from the guard and no lane would notice.
+
+## 5. Privacy — a real gap, reproducible
+
+A query-string sentinel went **3 members → 1** after `redact-artifacts.sh`
+(at f6f1f59 the same probe gave 3 → 0; the redactor is unchanged in this delta,
+so I treat my earlier `0` as an unreliable measurement rather than asserting a
+regression).
+
+The survivor is in `test.trace`, in a step **subtitle**, where Playwright records
+the URL **without its scheme**:
+
+```
+"subtitle":"127.0.0.1:3219/m.jpg?X-Amz-Sig=PUREQc669e40zz&e=60"
+```
+
+Reduced to a three-line unit test against the redactor itself:
+
+```
+"url":"http://host/m.jpg?X-Amz-Sig=SENTINELVALUE&e=60"   ->  ?<redacted>      OK
+"path":"/m.jpg?X-Amz-Sig=SENTINELVALUE&e=60"             ->  ?<redacted>      OK
+"subtitle":"host:3219/m.jpg?X-Amz-Sig=SENTINELVALUE&e=60" ->  UNCHANGED       LEAK
+```
+
+The absolute program needs a scheme; the relative program needs the match to
+start at `/`. A `host:port/path?query` string satisfies neither.
+
+**Why D9 does not catch it:** its fixture injects the signed URL as a
+sub-resource (`new Image(); img.src = url`) and navigates to `/`. A sub-resource
+never becomes a Playwright step subtitle. Any `page.goto(signedUrl)` or
+`page.request.get(signedUrl)` does.
+
+Nothing leaks today — nothing authenticates and no signed URL exists — but
+AGENTS.md's "**No URL query string leaves this repository, in any artifact**" is
+false as written.
+
+**Key hygiene is clean**: the per-run key appears 0 times in the lane output, 0
+times under `playwright-report/`, 0 times under `test-results/`; `.vizra-e2e` is
+gitignored, absent from the upload paths, and has no tracked files.
+
+## 6. Regression sweep — everything stays CLOSED
+
+Fourteen canary mutations, all exit 1:
+
+```
+F2  delete lane step 1 | npm run e2e || true 1
+F3  --grep one test  1 | --project one        1
+F5  if-no-files:warn 1 | redactor removed     1
+F6  namespace import 1 | eslint-disable       1
+F7  upload ungated   1 | redact cont-on-error 1
+F10 2nd ungated upload 1 | canary step deleted 1
+F9  raw spec in the full lane 1 | out-of-process 1
+```
+
+The five strongest forge attempts, re-run: `claimSigner` → "already been
+claimed"; `reporterKeyHex` → "not readable from a Playwright worker";
+fabricated annotation → "does not verify against this run"; duplicate stamp →
+"carries 2 harness stamps"; raw runner → "WITHOUT the harness stamp".
+
+## 7. CI on c669e40
+
+All nine checks green except GitGuardian; `ci-required` enumerated `e2e`, waited
+three polls and concluded `OK: every required check on c669e40… concluded
+success.` The `e2e` job log carries all three lines: `coverage floor: OK
+(9/9 9/9)`, `harness stamp: OK (18 succeeding result(s) verified)`, and
+`the harness canary failed all 3 fault-injection fixtures, each with the exact
+set of record kinds it demonstrates`. GitGuardian is the same two historical
+findings from `951f18b`, now across 8 commits; the delta adds nothing
+credential-shaped.
+
+---
+
+## Findings
+
+```
+FINDING 12: three import-free routes reach an unguarded page, and the documented residual names a mitigation that does not cover any of them
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     e2e/harness/browser-errors.ts (guardBrowser: own-property wrapping)
+             eslint-rules/no-unguarded-playwright-import.mjs (package references only)
+             AGENTS.md:521-533 ("A spec that launches its OWN browser…")
+  requirements: VZ-FOUND-008
+
+Observed:
+  Each of the following, in e2e/specs/, importing ONLY the harness `test`,
+  passes lint and passes the complete gate on a page that 404s a sub-resource
+  and throws on every load (20 passed, floor OK 10/9 10/9, stamp OK (20),
+  out-of-process exit 0):
+
+    const ctx = await Object.getPrototypeOf(browser).newContext.call(browser);
+    const own = await browser.browserType().launch();
+    const ctx = await playwright.chromium.launchPersistentContext(dir);
+
+  AGENTS.md:521 states the residual as "a browser obtained by **importing a
+  Playwright package** and calling `chromium.launch()` directly", and names
+  `vizra/no-unguarded-playwright-import` as "What catches that … This is the one
+  shape where lint is the only automated control."
+
+  None of the three imports a Playwright package, so the rule sees nothing —
+  I confirmed `import { chromium } from "@playwright/test"` is RED while
+  `browser.browserType().launch()` is green. `browserType` and
+  `launchPersistentContext` appear nowhere in AGENTS.md, the harness, the rule
+  or the CI scripts.
+
+  The prototype route is not even "your own browser": it is the harness's own
+  browser, escaped because the guard wraps `newContext` as an OWN property and
+  leaves the prototype method reachable. (`newPage` via the prototype IS caught,
+  because it calls `this.newContext` — the wrapper.)
+
+Failure:
+  The residual is documented as narrower than it is, with a mitigation that does
+  not apply. A reader who trusts that paragraph will believe lint covers the
+  escape hatch; it does not.
+
+Perspective:
+  developer, and through them visitor and member
+
+Recommendation:
+  1. Detect rather than prevent, for the harness's own browser: in
+     `vizraHarnessGuard` teardown, assert that `browser.contexts()` contains no
+     context the guard never saw, and fail the test naming it. That closes the
+     prototype route and any future creation path, with no monkey-patching.
+  2. Extend the lint rule for `e2e/specs/**` and `e2e/demos/**` to refuse
+     `.browserType(`, `.launch(` and `.launchPersistentContext(`. These are
+     method names, not package references — an AST rule reads them directly.
+  3. Correct AGENTS.md:521-533: the shape is "a browser or context the harness
+     was never handed", by any route including import-free ones, and lint covers
+     it only once (2) lands.
+
+Acceptance criteria:
+  - Each of the three specs above fails the lane by name.
+  - Each fails `npm run ci` by name.
+  - The honest `page`/`context`/`browser` overrides in D13 still pass, and the
+    18 lane tests still pass with `harness stamp: OK (18 …)`.
+  - AGENTS.md describes the residual in terms of the object, not the import.
+
+Tests:
+  scripts/e2e/demonstrate.sh D13 — three more RED halves, one per route, in the
+  same shape as the eight already there. RuleTester cases for the three method
+  names.
+
+Cross-repo implications:
+  core: none | user: as above | search: none | meta: none
+
+Challenge:
+  "All three are conspicuous, deliberate acts in an owner-reviewed path — this
+  is the accepted residual, not a hole." Largely right, and it is why this is
+  REQUIRED and not a blocker: none is an honest-looking idiom, unlike the `page`
+  override that made FINDING 11 blocking. The part that is not right is the
+  documentation: the paragraph tells a reader that lint catches this class, and
+  for every spelling that needs no import it does not. A residual stated
+  inaccurately is worse than one stated plainly, because it is trusted.
+```
+
+```
+FINDING 13: the artifact redactor misses scheme-less URLs, which is how Playwright records step subtitles
+Severity:    REQUIRED  (before M1; nothing leaks today)
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     scripts/ci/redact-artifacts.sh:78 (ABSOLUTE_PROGRAM), :92 (RELATIVE_PROGRAM)
+             e2e/demos/signed-url-artifact.demo.ts (D9's fixture)
+             AGENTS.md ("No URL query string leaves this repository, in any artifact")
+  requirements: VZ-FOUND-008
+
+Observed:
+  A query-string sentinel driven through `page.goto()` survived redaction in
+  `test.trace` inside trace.zip:
+
+      "subtitle":"127.0.0.1:3219/m.jpg?X-Amz-Sig=PUREQc669e40zz&e=60"
+
+  Reduced against the redactor directly:
+
+      "url":"http://host/m.jpg?...=SENTINELVALUE&e=60"      -> ?<redacted>
+      "path":"/m.jpg?...=SENTINELVALUE&e=60"                -> ?<redacted>
+      "subtitle":"host:3219/m.jpg?...=SENTINELVALUE&e=60"   -> UNCHANGED
+
+  The absolute program requires `scheme://`; the relative program requires the
+  match to begin at `/`. `host:port/path?query` satisfies neither.
+
+  D9 does not catch it because its sentinel is injected as a sub-resource
+  (`img.src = url`) and the test navigates to `/`. A sub-resource never becomes
+  a step subtitle; a `page.goto(signedUrl)` always does.
+
+  Measured 3 members -> 1 after redaction. `test-results/` is uploaded as a
+  14-day artifact on failure.
+
+Failure:
+  From M1, a red lane on a spec that navigates to a signed media URL publishes
+  that URL's query string. AGENTS.md's "No URL query string leaves this
+  repository, in any artifact" is false as written.
+
+Perspective:
+  member, photographer, operator
+
+Recommendation:
+  Add a third perl program for authority-relative URLs — an optional
+  `host[:port]` before the path — or widen the relative program to accept
+  `[A-Za-z0-9.-]+(?::\d+)?` before the leading `/`. Then extend D9 with a second
+  fixture that reaches the sentinel through `page.goto()` rather than a
+  sub-resource, so the subtitle path is covered by the demonstration that
+  claims to cover it.
+
+Acceptance criteria:
+  - The three-line reduction above redacts all three forms.
+  - A spec that `page.goto`s a signed-URL-shaped URL leaves 0 members carrying
+    the sentinel after redaction, with host and path still readable.
+  - D9 covers the navigation path as well as the sub-resource path.
+
+Tests:
+  scripts/e2e/demonstrate.sh D9 — a second RED/GREEN pair using page.goto;
+  scripts/e2e/sweep-artifacts.sh already performs the search.
+
+Cross-repo implications:
+  core: the first signed-URL slice is the trigger | user: as above
+  search: none | meta: the VZ-FOUND-008 privacy case already proposed at 44dac20
+
+Challenge:
+  "Nothing authenticates, so this leaks nothing." True today, and why it is not
+  a blocker. But the claim in AGENTS.md is absolute and is relied on when
+  deciding whether a red lane is safe to share, and the fix is one regex.
+```
+
+```
+FINDING 14: the canary has no fixture for `requestfailed`, so that listener can be removed silently
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     scripts/ci/harness-canary.mjs (CANARIES: console / response+404 / pageerror)
+             e2e/harness/browser-errors.ts (onRequestFailed)
+  requirements: VZ-FOUND-008
+
+Observed:
+  Neutering each guarded listener in turn and running the canary:
+
+      console      exit 1
+      weberror     exit 1
+      response     exit 1
+      requestfailed exit 0    <- not caught
+
+  The three fixtures demonstrate a console error, an HTTP 404 and an uncaught
+  exception. A 404 is a completed response, not a failed request, so no fixture
+  produces a `requestfailed` record.
+
+Failure:
+  One of the four guarded signal kinds — aborted requests, connection refused,
+  DNS failures — could be dropped from the guard with no lane going red. That is
+  the exact defect class the canary exists to close, for three kinds out of four.
+
+Perspective:
+  developer
+
+Recommendation:
+  Add a fourth fixture that requests a closed port (or a route aborted with
+  `route.abort()`), with expected kinds `["requestfailed"]`, so the canary's
+  exact-kind-set assertion covers all four.
+
+Acceptance criteria:
+  - Neutering the `requestfailed` listener fails the canary by name.
+  - The canary still passes unmodified, and `npm run e2e:demos` still reports
+    its full count.
+
+Tests:
+  The canary itself; plus a D12 half asserting the new fixture fails for its own
+  kind.
+
+Cross-repo implications:
+  core: none | user: as above | search: none | meta: none
+
+Challenge:
+  "`requestfailed` is redundant with `response` — a broken request usually shows
+  up on the console too." Usually, not always: a connection refused or an
+  aborted request produces no response at all, and my own probes at 112291e
+  showed `requestfailed` firing where `response` did not.
+```
+
+## Residuals: accepted-by-design vs real holes
+
+**Accepted by design** — a deliberate edit to a file whose job is to be a gate,
+all under `.github/CODEOWNERS` (which, as AGENTS.md says, enforces nothing until
+a ruleset is applied):
+
+- `e2e/harness/**`, `playwright.config.ts`, `eslint-rules/**`, `.github/**`.
+  None is silent: neutering the rule fails `npm run test`; neutering three of
+  the four guard listeners fails the canary; replacing the merged fixture costs
+  the stamp and fails both floor checks; fourteen workflow mutations are red by
+  name.
+- Arbitrary `run:` steps and composite actions can exfiltrate — no parser closes
+  that, and AGENTS.md says so.
+- The credential sweep is a declared tripwire with four measured evasions.
+
+**Real holes, reachable with lint green from a spec in `e2e/specs`:**
+
+- **FINDING 12** — prototype `newContext`, `browser.browserType().launch()`,
+  `launchPersistentContext`. Conspicuous, not honest-looking; REQUIRED, not
+  blocking.
+- **FINDING 13** — scheme-less URLs survive redaction into a 14-day artifact.
+  Nothing to leak today.
+- **FINDING 14** — `requestfailed` has no canary fixture.
+- Errors firing ≥ 50 ms after the body returns are missed (inherent flush
+  window). `request`-fixture 404s are out of scope — correctly, but unstated.
+
+## Status of all findings
+
+| # | Finding | Status |
+|---|---|---|
+| 1–10 | earlier rounds | CLOSED |
+| 11 | fixture override keeps the stamp, drops the guard | **CLOSED** — my exploit and ten more shapes all RED; guard and stamp are one fixture attached at the browser |
+| 12 | three import-free routes to an unguarded page; residual mis-stated | **OPEN — required, not blocking** |
+| 13 | scheme-less URLs survive redaction | **OPEN — required, before M1** |
+| 14 | no canary fixture for `requestfailed` | **OPEN — should** |
+
+## Verdict at c669e40
+
+**PASS.**
+
+FINDING 11 is closed, and the chair was right to ask for the class rather than
+the door. Merging the guard and the stamp into one automatic fixture attached at
+**BrowserContext** level — with the dependency list measured rather than guessed,
+and the reasoning for `browser`+`context` written down where the next reader will
+find it — closes every ordinary route I could construct: my own exploit, an
+overridden `context`, an overridden `browser`, a second page, a new context, a
+popup, an iframe inside a popup, a `beforeAll` page, a context closed early, and
+the pre-navigating fixture the builder found themselves. Removing the fixture
+costs the stamp, in all three spellings I tried, at both layers. There are no
+false positives: honest overrides pass, the allow-list still applies on an
+overridden page, and the real suite ran five times clean. Every count matched,
+88 of 88 demonstration halves reproduced from my clean clone, the tree was clean
+afterwards, and CI on this SHA carries the floor, stamp and canary lines.
+
+What remains is genuinely residual. Three routes still reach an unguarded page —
+the browser's prototype `newContext`, and two ways to launch a browser the
+harness never sees — and all three need no import, so the lint rule named as
+their mitigation cannot see them. But none is an honest-looking idiom: each is a
+conspicuous act with no innocent reading in a repository that has one app and one
+browser. That is a different thing from the `page` override that made FINDING 11
+blocking, which was the idiom Playwright's own documentation teaches. The
+correct response is to state the residual accurately and add the cheap
+detection — a teardown assertion that no unguarded context exists on the
+harness's browser, plus three method names in the lint rule — not to hold the
+slice.
+
+FINDING 13 should land before anything authenticates; it makes an absolute
+sentence in AGENTS.md false today, and it is one regex. FINDING 14 is one more
+canary fixture.
+
+PASS is not a merge and not VERIFIED — the chair records those. My recommendation
+is that VZ-FOUND-008 may be recorded VERIFIED on this evidence, with findings 12,
+13 and 14 carried as dependency-ready follow-ups, and with the two inaccurate
+AGENTS.md paragraphs corrected in whichever PR lands first.
