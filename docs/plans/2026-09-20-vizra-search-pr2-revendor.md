@@ -266,6 +266,95 @@ Round-2 lanes (`vizra-search/docs/evidence/pr2/lanes-local.txt`): every lane exi
 lane-guard cases, none skipped); `make contract-drift` `315 tests ran across 4 package(s),
 0 failures, none deselected`. No existing test weakened, deleted or skipped.
 
+### Fix round 3 — verifier PASS at `e219fc6` with one merge condition (Findings 5, 6, 7)
+
+Findings 1, 2 and 4 CLOSED. The merge condition was a **false guarantee**: the docstring and
+AGENTS.md said escaping the guard "takes a second deliberate edit — the shape test goes red on
+its own". The verifier measured that as true for *deleting* the guard lines and **false** for
+three one-edit spellings.
+
+Why a recipe step alone could never be enough, stated plainly: **every check invoked by the
+recipe dies with the recipe.**
+
+| one-edit mutation | why round 2 missed it |
+|---|---|
+| `-` prefix on a guard line | make ignores that line's exit status, and `make --dry-run` prints the command **without** the `-` — invisible to every dry-run scan |
+| `\|\| true` on a guard line | visible in the dry-run, but `check_structure` prefix-matched the command |
+| a duplicate target that **replaces** the recipe | the guard lines are gone, so no in-recipe check runs at all. My round-2 RED 5 appended a duplicate that *kept* the guard line, so it only caught itself — the same narrowing as round 1's self-selecting regex |
+
+Fixes:
+
+- **(a) the Makefile TEXT.** `check_makefile_text()` refuses a `-`/`@-` prefix on any recipe line,
+  a `|| true` / `|| :` / `; true` on a guard step, a second `contract-drift:` target, a lane inside
+  a make conditional, and a recipe with no guard step. `check_structure` now compares exact token
+  lists instead of prefix-matching.
+- **(b) an anchor outside make.** `./scripts/contract-drift-guard.py recipe` runs as its own step
+  in `.github/workflows/ci.yml`, **before** `make contract-drift`, so no Makefile edit reaches it.
+  A new `workflow` subcommand asserts that step exists, is unconditional and is not
+  `continue-on-error`; `scripts/ci-required-guard.sh` calls it (so deleting the step turns
+  `ci-required` red) and `TestTheLaneGuardIsAnchoredInTheWorkflow` calls it too (so `test` and
+  `test-noskip` go red as well). `TestThisRepositoryPassesItsOwnLaneGuard` runs the guard against
+  the real Makefile from the ordinary suite.
+- **(c) Finding 7.** `expected_reject_fixtures=5` pins the declared set; `floor_count` derives from
+  the pin, not from a count of surviving rows. Deleting a declaration row is now a named failure.
+
+Evidence `vizra-search/docs/evidence/pr2/F5-F6-round3-one-edit-bypasses-red-green.txt`, each
+mutation applied *with* a drifted vendored file, recorded against four readings — `L` =
+`make contract-drift`, `W` = the out-of-make guard, `JOB` = the CI job (`W` then `L`, the required
+check), `T` = `go test ./internal/httpapi/`:
+
+| one edit | L | W | JOB | T | verdict |
+|---|---|---|---|---|---|
+| none | 0 | 0 | 0 | 0 | GREEN |
+| `-` on the `recipe` line | 2 | 1 | 1 | 1 | RED |
+| `-` on the `ran` line | 2 | 1 | 1 | 1 | RED |
+| `\|\| true` on the `recipe` line | 2 | 1 | 1 | 1 | RED |
+| `\|\| true` on the `ran` line | 2 | 1 | 1 | 1 | RED |
+| duplicate target **replacing** the recipe | **0** | 1 | 1 | 1 | RED — `L` cannot catch this and is not claimed to |
+| workflow anchor deleted | — | — | — | 1 | RED, and `ci-required-guard` exit 1 |
+| workflow anchor made conditional | — | — | — | 1 | RED, and `ci-required-guard` exit 1 |
+| a fixture declaration row deleted | — | — | — | — | RED, `ci-required-guard` exit 1 |
+| restored | 0 | 0 | 0 | 0 | GREEN |
+
+**Residual, recorded in the transcript and in AGENTS.md rather than hidden:**
+`SHELL := /usr/bin/true` makes every recipe in this repository a no-op, so `L`, `W` and `JOB` are
+all 0. No check written inside a Makefile can prevent that and it always could. The drift is still
+caught: `T` = 1, because the required `test` and `test-noskip` lanes run `go test` directly.
+Editing `.github/workflows/ci.yml` as well removes the anchor — a second file and a second diff.
+All these paths are CODEOWNERS-assigned, and CODEOWNERS is advisory until the owner's ruleset
+exists.
+
+The docstring, AGENTS.md, the Makefile comments and the evidence README were rewritten to say
+exactly this — what one Makefile edit can no longer do, and what is still not covered.
+
+Round-3 lanes: every lane exit 0; `make ci` exit 0; **347 pass events, 0 skips**;
+`make contract-drift` `324 tests ran across 4 package(s), 0 failures, none deselected`.
+
+### FINAL CI — head `7babbd396a1fcf1a2940c45a8eeeb9d9d2854331`
+
+`gh api repos/yegamble/vizra-search/commits/7babbd3…/check-runs` → **12 check runs, conclusions
+`["success"]`**. Run `https://github.com/yegamble/vizra-search/actions/runs/35540797917`;
+`ci-required` run `35540797913`.
+
+`fmt` 19s, `vet` 44s, `echo-containment` 17s, `build` 42s, `contract-drift` 46s, `test` 1m23s,
+`test-noskip` 49s, `tidy-check` 19s, `govulncheck` 55s, `docker-build` 55s,
+**`ci-required` pass** 1m31s, GitGuardian pass.
+
+The three new controls are visible in the CI logs, not merely asserted here:
+
+- `contract-drift` job, **step 2**: `Run ./scripts/contract-drift-guard.py recipe` →
+  `contract-drift lane: 4 package(s) selected with no test-selecting flag`. This is the
+  out-of-make anchor, running before `make contract-drift`.
+- `contract-drift` job: `contract-drift: 324 tests ran across 4 package(s), 0 failures, none
+  deselected`.
+- `ci-required` job: `workflow anchor: .github/workflows/ci.yml:jobs.contract-drift runs
+  ./scripts/contract-drift-guard.py recipe unconditionally at step 2, before make contract-drift
+  at step 3` and `6 fixtures exercised, floor 6`.
+- `test-noskip`: **347 pass events, 0 skips** — identical to local.
+
+READY_FOR_REVIEW at `7babbd3`. Not VERIFIED: the new SHA gets a short delta re-verification
+before the merge.
+
 ### Round 2b — CI caught a platform-dependent guard, which is the point of CI
 
 `562bb99` was green on every lane **locally** and red on three in CI (`contract-drift`, `test`,
