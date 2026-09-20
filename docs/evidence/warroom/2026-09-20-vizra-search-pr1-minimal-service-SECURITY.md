@@ -552,3 +552,32 @@ Challenge:
 ```
 
 Two smaller notes, not filed: an unauthenticated caller can cause up to `MAX_INTERNAL_BODY_BYTES` to be buffered before verification with no connection or rate cap (bounded by the timeouts and a private network — revisit before M3); and `api/CONTRACT-SOURCE.json` pins `source_ref: feat/m0-foundation`, an unmerged core branch, so the pin should be refreshed to the merge commit before release.
+
+
+---
+
+# Closure check at ab41219bb99cd4fdec483d967ff361ce5f577ae8 (after fix round 1)
+
+Same reviewer, resumed by the chair 2026-09-20. Verbatim, extracted from its transcript by script. **Chair note:** Findings 1, 2 and 3 are CLOSED on this SHA and no new blocking finding was raised. Two runbook notes are carried to the compose/installer slices: the scheme's absolute range ends 2100-01-01 by design, and an unsynced host clock at boot surfaces as `search: degraded`.
+
+# Closure check — `vizra-search` PR #1 at `ab41219`
+
+Confirmed head. Suite green (`go test ./...` 6/6 ok), guard green. I re-verified the fix independently of its own tests by running the new `internal/hmacauth/hmacauth.go` in an isolated scratch module.
+
+**Finding 1 — CLOSED.**
+- *Refused at every magnitude, both directions*: **MET**. Every value accepted at `7f483ad` now returns `timestamp_out_of_range`, including `11013301709` and `253402300799`; `±301 s` → `stale_timestamp`, `±300 s` accepted. `hmacauth.go` — `if unixSeconds < MinTimestampUnix || unixSeconds > MaxTimestampUnix` precedes `skewSeconds := nowUnix - unixSeconds`, plain int64, no `time.Duration` derived from a header. `TestTheSkewArithmeticCannotSaturate` pins the ordering in source.
+- *Uniform 401*: **MET** — `Reason` is doc'd "NOT returned to the caller"; `writeError(…codeSignatureRejected, "request authentication failed")` is the single exit.
+- *AGENTS.md true*: **MET**.
+- *Second arithmetic edge*: none found. Negatives and `0` rejected by `isBareDecimalDigits` (`^[1-9][0-9]*$`); 20-digit overflow → `ReasonTimestampRange`, not `nil`; both operands bounded ≤4.1e9 so the subtraction and the negation are safe; `int64(MaxSkew/time.Second)` truncates in the closing direction. Verifier's own clock out of range → `verifier_clock_out_of_range`, confirmed at `0`, `999999999`, `4102444801`.
+
+**Finding 2 — CLOSED.** Vector file vendored byte-identical to core `2b9c540` (both digests match core exactly); `CONTRACT-SOURCE.json` pins both files with bytes and role; `TestEveryVendoredFileMatchesItsManifest` fails if either stops being pinned; `make contract-drift` now includes `./internal/hmacauth/`. Positive half reproduces canonical string *and* signature byte-for-byte; negative half is iterated in full, each first re-signed so a rejection cannot be blamed on a wrong MAC; `TestEveryNamedRejectClassIsCovered` blocks trimming. `+`/leading-zero/padded timestamps now `malformed_timestamp`. Core dropped `strings.ToUpper` — **the two canonicalisers are now identical: both a verbatim join of six fields.** One remaining difference, in the *validators* not the canonicaliser: search caps an uppercase method at 32 characters (`malformed_method`), core's `ValidateMethod` has no length cap. Unreachable — Echo answers 405 for any unregistered method before auth, and core sends only POST. Not worth a finding; worth a negative vector one day.
+
+**Finding 3 — CLOSED.** `ceilings()` refuses skew > 300 s and body cap > 8 MiB in production only; `TestCheckEnvReportsTheCeilingRefusals` proves doctor agrees with boot; `TestDevelopmentMayExceedTheProductionCeilings` + the `ExceedsProductionCeilings()` boot warning in `main.go` cover the dev path; `TestCeilingRefusalsEchoNoOtherConfiguration`.
+
+**Ride-alongs.** 4 **MET** — `Verify(req.Method, req.URL.EscapedPath(), …)`, `c.Path()` demoted to logging, `TestTheVerifiedPathIsTheRequestPathNotTheRouteTemplate`. 5 **MET** — refused before verification, same uniform 401, `TestAQueryStringIsRefusedBeforeVerification`. 6 **MET** — `TestIdenticalRequestsCanStillBeReplayedInsideTheWindowAtM0`. 7 **MET** — AGENTS.md:170-179 states the gap and the operator consequence. 8 **MET** — `run` binds `127.0.0.1:8081`; the warning carries mode/addr/note, never the key. 9(b) **MET** — `ci-required-select.sh` sorts by `started_at` and fails loudly on disagreeing duplicates rather than choosing; 9(c) **MET** — the comment now says the floor lives in the script and that only the owner ruleset closes it.
+
+**Addendum.** **MET.** `VectorsHMACKey` refused by exact value, `TestTheVectorsPublishedKeyIsStillTheOneWeRefuse` reads it out of the vendored file so re-vendoring cannot un-refuse it, `TestEveryKeyLiteralInThisRepositoryIsRefused` parses the test sources so the list cannot rot, and no message echoes a value. `check-workflows.py` parses YAML, folds and unquotes the key, ignores the value, fails closed on an unparseable or job-less workflow; the guard exercises all six fixtures on every run and `ci-required.yml` guarantees PyYAML.
+
+**New blocking findings in the 4,400-line delta: none.**
+
+Two non-blocking observations, no finding blocks: the absolute range makes 2100-01-01 a hard end-of-life for the scheme (deliberate, in the vectors, fine); and a host whose clock is unsynced at boot now 401s every internal call — correct fail-closed behaviour that surfaces as `search: degraded`, but worth a line in the runbook when compose wiring lands.
