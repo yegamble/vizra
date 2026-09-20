@@ -618,3 +618,337 @@ Executable without further judgement. Items 1–14 are the (a) list.
     (and the equivalents on the other frames).
 24. Add to both hand-offs' verification sections: parent-relative overflow, drawn-fraction-equals-
     stated-fraction for every data bar, and a light-mode render of every on-media control.
+
+---
+---
+
+# Re-check after the fix pass
+
+**Verdict: READY FOR OWNER REVIEW**, with two things I would fix first (§R5) and a disclosure list
+the owner must be given (§R4).
+
+| | |
+|---|---|
+| **Re-checked** | 2026-09-20, after `docs/design/figma/FIXES-first-slice.md` |
+| **Scope** | The twelve fix-before findings (A1…A14 in my numbering; the fixer's A1…A12 map to the same items), plus a regression sweep |
+| **Method** | Read-only. Treated the fixer's hand-off as claims; re-rendered 24 frames/components, re-ran the instance census and the parent-relative geometry audit from scratch, re-measured every `Meter` fill from the rendered pixels, and re-resolved `get_variable_defs` on the nodes whose colour bindings were the root causes. Nothing was edited. |
+| **Chair rulings honoured in my judgement** | M1 shell canonical; owner questions stay as drawn (`Download original` deliberately retained); component-level fixes; additive/corrective only, so the absent rename of `TopNav`/`TabBar` is not counted against the round. |
+
+## R1 — Per-finding status
+
+### A1 · Two application shells — **FIXED**
+
+Census re-run on both pages from fresh metadata: page `32:2` now has `TopNav` **0**, `TabBar` **0**,
+`TopNav / M1` **11**, `icon/Bell` **0**, `icon/Search` **0**. Page `27:2` unchanged (`TopNav / M1`
+×14, `AppBar / M1` ×9, `TabBar / M1` ×7).
+
+Verified by render, not by name. `38:2168`, `33:65`, `44:3869`, `50:1860` and `41:1175` all now show
+the same bar as `43:3000`: skip link, wordmark, Library, Albums, upload, **MO** avatar — no search
+field, no "Explore", no bell, no unread dot. `42:3331` shows `AppBar / M1` (`62:2862`) above a
+title-only band, and `TabBar / M1` with **Library** active; `37:1977` shows the same tab bar with
+**Upload** active. It reads as one product with the auth pages.
+
+Four residuals, all minor:
+
+- **Three tab-bar instances still carry the pre-fix layer name** — `37:2121`, `37:2264`, `42:3502`
+  are still called `TabBar (fixed to the bottom of the viewport)`. The component beneath is
+  `TabBar / M1` (confirmed by render), but a name-based census reads them as unswapped, which is how
+  I first mis-counted them. Rename the layers so the next audit is not misled.
+- **`42:3331` is mildly a second header.** The demoted `page-title (Library)` band keeps its own
+  bottom divider directly under the app bar's divider, so the phone library opens with two stacked
+  rules. D2a's `43:3320` has none — its page title is simply the first content element. Cosmetic, but
+  it is a visible difference from the auth pages at the same width.
+- **`37:1978` / `37:2152` (U5, U6) still wear a local `mobile-header` back-bar on a tab root.** With
+  the Upload tab selected at the bottom, the page offers a "←" and no wordmark. `48:1715` (V4) and
+  `51:2277` (A3) are genuine sub-pages where a back-bar is correct; U5/U6 are not. The fixer records
+  this honestly.
+- **The hidden superseded bar is confirmed as a trap** — see A6.
+
+### A2 · Zoom glyphs invisible in Light — **FIXED**
+
+`get_variable_defs` on `44:3920` now returns **only** `--vz-on-media` plus geometry tokens;
+`--vz-ink` is gone. Rendered `44:3920` at 4×: the left button shows a clear white `−` and the right a
+clear white `+`, and the two are unmistakably different controls. Dark (`46:1649`) unchanged and
+correct.
+
+I recomputed the contrast independently rather than taking the number: white `#ffffff` against the
+composited `color/on-media-scrim` chip on the theme-invariant stage is **20.1:1**, and against the
+worst possible backing (the chip over a pure-white photograph, compositing to ≈`#22252a`) is
+**≈15.8:1**. The claimed 19.7 / 20.1 is sound.
+
+**Checked the rest of the stage for the same mistake, as asked.** `get_variable_defs` on the whole
+V1 stage `44:3907` resolves no `--vz-ink` at all — prev, next, the ratio chip and the visibility
+badge are clean. The only theme tokens on the stage (`--vz-ink-3`, `--vz-bg-tint`, `--vz-line-2`)
+belong to the grey `AspectPlaceholder`, not to a control. Close, prev/next and details in the
+lightbox render correctly in both themes. No second instance of the defect.
+
+### A3 · SelectionCheckbox off-state — **FIXED**
+
+Cropped the same pixel region from `38:2168` (Light) and `41:1175` (Dark) as in the first review. In
+both, the unchecked box now reads unambiguously as a checkbox: dark fill → white ring → dark halo.
+The light-mode "black smudge" is gone.
+
+The misleading design note is corrected, and correctly: `41:1285` now says the two on-media tokens
+*render the same* in both themes and that this "is not the same as being readable on every backing",
+then records the dual ring and its 15.4:1.
+
+One caveat the owner should hear: this is still **computed, not observed**. There are no photographs
+in the file, so the dual ring has been verified on a light card and a dark card, not over a real
+image. The geometry is sound and should hold; it is not evidence.
+
+### A4 · Storage meter drew half its value — **FIXED**
+
+Re-measured from the rendered pixels myself, fill run against track run:
+
+| Instance | Frame | Stated | **I measured** |
+|---|---|---|---|
+| `42:1035` | `42:1012` | 62% | **61.9%** |
+| `42:1110` | `42:1078` | 91% | **90.9%** |
+| `42:1191` | `42:1159` | 100% | **99.9%** |
+| `42:1348` | `42:1325` (390) | 91% | **90.6%** |
+
+Correct within rounding. The fixer's table is accurate.
+
+**On the `Meter fit (fill width)` collection — flag it, do not mirror it.** It is a Figma-only
+workaround, not a design token, and it needs saying louder than a component description.
+`get_variable_defs` on `42:1110` returns `"meter/fill-91": "608"` **inside the same payload as the
+real tokens**. The one thing separating it from them is that it carries no `var(--vz-…)` code syntax
+— which is exactly the signal a builder or an agent mirroring variables into Tailwind is most likely
+to miss. It also hard-codes three percentages against three column widths, so any other value or
+column silently draws wrong again. Add an explicit "never mirrored; production computes
+`width: used/allowed`" line to the mirroring section of the D1 hand-off (§8), not only to the
+component.
+
+### A5 · 390 sheets — **FIXED**
+
+Rendered `54:2808` and `48:1877`. Every sheet button is now full width with matching left and right
+edges; the focus ring on "Cancel" and "Keep the album" outlines the control itself rather than a
+390px band. The destructive sheet now carries a red `TriangleAlert` beside an ink-coloured title,
+matching `54:2680` — the destructive signal is no longer colour alone. Safe action on top, holding
+focus. The six V5 sheet buttons got the same fix.
+
+Residual: the frame's design note still ends "so the thumb's resting position is never on Delete",
+which is false for this sheet — Delete is the bottom-most control. Correct the sentence or the
+layout; right now the note contradicts the drawing.
+
+### A6 · Clipped frames — **FIXED** (audit claim slightly off)
+
+Rendered `53:2638` and `52:2543`: both dialogs now have their right border, their padding and both
+footer buttons fully inside the frame. `48:1904` ends on the 844 fold.
+
+My independent parent-relative audit:
+
+| Page | Nodes I scanned | Offenders before | **Offenders now** |
+|---|---|---|---|
+| `27:2` | 887 | 1 | **0** |
+| `32:2` | 1,397 | 7 | **3** |
+
+The fixer claims 1 remaining on `32:2`. I find **3**: the deliberate `46:1633` photo (correct, it is
+the 200% demonstration), plus **`42:3334` and `42:3339` overflowing `page-title (Library)` by +9px
+each** — the two hidden, superseded controls inside the demoted bar. Nothing renders them, so the
+visual impact is nil, but the discrepancy confirms the point the fixer itself raises: a hidden node
+with two dead controls in it is a trap. Delete it when a rename/delete round is authorised.
+
+(My node counts are lower than the fixer's because `get_metadata` does not expand inside instances.
+The two audits cover different scopes and agree where they overlap.)
+
+### A7 · No zoom in the phone lightbox — **FIXED**
+
+`48:1877` now carries the cluster `69:4961`: zoom out, zoom in and a "Fit · press 0 to reset" chip,
+44×44 each, glyphs legible (they inherit the A2 fix).
+
+Residual introduced: the cluster is drawn **over the lower part of the photograph**, not in a stage
+gutter as it is on V1. It is on an 88% scrim so it stays legible, but the same frame's note says
+"nothing sits over the image except the close, visibility and step controls". Either move the cluster
+below the image or update the note.
+
+### A8 · Spec text rendered as product copy — **FIXED for all six named strings**
+
+Verified by render: the U2 banner now reads "Uploading 6 files. 2 finished, 2 need your attention.";
+the U5 banner is product copy; the reauth helper is "Press Enter to sign in and continue." and its
+footnote "Press Escape to close this. You stay on the page you were on, and a banner at the top will
+say you are signed out."; the breadcrumb is "Casa Barragán" with no "(you are here)"; the V3 prompt
+quotation is gone. The `aria-live` contract is preserved in the bottom design note. `33:376` is now a
+dashed, unfilled `DESIGN NOTE — NOT PRODUCT UI` box, clearly distinct from the real `STORAGE` card
+beside it.
+
+Residual of the same class, not on my original list: **`53:2638`'s dialog body still reads
+"In flight: the confirm button is the busy control (aria-busy, stable name), the radios are disabled,
+and Cancel stays available. Under prefers-reduced-motion…"** — a specification sentence inside a real
+dialog. Same treatment needed. The remaining `accent-soft` annotation blocks are still a second
+annotation style; cosmetic.
+
+### A9 · Destructive prominence — **PARTLY FIXED**
+
+Fixed where it was named: `44:3869`, `50:1860`, `48:1714` and `48:1877` now put Delete behind a
+full-width divider as a quiet button with a red label, and `46:1576` separates the trash from
+download with a visible rule. Rendered and confirmed on V1, A1, V2 and V5.
+
+Not fixed: **the BulkBar Delete is still a filled red button** on `38:2168`, `41:1175` and
+`42:3331`. The library page now has exactly two filled buttons — "Upload" (blue) and "Delete" (red)
+— so the destructive action is still co-equal with the primary on the surface the owner will spend
+most time on. See §R5. V5's Delete is still bottom-most, deliberately.
+
+### A10 · Duplicate components — **NOT FIXED** (deferred by ruling, honestly recorded)
+
+Census confirms all three duplications survive: `visibility marker` ×38 and `VisibilityBadge` ×41
+still coexist, sometimes in the same frame; `quota-progress` ×5 (ProgressBar) still does quota duty
+on `32:2` while `Meter` ×6 does it on `27:2`; on `33:65` the storage bar remains visually identical
+to the blue upload bars directly above it. Deprecation contracts were written into the descriptions.
+Acceptable as a deferral, since resolving it needs a rename or a delete.
+
+### A11 · Quiet controls read as static text — **FIXED, with one regression**
+
+Fixed at the component level and verified on `37:301`, `39:1707`, `33:65`, `44:3869`, `38:2168` and
+`42:3331`: "Show password", "Create an account", "Sign out", "Not you?", "Clear selection", "Retry
+all failed", "View", "Show more", "Back to your library" and "Done" all now carry a hairline and read
+as controls. See §R2 for the regression.
+
+Navigation instances are still buttons rather than accent links — acknowledged and deferred.
+
+### A12 · Facts that contradicted the drawing — **FIXED except the API-blocked item**
+
+- Header count: `33:65` now reads "6 files · 2 finished · **2 need your attention**", matching its
+  own footer. Fixed.
+- 200% zoom: `46:1633` is now 980×1472 in a 1440×900 stage and genuinely overflows it, so
+  "200% · arrows pan · 0 resets" states what is drawn. Fixed — see §R2 for what it cost.
+- Queue thumbnails: **still "1:1"** beside rows stating 6240×4160 and 48000×3000. The API block is
+  real and the reproducer is specific and credible (`relative-transform` cannot be overridden inside
+  an instance). Genuinely BLOCKED, not skipped — but see §R5 for the cheap partial fix.
+
+### A13 · No signed-out public photo page — **NOT FIXED**, stated for knowing acceptance
+
+Correct call. It is a new surface, not a repair. It belongs in the owner's decision list, not the
+defect list.
+
+### A14 · Control matrices — **NOT FIXED**, out of scope
+
+Correctly scoped out; the two hand-off documents were not in this round. The fixer's observation is
+right: now that every M1 frame instances D2a's shell, the rows `32:2` needs are exactly D2a §3.7.
+
+## R2 — Regressions
+
+I looked specifically at spacing, alignment, dark mode and the things I called genuinely good. The
+privacy semantics, the destructive-confirmation content, the upload failure states, the two empty
+states and the aspect-ratio proof in `47:1649` are all untouched and intact. Dark mode (`41:1175`,
+`46:1576`, `48:1877`) holds up with no new defects.
+
+Five regressions, one with product impact:
+
+1. **`Kind=Quiet` has converged on `Kind=Secondary`.** *(product impact)* Quiet is now 1px
+   `color/line` with no fill; Secondary is 1.5px with a `bg-elevated` fill. At normal viewing
+   distance they read the same. Where three button weights used to exist in one row, two now
+   collapse: the bulk bar at 1440 and 390 shows three near-identical outlined buttons plus a filled
+   Delete; `33:65`'s footer shows "Retry all failed" and "Cancel remaining" as near-twins; V1's right
+   column stacks "Show more", four Secondary and a quiet Delete at nearly equal mass. The fix was
+   right; the treatment needs to be further from Secondary — a tint, a weight change, or accent for
+   the navigation instances. This flattens hierarchy on exactly the surfaces A9 set out to fix.
+2. **`46:1576`'s stage is now a large featureless rectangle.** Drawing 200% honestly means a flat
+   grey placeholder fills the centre, and the enlarged photo now covers most of the library grid that
+   used to show behind the lightbox. It is geometrically correct and no longer lies, but it has
+   stopped demonstrating a photograph. This is the cost of having no real images; it is not a reason
+   to revert.
+3. **`48:1877`'s new zoom cluster overlaps the photograph** (A7 residual).
+4. **Two design notes are now false relative to what is drawn** — `54:2808` "the thumb's resting
+   position is never on Delete", and `48:1877` "nothing sits over the image except the close,
+   visibility and step controls".
+5. **`42:3331` opens with two stacked header rules** where D2a's 390 pages have none.
+
+## R3 — Verdict
+
+**READY FOR OWNER REVIEW.**
+
+Every finding I raised as blocking is closed or honestly deferred, and the two that mattered most —
+the split shell and the invisible on-media controls — are fixed at the root, in the component, not
+patched per frame. The fixer's claims held up against independent measurement: the census, the four
+meter fills, the contrast recomputation and the clipping repairs all check out. Where a claim was
+slightly wrong (three geometry offenders rather than one), the difference is invisible and the fixer
+had already flagged the underlying cause itself. The round did not break anything I had called good.
+
+What stops this being unqualified: one component-level regression (R2.1), one destructive-hierarchy
+surface left untouched (A9, the bulk bar), and a documented hole in coverage (no signed-out public
+photo page). None is grounds for another full round before the owner sees it.
+
+## R4 — What the owner must be told is knowingly imperfect
+
+The fixer's own list, with my assessment of each.
+
+| # | Item | Show the owner? |
+|---|---|---|
+| 1 | **Delete is the bottom-most control in the V5 actions sheet** — demoted and separated, still nearest the thumb | Yes, with disclosure. Moving a destructive action to the top of a non-confirming sheet is its own hazard; this is a defensible trade |
+| 2 | **The bulk-bar Delete is still filled red**, so the loudest control on the library page is the destructive one | **No — fix first.** See §R5 |
+| 3 | **Queue thumbnails are square** while their rows state 6240×4160 and 48000×3000 | **No — fix the label first.** See §R5 |
+| 4 | **No signed-out public photo page anywhere in the first slice** | Yes — and it belongs in the decision list, not the defect list. It is the destination of every share link and the whole public face of M1 |
+| 5 | **No real photographs anywhere in the file.** Every on-media contrast figure is a computed worst-case bound, not a measurement; the 200% demonstration is a flat rectangle | Yes, prominently. It is the single largest gap between "this is designed" and "this is proven" |
+| 6 | **A hidden, superseded bar survives in `42:3331`** with two dead controls inside it | Yes, as a note to the next agent rather than to the owner |
+
+Add two of my own:
+
+| # | Item | |
+|---|---|---|
+| 7 | **`Quiet` and `Secondary` now look alike** (R2.1) | Tell the owner the affordance problem is fixed and the weight separation is a follow-up |
+| 8 | **`Meter fit` is a Figma-only workaround** that must never be mirrored into Tailwind | Tell the builder, not the owner |
+
+## R5 — The two I would not show an owner without fixing
+
+1. **The filled-red `BulkBar` Delete** (`38:2168`, `41:1175`, `42:3331`). A9 was accepted and fixed
+   on five surfaces, then left on the one the owner opens first and looks at longest. The library
+   page currently has exactly two filled buttons: "Upload" and "Delete". It is a single variant
+   change inside one component — `Kind=Danger` → `Kind=Quiet` with a `color/danger` label, plus the
+   divider the other five surfaces already have. It is the difference between "we fixed the
+   hierarchy" and "we fixed it everywhere it did not show".
+2. **The "1:1" labels on the queue thumbnails** (`33:65`, `37:1977`, `37:2151`). The geometry is
+   genuinely API-blocked and I accept that. The *text* is not: the placeholder states a ratio that
+   contradicts the file dimensions printed two lines above it, on the upload page, breaking the
+   brief's headline rule in the most visible possible way. Either delete the "1:1" string from the
+   nested placeholder, or change the sample files' stated dimensions to square ones. If neither is
+   reachable, the owner must be told in one line rather than left to notice.
+
+Everything else in §R4 is fine to show with disclosure.
+
+## R6 — Owner questions, merged and final
+
+Most consequential first. Each is phrased to be answerable in one line. The shell question from my
+first review is gone — the chair settled it.
+
+1. **`Download original` in the viewer: keep it in M1, or remove it from the four frames?** The
+   ledger puts `VZ-DOWNLOAD-001` in M3; if it stays, the permission model and the audited count ship
+   now, because it must never be a dead control.
+2. **Should the first slice include a signed-out public photo page?** It is the destination of every
+   share link and the only surface a logged-out visitor can reach at M1, and none is drawn.
+3. **Duplicate email at sign-up: allow duplicates, accept the enumeration leak, or pull
+   `VZ-AUTH-002` forward?** Without verification at M1 there is no fourth option.
+4. **No password recovery at M1 — accept that a member who forgets their password is locked out
+   until an admin intervenes?** `VZ-AUTH-002` and `VZ-ADMIN-USERS-001` are both M2.
+5. **One vocabulary for visibility, or two?** Assets say "Unlisted", albums say "Link only", they
+   carry near-identical consequence text and the same link icon.
+6. **Confirm the theme-invariant near-black photo stage in both light and dark themes.**
+7. **When an album with sub-albums is deleted, are the sub-albums re-parented to the grandparent?**
+   The confirmation copy asserts it; ADR-007 does not rule on it.
+8. **Confirm Private as the shipped default visibility for new uploads.**
+9. **Confirm that an action interrupted by session expiry is resubmitted automatically after
+   re-authentication** — it is a real implementation cost, and the copy promises it.
+10. **Fix the quota and derivative numbers** — 20 GB per user, 100 MB per file, 50 files per batch,
+    display long edge, thumbnail size. All are `[to confirm in M0]` and all appear as facts on eight
+    frames.
+11. **Confirm there is no owner control to widen photo location in M1** — the viewer says so
+    explicitly.
+12. **Confirm the near-limit quota threshold of 90%, and whether it is an instance setting.**
+13. **Is share-grant expiry in M1?** A grant is drawn with "expires 30 Sep"; `VZ-ALBUM-002` names
+    creation, listing and revocation only.
+14. **Is the album password set in the same dialog?** It is offered as a radio whose consequence text
+    says so; the field itself is not drawn.
+15. **Confirm the album depth limit** — ADR-007 fixes 5 for collections and `[to confirm in M0]` for
+    albums; the breadcrumb assumes at least 3.
+16. **Confirm selection at 390 is an explicit Select → Done mode** rather than long-press.
+17. **Confirm Exif is a tab rather than a continuous section.**
+18. **Confirm the session copy says "30 days"** — should the 180-day absolute cap be mentioned to a
+    member too?
+19. **Confirm one refusal message for a bad claim token** (mistyped / used / superseded are
+    indistinguishable to the server), **and 409 Conflict for a claim against a claimed instance.**
+20. **Confirm no live password-strength meter** — a stated minimum instead of a client-side estimator
+    with no ledger entry.
+21. **Add or drop the un-ledgered controls**: the `Needs attention` library filter, `Show more`, full
+    screen (`F`) and the details toggle (`I`) have no ledger id.
+22. **Authorise verification of the 40 proposed Lucide export names** against a pinned
+    `lucide-react` before the typed icon registry ships — seven were renamed in recent releases.
