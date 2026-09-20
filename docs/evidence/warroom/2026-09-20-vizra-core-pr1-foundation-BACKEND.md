@@ -695,3 +695,175 @@ Challenge:
 - **Adding `storage_location_id`, `visibility_version` or any media column now.** ADR-005 is explicit that `asset_files` arrives in M1 with the reference; pre-creating columns for tables that do not exist would be worse than an additive migration.
 - **Splitting `jobs` per kind, or adding `job_runs` now.** ADR-004 chose one table deliberately and reserved `job_runs`; re-litigating that here would reverse an accepted decision on no new evidence. Findings 1, 3 and 4 fix the single table rather than replace it.
 - **Rewriting the ClaimJob CTE to batch-claim N rows.** Real win at high throughput, but it changes the lease and heartbeat semantics that Findings 1 and 7 touch; sequence it after those land.
+
+
+---
+
+# Closure check at 4f8d0fc207f94a2a516607d167fcf69abd7a2148 (after fix round 1)
+
+Same reviewer, resumed by the chair 2026-09-20; SQL reproduced on postgres:18-alpine (18.6). Verbatim, extracted from its transcript by script.
+
+**Chair ruling:** Findings 1–5 and 7–9 CLOSED. NEW-1 converges with the security seat's Finding 13 and is BLOCKING (frozen on merge). The two seats differ on hex case; the chair rules **lowercase only**: Go's netip emits lowercase, a canonical column keeps prefix equality and grouping honest, and loosening a CHECK later is easy while tightening one after rows exist is not. Frozen grammar: IPv6 `^[0-9a-f]{1,4}(:[0-9a-f]{1,4}){0,3}::(/(48|64))?$`; IPv4 with bounded octets as this reviewer proposes. The M1 truncation helper contract is written into 0003's header: lowercase, Unmap() first, mask to /24 and /64, NULL when there is no usable address. NEW-2 (rune-unsafe truncate) rides in the same final round. Migrations 0001, 0002 and 0004: SAFE TO FREEZE per this reviewer; 0003 after NEW-1.
+
+Checkout confirmed at `4f8d0fc`. All SQL reproduced on a disposable **postgres:18-alpine** container (18.6, already present locally; removed afterwards). Repo untouched.
+
+**Findings 1–9**
+
+1. **CLOSED.** Exact reproduction rerun, five crash cycles: `poison` ends `state=dead`, `finished_at` set, `last_error='lease elapsed with attempts exhausted…'`; `healthy-job-behind-it` was then claimed and reached `succeeded`. No `jobs_attempts_bounded` violation at any point. `attempts`-as-claim-count is now consistent across all four places — `ClaimJob` (`AND attempts < max_attempts`), `RetryJob` (same predicate), the sweep's single-statement `CASE`, and the CHECK — and documented at `store/queries/jobs.sql:33-47`. Zombie query `state='queued' AND attempts>=max_attempts` returns 0, and no code path can create one. Note for M2: a `vizra jobs retry` that requeues a dead row without resetting `attempts` would recreate exactly that zombie.
+2. **CLOSED.** `/Users/yosefgamble/github/vizra/vizra-core/.github/workflows/build-test.yml:34-96`. `merge_group` fallback to the default branch is right. It fails closed: `git fetch` and `base="$(git merge-base …)"` both exit under `set -euo pipefail`. `append-only` is in `required-checks.txt` and in `FLOOR_LANES` (`scripts/ci-required-guard.py:79`), plus CODEOWNERS on `/migrations/**` — three layers. The `migration-manifest.sh` header now states precisely which half it is.
+3. **CLOSED.** At 50k queued + 200k terminal: `Index Scan using jobs_claim`, no Sort node, no temp file, 7 buffers, 0.041 ms (was 14.5 ms / 815 buffers / 2352 kB external merge). Index 352 kB vs 1648 kB. `TestClaimPlanDoesNotSortTheBacklog` asserts absence of a `"Sort` node in `EXPLAIN (FORMAT JSON)` — a property, not a timing.
+4. **CLOSED.** All six over-limit raw INSERTs rejected by name; exactly-at-limit accepted; Go returns `ErrPayloadTooLarge`/`ErrKindTooLong`/`ErrCorrelationIDTooLong` before any row is written.
+5. **CLOSED.** `sites_singleton` rejected the second INSERT (`Key ((true))=(t) already exists`); `GetDefaultSite` has no `ORDER BY`/`LIMIT`.
+6. **OPEN — see NEW-1.**
+7–9. **CLOSED.** `recCtx` is `WithoutCancel` + 10 s and used by all four outcome writes; drain bounded by `DrainGrace`, wired from `VIZRA_SHUTDOWN_GRACE` (`cmd/worker/main.go:92`); `TestGracefulShutdownRecordsTheOutcomeOfAnInFlightJob`, `TestRetryLadderActuallyWalksTheLadder` (MaxAttempts 3, asserts `run_after` pushed out and three handler runs) and `TestAJobWhoseWorkerDiedIsReclaimedAndCompleted` all present; `PriorityUrgent`/`DefaultPriority`/`PriorityBackground` with 0 documented as unset.
+
+---
+
+```
+NEW-1: audit_events_ip_prefix_shape is too loose on IPv6 — it accepts a /112
+Severity:    BLOCKER  (frozen on merge)
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     migrations/0003_audit_events.up.sql:58-62
+             internal/integration/golden_test.go:1243-1285
+  requirements: VZ-ADMIN-002, VZ-FOUND-003
+
+Observed:
+  CHECK: ip_prefix ~ '^[0-9a-f]{1,4}(:[0-9a-f]{1,4})*::(/(48|64))?$'
+  The `*` is unbounded, so any number of groups may precede `::`. Tested on
+  PostgreSQL 18.6 against the migration verbatim:
+
+    TOO LOOSE (accepted, must be refused)
+      2001:db8:1234:5678:9abc:def0::          -> ACCEPT   (/96)
+      2001:db8:1234:5678:9abc:def0:1234::     -> ACCEPT   (/112)
+      2001:db8:1234:5678:9abc:def0::/48       -> ACCEPT   (suffix is a lie)
+      999.999.999.0                           -> ACCEPT   (not an address)
+
+    TOO TIGHT (refused, arguably legitimate)
+      2001:DB8::            -> REJECT   (uppercase hex)
+      2001:DB8:1234::/48    -> REJECT
+      ::ffff:192.0.2.0      -> REJECT   (IPv4-mapped, unless Unmap() is called)
+      ::                    -> REJECT
+
+    Correct cases all behave: 203.0.113.47, 203.0.113.47/24, 192.168.1.100,
+    2001:db8:1234:5678:9abc:def0:1234:5678 and ::ffff:192.0.2.47 are refused;
+    203.0.113.0, 203.0.113.0/24, 10.0.0.0, 2001:db8::, 2001:db8::/48,
+    2001:db8:1234::, 2001:db8:1234:5678::/64, 2001:0db8:0000:: and fe80:: are
+    accepted.
+
+Failure:
+  The header at :49-52 says "The column REFUSES a full address rather than
+  trusting a caller to truncate." It does not. `2001:db8:1234:5678:9abc:def0:1234::`
+  drops only the last 16 bits of a 128-bit address: the /64 subnet — the
+  household — is fully preserved, plus 48 bits of interface identifier. An M1
+  truncation helper with an off-by-one mask, or an operator backfill, stores a
+  personally identifying address in a queryable table and every gate stays green.
+  This is the one control that cannot be added later without rows already
+  violating it, which is the stated reason it landed now.
+  The builder's test cannot catch this: golden_test.go:1256-1260 only tries
+  addresses that do not end in `::`, so it passes against the leaky grammar.
+
+Perspective:
+  visitor (whose address it is), instance-admin, operator
+
+Recommendation:
+  Bound the group count to the deepest legitimate truncation (/64 = 4 groups)
+  and accept uppercase. One line:
+
+    OR ip_prefix ~ '^[0-9a-fA-F]{1,4}(:[0-9a-fA-F]{1,4}){0,3}::(/(48|64))?$'
+
+  and, while the line is open, bound the IPv4 octets:
+
+    ip_prefix ~ '^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}0(/24)?$'
+
+  Leave `::`, `::ffff:…` and the /len↔group-count agreement out of the CHECK —
+  document instead that the M1 helper calls Unmap() and emits NULL when no
+  usable address exists. Do NOT try to express full address validity in a
+  regex; the property that matters is "cannot be more specific than /64".
+
+Acceptance criteria:
+  * 2001:db8:1234:5678:9abc:def0:: and 2001:db8:1234:5678:9abc:def0:1234:: are
+    both refused.
+  * 2001:db8:1234:5678::/64 and 2001:db8:1234::/48 still accepted, with and
+    without the /len suffix, zero-padded and uppercase.
+  * 999.999.999.0 refused; 203.0.113.0 and 203.0.113.0/24 accepted.
+
+Tests:
+  Extend TestAuditEventsRefusesAFullIPAddress with a third subtest
+  "a prefix more specific than /64 is refused" carrying the four TOO LOOSE
+  strings above, and add the uppercase and zero-padded forms to the accept
+  list. The new subtest fails against today's migration, which is the
+  controlled-mutation proof.
+
+Cross-repo implications:
+  core: the M1 truncation helper must mask to /24 and /64 and Unmap() first.
+  user: the M2 admin console renders this column. search/meta: none.
+
+Challenge:
+  "No caller exists yet, so fix it in M1." The CHECK is in 0003 and freezes on
+  merge. Loosening a CHECK later is easy; TIGHTENING one after rows exist means
+  ADD CONSTRAINT NOT VALID, a VALIDATE pass, and deciding what to do with the
+  addresses already stored — which is the whole argument that put this
+  constraint in M0.
+```
+
+```
+NEW-2: truncate() can cut a UTF-8 rune in half, so the outcome write fails
+Severity:    REQUIRED  (Go only — not frozen, does not block the merge)
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     internal/jobs/worker.go:462-468 (truncate), :445 (safeError)
+  requirements: VZ-JOBS-001, VZ-OPS-005
+
+Observed:
+  truncate does `s[:max]` on a byte index (max = 2000) with no rune boundary
+  check. Reproduced in Go: input of 1999 'a' + 100 '日' produced output with
+  `utf8.ValidString == false`, bytes at the cut `61 61 61 61 e6 e2 80 a6 …` —
+  a lone 0xe6 lead byte followed by the ellipsis. PostgreSQL 18.6 rejects that
+  sequence:
+    ERROR:  invalid byte sequence for encoding "UTF8": 0xe6 0x80 0x26
+  The DB bound is char_length <= 4096 and truncate caps at ~2015 bytes, so the
+  CHECK is never the thing that fires — the encoding is.
+
+Failure:
+  Only on an error message over 2000 bytes whose byte 2000 falls inside a
+  multibyte rune: a non-ASCII filename, a remote API error body, a federation
+  peer's message. When it happens, RetryJob / DeadLetterJob / FailJob all fail,
+  the worker logs "scheduling retry failed" and the row stays `leased` — the
+  precise failure mode Finding 7 just fixed, re-entering through the error
+  path instead of the shutdown path. The sweep now recovers it correctly, so
+  this is degradation and lost diagnostics rather than a wedge; but the job's
+  real cause is never recorded, which is what last_error exists for.
+
+Perspective:
+  operator, developer
+
+Recommendation:
+  Make truncate rune-safe:
+    for max > 0 && !utf8.RuneStart(s[max]) { max-- }
+  or simply `strings.ToValidUTF8(s[:max], "")`. Do it after obs.Redact, keeping
+  the existing redact-then-truncate order.
+
+Acceptance criteria:
+  * truncate returns valid UTF-8 for any input, including a cut inside a rune.
+  * A handler returning a >2 KiB error containing multibyte characters still
+    reaches 'dead' or 'queued' with a stored last_error.
+
+Tests:
+  internal/jobs: a unit case asserting utf8.ValidString over a table of cut
+  positions; plus one integration case with a multibyte error message,
+  asserting last_error is non-null. The unit case fails today.
+
+Cross-repo implications:
+  core only.
+
+Challenge:
+  "Errors are ASCII in practice." M1's first non-ASCII error is an uploaded
+  filename, and the fix is one line.
+```
+
+**SAFE TO FREEZE: NOT YET.** `0001`, `0002` and `0004` are safe to freeze as they stand — I found nothing in them that M1 (`users`, `sessions`, `assets`, `asset_files`, `albums`) is forced to work around. `actor_user_id` takes its FK additively; `storage_locations.id` is ready for `asset_files.storage_location_id`; `sites_singleton` is correct per tenant database under M5; no tenant column anywhere; `jobs` needs no `site_id`. The only blocker is NEW-1, one regex on one line of `0003`. Fix that and I will call all four safe to freeze.
