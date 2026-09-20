@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-20 (tick 0 — war room created; wave 1 dispatched. A first dispatch was stopped by the owner for a session restart so the `vizra-builder`/`vizra-verifier` agent types would register; it left no branches, commits or PRs. Wave 1 was re-dispatched with the registered types).
+Last tick: 2026-09-20, tick 2 (user PR1 READY_FOR_REVIEW → verifier + security dispatched; Search inventory done; remaining inventories + GAPS.md in progress). Tick 0 — war room created; wave 1 dispatched. A first dispatch was stopped by the owner for a session restart so the `vizra-builder`/`vizra-verifier` agent types would register; it left no branches, commits or PRs. Wave 1 was re-dispatched with the registered types.
 
 ## Owner decisions
 
@@ -31,8 +31,10 @@ Recorded verbatim from the session of 2026-09-20. The owner answered two questio
 | Slice | Repo | Branch | Acceptance IDs | Builder state | PR | Verified SHA | Verdict |
 |---|---|---|---|---|---|---|---|
 | core PR1 foundation | vizra-core | `feat/m0-foundation` | VZ-FOUND-001, -003…-006 (per plan §PR1) | DISPATCHED 2026-09-20 | — | — | — |
-| user PR1 skeleton | vizra-user | `feat/m0-skeleton` | VZ-FOUND-002 | DISPATCHED 2026-09-20 | — | — | — |
+| user PR1 skeleton | vizra-user | `feat/m0-skeleton` | VZ-FOUND-002 | READY_FOR_REVIEW (builder) — head `5672bfd`; gh confirms OPEN, non-draft, MERGEABLE; `ci-required` + frontend/contract/guard/docker-build green on that SHA (50 tests, 0 skipped per builder) | yegamble/vizra-user#1 | verifying `5672bfd` | `vizra-verifier` + focused `vizra-security` review dispatched 2026-09-20; pending |
 | search PR1 minimal service | vizra-search | `feat/m0-minimal-service` | VZ-FOUND-003 (search half), Q-001 | DISPATCHED 2026-09-20 | — | — | — |
+
+Open points on user PR1 for the verdict: `required-checks.txt` is not at the repo root on the branch (where is the manifest, does it match the jobs that ran?); the vendored contract records core SHA `b0dbeb6`, which is on core's feature branch — after core PR1 squash-merges, user re-vendors from core `main` as the first step of user PR2 so provenance never dangles; the builder wrote its red/green transcripts under `docs/evidence/warroom/VZ-FOUND-002/` (builder claims — the verifier's file is separate).
 
 Contract rule for this wave: the core builder owns `api/` and commits it first; user and search consume it from `/Users/yosefgamble/github/vizra/vizra-core/api/` at a recorded SHA and do their contract-dependent step last.
 
@@ -78,7 +80,9 @@ Known gaps in the mockups: no photo viewer/detail page, no album detail, no auth
 2. Free disk space — 19 GiB free limits Docker and Playwright work.
 3. Mockup controls with **no ledger ID** need a scope decision (add to the ledger, mark unavailable, or drop). Search page: Save/bookmark on cards and the "Saved" tab (is Save the same thing as Favorite, which the ledger has?), the "Series" scope and "Editorial series" facet, the view-density switcher, "Interesting" / "Most loved" / "Most viewed" as sort orders, the "Analog / Film" facet, the per-card `4K` badge, the public "refreshed moments ago" label, related-query chips; and the `RAW` badge contradicts VZ-MEDIA-002, which declines RAW. Account pages: passkeys, SMS 2FA, Instagram/Adobe connections, scheduled publish, "AI training" toggle, "Hire", RAW/TIFF upload chips, and the "goimg Pro" billing card (Vizra has no billing product).
 4. Design acceptance once the Figma first-slice pages exist.
-5. Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a disposable Ubuntu 24.04 amd64 host for the install rehearsal; Q-036 domain before M6.
+5. **Rulesets (Q-032, owner action):** once the first PRs merge, each repo's `main` needs a ruleset requiring the `ci-required` context, blocking force-push and deletion, linear history, and CODEOWNERS over `.github/**` and `scripts/ci/**` (ADR-002 items 9–10). Until then a green check is advisory, and the builders say so in each repo's AGENTS.md. Note: GitHub does not enforce rulesets on private repos on a Free personal plan — check the plan, or say the word and the chair applies them with `gh api`.
+6. **Cross-repo contract freshness:** vizra-user and vizra-search vendor core's contract and verify its sha256, but cannot detect that the vendored copy is *stale* without read access to private vizra-core from CI — a fine-grained read-only token as an Actions secret, or making the check a meta fan-in lane. Owner supplies the credential or picks the fan-in.
+7. Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a disposable Ubuntu 24.04 amd64 host for the install rehearsal; Q-036 domain before M6.
 
 ## Merged
 
