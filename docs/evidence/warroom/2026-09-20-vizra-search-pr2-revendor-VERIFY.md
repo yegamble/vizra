@@ -589,3 +589,472 @@ of writing.
 *Verifier scratch clones under `…/scratchpad/vfy-pr2/` were deleted after this record was written.
 No file outside this evidence record was created or modified in the meta repo, and nothing was
 pushed to any repository.*
+
+---
+---
+
+# Re-verification at `e219fc6`
+
+**Verdict: PASS.** Findings 1, 2 and 4 **CLOSED**. Finding 3 **OPEN (narrowed, non-blocking)**.
+Two new non-blocking findings (5, 6).
+
+| field | value |
+|---|---|
+| Head SHA verified | `e219fc6b9f64d04d2adde87b830b2e9a4f388b5d` (unchanged before and after) |
+| Previous verdict | FAIL at `1772270` |
+| Ancestry | `1772270` **is** an ancestor of `e219fc6`; two commits since: `562bb99`, `e219fc6` |
+| Verifier checkout | fresh clone, `…/scratchpad/vfy-r2/sc` (deleted after) |
+| Environment | darwin/arm64, go1.26.2, **GNU Make 3.81**, uid 501; 16 GiB free |
+
+## 0. Provenance carries over — not re-verified, and it did not need to be
+
+`git diff --stat 1772270..e219fc6 -- api/` is **empty**. Blob ids at `e219fc6` are
+`848503cca45d…` and `6548d87e1811…` — identical to core `main`@`415a6d1` as established above,
+and `api/CONTRACT-SOURCE.json` is byte-unchanged. **The provenance section of this record stands
+in full for `e219fc6`.**
+
+## 1. Lanes at `e219fc6`
+
+| command | exit | result |
+|---|---|---|
+| `make ci` | **0** | all eight lanes green, 23.3 s |
+| `make contract-drift` | **0** | `contract-drift lane: 4 package(s) selected with no test-selecting flag` / `contract-drift: 315 tests ran across 4 package(s), 0 failures, none deselected` |
+| `make test-noskip` | **0** | **338 pass events, 0 skips** |
+| `make tidy-check` | **0** | `tidy-check: tidy` |
+| `./scripts/ci-required-guard.sh` | **0** | `6 fixtures exercised, floor 6` |
+
+Both builder claims reproduce **exactly**: 338 / 0 skips, and the 315-test contract-drift line
+verbatim. CI runs `make contract-drift` directly (`.github/workflows/ci.yml:87-88`), so the lane
+I exercised is the lane that gates.
+
+## 2. FINDING 1 — **CLOSED**
+
+The control now runs as recipe steps outside `go test`: `contract-drift-guard.py recipe` before,
+`… ran <report>` after, with `go test … || true` between (the `ran` step is the pass/fail
+authority and does check failures — verified at P17, where a drifted file still went red).
+
+My exact round-1 case, re-run with an in-place edit of `api/search-internal.openapi.yaml`
+underneath:
+
+```
+recipe: go test -count=1 -json -run 'TestVerifier' ./internal/httpapi/ … || true
+$ make contract-drift
+CONTRACT-DRIFT LANE REFUSED: the contract-drift lane carries -run.
+exit 2   ← RED
+```
+
+Every additional attack on the flag surface is refused:
+
+| probe | `make contract-drift` (all with a real vendored-file edit underneath) |
+|---|---|
+| P1 `-run 'TestVerifier'` — my round-1 case | **RED** — `carries -run` |
+| P8 `-count=0` | **RED** — `unexpected flag '-count=0'` |
+| P9 `-list .*` | **RED** — `unexpected flag '-list'` |
+| P10 `-run` via `-args` | **RED** — `carries -args` |
+| P11 package path matching nothing | **RED** — coverage check names the dropped package |
+| P20 a listed package that runs **zero** tests | **RED** — `package … ran ZERO tests` |
+
+The allowlist design (`ALLOWED_FLAGS = {-count=1, -json}`, everything else refused by name) is the
+right shape: a flag invented after the guard was written cannot quietly deselect a guard.
+
+## 3. FINDING 3 — **OPEN (narrowed)**. 4 of my 5 survivors closed
+
+| round-1 survivor | now |
+|---|---|
+| `-run` in `$(TESTFLAGS)` | **RED** — `carries -run` |
+| `GOFLAGS=-run=…` as a recipe env prefix | **RED** — `prefixed with the environment assignment` |
+| `GOFLAGS=-run=…` **exported in the environment** | **RED** — `GOFLAGS in the environment carries -run` |
+| `-run` in an **included** makefile | **RED** — `carries -run` |
+| `go test` behind a **wrapper script** | **RED** — `the lane runs './scripts/w.sh' instead of go test` |
+| **a duplicate `contract-drift:` target** | **still SURVIVES — exit 0** (see FINDING 5) |
+
+Asking `make --dry-run` instead of parsing the Makefile text closed four of five in one move.
+
+### Attacks on the guard itself
+
+| probe | `make contract-drift` | caught by the Go shape test? |
+|---|---|---|
+| P12 the `recipe` guard line deleted | **RED** (shape test fails; `ran` surfaces it) | yes |
+| P13 the `ran` guard line deleted | **RED** — `LAST command must be … ran <report>` | yes |
+| P14 **both** guard lines deleted | SURVIVOR exit 0 | **yes** — `TestTheContractDriftLaneIsGuardedFromOutsideGoTest` fails |
+| P15 `-` prefix on the guard lines | SURVIVOR exit 0 | **NO — 0 shape failures** |
+| P16 `\|\| true` on the guard lines | SURVIVOR exit 0 | **NO — 0 shape failures** |
+| P17 `.ONESHELL:` added | **RED** — drift still caught | n/a |
+| P18 `SHELL := /usr/bin/true` | SURVIVOR — and `make test`, `test-noskip`, `ci` **all** exit 0 | no |
+| P19 `make -i` / `MAKEFLAGS=-i` | SURVIVOR | n/a — CI runs plain `make contract-drift`, so this needs a workflow edit |
+
+**P14 is the builder's documented residual and it holds as documented**: two edits, and the shape
+test goes red on its own. **P15 and P16 are not** — see FINDING 6.
+
+P18 (`SHELL :=` pointed at a no-op) disables every make-based lane at once. That is a generic
+property of any make-driven gate, is equally true of the base branch, and is not a regression from
+this PR; recorded as a limit of the design, not a finding against it.
+
+## 4. Make-version portability — **handled, and robust for the right reason**
+
+`562bb99` matched literal markers `("overriding commands for target", "ignoring old commands for
+target")` — make 3.81 wording only, which is why it was red in CI on ubuntu (make 4.x).
+`e219fc6` replaces them with
+`re.compile(r"(overriding|ignoring old)\s+(commands|recipe)\s+for\s+target", re.I)`.
+
+Tested directly against all four wordings:
+
+```
+new:MATCH  old:MATCH   overriding commands for target   (make 3.81)
+new:MATCH  old:MISS    ignoring old commands for target (make 3.81)
+new:MATCH  old:MISS    overriding recipe for target     (make 4.x)
+new:MATCH  old:MISS    ignoring old recipe for target   (make 4.x)
+```
+
+I confirmed the 3.81 wording empirically on this machine. **The make-4.x path I can only judge
+from the regex and the CI log** — no make 4.x is installed here; the builder states the same
+limitation in `docs/evidence/pr2/F7-round2-make-version-portability.txt` rather than implying they
+tested it.
+
+**Is warning-text parsing robust?** The regex itself is not the durable part — a future wording
+would miss it. What makes it acceptable is the **catch-all immediately after**: any line containing
+`warning:` in make's stderr while resolving the lane is refused outright. That fails closed on
+wordings nobody anticipated, which is the correct design. The coordinator's suggested alternative —
+compare the dry-run recipe against the expected shape — is *already* implemented as
+`check_structure`. So the fragility is **not** in the wording. It is that both checks live inside a
+recipe step the duplicate target removes (FINDING 5).
+
+## 5. FINDING 2 — **CLOSED**
+
+`check-workflows.py` now returns 0 clean / 1 VIOLATION / **2 UNEVALUABLE**, the guard requires
+exit **1 exactly** from a reject fixture, checks readability and non-emptiness *before* running the
+checker, and each reject fixture declares the rule it must trip (`fixture|at|key|value`) which must
+appear verbatim in the checker's `VIOLATION` line.
+
+All eight required reds are **named failures**:
+
+| probe | result |
+|---|---|
+| unreadable **reject** fixture | **RED** — `UNUSABLE FIXTURE: … exists but is not readable.` |
+| unreadable **accept** fixture | **RED** — `UNUSABLE FIXTURE: …` |
+| **emptied** reject fixture | **RED** — `UNUSABLE FIXTURE: … is empty.` |
+| **invalid YAML** in a reject fixture | **RED** — `UNEVALUABLE FIXTURE: … (exit 2). Nothing was checked.` |
+| fixture edited to trip a **different** rule | **RED** — `WRONG RULE TRIPPED: … not for the rule it declares` |
+| fixture made **valid** | **RED** — `the workflow checker ACCEPTED …` |
+| fixture **directory missing** | **RED** — `MISSING FIXTURES: …` |
+| **glob empty** | **RED** — `MISSING FIXTURE: …` named one by one |
+
+Both round-1 survivors (unreadable reject fixture; emptied fixture) are now red by name. The three
+extra probes requested:
+
+- a fixture tripping **two** rules (declared + another) → exit 0. **Correct**, not a defect: the
+  declared rule is still tripped, so the fixture still proves what it was written to prove.
+- a new fixture with **no declaration** that is still rejected → exit 0, `7 fixtures exercised,
+  floor 6`. **Correct** — the floor is a minimum. A new undeclared fixture that is **clean** is
+  **RED** (`ACCEPTED …`), so a decorative fixture cannot be added.
+- a fixture's **declaration row removed** from `reject_fixtures` → exit 0, floor silently drops to
+  5. See FINDING 7.
+
+## 6. Tests since `1772270` — **strengthened, nothing weakened**
+
+Census **163 → 168**. One function removed —
+`TestTheContractDriftLaneSelectsEveryVendoredFileGuard` — and six added.
+
+**Ruling on the rewrite: acceptable, and an improvement.** The removed function was *added by this
+same PR* (it does not exist at base `581d79d`), so **no pre-existing test was touched**. Its single
+property was split into three, and three self-tests of the new guard were added:
+
+```
+TestTheContractDriftLaneIsGuardedFromOutsideGoTest
+TestTheContractDriftLaneCarriesNoTestSelectingFlag
+TestTheContractDriftLaneRunsEveryPackageHoldingAVendoredFileGuard
+TestTheLaneGuardAcceptsAWellFormedLane          (positive control)
+TestTheLaneGuardRefusesEveryKnownBypass         (negative control)
+TestTheLaneGuardRefusesAFlagFromAnIncludedMakefile
+```
+
+Against base `581d79d` the census is 162 → 168 with **zero** removals. No `t.Skip`,
+`testing.Short` or build-tag exclusion added. No production Go changed.
+
+## 7. CI on `e219fc6` — **PASS**
+
+`total_count: 12`, every check-run `completed` / `success`: fmt, vet, echo-containment, build,
+contract-drift, test, test-noskip, tidy-check, govulncheck, docker-build, ci-required,
+GitGuardian. All 10 manifest lanes executed; the manifest matches the jobs that ran; `ci-required`
+ran on this SHA.
+
+The `contract-drift` job log on `e219fc6` shows **both** guard steps with real counts:
+
+```
+./scripts/contract-drift-guard.py recipe
+contract-drift lane: 4 package(s) selected with no test-selecting flag (internal/config, internal/contract, internal/hmacauth, internal/httpapi)
+./scripts/contract-drift-guard.py ran .contract-drift-report.json
+contract-drift: 315 tests ran across 4 package(s), 0 failures, none deselected
+```
+
+315 matches my local run exactly.
+
+## 8. Claims audit — **FINDING 4 CLOSED**, one sentence now false
+
+`docs/evidence/pr2/README.md` now states correctly that core's `api/` changed in **three** files
+and that only two are vendored — my round-1 NIT is fixed. The README also voluntarily records that
+round 1's `-run` demo "went red for an accidental reason", which is an unusually honest correction.
+
+One sentence is now false: `scripts/contract-drift-guard.py:32-36` and `AGENTS.md:330` state that
+escaping "takes a second deliberate edit — the shape test goes red on its own". True for P14 and
+P2; **false for P15 and P16** (FINDING 6).
+
+---
+
+## Findings at `e219fc6`
+
+```
+FINDING 5: a duplicate `contract-drift:` target that omits the guard is a
+           one-edit bypass; the duplicate-detection cannot run to catch it
+Severity:    SHOULD
+Confidence:  high
+Status:      round-1 FINDING 3, item 1 — still OPEN (narrowed)
+
+Affected:
+  repo:      vizra-search
+  files:     scripts/contract-drift-guard.py:126-148 (DUPLICATE_TARGET_RE,
+             check_make_warnings) ; Makefile:92-96
+  requirements: F7
+
+Observed:
+  make runs the LAST definition of a target. A second `contract-drift:` target
+  therefore REPLACES the recipe — including the two guard lines — so the guard
+  is never invoked and its duplicate-detection never executes:
+
+      $ cat >> Makefile <<'EOF'
+      .PHONY: contract-drift
+      contract-drift:
+      	go test -count=1 -json -run TestNothingAtAll $(DRIFT_PKGS) > $(DRIFT_REPORT) || true
+      EOF
+      $ printf '\n# UNAUTHORISED EDIT\n' >> api/search-internal.openapi.yaml
+      $ make contract-drift
+      Makefile:152: warning: overriding commands for target `contract-drift'
+      go test … -run TestNothingAtAll … || true
+      exit 0                                   ← contract drifted, lane green
+
+  The builder's RED 5 demonstration appended a duplicate that KEPT the guard
+  line, so `contract-drift-guard.py recipe` ran and refused it. That is the
+  same narrowing as round 1's self-selecting `-run` regex: the transcript is
+  honest about what it did, but the natural form of the bypass — a duplicate
+  that simply supplies its own recipe — is not covered.
+
+  It IS caught one lane over: an unfiltered `go test ./internal/httpapi/` fails
+  TestTheContractDriftLaneIsGuardedFromOutsideGoTest and
+  TestTheContractDriftLaneCarriesNoTestSelectingFlag, so CI's required `test`
+  and `test-noskip` lanes go red and nothing reaches main.
+
+Failure:
+  `make contract-drift` reports success with the vendored contract edited in
+  place. That is F7's original complaint — the drift dies only in a broader
+  lane, not the one whose name says it checks drift — reachable now only by a
+  deliberate Makefile edit rather than by an accidental rename.
+
+Perspective:
+  developer, operator
+
+Recommendation:
+  No in-recipe control can survive its own recipe being replaced, so put the
+  duplicate check where it still runs: have `check_make_warnings` keep the
+  catch-all (it is sound), and add a cheap text scan — a second line matching
+  `^contract-drift:` in the Makefile — to the Go shape test, which already
+  catches this case and is the layer that actually bites. Then correct the
+  README row and AGENTS.md to say the duplicate target is caught by the shape
+  test in `test`/`test-noskip`, not by the lane guard.
+
+Acceptance criteria:
+  - A duplicate `contract-drift:` target that omits the guard makes at least one
+    REQUIRED lane red, and the documentation names which lane.
+  - The guard's own duplicate-detection keeps working for a duplicate that does
+    invoke it (already true).
+
+Tests:
+  internal/httpapi/lane_selection_test.go — add the omit-the-guard duplicate to
+  TestTheLaneGuardRefusesEveryKnownBypass. The harness exists.
+
+Cross-repo implications:
+  core: none | user: none | search: this PR | meta: none
+
+Challenge:
+  The strongest counterargument: `make contract-drift` is not a merge gate on
+  its own — `ci-required` is, and it requires `test` and `test-noskip`, both of
+  which are red here. So no drifted contract can merge, and this is cosmetic
+  about which lane reports it. I keep it at SHOULD rather than dropping it
+  because the whole point of F7 was that the lane named for drift must be the
+  lane that catches drift.
+```
+
+```
+FINDING 6: `-` or `|| true` on a guard recipe line silently disarms the lane in
+           ONE edit, and the shape test does not notice — contradicting the
+           documented "escaping needs two edits"
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra-search
+  files:     scripts/contract-drift-guard.py:32-36 (the claim),
+             :247-270 (check_structure) ; AGENTS.md:330 ;
+             internal/httpapi/lane_selection_test.go (shape test)
+  requirements: F7
+
+Observed:
+  Two one-edit mutations leave `make contract-drift` at exit 0 with a vendored
+  file edited in place, AND leave the Go shape test green (0 shape-test
+  failures, measured):
+
+    P15   -./scripts/contract-drift-guard.py recipe
+          -./scripts/contract-drift-guard.py ran $(DRIFT_REPORT)
+    P16   ./scripts/contract-drift-guard.py recipe || true
+          ./scripts/contract-drift-guard.py ran $(DRIFT_REPORT) || true
+
+  For P15 the reason is precise and worth stating: `make --dry-run` PRINTS THE
+  COMMAND WITHOUT THE `-` PREFIX. Both check_structure and the shape test read
+  the dry-run output, so the `-` is invisible to both while make silently
+  ignores the step's exit status:
+
+      $ make --dry-run --no-print-directory contract-drift
+      ./scripts/contract-drift-guard.py recipe            ← the '-' is gone
+      go test -count=1 -json … || true
+      ./scripts/contract-drift-guard.py ran .contract-drift-report.json
+
+  For P16 the `|| true` IS visible in the dry-run, but check_structure only
+  asserts `commands[0].startswith(GUARD)` and `" recipe" in commands[0]`, both
+  of which a trailing `|| true` satisfies.
+
+  Contrast P14 (both guard lines deleted), where the shape test DOES fail — the
+  documented residual holds there, and only there.
+
+Failure:
+  The guard still prints its REFUSED message, but the lane exits 0, so the
+  failure is invisible to CI and to anyone reading the exit code. The
+  documentation in scripts/contract-drift-guard.py:32-36 and AGENTS.md:330 tells
+  the reader escaping "takes a second deliberate edit — the shape test goes red
+  on its own". For these two mutations that is not true, and a reader relying on
+  that sentence would believe the lane is protected when it is not. As with
+  FINDING 5, CI's `test`/`test-noskip` lanes still catch the drift, so nothing
+  merges.
+
+Perspective:
+  developer, operator
+
+Recommendation:
+  The dry-run cannot see `-`, so this one needs the Makefile TEXT. Smallest
+  change: in the shape test (which already reads the Makefile), reject a
+  contract-drift recipe line that begins with `-`, `@-`, or ends with `|| true`
+  / `|| :`. Tighten check_structure at the same time so a guard command with
+  anything appended after it is refused rather than prefix-matched.
+  Then either make the "two edits" sentence true, or soften it to name what is
+  actually guaranteed.
+
+Acceptance criteria:
+  - `-` prefixed on either guard line -> at least one REQUIRED lane red,
+    naming the line.
+  - `|| true` appended to either guard line -> same.
+  - P14 (both lines deleted) still red in the shape test.
+  - The sentence in scripts/contract-drift-guard.py and AGENTS.md matches what
+    is enforced.
+
+Tests:
+  internal/httpapi/lane_selection_test.go — add both spellings to
+  TestTheLaneGuardRefusesEveryKnownBypass.
+
+Cross-repo implications:
+  core: none | user: none | search: this PR | meta: none
+
+Challenge:
+  The strongest counterargument: anyone typing `-` in front of the guard line is
+  deliberately disarming a control they can see, in an owner-reviewed file, and
+  no in-recipe check can stop that — `SHELL := /usr/bin/true` (P18) disables
+  every lane in this repository with one edit and always could. On that reading
+  the only real defect is the documentation sentence, and the code needs no
+  change. I keep it at SHOULD because the fix is three lines and because the
+  claim is currently load-bearing for reviewers.
+```
+
+```
+FINDING 7: deleting a fixture's declaration row lowers the fixture floor
+           silently, from 6 to 5
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-search
+  files:     scripts/ci-required-guard.sh (the `reject_fixtures` table and
+             `floor_count`)
+  requirements: F8
+
+Observed:
+  floor_count is computed from the same `reject_fixtures` table that supplies
+  the per-fixture rule declarations. Removing one row removes the fixture from
+  the floor, removes its rule check, and lowers the floor in one edit:
+
+      $ # delete the wf-quoted-key.yml row from reject_fixtures
+      $ ./scripts/ci-required-guard.sh
+      … (6 fixtures exercised, floor 5)     exit 0
+
+  The fixture is still exercised through the glob and must still be rejected,
+  so a fixture that stops being rejected at all is still caught; what is lost is
+  the binding to the RULE it must trip.
+
+Failure:
+  The same "the floor lives in the file it guards" limitation the script already
+  acknowledges for lanes, now applying to fixtures. It is visible in the output
+  (`floor 5`) but nothing fails.
+
+Perspective:
+  developer
+
+Recommendation:
+  Make the floor a literal, e.g. `expected_floor=6` asserted against
+  `floor_count`, so lowering the table without lowering the literal is a named
+  failure — the same shape as the lane floor.
+
+Acceptance criteria:
+  Removing any row from `reject_fixtures` makes the guard exit non-zero.
+
+Tests:
+  The script is runnable outside Actions; add the mutation to the round-2
+  transcript.
+
+Cross-repo implications:
+  core: none | user: none | search: this PR | meta: none
+
+Challenge:
+  CODEOWNERS covers /scripts/ under the `*` rule, the change is visible in the
+  diff and in the output line, and the fixture is still required to be rejected.
+  This is a NIT and should not hold the PR.
+```
+
+---
+
+## Verdict at `e219fc6`: **PASS**
+
+| round-1 finding | status |
+|---|---|
+| FINDING 1 — `-run` deselects the guard that forbids `-run` | **CLOSED** — my exact case is RED; the control now runs outside `go test`; every flag probe refused |
+| FINDING 2 — unevaluable fixture counted as "correctly rejected" | **CLOSED** — all eight required reds are named failures |
+| FINDING 3 — Makefile-parser bypasses | **OPEN, narrowed** — 4 of 5 closed; the duplicate target survives the lane (FINDING 5), non-blocking |
+| FINDING 4 — core `api/` file count in the plan | **CLOSED** — README now states it correctly |
+
+Both findings that drove the round-1 FAIL are closed, and closed properly rather than patched: the
+control was moved out of `go test`'s selection space, it asks `make --dry-run` instead of parsing
+text, it checks the environment, and it verifies afterwards that the packages it claims to cover
+actually ran tests. `make ci` is green with 338 pass events and 0 skips; `contract-drift` reports
+315 tests across 4 packages with none deselected; all 12 CI check-runs are green on this SHA with
+`ci-required` present and the guard's two lines visible in the job log with real counts.
+
+No blocking finding remains. FINDINGS 5, 6 and 7 are SHOULD/NIT hardening: every one needs a
+deliberate edit to an owner-reviewed file, and in every case CI's required `test` and `test-noskip`
+lanes still catch a drifted contract, so no drifted contract can merge.
+
+**One item I would put to the chair as a merge condition rather than a follow-up**: the sentence in
+`scripts/contract-drift-guard.py:32-36` and `AGENTS.md:330` claiming escaping "takes a second
+deliberate edit" is false for the `-` and `|| true` spellings (FINDING 6). It is a documentation
+correction of a few words, and leaving a stated guarantee stronger than the control is the species
+of claim that produced the round-1 FAIL.
+
+PASS is not a merge and does not make the ledger entry VERIFIED — the chair records those. Head SHA
+`e219fc6b9f64d04d2adde87b830b2e9a4f388b5d` had not moved at the time of writing.
+
+*Verifier scratch clone `…/scratchpad/vfy-r2/` was deleted after this record was written. Nothing
+outside this evidence file was created or modified in the meta repo, and nothing was pushed.*
