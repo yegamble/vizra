@@ -145,9 +145,64 @@ Stated in `AGENTS.md` and in the `e2e/harness/stamp.ts` header, not hidden.
 build cache pruned, deliberately — `docker builder prune` is not scoped to one
 creator. No throwaway PR or branch was opened this round.
 
+---
+
+## Fix round 1 of 2 — FINDING 11 (head `c669e40`)
+
+### The hole
+The stamp was an `auto` fixture; the guard was a `page` override.
+`test.extend` replaces one without the other, so four lines of ordinary,
+lint-clean Playwright kept the stamp and removed the guard, and the whole gate
+went green on a page that 404s a sub-resource and throws. The stamp proved
+"this test came from the harness `test` object"; the claim is "this test ran the
+guard".
+
+### What changed
+| File | Change |
+|---|---|
+| `e2e/harness/browser-errors.ts` | `collectBrowserErrors(page)` → `guardBrowser(browser)`: BrowserContext-level `console` / `weberror` / `requestfailed` / `response` listeners, a sweep of existing contexts, and wrapping of `browser.newContext`/`newPage` for the test, restored on dispose by DELETING the own property rather than restoring a bound copy |
+| `e2e/harness/test.ts` | one automatic fixture `vizraHarnessGuard` holds the guard **and** the stamp; deps `{ browser, context, browserErrorPolicy }` |
+| `eslint-rules/no-unguarded-playwright-import.mjs` | new `harnessFixtures` option: `.extend` may not replace a harness-owned fixture, and an unreadable fixtures object fails closed. `test.extend` is NOT banned |
+| `scripts/ci/harness-canary.mjs` | one invocation per fixture; asserts the exact SET of record kinds (present AND absent) |
+| `scripts/ci/check-e2e-lane.mjs` | asserts `guardBrowser`, the combined fixture, and that `e2e/harness/test.ts` does not override `page` again |
+| `scripts/e2e/demonstrate.sh` | D13 (11 halves), D12e (2 halves), D12 mutations updated to the new listener source, D12d added |
+| `e2e/harness/browser-errors.test.ts` | +8 `guardBrowser` cases (including prototype restore) and +4 fixture-override lint cases |
+| `AGENTS.md` | "WHY AT THE BROWSER, AND WHY ONE FIXTURE"; corrected canary claim; new residual |
+
+### The dependency list was measured, not chosen
+| Fixture depends on | Guard installed | Page at assertion | Result |
+|---|---|---|---|
+| `browser` | before `page` ✅ | closed (`pages=0`) ❌ | flush a no-op; the failure's trace went 21 members → 8 |
+| `browser` + `page` | after an overridden `page` ❌ | open ✅ | a spec navigating inside its own fixture **passed** on a broken page |
+| `browser` + `context` | before `page` ✅ | open (`pages=1`) ✅ | both; D13e2 fails with all three records |
+
+### Commands on `c669e40` (local, macOS arm64)
+| Command | Exit | Result |
+|---|---|---|
+| `npm run ci` | 0 | vitest **12 files / 289 tests / 0 skipped** (was 269) |
+| `bash scripts/ci/require-checks_test.sh` | 0 | 102 cases / 109 assertions / 0 failed |
+| `bash scripts/ci/check-e2e-lane.sh` | 0 | — |
+| `bash scripts/ci/check-required-floor.sh` | 0 | floor `frontend contract e2e` |
+| `npx playwright test` | 0 | 18 passed, floor 9/9 9/9, `harness stamp: OK (18 verified)` |
+| `node scripts/ci/check-coverage-floor-ran.mjs` | 0 | floor OK + 18 stamps verified |
+| `node scripts/ci/harness-canary.mjs` | 0 | 3 fixtures, exact kind sets (~6 s) |
+| `npm run e2e:demos` | 0 | **88 halves passed, 0 blocked, 0 failed** (was 74) |
+
+**CI on `c669e40`:** `ci-required` pass — "OK: every required check on
+c669e4001738df3f7c7ec3fcf1feaf3c9e41ca4e concluded success". All eight lanes
+pass; GitGuardian still FAILURE on the same historical pair.
+
+### Residual, stated rather than implied
+A spec that launches its OWN browser (importing a Playwright package and calling
+`chromium.launch()`) is not guarded at runtime — the harness never sees that
+object. Lint and review are the only controls there; the stamp, the floor, the
+canary and the parser are not. Note the contrast with D13g: a `browser` fixture
+overridden through Playwright's built-in `playwright` fixture needs no import,
+so lint cannot see it — and the runtime does catch that one.
+
 ## Blockers and handoff
-None. Next concrete action: the independent verifier re-verifies
-`f6f1f59a7c15a15e50c052602c3da88a425e5d35`. GitGuardian remains FAILURE on the
+None. Next concrete action: the same independent verifier re-verifies
+`c669e4001738df3f7c7ec3fcf1feaf3c9e41ca4e`. GitGuardian remains FAILURE on the
 same two historical findings from `951f18b` (an `hmr?id=` loopback dev-server
 value); a squash-merge drops that commit, and the check needs deliberate owner
 dismissal rather than being merged past.
