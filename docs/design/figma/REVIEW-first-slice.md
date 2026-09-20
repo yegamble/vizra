@@ -952,3 +952,36 @@ first review is gone — the chair settled it.
     screen (`F`) and the details toggle (`I`) have no ledger id.
 22. **Authorise verification of the 40 proposed Lucide export names** against a pinned
     `lucide-react` before the typed icon registry ships — seven were renamed in recent releases.
+
+---
+
+## Second re-check (after the fixer's second pass)
+
+Rendered read-only, both themes. **(1) BulkBar Delete — FIXED.** `38:2460` (Light) and `41:1282`
+(Dark) both read "3 photos selected · [Add to album] [Set visibility] │ 🗑 Delete … Clear selection":
+Delete is Quiet with a red `Trash2` glyph, a red label and a preceding rule, so it is destructive by
+glyph + word + colour + separation — never colour alone — and the library's only filled button is now
+"Upload". Identical in dark. The same glyph reached the four Deletes demoted in the first pass. In
+`48:1877` Delete is now fenced between two rules with "Show Exif and file details" below it, so it is
+no longer the thumb-resting control. **(2) Queue previews — FIXED.** The "1:1" labels are gone from
+all 17 previews (`33:65`, `37:1977`, `37:2151`, `36:332`); a neutral 56×56 box beside "6240 × 4160"
+claims nothing, and the six design notes distinguish a cropped list preview from the aspect-preserving
+grid and stage. The ratio claim is withdrawn rather than falsified — honest. **(3) Quiet/Secondary
+regression — FIXED.** Board `78:10` shows three unmistakable ranks in both themes (filled accent /
+outlined + elevated fill / accent text, no border), and the `Button` set `7:146` confirms Quiet keeps
+its `bg-tint` hover and pressed surfaces and its 2px focus ring, so it is still pressable and still
+focus-visible. The three flattened surfaces now read in three ranks: the bulk bar, `33:65`'s footer
+("Retry all failed" link / "Cancel remaining" outlined / "Go to library" filled) and V1's action
+column. **(4)** V5's zoom cluster now sits in the stage gutter with no overlap, and V2's photo shows
+its top edge inside the stage, so it reads as a pan rather than a field. **(5) New problems: one.**
+V5's photograph is now 187 × 280 in a 390 viewport — the smallest it has been, and smaller than the
+sheet beneath it; the phone lightbox no longer makes the photograph the hero. That is the honest cost
+of a non-overlapping cluster plus a six-action sheet, and it is worth revisiting with a real image,
+but it is not worth another round now. Quiet also now reads more as a link than a button — an
+acknowledged trade, and most of its instances are navigation. My independent audit of `32:2` returns
+**1** overflow offender (the deliberate 200% photo `46:1633`); the two hidden controls have been moved
+out to the page-level holder `80:2927`; the census is `TopNav / M1` ×11, `AppBar / M1` ×3 (U5 and U6
+now carry it), `TabBar / M1` ×5, `icon/Bell` 0, `icon/Search` 0, and the three stale tab-bar layer
+names are corrected. Nothing the second pass touched broke anything else.
+
+**Verdict: SHOW.**
