@@ -742,3 +742,615 @@ PASS is not a merge and not VERIFIED; neither is FAIL a rejection of the
 approach. VZ-FOUND-008 must not reach VERIFIED until Findings 1 and 2 are closed
 and re-verified, because every later UI slice's evidence is only as good as this
 harness's inability to lie.
+
+---
+
+# Re-verification at 44dac20
+
+**Verdict: FAIL** — one blocking finding, narrowed to a single line. Four of my
+five findings are CLOSED with evidence I reproduced myself. Finding 1 is OPEN by
+a much smaller margin than before, and one new finding (fail-open on the
+redactor's own failure) is REQUIRED but not blocking.
+
+| | |
+|---|---|
+| Head SHA verified | `44dac201c120e2a6d0c689cf53aafb218ca341a3` — confirmed unmoved at start and finish |
+| Ancestry | `git merge-base --is-ancestor 112291e… HEAD` → **yes**; 2 commits on top (`9a362f7`, `44dac20`) |
+| Delta from my FAIL | 74 files, +2694 −651 |
+| Environment | macOS arm64, Node v22.14.0, @playwright/test 1.63.0, Chromium `chromium-1243` (already in the cache — I installed no browser); Docker available, 16 GiB free, so the local image build **ran** |
+| Clone | fresh, `<scratch>/verify-44dac20/vizra-user`, deleted on completion |
+
+## 1. Commands — every claim matched
+
+| Command | Exit | Result | Builder's claim |
+|---|---|---|---|
+| `npm ci` | 0 | lockfile consistent | — |
+| `npm run ci` | 0 | — | — |
+| `npm run test` | 0 | **9 files / 206 tests / 0 skipped** | 9 / 206 / 0 — **matches** |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **86 cases / 93 assertions / 0 failed** | 86 / 93 — **matches** |
+| `npm run e2e` | 0 | **18 passed, 0 skipped**; `coverage floor: OK (desktop-chromium-1440=9/9 mobile-chromium-390=9/9)` | — |
+| `node scripts/ci/check-coverage-floor-ran.mjs` | 0 | `OK … (desktop=9/9 mobile=9/9)` | — |
+| `npm run e2e:demos` (Docker) | 0 | **39 halves passed, 0 blocked, 0 failed** | 39 halves — **matches** |
+| `npx vitest run eslint-rules/no-unguarded-playwright-import.test.mjs` | 0 | 33 tests (the +1 file, +29 tests) | — |
+
+Both images I built were deleted; no other agent's images, containers or volumes
+were touched.
+
+## 2. FINDING 1 — the bypass. **OPEN**, narrowed to one line.
+
+The regex became an AST rule (`eslint-rules/no-unguarded-playwright-import.mjs`)
+that bans any reference to the package and restricts `test`/`expect` to the
+harness entry. I put 19 spellings through the **real** ESLint configuration.
+
+**Caught (14)** — named double-quote; named single-quote; namespace; default;
+side-effect; `require()`; dynamic `import()`; `import type { test }` (smuggling);
+plain template literal; `@playwright/test/lib/index`; `playwright/test` named
+form; `import pw = require(...)`; `createRequire`; and (correctly allowed)
+`import type { Page }` and inline `import("@playwright/test").Page`.
+
+My two original bypasses are both dead: the namespace form and the
+single-quoted named form are now errors. The vitest sweep additionally lints
+every real spec with the repository's own config and asserts the rule is
+severity 2 for `e2e/specs/`, and `/e2e/specs/` and `/e2e/demos/` are now in
+CODEOWNERS.
+
+**Lint-level gaps (4), of which one is a working exploit.** I ran each to
+ground — lint, then TypeScript, then Playwright, then the full lane:
+
+| Spelling | Lint | Runs? | Lane |
+|---|---|---|---|
+| `import * as pw from "playwright/test"` (unscoped package) | passes | yes, spec passes on the broken page | **red overall** — loads a second runner copy and fails all 18 real tests. Loud, not silent. |
+| `require("@playwright" + "/test")` (concatenated specifier) | passes | yes, spec passes on the broken page | **`npm run ci` exit 2** — TypeScript `TS7031: Binding element 'page' implicitly has an 'any' type`. Caught incidentally by `noImplicitAny`. |
+| `` await import(`@playwright/${part}`) `` | passes | **no** — `require() cannot be used on an ESM graph with top-level await` | n/a |
+| `/* eslint-disable vizra/no-unguarded-playwright-import */` | passes | yes | **GREEN. The harness lies.** |
+
+The last one, measured on the pristine tree with one added spec whose page
+404s a sub-resource and throws an uncaught `Error` on every load:
+
+```
+e2e/specs/__b2.spec.ts
+  /* eslint-disable vizra/no-unguarded-playwright-import */
+  import { test } from "@playwright/test";
+
+npm run ci                                   -> exit 0   (9 files / 206 tests)
+npx playwright test (full lane, floor armed) -> exit 0   20 passed
+                                                e2e coverage floor: OK (desktop=10/9 mobile=10/9)
+node scripts/ci/check-coverage-floor-ran.mjs -> exit 0
+bash scripts/ci/check-e2e-lane.sh            -> exit 0
+```
+
+`eslint.config.mjs` sets neither `linterOptions.noInlineConfig` nor
+`reportUnusedDisableDirectives`, and the directive is *used*, so the latter
+would not help anyway. The vitest sweep lints through the same ESLint, so it
+inherits the suppression.
+
+**Why this is still blocking, and why it is much less bad than before.** The
+comment names the rule it defeats, so it is self-incriminating in a diff, and
+`/e2e/specs/` is now owner-reviewed — a real improvement. But AGENTS.md now
+states as contract that "a spec may not reach `@playwright/test` at all", and
+that remains defeasible by one comment with every automated gate green. The fix
+is one line: `linterOptions: { noInlineConfig: true }` on the `e2e/specs/**`,
+`e2e/demos/**` config block. (`playwright/test` should also be added to the
+rule's package list, and the unscoped-namespace case asserted, so the defence is
+the rule rather than a module-loading accident.)
+
+## 3. FINDING 2 — the lane guard. **CLOSED.**
+
+`check-e2e-lane.sh` now delegates to `check-e2e-lane.mjs`, which **parses** the
+workflow with the pinned `yaml` package and asserts the step graph. I ran 18
+mutations; **17 are red by name**, and the unmodified control passes.
+
+| Mutation | Result |
+|---|---|
+| delete the `npm run e2e` step | red — "no step runs the browser lane" |
+| replace it with `echo skipping` | red — same, and it names the closest step |
+| `npm run e2e \|\| true` | red |
+| `npm run e2e; true` | red |
+| `if: false` on the step | red |
+| `continue-on-error: true` / `"true"` / `${{ expression }}` | red (all three) |
+| multi-line `run: \|` with the command buried after `exit 0` | red |
+| `shell: python` | red |
+| `E2E_BASE_URL` at a port no `docker run --publish` exposes | red |
+| `if: false` on the **job** | red |
+| remove the floor re-check step | red |
+| remove the redaction step | red |
+| `if-no-files-found` back to `warn` | red |
+| second job named `e2e` (shadow) | red — YAML duplicate-key parse error, fails closed |
+| add a `paths:` filter to `pull_request` | red |
+
+**Residual, non-exploitable:** `working-directory: docs` on the lane step passes
+the guard. It is not a silent bypass — the only `package.json` outside
+`node_modules`/`.next` is the repository root's, and `.next` does not exist on
+the runner (the workflow builds a Docker image, not a local build), so the step
+would fail loudly with a missing script. Worth adding for defence in depth;
+not a finding.
+
+## 4. FINDING 3 — the coverage floor. **CLOSED.**
+
+Minima moved to `e2e/harness/required-projects.json` (9/9, CODEOWNERS-covered),
+read by both the in-process reporter and a new out-of-process CI step.
+
+**Every filtered form is refused**, which is stronger than raising the numbers:
+
+```
+--grep "reports liveness"   red — the run was FILTERED (--grep)
+-g "reports liveness"       red — (-g)
+--grep-invert               red — (--grep-invert)
+--grep=reports              red — (--grep)
+e2e/specs/health.spec.ts    red — file filter "e2e/specs/health.spec.ts"
+--project=desktop-…         red — (--project)
+--shard=1/2                 red — (--shard)
+--last-failed               red — (--last-failed)
+no filter                   exit 0, coverage floor: OK (9/9 9/9)
+```
+
+**Deleting a test goes red.** I removed one test from `home.spec.ts`: the lane
+exited 1 with `ran 8 passing test(s), and the floor is 9` from the in-process
+reporter, and the out-of-process step named the same shortfall for both
+projects.
+
+**The stale-report attack does not work.** I wrote a good 18-test report, then
+deleted the `json` reporter from `playwright.config.ts` (the edit the PR being
+gated could make) and ran a short filtered run. Playwright clears
+`playwright-report/` at run start, so the checker got ENOENT and failed closed —
+"A lane whose report is missing did not run; that is a failure, not a silence."
+Exit 1 (verified with a clean exit-code capture: full run → 0, missing report →
+1). Both directories are gitignored (`.gitignore:16,20`) and CI checks out
+fresh, so no stale file can be present there either.
+
+## 5. FINDING 4 — privacy. **The query-string case is CLOSED. A scope statement is still owed, and there is a new fail-open.**
+
+### The headline case, clean
+
+I re-ran my original test with the sentinel appearing **only** as a URL query
+value — no `page.evaluate` parameter, no body, no header:
+
+```
+page.goto("/media/photo.jpg?X-Amz-Signature=PUREQUERYzz9911&X-Amz-Expires=60")
+
+before redaction:  3 members contain the sentinel
+                   (1-trace.network, 1-trace.trace, test.trace)
+after  redaction:  0 members contain the sentinel
+                   path "media/photo.jpg" still readable in 6 members
+```
+
+### The real CI artifact
+
+Better than my local run: I downloaded the artifact from run **35536837315**
+(item 6) and unpacked every nested archive. In the bytes GitHub actually served:
+
+```
+239 occurrences of "?<redacted>"
+  0 absolute URLs carrying a live query
+  0 relative URLs carrying a live query
+  0 non-empty "queryString" arrays
+host and path intact, e.g. http://127.0.0.1:3000/__vizra_e2e_fixture__/media/photo.jpg
+```
+
+The redaction demonstrably ran in CI on a genuinely uploaded artifact.
+
+### Per-channel coverage, measured
+
+I built a failing run carrying a distinct sentinel in eleven channels, ran
+`redact-artifacts.sh`, and swept every member of every archive.
+
+| Channel | Covered? |
+|---|---|
+| URL query string | **yes** (clean test above) |
+| URL fragment | **yes** |
+| `Location` response header (it is a URL) | **yes** |
+| `Authorization` request header | no — survives in `1-trace.network` |
+| `Cookie` request header | no — survives in `1-trace.network` |
+| `x-amz-security-token` request header | no — survives in `1-trace.network` |
+| `Set-Cookie` response header | no — survives in `1-trace.network` |
+| POST body | no — survives in `resources/*.txt` (script header says bodies are out of scope) |
+| response body | no — same |
+| console message (a bare token, not a URL) | no — survives in `*-trace.trace` |
+| DOM snapshot / attachment | no — survives |
+| **Playwright call parameters** (`page.evaluate`/`page.fill` arguments) | no — survives in `*-trace.trace`; named by nobody, and the channel a real login spec would use |
+
+**Correction to my own method:** my first multi-channel probe passed all eleven
+sentinels through one `page.evaluate` argument, which put every one of them into
+the trace as a call parameter regardless of channel. That is why "query string"
+appeared to survive. The clean re-run above is the one that counts. The header
+results stand independently, because they land in `1-trace.network`, which
+records the real wire headers.
+
+**None of this can leak anything today** — nothing authenticates, there is no
+vizra-core, no session cookie and no signed URL, and the VZ-FOUND-008 ledger
+entry's privacy case list is empty. All of it becomes live at M1.
+
+**What AGENTS.md says.** Lines 197–218 claim "**No URL query string leaves this
+repository, in any artifact**" — literally true and now verified — and state the
+`.png`/`.webm` exclusion. They do **not** say that headers, cookies, bodies or
+Playwright call parameters are uncovered; worse, "keeping origin, path,
+**headers** and timings readable" is presented as a feature, which a reader
+could mistake for safety. That scope statement is still owed.
+
+### New: the upload is fail-open on the redactor's own failure
+
+`redact-artifacts.sh` handles an unparseable archive correctly — I fed it a
+corrupt `.zip` and it warned and **deleted** the file rather than uploading
+unredacted bytes, exit 0, sentinel gone. Fail-closed, verified.
+
+But the redact step and the upload step both carry `if: failure()` and nothing
+links them. `failure()` is true when *any* prior step failed, so if the redactor
+itself exits non-zero — exit 2 on a missing `perl`/`unzip`/`zip`, exit 1 on a
+repack failure — the upload still runs and publishes the **unredacted** tree.
+See FINDING 7.
+
+## 6. Item 6 — the artifact proof. **Confirmed, and FINDING 5 is CLOSED.**
+
+```
+run 35536837315  workflow e2e  conclusion FAILURE
+  branch chore/e2e-artifact-upload-proof, sha 0401d5ea, event pull_request
+  title "THROWAWAY — prove the e2e artifact path executes (do not merge)"
+artifact playwright-artifacts-35536837315-1, 1,251,268 bytes,
+  expired false, expires 2026-10-04 (14 days)
+PR #4: state closed, merged false
+branches now: feat/m0-browser-env, main   <- chore/e2e-artifact-upload-proof deleted
+```
+
+`if-no-files-found: error` is set in the workflow and enforced by the parser
+(mutation m16 is red). The ledger's `evidence_required` — "CI artifact links;
+retained traces for a deliberately failing spec" — is now satisfiable from a
+real run, and I verified the artifact's contents rather than its existence.
+
+## 7. Item 7 — test changes and the two CI fixes. **All sound.**
+
+**`browser-errors.test.ts` −20/+62.** The removed `it.each` regex assertion is
+replaced by two strictly stronger ones: (a) run the repository's real ESLint
+config over every real spec and demo, assert zero violations of the rule **and**
+assert the sweep actually covered every file (so a file ESLint declined to lint
+cannot pass silently); (b) assert the rule fires at severity 2 for a path under
+`e2e/specs/`, using a spelling the old regex missed. The `files.length >= 4`
+vacuity check is retained; the `readFileSync` import removal is consequential.
+**Nothing was weakened.**
+
+**The two D4a transcripts.** Regenerated machine output, not assertions: the
+floor label changed (`required-projects.ts` → `.json`), the minimum changed
+(1 → 9), and the new `the run was FILTERED (--grep)` diagnostic appears. Strictly
+more informative, faithful to the code. **Legitimate.**
+
+**`ci-guard` never ran `npm ci`.** Fixed by adding `setup-node` + `npm ci`, and —
+correctly — by adding `package.json` and `package-lock.json` to the job's path
+filter, so a lockfile change triggers the guard that now depends on it. The
+missing `yaml` package failed loudly (13 named failures), which is the right
+failure mode; it is now simply not missing.
+
+**ESLint was linting `playwright-report/`.** Now ignored, along with
+`test-results/`. `git ls-files` shows **no tracked file** under either path and
+both are gitignored, so the ignore cannot hide a real source file. Sound.
+
+## 8. Item 8 — CI on 44dac20
+
+```
+ci-required   success 20:59:01      contract  success      docker-build success
+e2e           success 20:58:37      frontend  success      guard        success
+deps-scan     success               image-scan success
+GitGuardian Security Checks         FAILURE
+```
+
+`ci-required` log on this SHA:
+
+```
+  - frontend
+  - contract
+  - ?guard
+  - ?docker-build
+  - e2e
+waiting: frontend … contract … guard … docker-build … e2e (in_progress)
+waiting: docker-build (in_progress) e2e (in_progress)
+waiting: e2e (in_progress)
+OK: every required check on 44dac201c120e2a6d0c689cf53aafb218ca341a3 concluded success.
+```
+
+Every manifest lane executed and concluded `success`; `e2e` is required,
+non-optional, and `ci-required` waited for it.
+
+**GitGuardian**: still "2 secrets … from the scan of **4** commits" — the same
+two historical findings from `951f18b`, rescanned across the now-four-commit PR.
+I diffed `112291e..44dac20` for credential-shaped additions and for live query
+strings: **none**. The only `hmr?id=` occurrences at this head are the prose
+example in `redact.ts` and the `PLACEHOLDER-not-a-real-id` constant in
+`redact.test.ts`. A squash-merge drops `951f18b`. The check still needs
+deliberate owner dismissal rather than being merged past.
+
+---
+
+## Findings
+
+```
+FINDING 6: one `eslint-disable` comment still opts a spec out of the browser-error guard, with every automated gate green
+Severity:    BLOCKER
+Confidence:  high
+Supersedes:  FINDING 1 (the two import spellings I reported are both closed)
+
+Affected:
+  repo:      vizra-user
+  files:     eslint.config.mjs:29-45 (no `linterOptions`)
+             eslint-rules/no-unguarded-playwright-import.mjs:53 (PACKAGE list)
+             e2e/harness/browser-errors.test.ts:204-224 (the sweep lints through the same ESLint)
+             AGENTS.md (the "A spec may not reach `@playwright/test` at all" paragraph)
+  requirements: VZ-FOUND-008
+
+Observed:
+  On the pristine tree at 44dac20, one added spec:
+
+      /* eslint-disable vizra/no-unguarded-playwright-import */
+      import { test } from "@playwright/test";
+      test("…", async ({ page }) => {
+        await page.addInitScript(() => { … 404 a sub-resource, then throw … });
+        await page.goto("/"); await page.waitForLoadState("networkidle");
+      });
+
+      npm run ci                                   exit 0  (9 files / 206 tests)
+      npx playwright test  (full lane, floor armed) exit 0  20 passed
+                                                     coverage floor: OK (desktop=10/9 mobile=10/9)
+      node scripts/ci/check-coverage-floor-ran.mjs  exit 0
+      bash scripts/ci/check-e2e-lane.sh             exit 0
+
+  eslint.config.mjs sets neither `linterOptions.noInlineConfig` nor
+  `reportUnusedDisableDirectives`. The directive is USED, so the latter would
+  not catch it regardless. The vitest sweep in browser-errors.test.ts calls the
+  same ESLint, so the suppression applies there too — it reported no violation.
+
+  Separately, the rule's PACKAGE constant is `@playwright/test` only, so the
+  unscoped `playwright/test` (which node_modules/playwright/test.js re-exports)
+  is not a package reference. `import * as pw from "playwright/test"` passes
+  lint and runs; it happens to fail the lane only because loading a second
+  runner copy breaks all 18 real tests. That is a module-loading accident, not a
+  control.
+
+Failure:
+  The guard every later UI slice depends on is still optional, at the cost of
+  one comment. AGENTS.md states as reviewed contract that "a spec may not reach
+  `@playwright/test` at all"; that is false while an inline directive can turn
+  the rule off for a file.
+
+Perspective:
+  developer, and through them visitor and member, who receive the broken page.
+
+Recommendation:
+  Two lines, in the config block that already exists:
+
+      files: ["e2e/specs/**/*.ts", "e2e/demos/**/*.ts"],
+      linterOptions: { noInlineConfig: true },
+      rules: { "vizra/no-unguarded-playwright-import": ["error", { … }] },
+
+  and add "playwright/test" to the rule's package list (a second constant beside
+  PACKAGE, matched the same way).
+
+Acceptance criteria:
+  - A spec in e2e/specs/ carrying
+    `/* eslint-disable vizra/no-unguarded-playwright-import */` fails
+    `npm run ci`.
+  - So does `// eslint-disable-next-line vizra/no-unguarded-playwright-import`.
+  - So does `/* eslint-disable */` with no rule named.
+  - `import * as pw from "playwright/test"` fails lint by name.
+  - The unmodified tree still passes `npm run ci` with 206 tests and no new skips.
+
+Tests:
+  eslint-rules/no-unguarded-playwright-import.test.mjs for the `playwright/test`
+  cases (RuleTester, the harness exists). For the disable directive, RuleTester
+  cannot express it — add a case to browser-errors.test.ts alongside the existing
+  "the rule is configured as an error" test, linting text that carries the
+  directive and asserting the violation still reports. Then add a RED half to
+  scripts/e2e/demonstrate.sh D8 for the directive, matching the five that are
+  already there.
+
+Cross-repo implications:
+  core: none | user: as above | search: none
+  meta: VZ-FOUND-008 must not reach VERIFIED until this is closed.
+
+Challenge:
+  "The comment names the rule it defeats, and /e2e/specs/ is now owner-reviewed —
+  a reviewer cannot miss it." That is the strongest argument and it is why this
+  is a one-line fix rather than a redesign. But every other control in this PR
+  was built on the principle that review is not the mechanism: CODEOWNERS covers
+  .github/ and the workflow parser was still written. A control that is off by
+  default for any file that asks is not default-deny, and `noInlineConfig` costs
+  one line.
+```
+
+```
+FINDING 7: if the artifact redactor fails, the unredacted artifacts are uploaded anyway
+Severity:    REQUIRED  (not blocking for this PR — nothing authenticates yet)
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     .github/workflows/e2e.yml:122-124 (redact step, `if: failure()`)
+             .github/workflows/e2e.yml:136-137 (upload step, `if: failure()`)
+             scripts/ci/redact-artifacts.sh:57-62 (exit 2), :151-155 (exit 1)
+             scripts/ci/check-e2e-lane.mjs:222-249
+  requirements: VZ-FOUND-008; meta AGENTS.md § Engineering guardrails
+
+Observed:
+  Both steps are gated on bare `if: failure()`, and nothing links them. GitHub's
+  `failure()` is true when ANY earlier step in the job failed, so a redactor that
+  itself exits non-zero does not stop the upload — it satisfies its condition.
+
+  redact-artifacts.sh has two hard-failure paths:
+    exit 2  `perl`, `unzip` or `zip` missing (lines 57-62)
+    exit 1  a repack failure after the original archive was already removed (151-155)
+
+  In both cases `test-results/` and `playwright-report/` are left partially or
+  wholly unredacted and the next step publishes them for 14 days.
+
+  The unparseable-archive path IS fail-closed, and I verified it: given a corrupt
+  `.zip`, the script warned, deleted the file, exited 0, and the sentinel was
+  gone from the tree.
+
+  check-e2e-lane.mjs requires the redact step to exist and to precede the upload
+  (mutation m15 is red) but does not require the upload to be conditional on the
+  redaction having succeeded.
+
+Failure:
+  From M1 a runner missing one of three tools, or one corrupt repack, publishes
+  signed media URLs and session cookies as a downloadable artifact. Today the
+  artifacts contain nothing private, so nothing leaks now.
+
+Perspective:
+  member, photographer, operator
+
+Recommendation:
+  Give the redact step an `id` and gate the upload on it:
+
+      - name: Redact URL query strings in the artifacts
+        id: redact
+        if: failure()
+        run: bash scripts/ci/redact-artifacts.sh test-results playwright-report
+
+      - name: Upload Playwright artifacts
+        if: failure() && steps.redact.outcome == 'success'
+
+  and add the corresponding assertion to check-e2e-lane.mjs, where every other
+  property of this step graph is already asserted.
+
+Acceptance criteria:
+  - A workflow whose upload step is gated on bare `failure()` fails
+    `check-e2e-lane.sh` by name.
+  - The committed workflow passes.
+  - A run in which the redactor exits non-zero uploads nothing.
+
+Tests:
+  scripts/e2e/demonstrate.sh D7 — a mutation that removes the
+  `steps.redact.outcome` condition, asserted red, beside the existing five.
+
+Cross-repo implications:
+  core: none | user: as above | search: none | meta: none
+
+Challenge:
+  "ubuntu-24.04 ships perl, unzip and zip; this cannot happen." Probably true
+  today, and it is why this is REQUIRED rather than BLOCKER. But the runner image
+  is not this repository's to pin, the repack path is reachable on a full disk,
+  and the whole point of `if-no-files-found: error` — added in this same round —
+  was that a privacy control which has never executed must fail loudly rather
+  than quietly.
+```
+
+```
+FINDING 8: AGENTS.md's redaction section does not state which credential channels are uncovered
+Severity:    SHOULD  (must-fix before M1)
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     AGENTS.md:197-218
+             scripts/ci/redact-artifacts.sh:36-48
+  requirements: VZ-FOUND-008 (propose a privacy case on the ledger entry)
+
+Observed:
+  AGENTS.md:197 reads "**No URL query string leaves this repository, in any
+  artifact.**" — literally true, and I verified it end to end, including in the
+  real CI artifact from run 35536837315. Line 214 names the deliberate
+  `.png`/`.webm` exclusion.
+
+  It does not name the other uncovered channels. I measured them against a
+  failing run: `Authorization`, `Cookie`, `x-amz-security-token` and `Set-Cookie`
+  survive in `1-trace.network`; POST and response bodies survive in
+  `resources/*.txt`; a bare (non-URL) token in a console message, in a DOM
+  snapshot, and — the one nobody has named — in a **Playwright call parameter**
+  (`page.evaluate`/`page.fill` arguments) survives in `*-trace.trace`. File and
+  directory names are never rewritten at all; they derive from test titles.
+
+  AGENTS.md:211-212 presents "keeping origin, path, **headers** and timings
+  readable" as a feature, which reads as reassurance about the very channel that
+  is uncovered.
+
+Failure:
+  A later slice's author reads "no query string leaves this repository" plus
+  "headers readable" and concludes it is safe to let an authenticated page reach
+  a red lane. Nothing leaks today; the first authenticated slice is where this
+  is discovered, which is how the GitGuardian incident happened the first time.
+
+Perspective:
+  developer, member, photographer
+
+Recommendation:
+  Add four lines to the existing section naming what is NOT covered — request
+  and response headers (Authorization, Cookie, Set-Cookie, and bearer-ish
+  vendor headers), request and response bodies, Playwright call parameters, and
+  artifact file names — and record the M1 precondition on the ledger rather than
+  in prose.
+
+Acceptance criteria:
+  - AGENTS.md names each uncovered channel.
+  - docs/quality/features.json VZ-FOUND-008 carries a privacy case:
+    "no session cookie, Authorization header or signed URL reaches an uploaded
+    artifact", status UNVERIFIED, with a named dependency on the first slice
+    that authenticates.
+  - Before that slice merges, a demonstration proves it, using
+    scripts/e2e/sweep-artifacts.sh, which already does exactly this search.
+
+Tests:
+  scripts/e2e/demonstrate.sh D9 already produces a failing run and sweeps every
+  member for a sentinel. Extend it with a header-channel sentinel when the first
+  authenticated slice gives it a real credential to use; the harness exists.
+
+Cross-repo implications:
+  core: the first signed-URL / session slice in vizra-core is the trigger.
+  user: as above | search: none | meta: add the privacy case to the ledger entry.
+
+Challenge:
+  "The section is about query strings and says so; it is not wrong." Agreed — it
+  is accurate, which is why this is SHOULD and not a correctness finding. The
+  objection is that a reader deciding whether a red lane is safe will read this
+  section and nothing else, and the sentence that follows tells them headers are
+  kept.
+```
+
+## Status of my five original findings
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | spec can bypass the guard | **OPEN** — both my spellings closed; superseded by FINDING 6 (the `eslint-disable` directive) |
+| 2 | lane guard does not assert the lane runs | **CLOSED** — 17/18 mutations red by name; the one that passes fails loudly at runtime |
+| 3 | floor is 1 per project, not 9 | **CLOSED** — 9/9 in a CODEOWNERS-covered JSON, every filter form refused, deletion red, re-checked out of process, stale report fails closed |
+| 4 | traces carry raw query strings | **CLOSED for query strings** — verified locally (3→0, path readable) and in the real uploaded CI artifact (239 `?<redacted>`, 0 live queries). Residual scope statement → FINDING 8; new fail-open → FINDING 7 |
+| 5 | artifact upload path never executed | **CLOSED** — run 35536837315 uploaded 1.25 MB, `if-no-files-found: error` set and enforced, PR #4 closed unmerged, branch deleted |
+
+## What I could not check
+
+- **linux/amd64.** Verified on macOS arm64; the CI `e2e` and `docker-build` lanes
+  cover the ADR-009 acceptance platform and are green on this SHA, and the CI
+  artifact I unpacked was produced there.
+- **Branch protection.** CODEOWNERS now covers `/e2e/specs/` and `/e2e/demos/`,
+  which FINDING 6 partly leans on — but as the file itself says, it does nothing
+  until an owner applies a ruleset. Still aspirational on every path.
+- **Nested archives inside a trace member.** `redact-artifacts.sh` byte-rewrites
+  a `.zip` found inside an extracted tree rather than recursing into it, and
+  `sweep-artifacts.sh` enumerates archives once. No Playwright artifact nests
+  archives today, so this is theoretical; I did not construct one.
+
+## Verdict at 44dac20
+
+**FAIL**, on FINDING 6 alone.
+
+This round closed four of my five findings with work that is better than what I
+asked for: a real AST rule instead of a better regex, a YAML parser instead of a
+better grep, a floor that refuses every filtered run rather than just a higher
+number, and an artifact-redaction path proven on a genuinely uploaded CI
+artifact rather than argued. Fourteen of nineteen bypass spellings are now
+errors, seventeen of eighteen workflow mutations are red by name, eight of eight
+filter forms are refused, and 39 of 39 demonstration halves reproduced from my
+clean clone. Every count the builder claimed matched mine exactly.
+
+What stops it is one line of configuration. `eslint.config.mjs` permits inline
+directives, so `/* eslint-disable vizra/no-unguarded-playwright-import */` still
+buys a spec an exemption from the one control this entire slice exists to
+provide, with `npm run ci`, the full lane, the coverage floor, the out-of-process
+floor re-check and the lane guard all green on a page that 404s and throws. The
+remedy is `linterOptions: { noInlineConfig: true }` on a config block that
+already exists, plus adding `playwright/test` to the rule's package list so the
+unscoped namespace form is refused by the rule rather than by a module-loading
+accident.
+
+FINDING 7 should be fixed in the same round (two lines in the workflow and one
+assertion in the parser). FINDING 8 is a documentation and ledger change, not
+code.
+
+VZ-FOUND-008 must not reach VERIFIED until FINDING 6 is closed and
+re-verified. PASS is not a merge and FAIL is not a rejection of the approach —
+the approach is now sound.
