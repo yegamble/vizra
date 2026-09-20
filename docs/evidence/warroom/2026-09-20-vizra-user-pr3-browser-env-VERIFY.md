@@ -1354,3 +1354,453 @@ code.
 VZ-FOUND-008 must not reach VERIFIED until FINDING 6 is closed and
 re-verified. PASS is not a merge and FAIL is not a rejection of the approach —
 the approach is now sound.
+
+---
+
+# Re-verification at 0ac9fb6
+
+**Verdict: FAIL** — one blocking finding, one line to fix, in the same class as
+FINDING 6 but through a different door that this round was not asked to close.
+**Findings 6, 7 and 8 are each CLOSED for everything the round was scoped to
+do**, and the work is the best of the three rounds.
+
+| | |
+|---|---|
+| Head SHA verified | `0ac9fb6a820d50ef030f86f053409b967d2beec8` — confirmed unmoved at start and finish |
+| Ancestry | `git merge-base --is-ancestor 44dac20… HEAD` → **yes**; 2 commits on top (`edd70cb`, `0ac9fb6`) |
+| Delta | 52 files, +1100 −287 |
+| Environment | macOS arm64, Node v22.14.0, @playwright/test 1.63.0, Chromium `chromium-1243` (already cached — I installed no browser); Docker available, 16 GiB free, local image build **ran** |
+| Clone | fresh, `<scratch>/verify-0ac9fb6/vizra-user`, deleted on completion |
+
+**Scope check.** The delta touches exactly Findings 6, 7 and the wording half of
+8: `eslint.config.mjs`, the rule, `browser-errors.test.ts`, the workflow's
+redact/upload gate, `check-e2e-lane.mjs`, `AGENTS.md`, the new
+`no-credentials-in-specs.test.ts`, `demonstrate.sh`, `require-checks_test.sh`,
+and regenerated transcripts. The only thing outside that list is
+`e2e/demos/console-error.demo.ts`, where two `eslint-disable-next-line
+no-console` comments were replaced by a config-level `no-console: "off"` for
+`e2e/demos/**` — a direct and necessary consequence of `noInlineConfig`. Nothing
+out of scope.
+
+## 1. Counts — every claim matched
+
+| Command | Exit | Result | Claim |
+|---|---|---|---|
+| `npm ci` | 0 | lockfile consistent | — |
+| `npm run ci` | 0 | — | — |
+| `npm run test` | 0 | **10 files / 227 tests / 0 skipped** | 10 / 227 / 0 — **matches** |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **92 cases / 99 assertions / 0 failed** | 92 / 99 — **matches** |
+| `npm run e2e` | 0 | 18 passed; `coverage floor: OK (9/9 9/9)` | — |
+| `node scripts/ci/check-coverage-floor-ran.mjs` | 0 | `OK … (9/9 9/9)` | — |
+| `npm run e2e:demos` | 0 | **51 halves passed, 0 blocked, 0 failed** | 51 halves — **matches** |
+
+**A correction against myself.** My first demo run reported 49/51 with D4c red.
+That was my own contamination: I ran the attack battery, which repeatedly writes
+and deletes `e2e/specs/__atk.spec.ts`, *concurrently* with the demo suite, so
+D4c's run saw a tenth spec and D4c-GREEN crashed on the `playwright/lib/index`
+probe that happened to be on disk at that moment. Re-run on a pristine tree with
+nothing else touching the repository: **51/51, exit 0.** The builder's claim is
+correct and my first number was wrong.
+
+## 2. FINDING 6 — **CLOSED.**
+
+`linterOptions: { noInlineConfig: true }` on the `e2e/specs/**`, `e2e/demos/**`
+block; `PACKAGES` widened to `["@playwright/test", "playwright/test", "playwright"]`.
+
+**My exact 44dac20 exploit, verbatim, now fails:**
+
+```
+/* eslint-disable vizra/no-unguarded-playwright-import */
+import { test } from "@playwright/test";      (page 404s a sub-resource and throws)
+
+npm run ci  ->  exit 1
+  1:1  warning  '/* eslint-disable … */' has no effect because you have
+                'noInlineConfig' setting in your config
+  2:1  error    This file must not reference `@playwright/test` …
+                vizra/no-unguarded-playwright-import
+```
+
+**All twelve spellings I tried are errors** — six inline-directive forms and
+four package spellings, plus the two controls:
+
+| Form | Result |
+|---|---|
+| `/* eslint-disable RULE */` | caught |
+| `// eslint-disable-next-line RULE` | caught |
+| `// eslint-disable-line RULE` | caught |
+| `/* eslint RULE: "off" */` | caught |
+| `/* eslint RULE: 0 */` | caught |
+| `/* eslint-disable */` (no rule named) | caught |
+| `/* global test */` + disable | caught |
+| `import { test } from "playwright/test"` | caught |
+| `import * as pw from "playwright/test"` | caught |
+| `import { chromium } from "playwright"` | caught |
+| `import x from "playwright/lib/index"` | caught |
+| `import x from "playwright-extra"` | correctly **allowed** — prefix over-match avoided |
+
+**Pinned both ways, and the pin bites.** `browser-errors.test.ts` asserts the
+setting via `calculateConfigForFile` *and* the behaviour for four comment forms
+*and* the unscoped spelling. Deleting the `linterOptions` line → **5 tests fail**,
+naming both the missing setting and each suppressed directive.
+
+**`no-console` for demos moved into config, correctly.** Demos that must log
+still can (`e2e/demos/**` → `no-console: "off"`, and the 51-half suite passes);
+specs still cannot — a `console.log` in `e2e/specs/**` is an error, and with
+`noInlineConfig` a spec can no longer excuse one with a comment either.
+
+## 3. FINDING 7 — **CLOSED.**
+
+`id: redact` on the redactor; upload gated on
+`failure() && steps.redact.outcome == 'success'`; the parser asserts it.
+**8 of 11 mutations red by name**, including both traps the chair named:
+
+| Mutation | Result |
+|---|---|
+| upload back to bare `failure()` | red — "not gated on the redaction having SUCCEEDED" |
+| `steps.redact.conclusion` instead of `.outcome` | red |
+| gate on `always()` | red — "not gated on `failure()`" |
+| gate on `outcome != 'skipped'` (ran, not succeeded) | red |
+| remove the step `id` | red — "cannot be gated on whether it succeeded" |
+| redactor removed | red |
+| `continue-on-error` on the redactor | red — "would report `success` however it exits" |
+| upload moved before the redactor | red |
+| `actions/upload-artifact` replaced by another action | red — "no step uploads artifacts" |
+
+### CI proof — run 35538966116
+
+```
+workflow e2e, branch chore/e2e-redactor-failure-proof, sha b87c3b12, conclusion FAILURE
+
+  Browser lane (desktop 1440, mobile 390)      failure
+  The coverage floor was actually satisfied    skipped
+  Redact URL query strings in the artifacts    FAILURE
+  Upload Playwright artifacts                  SKIPPED
+  artifacts: { "count": 0, "names": [] }
+```
+
+Exactly the behaviour the fix promises: the redactor failed, the upload did not
+run, and **zero bytes were published**. PR #5 `state: closed, merged: false`;
+branch `chore/e2e-redactor-failure-proof` is gone from the branch list.
+
+## 4. FINDING 8 (wording + guard) — **CLOSED**, with an honest caveat.
+
+**The "NOT covered" table in AGENTS.md matches my measurements channel for
+channel** — `Authorization`, `Cookie`, `Set-Cookie`, vendor token headers
+(`1-trace.network`); request and response bodies (`resources/*`); non-URL console
+tokens, DOM snapshots, and **Playwright call parameters** (`*-trace.trace`);
+artifact file and directory names; `.png`/`.webm`. The misleading sentence that
+offered "headers … readable" as a feature is **gone**, and the table is
+introduced with "Read this list before you decide a red lane is safe to share."
+That is a better scope statement than I asked for.
+
+**The tripwire is a tripwire.** `e2e/harness/no-credentials-in-specs.test.ts`
+catches all five real patterns I threw at it — `page.fill` on a password field,
+`storageState`, `setExtraHTTPHeaders({Authorization})`, `addCookies`, and a
+signed-URL shape — and an ordinary spec passes. It is evaded by anything that
+isn't in its pattern list:
+
+| Evasion | Result |
+|---|---|
+| `pressSequentially` instead of `.fill(` | evades |
+| `page.evaluate` setting `document.cookie` | evades |
+| credentials read from `process.env` | evades |
+| a login helper in `e2e/harness/` (outside the swept dirs) | evades |
+
+**Is it described honestly?** Mostly yes, and better than most: AGENTS.md
+enumerates the exact patterns it matches rather than claiming coverage, and the
+file's own header says "This is a source sweep, not a type check: the point is
+to be impossible to satisfy accidentally." The one overstatement is framing —
+AGENTS.md says the hard rule is what the test "asserts", where it in fact
+*samples*. One sentence ("it catches the accident, not the determined author")
+would close it. Not blocking; recorded as a residual.
+
+## 5. Regression sweep — Findings 2, 3, 5 stay **CLOSED**
+
+Three canaries each, all red:
+
+```
+F2  delete the lane step           exit 1
+    npm run e2e || true            exit 1
+    if: false on the job           exit 1
+F3  --grep one test                exit 1   (the run was FILTERED)
+    --project one project          exit 1
+    delete one test                exit 1   (8 < 9)
+F5  if-no-files-found: warn        exit 1
+    drop playwright-report/        exit 1
+    redactor removed               exit 1
+```
+
+**Privacy still holds**: a pure query-string sentinel went 3 members → **0**
+after `redact-artifacts.sh`, with `media/photo.jpg` still readable.
+
+**No test weakened or deleted since 44dac20.** `browser-errors.test.ts` +77/−0,
+`require-checks_test.sh` +45/−0, `no-credentials-in-specs.test.ts` +142 new. The
+only removed lines in any test or spec file are the two
+`eslint-disable-next-line no-console` comments in the demo (replaced by config,
+as `noInlineConfig` requires) and one comment in the rule's test — which was
+replaced by a **broader** comment plus two new valid cases (`playwright-extra`,
+`playwrightish`), and I confirmed `playwright-extra` is still allowed. The rule
+test went +42/−1 and gained the three unscoped-package error cases.
+
+## 6. CI on 0ac9fb6
+
+```
+ci-required success 21:40:17   contract success   docker-build success
+e2e         success 21:39:55   frontend success   guard        success
+deps-scan   success            image-scan success
+GitGuardian Security Checks    FAILURE
+
+  - frontend / - contract / - ?guard / - ?docker-build / - e2e
+waiting: frontend … contract … guard … docker-build … e2e (in_progress)
+waiting: e2e (in_progress)   x2
+OK: every required check on 0ac9fb6a820d50ef030f86f053409b967d2beec8 concluded success.
+```
+
+On this **green** e2e run: `Redact URL query strings` **skipped**, `Upload
+Playwright artifacts` **skipped**, artifact count **0** — correct, and proof the
+new gate does not fire spuriously.
+
+**GitGuardian**: still "2 secrets … from the scan of **6** commits" — the same two
+historical findings from `951f18b`, rescanned across the now-six-commit PR. The
+delta `44dac20..0ac9fb6` adds **no** credential-shaped content and **no** live
+query strings. Squash-merge drops `951f18b`; the check still needs deliberate
+owner dismissal.
+
+---
+
+## Findings
+
+```
+FINDING 9: a spec in any e2e/ directory other than specs/ or demos/ is collected by Playwright but linted by neither guard, and the whole gate stays green on a broken page
+Severity:    BLOCKER
+Confidence:  high
+Class:       the same as FINDING 6, through a different door. Pre-existing at
+             44dac20 (the globs are unchanged); this round was not asked to
+             close it, and did not.
+
+Affected:
+  repo:      vizra-user
+  files:     eslint.config.mjs:39  files: ["e2e/specs/**/*.ts", "e2e/demos/**/*.ts"]
+             e2e/harness/no-credentials-in-specs.test.ts:99  for (const dir of ["specs", "demos"])
+             playwright.config.ts  testDir: "./e2e", testMatch: "**/*.spec.ts"
+  requirements: VZ-FOUND-008
+
+Observed:
+  Playwright collects `**/*.spec.ts` under `./e2e`. Both guards enumerate
+  `e2e/specs` and `e2e/demos`. Any other directory under `e2e/` is therefore
+  collected and unguarded.
+
+  On the pristine tree at 0ac9fb6, one file at `e2e/other/__r1.spec.ts`:
+
+      import { test } from "@playwright/test";
+      test("R1", async ({ page }) => {
+        await page.addInitScript(() => { … 404 a sub-resource, then throw … });
+        await page.goto("/"); await page.waitForLoadState("networkidle");
+      });
+
+      npx eslint e2e/other/__r1.spec.ts            -> exit 0 (rule not applied)
+      npm run ci                                   -> exit 0 (10 files / 227 tests)
+      npx playwright test (full lane, floor armed) -> exit 0  20 passed
+                                                      coverage floor: OK (10/9 10/9)
+        ✓ [desktop-chromium-1440] e2e/other/__r1.spec.ts  R1
+        ✓ [mobile-chromium-390]   e2e/other/__r1.spec.ts  R1
+      node scripts/ci/check-coverage-floor-ran.mjs -> exit 0
+      npx vitest run …/no-credentials-in-specs.test.ts -> 8 passed (never saw the file)
+
+  Other extensions are NOT a hole: `.mts`, `.cts` and `.js` under e2e/specs/ are
+  not collected by Playwright at all (testMatch is `**/*.spec.ts`); I confirmed
+  each collects 0 tests.
+
+Failure:
+  The control the slice exists to provide is optional again — this time with no
+  self-incriminating comment. A new directory names nothing and defeats both the
+  import guard and the credential tripwire at once. Every later UI slice adds
+  specs, and nothing makes the guard's directory list follow the runner's.
+
+Perspective:
+  developer, and through them visitor and member, who receive the broken page.
+
+Recommendation:
+  Make the ESLint glob cover what Playwright collects, and the credential
+  sweep's roots follow it:
+
+      files: ["e2e/**/*.ts"],
+      ignores: ["e2e/harness/**"],          // the module that must import the real Playwright
+
+  and in no-credentials-in-specs.test.ts walk `e2eRoot` itself, excluding
+  `harness`, rather than a hard-coded ["specs", "demos"].
+
+Acceptance criteria:
+  - A spec at e2e/other/x.spec.ts using `@playwright/test` fails `npm run ci` by
+    name, as one in e2e/specs/ does.
+  - The credential sweep's file list includes it.
+  - e2e/harness/**  still lints clean (it imports the real Playwright by design).
+  - The unmodified tree still passes npm run ci with 227 tests and no new skips,
+    and npm run e2e:demos still reports 51/51.
+
+Tests:
+  browser-errors.test.ts already walks e2eRoot for **/*.{spec,demo}.ts and
+  asserts ESLint covered every file it found — it found e2e/other/__r1.spec.ts
+  and linted it, but the rule was not configured for that path, so it reported
+  no violation. Add one assertion beside it: for every file the walk finds, the
+  resolved config (calculateConfigForFile) must have
+  `rules["vizra/no-unguarded-playwright-import"]` at severity 2 and
+  `linterOptions.noInlineConfig === true`. That closes the class rather than the
+  directory, and the sweep that finds the files already exists.
+  Then add a RED half to demonstrate.sh D8 for a spec outside e2e/specs/.
+
+Cross-repo implications:
+  core: none | user: as above | search: none
+  meta: VZ-FOUND-008 must not reach VERIFIED until this is closed.
+
+Challenge:
+  "A new top-level directory under e2e/ is far more visible in a diff than a
+  comment, and CODEOWNERS covers it." Both true — and `* @yegamble` means every
+  path in this repository is owner-reviewed, so that was never the
+  distinguishing factor for FINDING 6 either. The distinguishing factor is
+  whether an automated gate can be made to report green on a broken page without
+  touching a file whose job is to be a gate. Here it can, and the fix is one
+  glob. The counter-argument I find hardest to dismiss is priority, not
+  correctness: this is the third round, everything asked for was delivered, and
+  a chair could reasonably take FINDING 9 as a follow-up slice with the ledger
+  entry held at IMPLEMENTED rather than VERIFIED. I am recording it as BLOCKER
+  because the ledger entry's whole claim is that this harness cannot go green on
+  a broken page, and today it still can.
+```
+
+```
+FINDING 10: the workflow parser checks only the FIRST upload-artifact step; a second, ungated one passes
+Severity:    REQUIRED  (not blocking — it only matters when the redactor fails)
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     scripts/ci/check-e2e-lane.mjs:229  steps.find(step => usesOf(step).startsWith("actions/upload-artifact@"))
+  requirements: VZ-FOUND-008
+
+Observed:
+  The parser locates the upload step with `.find(...)` and asserts the gate on
+  that one step. I appended a SECOND upload-artifact step at the end of the job,
+  on a bare `if: failure()`, publishing the same two directories:
+
+      node scripts/ci/check-e2e-lane.mjs <mutant>  ->  exit 0  "OK: …"
+
+  When the redactor succeeds this is harmless (the bytes are already redacted).
+  When the redactor FAILS, the gated upload is skipped and the ungated one
+  publishes the unredacted tree — which is precisely the fail-open FINDING 7
+  closed for the first step.
+
+  Out of scope, and I am not raising it as a finding: an arbitrary `run:` step
+  can exfiltrate by other means (`gh release upload`, `curl`). I confirmed such
+  a step passes the parser. No workflow linter can close that, and the
+  protection there is review, not parsing.
+
+Failure:
+  The FINDING 7 fix is per-step where it needed to be per-job.
+
+Perspective:
+  member, photographer, operator
+
+Recommendation:
+  Change `.find` to `.filter` and require every upload-artifact step to carry
+  the gate and the `if-no-files-found: error`; report by index when one does not.
+
+Acceptance criteria:
+  - A workflow with two upload-artifact steps, one ungated, fails
+    check-e2e-lane.sh by name.
+  - The committed workflow (one upload step) passes.
+  - bash scripts/ci/require-checks_test.sh still reports 0 failed.
+
+Tests:
+  scripts/e2e/demonstrate.sh D7 — a second-upload mutation, asserted red,
+  alongside the four D7 halves already there.
+
+Cross-repo implications:
+  core: none | user: as above | search: none | meta: none
+
+Challenge:
+  "Adding a whole second upload step to smuggle artifacts past the redactor is
+  not a realistic mistake." Agreed — which is why this is REQUIRED and not
+  BLOCKER. It is worth one character (`find` → `filter`) because the parser's
+  value is that it answers for the whole job, and a reader will assume it does.
+```
+
+## Residuals: accepted-by-design vs real holes
+
+**Accepted by design** (the mechanism is owner review of a file whose job is to
+be the gate; I verified each is at least not *silently* removable):
+
+- `eslint.config.mjs`, `eslint-rules/no-unguarded-playwright-import.mjs` —
+  `/eslint-rules/` is a CODEOWNERS path, and neutering the rule (`PACKAGES = []`)
+  **fails `npm run test`**, so it is not silent.
+- `e2e/harness/test.ts` — `/e2e/harness/` is a CODEOWNERS path. Neutering the
+  guard while leaving the identifiers present **is** silent in CI (`npm run test`
+  exit 0, `check-e2e-lane.sh` exit 0), because the lane guard's harness check is
+  string-presence only and `npm run e2e:demos` is not a CI lane. Accepted, but
+  worth knowing: the demonstrations, not CI, are what would catch it.
+- `e2e/harness/required-projects.json`, `playwright.config.ts` — CODEOWNERS
+  paths; both are additionally re-checked out of process.
+- Arbitrary `run:` steps in the workflow (`gh`/`curl` exfiltration) — outside
+  what any parser can close.
+
+**Real holes** (no gate notices; nothing about the change announces itself):
+
+- **FINDING 9** — a spec outside `e2e/specs/` and `e2e/demos/`. Blocking.
+- **FINDING 10** — a second ungated upload step. Required, not blocking.
+- The credential tripwire's evasions (`pressSequentially`, `page.evaluate`, env
+  vars, a helper in `e2e/harness/`). Not a finding: it is a tripwire by
+  construction and says so; the real control is the queued artifact-privacy
+  slice.
+
+## Status of all findings
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | spec bypasses the guard (two import spellings) | CLOSED at 44dac20 |
+| 2 | lane guard does not assert the lane runs | **CLOSED** — 3/3 canaries red |
+| 3 | floor is a report, not a floor | **CLOSED** — 3/3 canaries red |
+| 4 | traces carry raw query strings | **CLOSED** — verified again, 3 → 0 |
+| 5 | artifact upload path never executed | **CLOSED** — 3/3 canaries red |
+| 6 | `eslint-disable` opts a spec out | **CLOSED** — 12/12 spellings caught, exploit now exit 1, setting and behaviour pinned |
+| 7 | upload fail-open on redactor failure | **CLOSED** — 8/11 mutations red, proved in CI run 35538966116 (upload skipped, 0 artifacts) |
+| 8 | AGENTS.md does not state what is uncovered | **CLOSED** — table matches my measurements; tripwire added and honestly enumerated |
+| 9 | spec outside e2e/specs is unguarded | **OPEN — blocking** |
+| 10 | parser checks only the first upload step | **OPEN — required, not blocking** |
+
+## Verdict at 0ac9fb6
+
+**FAIL**, on FINDING 9 alone.
+
+Everything this round was asked to do, it did, and did well. My exact exploit is
+dead and ESLint itself now warns that the directive has no effect. All six
+inline-directive forms and all four Playwright package spellings are errors,
+with `playwright-extra` correctly still allowed — the rule got stricter without
+getting sloppier. `noInlineConfig` is pinned twice over, by
+`calculateConfigForFile` and by behaviour, and removing it turns five tests red.
+The redact/upload gate catches the `conclusion`-vs-`outcome` trap and the
+`continue-on-error` trap, and it was proved in CI on a real run where the
+redactor failed, the upload was skipped and zero bytes were published. The
+"NOT covered" table matches my channel-by-channel measurements exactly,
+including the call-parameter channel nobody had named. Nine regression canaries
+are red, no test was weakened, 51 of 51 demonstration halves reproduced from my
+clean clone, and every count matched.
+
+What stops it is one glob. `eslint.config.mjs` guards `e2e/specs/**` and
+`e2e/demos/**`; `playwright.config.ts` collects `**/*.spec.ts` under `e2e/`.
+A spec at `e2e/other/x.spec.ts` is therefore run by the lane and linted by
+nothing, and I measured `npm run ci` exit 0, the lane exit 0 with
+`coverage floor: OK (10/9 10/9)`, the out-of-process floor exit 0 and the
+credential sweep blind to it — on a page that 404s a sub-resource and throws on
+every load. It is the same class as FINDING 6 and it predates this round; the
+fix is `files: ["e2e/**/*.ts"], ignores: ["e2e/harness/**"]` plus the matching
+change to the credential sweep's roots, and the assertion that closes the class
+rather than the directory already has a sweep to hang on.
+
+FINDING 10 should ride along (one character). The tripwire's evasions are not
+findings — it is a tripwire and says so.
+
+VZ-FOUND-008 must not reach VERIFIED until FINDING 9 is closed and re-verified.
+If the chair judges FINDING 9 a follow-up slice rather than a blocker for this
+PR, the honest disposition is to merge with the ledger entry at IMPLEMENTED and
+the finding carried as its own dependency-ready item — not to mark it VERIFIED,
+because the claim that entry makes is exactly the one still defeasible.
