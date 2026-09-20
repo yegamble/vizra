@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Account — goimg</title>
+<link rel="stylesheet" href="account.css"/>
+<style>
+  .sec-svg { width: 18px; height: 18px; color: var(--ink-3); flex-shrink: 0; }
+  .conn { display: flex; align-items: center; gap: 12px; width: 100%; }
+  .conn-logo { width: 34px; height: 34px; border-radius: 10px; background: var(--bg-tint); display: inline-flex; align-items: center; justify-content: center; color: var(--ink); font-weight: 700; font-size: 14px; flex-shrink: 0; }
+  .plan-card { display: flex; gap: 14px; align-items: center; padding: 16px 18px; background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 8%, white), white); border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--line)); border-radius: 14px; }
+  .plan-mark { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, oklch(0.78 0.09 50), oklch(0.55 0.18 260)); flex-shrink: 0; }
+  .plan-title { font-size: 15px; font-weight: 600; }
+  .plan-sub { font-size: 13px; color: var(--ink-3); margin-top: 1px; }
+</style>
+</head>
+<body>
+<div id="nav-slot"></div>
+<main class="app">
+  <div id="sidebar-slot"></div>
+  <section class="main">
+    <div id="mobile-header-slot"></div>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Account</h1>
+        <p class="page-sub">Manage the basics — sign-in, security, and plan.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Plan</h2></div>
+      <div class="card-body">
+        <div class="plan-card">
+          <div class="plan-mark"></div>
+          <div style="flex:1;">
+            <div class="plan-title">goimg Pro <span class="tag accent" style="margin-left:6px;">Active</span></div>
+            <div class="plan-sub">Unlimited uploads · 4K exports · Renews May 12, 2026</div>
+          </div>
+          <button class="btn btn-secondary btn-sm">Manage</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Sign-in</h2></div>
+      <div class="row-list">
+        <div class="row">
+          <div class="row-main"><div class="row-title">Email</div><div class="row-sub">alex@alexrivera.studio · verified</div></div>
+          <button class="btn btn-secondary btn-sm">Change</button>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Password</div><div class="row-sub">Last changed 4 months ago</div></div>
+          <button class="btn btn-secondary btn-sm">Change</button>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Passkeys</div><div class="row-sub">2 devices · iPhone, MacBook Pro</div></div>
+          <button class="btn btn-secondary btn-sm">Manage</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Two-factor authentication</h2><p class="card-sub">Add a second step when signing in on a new device.</p></div>
+      <div class="row-list">
+        <div class="row">
+          <div class="row-main"><div class="row-title">Authenticator app</div><div class="row-sub">1Password · Enabled</div></div>
+          <div style="display:flex;align-items:center;gap:10px;"><span class="tag success"><span class="dot success" style="width:6px;height:6px;"></span>On</span><label class="toggle"><input type="checkbox" checked/><span class="track"></span><span class="thumb"></span></label></div>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">SMS backup</div><div class="row-sub">+1 ••• ••• 0142</div></div>
+          <label class="toggle"><input type="checkbox"/><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Recovery codes</div><div class="row-sub">8 of 10 remaining</div></div>
+          <button class="btn btn-secondary btn-sm">View</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Connected accounts</h2><p class="card-sub">Sign in with these services and share to them.</p></div>
+      <div class="row-list">
+        <div class="row">
+          <div class="conn"><span class="conn-logo" style="background:#000;color:white;">A</span><div class="row-main"><div class="row-title">Apple</div><div class="row-sub">Connected as alex@icloud.com</div></div></div>
+          <button class="btn btn-ghost btn-sm">Disconnect</button>
+        </div>
+        <div class="row">
+          <div class="conn"><span class="conn-logo" style="background:linear-gradient(135deg,#F58529,#DD2A7B,#8134AF);color:white;">IG</span><div class="row-main"><div class="row-title">Instagram</div><div class="row-sub">@alex.rivera.studio</div></div></div>
+          <button class="btn btn-ghost btn-sm">Disconnect</button>
+        </div>
+        <div class="row">
+          <div class="conn"><span class="conn-logo">G</span><div class="row-main"><div class="row-title">Google</div><div class="row-sub">Not connected</div></div></div>
+          <button class="btn btn-secondary btn-sm">Connect</button>
+        </div>
+        <div class="row">
+          <div class="conn"><span class="conn-logo" style="background:#FF9B3D;color:white;">A</span><div class="row-main"><div class="row-title">Adobe Creative Cloud</div><div class="row-sub">Import edits from Lightroom</div></div></div>
+          <button class="btn btn-secondary btn-sm">Connect</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Sessions</h2><p class="card-sub">Devices currently signed in.</p></div>
+      <div class="row-list">
+        <div class="row">
+          <div class="row-main"><div class="row-title">MacBook Pro · Safari <span class="tag accent" style="margin-left:6px;">This device</span></div><div class="row-sub">Berlin, Germany · Active now</div></div>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">iPhone 15 Pro · goimg app</div><div class="row-sub">Berlin, Germany · 2 hours ago</div></div>
+          <button class="btn btn-ghost btn-sm">Sign out</button>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">iPad Air · Safari</div><div class="row-sub">Mexico City · 3 days ago</div></div>
+          <button class="btn btn-ghost btn-sm">Sign out</button>
+        </div>
+      </div>
+      <div class="card-foot"><span>Don't recognize a session?</span><button class="btn btn-danger btn-sm">Sign out of all</button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title" style="color:var(--danger);">Danger zone</h2></div>
+      <div class="row-list">
+        <div class="row">
+          <div class="row-main"><div class="row-title">Export your data</div><div class="row-sub">Download a ZIP of your photos, albums, and metadata.</div></div>
+          <button class="btn btn-secondary btn-sm">Request export</button>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Deactivate account</div><div class="row-sub">Temporarily hide your profile. Reactivate any time.</div></div>
+          <button class="btn btn-secondary btn-sm">Deactivate</button>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Delete account</div><div class="row-sub">Permanently remove your account and all content.</div></div>
+          <button class="btn btn-danger btn-sm">Delete</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="mobile-tabs-slot"></div>
+<script>window.__page = { key: 'account' };</script>
+<script src="account-shell.js"></script>
+</body>
+</html>

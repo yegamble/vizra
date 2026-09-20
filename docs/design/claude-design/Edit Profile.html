@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Edit Profile — goimg</title>
+<link rel="stylesheet" href="account.css"/>
+<style>
+  .cover-edit { position: relative; border-radius: var(--radius-lg); overflow: hidden; aspect-ratio: 16/5; background: #111; }
+  .cover-edit img { width: 100%; height: 100%; object-fit: cover; }
+  .cover-tools { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; }
+  .cover-tool { padding: 6px 12px; border-radius: 999px; background: rgba(0,0,0,.5); color: white; backdrop-filter: blur(12px); font-size: 12.5px; font-weight: 500; display: inline-flex; gap: 6px; align-items: center; }
+  .cover-tool svg { width: 14px; height: 14px; }
+  .avatar-row { display: flex; gap: 16px; align-items: center; margin-top: -56px; margin-left: 20px; margin-bottom: 14px; position: relative; z-index: 2; }
+  .avatar-big { width: 112px; height: 112px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 4px white, 0 10px 24px -10px rgba(17,22,40,.35); background: var(--line-2); }
+  .avatar-big img { width: 100%; height: 100%; object-fit: cover; }
+  .avatar-actions { padding-top: 48px; display: flex; gap: 8px; }
+  .links-list { display: flex; flex-direction: column; gap: 8px; }
+  .link-row { display: flex; gap: 8px; }
+  .link-row .select { width: 160px; flex-shrink: 0; }
+  .link-row .input { flex: 1; }
+  .add-link { align-self: flex-start; color: var(--accent); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border-radius: 8px; }
+  .add-link:hover { background: color-mix(in oklab, var(--accent) 10%, transparent); }
+</style>
+</head>
+<body>
+<div id="nav-slot"></div>
+<main class="app">
+  <div id="sidebar-slot"></div>
+  <section class="main">
+    <div id="mobile-header-slot"></div>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Edit profile</h1>
+        <p class="page-sub">How you appear to other photographers and visitors.</p>
+      </div>
+      <div class="page-actions">
+        <a class="btn btn-ghost" href="Artist Profile.html">View profile</a>
+        <button class="btn btn-primary">Save changes</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Cover &amp; avatar</h2><p class="card-sub">A 3:1 cover works best. Avatars are cropped to a circle.</p></div>
+      <div class="card-body">
+        <div class="cover-edit">
+          <img src="https://images.unsplash.com/photo-1520962880247-cfaf541c8724?auto=format&fit=crop&w=1800&q=80" alt=""/>
+          <div class="cover-tools">
+            <button class="cover-tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="m21 15-5-4-9 7"/></svg>Replace</button>
+            <button class="cover-tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18"/><path d="m5 7 1 13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/><path d="M9 7V4h6v3"/></svg>Remove</button>
+          </div>
+        </div>
+        <div class="avatar-row">
+          <div class="avatar-big"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80" alt=""/></div>
+          <div class="avatar-actions">
+            <button class="btn btn-secondary btn-sm">Upload new</button>
+            <button class="btn btn-ghost btn-sm">Remove</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">About you</h2></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-grid two">
+            <div class="field"><label>Display name</label><input class="input" value="Alex Rivera"/></div>
+            <div class="field"><label>Username</label><div class="input-with-prefix"><span class="prefix">goimg.com/</span><input value="alex.rivera"/></div></div>
+          </div>
+          <div class="field">
+            <label>Tagline</label>
+            <input class="input" value="Urban Brutalism · Editorial architecture"/>
+            <span class="help">Shown under your name on your profile.</span>
+          </div>
+          <div class="field">
+            <label>Bio</label>
+            <textarea class="textarea">Alex Rivera is a documentary and architectural photographer working between Mexico City and Berlin. His long-form studies of post-war concrete treat the material as a slow-moving, almost liturgical subject.</textarea>
+            <div class="char-count">242 / 500</div>
+          </div>
+          <div class="form-grid two">
+            <div class="field">
+              <label>Location</label>
+              <div class="input-with-prefix"><span class="prefix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M20 10c0 7-8 12-8 12S4 17 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span><input value="Mexico City · Berlin"/></div>
+            </div>
+            <div class="field">
+              <label>Pronouns</label>
+              <select class="select"><option>he / him</option><option>she / her</option><option>they / them</option><option>Custom…</option><option>Prefer not to say</option></select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Links</h2><p class="card-sub">Up to 5 links appear on your profile.</p></div>
+      <div class="card-body">
+        <div class="links-list">
+          <div class="link-row">
+            <select class="select"><option>Website</option><option>Instagram</option><option>Are.na</option><option>Twitter/X</option><option>Mastodon</option><option>Other</option></select>
+            <input class="input" value="alexrivera.studio"/>
+            <button class="btn btn-icon" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+          </div>
+          <div class="link-row">
+            <select class="select"><option>Instagram</option><option>Website</option><option>Are.na</option></select>
+            <input class="input" value="@alex.rivera.studio"/>
+            <button class="btn btn-icon" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+          </div>
+          <div class="link-row">
+            <select class="select"><option>Are.na</option></select>
+            <input class="input" value="are.na/alex-rivera"/>
+            <button class="btn btn-icon" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+          </div>
+          <button class="add-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>Add another link</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Availability</h2></div>
+      <div class="row-list">
+        <div class="row">
+          <div class="row-main"><div class="row-title">Available for commissions</div><div class="row-sub">A green dot will show on your profile.</div></div>
+          <label class="toggle"><input type="checkbox" checked/><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Booking note</div></div>
+          <div class="row-value"><b>Booking Q3 2026</b></div>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Open to</div></div>
+          <div class="row-value"><b>Architecture · Editorial</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="mobile-tabs-slot"></div>
+<script>window.__page = { key: 'edit-profile' };</script>
+<script src="account-shell.js"></script>
+</body>
+</html>

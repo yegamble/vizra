@@ -1,0 +1,1299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Lumen Atlas — Search: "mountain light"</title>
+<style>
+  /* ---------- Tokens (shared with main) ---------- */
+  :root {
+    --bg:          oklch(0.985 0.003 250);
+    --bg-elev:    #ffffff;
+    --bg-tint:    oklch(0.96 0.004 250);
+    --ink:         oklch(0.18 0.015 260);
+    --ink-2:       oklch(0.38 0.012 260);
+    --ink-3:       oklch(0.56 0.010 260);
+    --line:        oklch(0.90 0.006 260);
+    --line-2:     oklch(0.94 0.005 260);
+    --accent:      oklch(0.58 0.18 255);
+    --accent-ink:  oklch(0.36 0.16 258);
+    --accent-soft: oklch(0.95 0.04 255);
+    --radius-xl:   28px;
+    --radius-lg:   22px;
+    --radius-md:   16px;
+    --radius-sm:   12px;
+    --shadow-sm: 0 1px 2px rgba(17,22,40,.04), 0 1px 1px rgba(17,22,40,.03);
+    --shadow-md: 0 8px 24px -12px rgba(17,22,40,.12), 0 2px 6px rgba(17,22,40,.05);
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+    --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+    --nav-h: 56px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  html { background: var(--bg); }
+  body {
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-size: 15px; line-height: 1.5;
+    letter-spacing: -0.005em;
+    padding-bottom: 72px; /* mobile tab bar */
+  }
+  img { display: block; max-width: 100%; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  /* ---------- Nav (same language as main) ---------- */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    height: var(--nav-h);
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 16px;
+    background: color-mix(in oklab, white 82%, transparent);
+    backdrop-filter: saturate(180%) blur(22px);
+    -webkit-backdrop-filter: saturate(180%) blur(22px);
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  }
+  .brand {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-display); font-weight: 600; font-size: 16px;
+    letter-spacing: -0.01em; flex-shrink: 0;
+  }
+  .brand-mark {
+    width: 22px; height: 22px; border-radius: 7px;
+    background:
+      radial-gradient(circle at 30% 30%, oklch(0.75 0.15 80), transparent 60%),
+      linear-gradient(135deg, oklch(0.58 0.18 255), oklch(0.45 0.14 285));
+    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,.35);
+  }
+  .brand-name b { font-weight: 600; }
+  .brand-name span { color: var(--ink-3); font-weight: 400; }
+
+  .nav-search {
+    flex: 1; min-width: 0; height: 36px;
+    border-radius: 999px; border: 1px solid var(--line);
+    background: white;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 10px 0 14px;
+    color: var(--ink); font-size: 14px;
+    transition: border-color .15s, box-shadow .15s;
+    box-shadow: var(--shadow-sm);
+  }
+  .nav-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent); }
+  .nav-search input { all: unset; flex: 1; min-width: 0; font: inherit; color: var(--ink); }
+  .nav-search input::placeholder { color: var(--ink-3); }
+  .nav-search .clear {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in oklab, var(--ink) 10%, transparent);
+    color: var(--ink-2);
+    flex-shrink: 0;
+  }
+  .nav-search .clear svg { width: 11px; height: 11px; }
+
+  .nav-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 999px;
+    color: var(--ink-2);
+    transition: background .15s, color .15s;
+  }
+  .icon-btn:hover { background: var(--bg-tint); color: var(--ink); }
+  .icon-btn svg { width: 19px; height: 19px; }
+
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg, oklch(0.78 0.09 50), oklch(0.55 0.14 25));
+    color: white; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; letter-spacing: .02em;
+    flex-shrink: 0;
+  }
+
+  .nav-links { display: none; }
+  @media (min-width: 900px) {
+    .nav { padding: 0 24px; gap: 18px; }
+    .nav-search { max-width: 420px; order: 2; }
+    .nav-links {
+      display: inline-flex; align-items: center; gap: 2px; order: 3;
+      font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+    }
+    .nav-links a { color: var(--ink-2); padding: 8px 12px; border-radius: 999px; }
+    .nav-links a:hover { color: var(--ink); }
+    .nav-actions { order: 4; }
+    .brand { order: 1; }
+  }
+
+  /* ---------- Page layout ---------- */
+  .page {
+    max-width: 1440px; margin: 0 auto;
+    padding: 0 16px;
+  }
+
+  /* ---------- Result header ---------- */
+  .result-head {
+    padding: 26px 0 18px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .rh-top {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .rh-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(28px, 4.8vw, 40px);
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+    margin: 0;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+  .rh-title em {
+    font-style: normal;
+    color: var(--accent-ink);
+    background: linear-gradient(180deg, transparent 62%, color-mix(in oklab, var(--accent) 18%, transparent) 62%);
+    padding: 0 6px; border-radius: 6px;
+  }
+  .rh-count {
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+  .rh-count b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Filter chips row ---------- */
+  .filter-row {
+    display: flex; align-items: center; gap: 8px;
+    overflow-x: auto; overflow-y: hidden;
+    padding: 4px 0 10px;
+    scrollbar-width: none;
+  }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-chip {
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 34px; padding: 0 14px;
+    border-radius: 999px;
+    background: white; border: 1px solid var(--line);
+    font-size: 13px; font-weight: 500;
+    color: var(--ink-2);
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .filter-chip:hover { border-color: var(--ink-3); color: var(--ink); }
+  .filter-chip svg { width: 14px; height: 14px; }
+  .filter-chip.active {
+    background: var(--ink); color: white; border-color: var(--ink);
+  }
+  .filter-chip .count {
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+    color: var(--ink-2);
+    border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 600;
+  }
+  .filter-chip.active .count { background: rgba(255,255,255,.18); color: white; }
+  .filter-chip.applied {
+    background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 40%, var(--line));
+    color: var(--accent-ink);
+  }
+  .filter-chip.applied .x {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: color-mix(in oklab, var(--accent) 25%, transparent);
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-left: 2px;
+  }
+  .filter-chip.applied .x svg { width: 8px; height: 8px; }
+
+  .filter-row .divider {
+    width: 1px; height: 22px; background: var(--line); flex-shrink: 0;
+    margin: 0 2px;
+  }
+
+  /* ---------- Toolbar (sort + view) ---------- */
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0 18px;
+    border-bottom: 1px solid var(--line-2);
+  }
+  .sort-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 34px; padding: 0 12px 0 14px;
+    border-radius: 999px;
+    background: white; border: 1px solid var(--line);
+    font-size: 13px; font-weight: 500; color: var(--ink);
+  }
+  .sort-btn b { font-weight: 600; }
+  .sort-btn .label { color: var(--ink-3); font-weight: 400; }
+  .sort-btn svg { width: 14px; height: 14px; color: var(--ink-3); }
+  .view-group {
+    display: inline-flex; background: white; border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px; gap: 2px;
+  }
+  .view-btn {
+    width: 34px; height: 28px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--ink-3);
+  }
+  .view-btn.active { background: var(--ink); color: white; }
+  .view-btn svg { width: 14px; height: 14px; }
+
+  /* ---------- Layout: sidebar + grid ---------- */
+  .results-shell {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 20px 0 40px;
+  }
+  @media (min-width: 1000px) {
+    .results-shell { grid-template-columns: 248px 1fr; gap: 36px; }
+  }
+
+  /* Sidebar (desktop) */
+  .sidebar {
+    display: none;
+  }
+  @media (min-width: 1000px) {
+    .sidebar {
+      display: block;
+      position: sticky;
+      top: calc(var(--nav-h) + 14px);
+      align-self: start;
+      max-height: calc(100vh - var(--nav-h) - 28px);
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .sidebar::-webkit-scrollbar { width: 6px; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+  }
+
+  .filter-section { padding: 6px 0 14px; }
+  .filter-section + .filter-section { border-top: 1px solid var(--line-2); padding-top: 16px; }
+  .filter-label {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 10px;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .fi {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 8px; border-radius: 8px;
+    font-size: 13.5px; color: var(--ink-2);
+    cursor: pointer;
+  }
+  .fi:hover { background: var(--bg-tint); color: var(--ink); }
+  .fi input[type=checkbox], .fi input[type=radio] {
+    appearance: none; -webkit-appearance: none;
+    width: 16px; height: 16px; border-radius: 5px;
+    border: 1.5px solid var(--line);
+    background: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .fi input[type=radio] { border-radius: 50%; }
+  .fi input[type=checkbox]:checked,
+  .fi input[type=radio]:checked {
+    background: var(--accent); border-color: var(--accent);
+  }
+  .fi input[type=checkbox]:checked::after {
+    content: "";
+    width: 9px; height: 5px;
+    border-left: 2px solid white; border-bottom: 2px solid white;
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+  .fi input[type=radio]:checked::after {
+    content: ""; width: 6px; height: 6px; border-radius: 50%; background: white;
+  }
+  .fi .label { flex: 1; }
+  .fi .ct { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+  /* Color swatches filter */
+  .swatches {
+    display: grid; grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+  }
+  .sw {
+    aspect-ratio: 1; border-radius: 50%;
+    border: 1.5px solid white;
+    box-shadow: 0 0 0 1px var(--line), inset 0 0 0 1px rgba(0,0,0,.06);
+    cursor: pointer;
+    transition: transform .15s;
+    position: relative;
+  }
+  .sw:hover { transform: scale(1.08); }
+  .sw.on { box-shadow: 0 0 0 2px var(--accent), inset 0 0 0 1px rgba(0,0,0,.08); }
+  .sw.on::after {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: rgba(255,255,255,.4) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>') center/50% no-repeat;
+  }
+
+  /* Orientation segmented */
+  .seg {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px;
+    background: var(--bg-tint); border-radius: 10px; padding: 3px;
+  }
+  .seg button {
+    padding: 7px 4px; border-radius: 8px;
+    font-size: 11px; font-weight: 500; color: var(--ink-2);
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .seg button.on { background: white; color: var(--ink); box-shadow: var(--shadow-sm); }
+  .seg button .glyph {
+    width: 16px; height: 12px; border: 1.4px solid currentColor; border-radius: 2px;
+  }
+  .seg .glyph.sq { width: 12px; height: 12px; }
+  .seg .glyph.port { width: 9px; height: 14px; }
+  .seg .glyph.pano { width: 20px; height: 8px; }
+
+  /* Range */
+  .range-wrap { padding: 4px 4px 0; }
+  .range-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px;
+    background: linear-gradient(to right, var(--accent) 0%, var(--accent) 65%, var(--line) 65%, var(--line) 100%);
+    border-radius: 2px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 18px; height: 18px; border-radius: 50%; background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,.2), 0 0 0 1px var(--line);
+    cursor: pointer;
+  }
+
+  /* Sidebar footer */
+  .side-footer {
+    display: flex; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line-2); margin-top: 10px;
+  }
+  .side-footer button {
+    flex: 1; height: 34px; border-radius: 10px; font-size: 13px; font-weight: 500;
+  }
+  .side-footer .apply { background: var(--ink); color: white; }
+  .side-footer .reset { color: var(--ink-2); background: var(--bg-tint); }
+
+  /* ---------- Masonry grid ---------- */
+  .masonry {
+    column-count: 1;
+    column-gap: 12px;
+  }
+  @media (min-width: 520px) { .masonry { column-count: 2; column-gap: 14px; } }
+  @media (min-width: 780px) { .masonry { column-count: 3; } }
+  @media (min-width: 1200px) { .masonry { column-count: 3; column-gap: 16px; } }
+  @media (min-width: 1440px) { .masonry { column-count: 4; } }
+
+  .card {
+    display: block;
+    position: relative;
+    margin: 0 0 14px;
+    break-inside: avoid;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--line-2);
+    box-shadow: var(--shadow-sm);
+    transition: transform .25s, box-shadow .25s;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .card img {
+    width: 100%; height: auto; display: block;
+    transition: transform .6s ease;
+  }
+  .card:hover img { transform: scale(1.03); }
+
+  .card-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 12px;
+    opacity: 0;
+    transition: opacity .2s;
+    background: linear-gradient(180deg, rgba(0,0,0,.28) 0%, transparent 30%, transparent 60%, rgba(0,0,0,.65) 100%);
+    pointer-events: none;
+  }
+  .card:hover .card-overlay, .card:focus-within .card-overlay { opacity: 1; }
+  .card-overlay > * { pointer-events: auto; }
+
+  .card-top { display: flex; justify-content: space-between; gap: 8px; }
+  .card-actions { display: flex; gap: 6px; }
+  .c-act {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(255,255,255,.22);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0.5px solid rgba(255,255,255,.25);
+    transition: background .15s;
+  }
+  .c-act:hover { background: rgba(255,255,255,.35); }
+  .c-act.on { background: white; color: oklch(0.55 0.18 25); }
+  .c-act svg { width: 14px; height: 14px; }
+
+  .card-bot {
+    color: white;
+  }
+  .card-title {
+    font-size: 14px; font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,.4);
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .card-author {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px;
+  }
+  .card-author .av {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--line);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.3);
+    flex-shrink: 0;
+    background-size: cover; background-position: center;
+  }
+  .card-author .name { font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  .card-stats {
+    margin-left: auto;
+    display: inline-flex; gap: 9px;
+    font-size: 11.5px; font-variant-numeric: tabular-nums;
+  }
+  .card-stats span { display: inline-flex; align-items: center; gap: 3px; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  .card-stats svg { width: 11px; height: 11px; }
+
+  .card-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 8px; border-radius: 999px;
+    background: rgba(255,255,255,.85);
+    backdrop-filter: blur(10px);
+    color: var(--ink);
+    font-size: 11px; font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+  .card-badge svg { width: 11px; height: 11px; }
+  .card-badge.video { background: rgba(0,0,0,.55); color: white; }
+
+  /* ---------- Inline strips ---------- */
+  .strip {
+    margin: 26px 0 18px;
+    padding: 18px 18px 20px;
+    background: var(--bg-tint);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--line-2);
+  }
+  .strip-head {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .strip-title {
+    font-family: var(--font-display);
+    font-weight: 600; font-size: 18px;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .strip-sub {
+    font-size: 12.5px; color: var(--ink-3); margin-top: 2px;
+  }
+  .strip-more {
+    font-size: 13px; color: var(--accent);
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+  .strip-more svg { width: 13px; height: 13px; }
+
+  /* Related chips */
+  .related-chips {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .rc {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 999px;
+    background: white; border: 1px solid var(--line);
+    font-size: 13px; font-weight: 500;
+    color: var(--ink);
+    transition: all .15s;
+  }
+  .rc:hover { border-color: var(--ink-2); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+  .rc .arr { color: var(--ink-3); }
+  .rc svg { width: 12px; height: 12px; }
+
+  /* Artist row (horizontal scroll) */
+  .artist-scroll {
+    display: flex; gap: 14px;
+    overflow-x: auto;
+    padding: 4px 2px 8px;
+    scrollbar-width: none;
+  }
+  .artist-scroll::-webkit-scrollbar { display: none; }
+  .artist-card {
+    flex: 0 0 auto;
+    width: 200px;
+    background: white;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line-2);
+    padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+    transition: box-shadow .2s, transform .2s;
+  }
+  .artist-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .artist-top { display: flex; align-items: center; gap: 10px; }
+  .artist-av {
+    width: 40px; height: 40px; border-radius: 50%;
+    background-size: cover; background-position: center;
+    background-color: var(--line);
+    flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
+  }
+  .artist-meta { min-width: 0; flex: 1; }
+  .artist-name { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .artist-handle { font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .artist-thumbs {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px;
+    border-radius: 10px; overflow: hidden;
+  }
+  .artist-thumbs div {
+    aspect-ratio: 1; background-size: cover; background-position: center;
+    background-color: var(--line-2);
+  }
+  .artist-follow {
+    height: 30px; border-radius: 999px;
+    background: var(--bg-tint); color: var(--ink);
+    font-size: 12px; font-weight: 600;
+    letter-spacing: -0.01em;
+    border: 1px solid var(--line);
+  }
+  .artist-follow:hover { border-color: var(--ink-3); }
+
+  /* Load more */
+  .load-more {
+    text-align: center; padding: 30px 0 10px;
+  }
+  .load-more button {
+    height: 44px; padding: 0 22px;
+    border-radius: 999px;
+    background: var(--ink); color: white;
+    font-size: 14px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: transform .15s;
+  }
+  .load-more button:hover { transform: translateY(-1px); }
+  .load-more button svg { width: 14px; height: 14px; }
+  .pager-hint { font-size: 12px; color: var(--ink-3); margin-top: 10px; }
+
+  /* Mobile filter trigger */
+  .mobile-filter-bar {
+    display: flex; gap: 8px; padding: 8px 0 4px;
+  }
+  @media (min-width: 1000px) { .mobile-filter-bar { display: none; } }
+  .mfb {
+    flex: 1; height: 38px;
+    border-radius: 10px;
+    background: white; border: 1px solid var(--line);
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    font-size: 13px; font-weight: 500; color: var(--ink);
+  }
+  .mfb .count {
+    background: var(--accent); color: white;
+    border-radius: 999px; padding: 0 7px; font-size: 11px; height: 18px;
+    display: inline-flex; align-items: center;
+  }
+  .mfb svg { width: 14px; height: 14px; color: var(--ink-2); }
+
+  /* Filter sheet (mobile) */
+  .sheet-scrim {
+    position: fixed; inset: 0; background: rgba(17,22,40,.3);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    z-index: 99; opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .sheet-scrim.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    max-height: 88vh;
+    background: color-mix(in oklab, white 94%, transparent);
+    backdrop-filter: saturate(180%) blur(30px);
+    border-radius: 22px 22px 0 0;
+    z-index: 100;
+    transform: translateY(100%);
+    transition: transform .3s cubic-bezier(.2,.9,.3,1.1);
+    display: flex; flex-direction: column;
+    box-shadow: 0 -20px 40px -10px rgba(17,22,40,.2);
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheet-grab {
+    width: 40px; height: 5px; border-radius: 3px;
+    background: color-mix(in oklab, var(--ink) 18%, transparent);
+    margin: 8px auto 4px;
+  }
+  .sheet-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 18px 14px; border-bottom: 1px solid var(--line-2);
+  }
+  .sheet-head h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .sheet-head .sheet-close {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--bg-tint); color: var(--ink-2);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .sheet-body { padding: 16px 18px 8px; overflow-y: auto; flex: 1; }
+  .sheet-footer {
+    padding: 12px 18px 22px;
+    border-top: 1px solid var(--line-2);
+    display: flex; gap: 10px;
+  }
+  .sheet-footer button { flex: 1; height: 44px; border-radius: 12px; font-weight: 600; }
+  .sheet-footer .apply { background: var(--ink); color: white; }
+  .sheet-footer .reset { background: var(--bg-tint); color: var(--ink); }
+
+  /* Sort popover */
+  .pop-wrap { position: relative; }
+  .pop {
+    position: absolute; top: calc(100% + 8px); right: 0;
+    min-width: 220px;
+    background: color-mix(in oklab, white 94%, transparent);
+    backdrop-filter: saturate(180%) blur(28px);
+    border-radius: 14px;
+    box-shadow: 0 24px 48px -16px rgba(17,22,40,.28), inset 0 0 0 0.5px rgba(255,255,255,.7), inset 0 0 0 1px color-mix(in oklab, var(--line) 60%, transparent);
+    z-index: 40;
+    padding: 5px;
+    opacity: 0; transform: translateY(-4px) scale(.98); pointer-events: none;
+    transform-origin: top right;
+    transition: opacity .16s, transform .18s cubic-bezier(.2,.9,.3,1.05);
+  }
+  .pop.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  .pop-item {
+    all: unset; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 9px;
+    font-size: 13.5px; color: var(--ink);
+  }
+  .pop-item:hover { background: color-mix(in oklab, var(--accent) 10%, transparent); }
+  .pop-item .check { width: 14px; color: var(--accent); opacity: 0; }
+  .pop-item.sel .check { opacity: 1; }
+  .pop-item .check svg { width: 14px; height: 14px; }
+  .pop-item small { color: var(--ink-3); margin-left: auto; font-size: 11px; }
+
+  /* Zero state / no results fallback lift */
+  .empty-note {
+    padding: 8px 4px; font-size: 13px; color: var(--ink-3);
+  }
+
+  /* ---------- Mobile tab bar (borrowed) ---------- */
+  .mobile-tabs {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 62px;
+    background: color-mix(in oklab, white 90%, transparent);
+    backdrop-filter: saturate(180%) blur(22px);
+    border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 0 10px env(safe-area-inset-bottom, 0);
+    z-index: 40;
+  }
+  @media (min-width: 900px) { .mobile-tabs { display: none; } }
+  .mobile-tabs .tab {
+    display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; color: var(--ink-3); font-size: 10px; font-weight: 500;
+    height: 100%; border-radius: 999px;
+  }
+  .mobile-tabs .tab.active { color: var(--accent); }
+  .mobile-tabs .tab svg { width: 20px; height: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav">
+  <a class="brand" href="Lumen Atlas Gallery.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name"><b>Lumen</b> <span>Atlas</span></span>
+  </a>
+
+  <label class="nav-search" aria-label="Search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="searchInput" value="mountain light" />
+    <button class="clear" aria-label="Clear">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+    </button>
+  </label>
+
+  <nav class="nav-links" aria-label="Primary">
+    <a href="Lumen Atlas Gallery.html">Discover</a>
+    <a href="#">Collections</a>
+    <a href="#">Artists</a>
+  </nav>
+
+  <div class="nav-actions">
+    <button class="icon-btn" aria-label="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+    </button>
+    <button class="icon-btn" aria-label="Upload">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>
+    </button>
+    <span class="avatar" aria-label="Your profile">MK</span>
+  </div>
+</header>
+
+<!-- ============ RESULT HEAD ============ -->
+<div class="page">
+
+  <div class="result-head">
+    <div class="rh-top">
+      <h1 class="rh-title">Results for <em>"mountain light"</em></h1>
+      <p class="rh-count"><b>48,214</b> photos · <b>312</b> artists · <b>26</b> collections · refreshed moments ago</p>
+    </div>
+
+    <!-- Filter chip row (type) -->
+    <div class="filter-row" role="tablist" aria-label="Result type">
+      <button class="filter-chip active">Photos <span class="count">48.2k</span></button>
+      <button class="filter-chip">Artists <span class="count">312</span></button>
+      <button class="filter-chip">Collections <span class="count">26</span></button>
+      <button class="filter-chip">Series <span class="count">9</span></button>
+      <span class="divider"></span>
+      <button class="filter-chip applied">
+        Landscape
+        <span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg></span>
+      </button>
+      <button class="filter-chip applied">
+        Past year
+        <span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile filter bar -->
+  <div class="mobile-filter-bar">
+    <button class="mfb" id="openSheet">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18"/><path d="M6 12h12"/><path d="M10 18h4"/></svg>
+      Filters <span class="count">2</span>
+    </button>
+    <button class="mfb" id="openSortMobile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13"/><path d="M3 12h9"/><path d="M3 18h5"/><path d="m17 8 4 4-4 4"/></svg>
+      Relevant
+    </button>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="pop-wrap">
+      <button class="sort-btn" id="sortBtn" aria-haspopup="listbox" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13"/><path d="M3 12h9"/><path d="M3 18h5"/><path d="m17 8 4 4-4 4"/></svg>
+        <span class="label">Sort by</span> <b id="sortLabel">Relevant</b>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="sortPop" role="listbox">
+        <button class="pop-item sel" data-v="Relevant"><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>Relevant <small>Recommended</small></button>
+        <button class="pop-item" data-v="Recent"><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>Recent</button>
+        <button class="pop-item" data-v="Interesting"><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>Interesting</button>
+        <button class="pop-item" data-v="Most loved"><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>Most loved</button>
+        <button class="pop-item" data-v="Most viewed"><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>Most viewed</button>
+      </div>
+    </div>
+
+    <div class="view-group" role="tablist" aria-label="View">
+      <button class="view-btn" aria-label="Grid">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
+      <button class="view-btn active" aria-label="Masonry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="10" rx="1"/><rect x="14" y="3" width="7" height="6" rx="1"/><rect x="3" y="17" width="7" height="4" rx="1"/><rect x="14" y="13" width="7" height="8" rx="1"/></svg>
+      </button>
+      <button class="view-btn" aria-label="Large">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="8" rx="1"/><rect x="3" y="13" width="18" height="8" rx="1"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ SHELL: sidebar + results ============ -->
+  <div class="results-shell">
+
+    <!-- Sidebar (desktop) -->
+    <aside class="sidebar" id="sidebar">
+
+      <section class="filter-section">
+        <p class="filter-label">Content</p>
+        <div class="filter-group">
+          <label class="fi"><input type="checkbox" checked/><span class="label">Photos</span><span class="ct">48.2k</span></label>
+          <label class="fi"><input type="checkbox"/><span class="label">Videos</span><span class="ct">1.1k</span></label>
+          <label class="fi"><input type="checkbox"/><span class="label">Editorial series</span><span class="ct">9</span></label>
+          <label class="fi"><input type="checkbox"/><span class="label">Public domain</span><span class="ct">3.4k</span></label>
+        </div>
+      </section>
+
+      <section class="filter-section">
+        <p class="filter-label">Color palette</p>
+        <div class="swatches" id="swatches">
+          <button class="sw on" style="background: oklch(0.3 0.06 250)" aria-label="Midnight"></button>
+          <button class="sw" style="background: oklch(0.62 0.15 250)" aria-label="Azure"></button>
+          <button class="sw" style="background: oklch(0.85 0.10 230)" aria-label="Sky"></button>
+          <button class="sw on" style="background: oklch(0.55 0.14 25)" aria-label="Sunset"></button>
+          <button class="sw" style="background: oklch(0.78 0.14 80)" aria-label="Gold"></button>
+          <button class="sw" style="background: oklch(0.92 0.04 90)" aria-label="Ivory"></button>
+          <button class="sw" style="background: oklch(0.55 0.13 145)" aria-label="Forest"></button>
+          <button class="sw" style="background: oklch(0.80 0.07 150)" aria-label="Sage"></button>
+          <button class="sw" style="background: oklch(0.42 0.07 30)" aria-label="Umber"></button>
+          <button class="sw" style="background: oklch(0.22 0.01 260)" aria-label="Ink"></button>
+          <button class="sw" style="background: oklch(0.95 0.008 260)" aria-label="Paper"></button>
+          <button class="sw" style="background: linear-gradient(135deg, oklch(0.6 0.18 30), oklch(0.6 0.18 300))" aria-label="Any"></button>
+        </div>
+      </section>
+
+      <section class="filter-section">
+        <p class="filter-label">Orientation</p>
+        <div class="seg" id="seg">
+          <button class="on"><span class="glyph sq"></span>Any</button>
+          <button><span class="glyph"></span>Land</button>
+          <button><span class="glyph port"></span>Port</button>
+          <button><span class="glyph pano"></span>Pano</button>
+        </div>
+      </section>
+
+      <section class="filter-section">
+        <p class="filter-label">Minimum size</p>
+        <div class="range-wrap">
+          <input type="range" min="0" max="100" value="65" />
+          <div class="range-row"><span>Any</span><span>Large · 4K+</span></div>
+        </div>
+      </section>
+
+      <section class="filter-section">
+        <p class="filter-label">Date taken</p>
+        <div class="filter-group">
+          <label class="fi"><input type="radio" name="date"/><span class="label">Anytime</span></label>
+          <label class="fi"><input type="radio" name="date"/><span class="label">Past week</span></label>
+          <label class="fi"><input type="radio" name="date"/><span class="label">Past month</span></label>
+          <label class="fi"><input type="radio" name="date" checked/><span class="label">Past year</span></label>
+          <label class="fi"><input type="radio" name="date"/><span class="label">Custom range…</span></label>
+        </div>
+      </section>
+
+      <section class="filter-section">
+        <p class="filter-label">License</p>
+        <div class="filter-group">
+          <label class="fi"><input type="checkbox"/><span class="label">All licenses</span></label>
+          <label class="fi"><input type="checkbox" checked/><span class="label">Creative Commons</span><span class="ct">12.3k</span></label>
+          <label class="fi"><input type="checkbox"/><span class="label">Commercial use</span><span class="ct">4.8k</span></label>
+          <label class="fi"><input type="checkbox"/><span class="label">No derivatives</span></label>
+        </div>
+      </section>
+
+      <section class="filter-section">
+        <p class="filter-label">Camera</p>
+        <div class="filter-group">
+          <label class="fi"><input type="checkbox"/><span class="label">Leica</span><span class="ct">912</span></label>
+          <label class="fi"><input type="checkbox"/><span class="label">Fujifilm</span><span class="ct">2.1k</span></label>
+          <label class="fi"><input type="checkbox"/><span class="label">Hasselblad</span><span class="ct">404</span></label>
+          <label class="fi"><input type="checkbox"/><span class="label">Analog / Film</span><span class="ct">1.4k</span></label>
+        </div>
+      </section>
+
+      <div class="side-footer">
+        <button class="reset">Reset</button>
+        <button class="apply">Apply</button>
+      </div>
+    </aside>
+
+    <!-- Results column -->
+    <div>
+
+      <!-- Masonry -->
+      <div class="masonry" id="masonry">
+        <!-- 24 cards, varied aspect ratios; heights controlled by image aspect -->
+        <!-- card 1 -->
+        <a class="card" href="#" style="grid-row: span 20">
+          <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=900&q=80" alt="Snowy peaks at dawn" loading="lazy" style="aspect-ratio: 4/5;"/>
+          <div class="card-overlay">
+            <div class="card-top">
+              <span class="card-badge">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6 4.3 2.3 7.3L12 16.8 5.7 21l2.3-7.3-6-4.3h7.6z"/></svg>
+                Featured
+              </span>
+              <div class="card-actions">
+                <button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button>
+                <button class="c-act on" aria-label="Love"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg></button>
+              </div>
+            </div>
+            <div class="card-bot">
+              <h3 class="card-title">Cascades, Blue Hour</h3>
+              <div class="card-author">
+                <span class="av" style="background-image:url(https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=80&q=80)"></span>
+                <span class="name">Marie Okafor</span>
+                <span class="card-stats">
+                  <span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>4.2k</span>
+                  <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>38k</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- card 2 -->
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=900&q=80" alt="Lake reflection" loading="lazy"/>
+          <div class="card-overlay">
+            <div class="card-top">
+              <span></span>
+              <div class="card-actions">
+                <button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button>
+                <button class="c-act" aria-label="Love"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg></button>
+              </div>
+            </div>
+            <div class="card-bot">
+              <h3 class="card-title">Lake Louise, First Light</h3>
+              <div class="card-author">
+                <span class="av" style="background-image:url(https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80)"></span>
+                <span class="name">Rhea Sandoval</span>
+                <span class="card-stats">
+                  <span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>1.8k</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- card 3 (tall) -->
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1454496522488-7a8e488e8606?auto=format&fit=crop&w=900&q=80" alt="Morning ridge" loading="lazy"/>
+          <div class="card-overlay">
+            <div class="card-top">
+              <span class="card-badge video">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                1:42
+              </span>
+              <div class="card-actions">
+                <button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button>
+              </div>
+            </div>
+            <div class="card-bot">
+              <h3 class="card-title">Alpenglow Timelapse</h3>
+              <div class="card-author">
+                <span class="av" style="background-image:url(https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=80&q=80)"></span>
+                <span class="name">Hana Mori</span>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy"/>
+          <div class="card-overlay">
+            <div class="card-top"><span></span>
+              <div class="card-actions">
+                <button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button>
+              </div>
+            </div>
+            <div class="card-bot">
+              <h3 class="card-title">Dolomites Summit Glow</h3>
+              <div class="card-author"><span class="av" style="background:oklch(0.7 0.12 60)"></span><span class="name">P. Lindqvist</span></div>
+            </div>
+          </div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=900&q=80&ixid=a" alt="" loading="lazy"/>
+          <div class="card-overlay">
+            <div class="card-top"><span></span>
+              <div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div>
+            </div>
+            <div class="card-bot">
+              <h3 class="card-title">Grandeur</h3>
+              <div class="card-author"><span class="av" style="background:oklch(0.7 0.12 220)"></span><span class="name">K. Abellán</span></div>
+            </div>
+          </div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Valley of Mist</h3><div class="card-author"><span class="av" style="background:oklch(0.62 0.15 140)"></span><span class="name">L. Yamamoto</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span class="card-badge">RAW</span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Above the Clouds</h3><div class="card-author"><span class="av" style="background:oklch(0.72 0.1 20)"></span><span class="name">T. Nakano</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Golden Ridge</h3><div class="card-author"><span class="av" style="background:oklch(0.52 0.14 250)"></span><span class="name">S. Kowalski</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Silent Passage</h3><div class="card-author"><span class="av" style="background:oklch(0.68 0.08 100)"></span><span class="name">M. Becker</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act on" aria-label="Love"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Torres del Paine</h3><div class="card-author"><span class="av" style="background:oklch(0.55 0.15 30)"></span><span class="name">E. Vogel</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?auto=format&fit=crop&w=900&q=80&ixid=b" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Ridge Study No. 4</h3><div class="card-author"><span class="av" style="background:oklch(0.72 0.1 200)"></span><span class="name">A. Rivera</span></div></div></div>
+        </a>
+
+        <!-- Inline related searches strip (in the middle of grid) -->
+        <div class="strip" style="break-inside: avoid; margin-bottom: 14px;">
+          <div class="strip-head">
+            <div>
+              <h2 class="strip-title">Refine your search</h2>
+              <p class="strip-sub">Common ways photographers narrow results for <em>mountain light</em></p>
+            </div>
+          </div>
+          <div class="related-chips">
+            <a class="rc" href="#">alpenglow <span class="arr">›</span></a>
+            <a class="rc" href="#">golden hour ridge</a>
+            <a class="rc" href="#">low cloud mountain</a>
+            <a class="rc" href="#">dolomites sunrise</a>
+            <a class="rc" href="#">blue hour cascades</a>
+            <a class="rc" href="#">fog layers</a>
+            <a class="rc" href="#">storm light</a>
+            <a class="rc" href="#">moonlight peaks</a>
+          </div>
+        </div>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=900&q=80&ixid=b" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Quiet Morning</h3><div class="card-author"><span class="av" style="background:oklch(0.72 0.1 260)"></span><span class="name">J. Saaristo</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1454496522488-7a8e488e8606?auto=format&fit=crop&w=900&q=80&ixid=c" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span class="card-badge">4K</span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Fjord Morning</h3><div class="card-author"><span class="av" style="background:oklch(0.65 0.1 230)"></span><span class="name">I. Strand</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?auto=format&fit=crop&w=900&q=80&ixid=d" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Trail to Nowhere</h3><div class="card-author"><span class="av" style="background:oklch(0.7 0.14 90)"></span><span class="name">C. Beaumont</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=900&q=80&ixid=e" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Last Snow</h3><div class="card-author"><span class="av" style="background:oklch(0.58 0.12 30)"></span><span class="name">D. Ahmadi</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=900&q=80&ixid=f" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Westerly Wind</h3><div class="card-author"><span class="av" style="background:oklch(0.72 0.1 310)"></span><span class="name">N. Laurent</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=900&q=80&ixid=g" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Reflections, Plateau</h3><div class="card-author"><span class="av" style="background:oklch(0.6 0.14 200)"></span><span class="name">O. Petrov</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=900&q=80&ixid=h" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span class="card-badge">CC-BY</span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">Pine and Peak</h3><div class="card-author"><span class="av" style="background:oklch(0.55 0.12 140)"></span><span class="name">R. Vasquez</span></div></div></div>
+        </a>
+
+        <a class="card" href="#">
+          <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=900&q=80&ixid=i" alt="" loading="lazy"/>
+          <div class="card-overlay"><div class="card-top"><span></span><div class="card-actions"><button class="c-act" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></button></div></div><div class="card-bot"><h3 class="card-title">North Face, Early</h3><div class="card-author"><span class="av" style="background:oklch(0.72 0.12 50)"></span><span class="name">H. Brun</span></div></div></div>
+        </a>
+
+      </div>
+
+      <!-- Artists strip -->
+      <section class="strip" aria-label="Photographers matching">
+        <div class="strip-head">
+          <div>
+            <h2 class="strip-title">Artists who shoot this</h2>
+            <p class="strip-sub">Photographers whose work matches <em>mountain light</em></p>
+          </div>
+          <a class="strip-more" href="#">See all 312 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></a>
+        </div>
+        <div class="artist-scroll">
+          <div class="artist-card">
+            <div class="artist-top">
+              <div class="artist-av" style="background-image:url(https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&q=80)"></div>
+              <div class="artist-meta">
+                <div class="artist-name">Marie Okafor</div>
+                <div class="artist-handle">@mokafor · 1.2k photos</div>
+              </div>
+            </div>
+            <div class="artist-thumbs">
+              <div style="background-image:url(https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=240&q=70)"></div>
+              <div style="background-image:url(https://images.unsplash.com/photo-1454496522488-7a8e488e8606?auto=format&fit=crop&w=240&q=70)"></div>
+              <div style="background-image:url(https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=240&q=70)"></div>
+            </div>
+            <button class="artist-follow">Follow</button>
+          </div>
+          <div class="artist-card">
+            <div class="artist-top">
+              <div class="artist-av" style="background-image:url(https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=80)"></div>
+              <div class="artist-meta">
+                <div class="artist-name">Rhea Sandoval</div>
+                <div class="artist-handle">@rhea.light · 844 photos</div>
+              </div>
+            </div>
+            <div class="artist-thumbs">
+              <div style="background-image:url(https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?auto=format&fit=crop&w=240&q=70)"></div>
+              <div style="background-image:url(https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?auto=format&fit=crop&w=240&q=70)"></div>
+              <div style="background-image:url(https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=240&q=70)"></div>
+            </div>
+            <button class="artist-follow">Follow</button>
+          </div>
+          <div class="artist-card">
+            <div class="artist-top">
+              <div class="artist-av" style="background-image:url(https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=160&q=80)"></div>
+              <div class="artist-meta">
+                <div class="artist-name">Hana Mori</div>
+                <div class="artist-handle">@hanamori · 612 photos</div>
+              </div>
+            </div>
+            <div class="artist-thumbs">
+              <div style="background-image:url(https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=240&q=70)"></div>
+              <div style="background-image:url(https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=240&q=70)"></div>
+              <div style="background-image:url(https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=240&q=70)"></div>
+            </div>
+            <button class="artist-follow">Follow</button>
+          </div>
+          <div class="artist-card">
+            <div class="artist-top">
+              <div class="artist-av" style="background:linear-gradient(135deg,oklch(0.7 0.15 30),oklch(0.5 0.12 290))"></div>
+              <div class="artist-meta">
+                <div class="artist-name">Johan Saaristo</div>
+                <div class="artist-handle">@saaristo · 1.5k photos</div>
+              </div>
+            </div>
+            <div class="artist-thumbs">
+              <div style="background-image:url(https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=240&q=70)"></div>
+              <div style="background-image:url(https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=240&q=70)"></div>
+              <div style="background-image:url(https://images.unsplash.com/photo-1454496522488-7a8e488e8606?auto=format&fit=crop&w=240&q=70)"></div>
+            </div>
+            <button class="artist-follow">Follow</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Load more -->
+      <div class="load-more">
+        <button>
+          Load more results
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></svg>
+        </button>
+        <div class="pager-hint">Showing 1–24 of 48,214 · Page 1 of 2,009</div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ FILTER SHEET (mobile) ============ -->
+<div class="sheet-scrim" id="sheetScrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head">
+    <h2 id="sheetTitle">Filters</h2>
+    <button class="sheet-close" id="closeSheet" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="14" height="14"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body" id="sheetBody">
+    <!-- content is populated by JS (mirror of sidebar) -->
+  </div>
+  <div class="sheet-footer">
+    <button class="reset">Reset</button>
+    <button class="apply" id="applySheet">Show 48,214 results</button>
+  </div>
+</div>
+
+<!-- ============ MOBILE TAB BAR ============ -->
+<nav class="mobile-tabs" aria-label="Mobile navigation">
+  <a class="tab" href="Lumen Atlas Gallery.html" aria-label="Home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+    Home
+  </a>
+  <button class="tab active" aria-label="Search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    Search
+  </button>
+  <button class="tab" aria-label="Saved">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg>
+    Saved
+  </button>
+  <button class="tab" aria-label="Profile">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
+    You
+  </button>
+</nav>
+
+<script>
+  // Sort popover
+  (function(){
+    const btn = document.getElementById('sortBtn');
+    const pop = document.getElementById('sortPop');
+    const label = document.getElementById('sortLabel');
+    const setOpen = o => { pop.classList.toggle('open', o); btn.setAttribute('aria-expanded', o); };
+    btn.addEventListener('click', e => { e.stopPropagation(); setOpen(!pop.classList.contains('open')); });
+    document.addEventListener('click', e => { if (!pop.contains(e.target) && !btn.contains(e.target)) setOpen(false); });
+    pop.querySelectorAll('.pop-item').forEach(it => it.addEventListener('click', () => {
+      pop.querySelectorAll('.pop-item').forEach(x => x.classList.remove('sel'));
+      it.classList.add('sel');
+      label.textContent = it.dataset.v;
+      setOpen(false);
+    }));
+  })();
+
+  // Color swatches
+  document.querySelectorAll('#swatches .sw').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
+
+  // Segmented (orientation)
+  (function(){
+    const seg = document.getElementById('seg');
+    if (!seg) return;
+    seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      seg.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+    }));
+  })();
+
+  // Filter chip toggle (top-level type)
+  document.querySelectorAll('.filter-row .filter-chip:not(.applied)').forEach((c, i, all) => {
+    c.addEventListener('click', () => {
+      all.forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+    });
+  });
+  // Remove applied chip
+  document.querySelectorAll('.filter-chip.applied').forEach(c => c.addEventListener('click', () => c.remove()));
+
+  // Mobile filter sheet (clone sidebar)
+  (function(){
+    const sheet = document.getElementById('sheet');
+    const scrim = document.getElementById('sheetScrim');
+    const body = document.getElementById('sheetBody');
+    const open = document.getElementById('openSheet');
+    const close = document.getElementById('closeSheet');
+    const apply = document.getElementById('applySheet');
+
+    const setOpen = o => {
+      sheet.classList.toggle('open', o);
+      scrim.classList.toggle('open', o);
+      document.body.style.overflow = o ? 'hidden' : '';
+    };
+    const populate = () => {
+      const side = document.getElementById('sidebar');
+      // Clone sections (exclude .side-footer)
+      body.innerHTML = '';
+      side.querySelectorAll('.filter-section').forEach(s => body.appendChild(s.cloneNode(true)));
+      // Wire cloned color swatches
+      body.querySelectorAll('.sw').forEach(sw => sw.addEventListener('click', () => sw.classList.toggle('on')));
+      body.querySelectorAll('.seg button').forEach((b, _, all) => {
+        b.addEventListener('click', () => { [...all].forEach(x => x.classList.remove('on')); b.classList.add('on'); });
+      });
+    };
+    open.addEventListener('click', () => { populate(); setOpen(true); });
+    close.addEventListener('click', () => setOpen(false));
+    scrim.addEventListener('click', () => setOpen(false));
+    apply.addEventListener('click', () => setOpen(false));
+  })();
+
+  // Clear search
+  document.querySelector('.nav-search .clear').addEventListener('click', () => {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchInput').focus();
+  });
+</script>
+
+</body>
+</html>
