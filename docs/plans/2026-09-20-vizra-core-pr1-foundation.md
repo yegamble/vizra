@@ -432,10 +432,23 @@ throwaway PRs against `feat/m0-foundation` (not `main`: the rule bites only for
 migrations that exist on the BASE branch, and these four are not on main yet, so
 basing on this branch is the faithful simulation of an edit after merge).
 
-| | PR | Run | Result |
-|---|---|---|---|
-| negative — edit `0002`, regenerate the manifest | [#2](https://github.com/yegamble/vizra-core/pull/2) | [35532576593](https://github.com/yegamble/vizra-core/actions/runs/35532576593) | **FAILED**, naming the file |
-| positive — only ADD `0005` | [#3](https://github.com/yegamble/vizra-core/pull/3) | [35532590902](https://github.com/yegamble/vizra-core/actions/runs/35532590902) | **PASSED** |
+| | PR | Run | `append-only` JOB | RUN conclusion |
+|---|---|---|---|---|
+| negative — edit `0002`, regenerate the manifest | [#2](https://github.com/yegamble/vizra-core/pull/2) | [35532576593](https://github.com/yegamble/vizra-core/actions/runs/35532576593) | **failure**, naming the file | failure |
+| positive — only ADD `0005` | [#3](https://github.com/yegamble/vizra-core/pull/3) | [35532590902](https://github.com/yegamble/vizra-core/actions/runs/35532590902) | **success** | **failure** |
+
+**Correction, round 2.** The round-1 write-up said run 35532590902 "PASSED". It
+did not: the RUN concluded `failure`. What passed was the `append-only` JOB —
+`append-only: ok (2 migration file hash(es) added, none removed or changed)`.
+The run failed in `build-test`, on `make ci` → `sqlc-verify`, because the
+throwaway branch added migration `0005` without regenerating the sqlc output,
+which is unrelated to the append-only control. Verified from the API:
+`run conclusion: failure`; jobs `append-only success`, `build-test failure`.
+
+The distinction matters: the positive control's job is to show that the
+append-only gate does not block a purely additive migration, and it does show
+that. It does not show that such a PR is otherwise mergeable, and the earlier
+wording implied it did.
 
 ```
 ##[error]a migrations/manifest.sha256 line was REMOVED or CHANGED.
@@ -535,6 +548,111 @@ destructive alternation — now goes RED:
 exclusions are now committed with per-path reasons. Clearing the history needs
 either a rewrite — which breaks the `api/` SHA `b0dbeb6` already vendored — or
 the owner resolving them in the dashboard. Owner decision.
+
+
+## Review round 2 — the last round
+
+Head `b5f8f6aa0584d11a502e0415113ce5b52159d548`. **`api/` untouched** — it is
+still `866eeb8c2028b18e68eec86fcce36ea545d1af55`, which is what `vizra-user` and
+`vizra-search` vendor.
+
+All five required checks green: `append-only`, `build-test`, `cache-matrix`
+(both legs), `govulncheck`, `docker-build`, plus the `ci-required` fan-in.
+**917 tests, 0 skips**, 315 of them the frozen matrix. Transcripts are now
+durable in the repository under `docs/evidence/pr1-round1/` and
+`docs/evidence/pr1-round2/`, not a session scratchpad.
+
+### 1. BLOCKER — `audit_events_ip_prefix_shape` accepted a /96 and a /112
+
+The IPv6 branch's group repetition was unbounded. Before touching the
+migration, the whole named case list was checked against both grammars:
+
+```
+value                                    want   current  frozen
+2001:db8:1234:5678:9abc:def0::           False  True     False    <-- CURRENT IS WRONG
+2001:db8:1234:5678:9abc:def0:1234::      False  True     False    <-- CURRENT IS WRONG
+a:b:c:d:e:f:1::                          False  True     False    <-- CURRENT IS WRONG
+2001:db8:1234:5678:9abc:def0::/48        False  True     False    <-- CURRENT IS WRONG
+999.999.999.0                            False  True     False    <-- CURRENT IS WRONG
+2001:DB8::                               False  False    False
+...
+frozen grammar: all 14 cases correct
+```
+
+`999.999.999.0` was a second, smaller hole in the same constraint: the IPv4
+branch used `[0-9]{1,3}`, which is not an octet.
+
+The new subtest is RED against the old regex (`01-ip-prefix-RED.txt`, all five
+values accepted) and green after (`02-ip-prefix-GREEN.txt`, five subtests). The
+frozen grammar is exactly as ruled; the `/len` suffix is deliberately not
+cross-checked against the group count, and the reason is in the migration. The
+M1 writer's contract — Unmap() first, mask to /24 and /64, lowercase, NULL when
+there is no usable address — is written into 0003's header. `manifest.sha256`
+regenerated in the same commit; `append-only` green.
+
+### 2. REQUIRED — `truncate` cut UTF-8 runes in half
+
+Unit RED (`03-truncate-RED.txt`): a dangling `c3` byte at pad 1991.
+
+End-to-end RED (`05-lasterror-utf8-RED.txt`), which is the failure that matters:
+
+```
+msg="jobs: recording dead-letter failed" rows=0
+    error="ERROR: invalid byte sequence for encoding \"UTF8\": 0xe6 0xe2 0x80 (SQLSTATE 22021)"
+```
+
+The row stayed `leased` with `last_error` NULL — the cause lost, and the sweep
+about to re-run it. GREEN: 2014 bytes stored, valid UTF-8, redacted, message
+preserved.
+
+The integration fixture pads to exactly 1999 bytes so a 3-byte rune starts at
+byte 2000; a first attempt left the alignment to chance and passed under the
+bug, which is worth recording because a red that depends on luck is not a red.
+
+**A second defect found while doing this, fixed in the same commit:** the three
+`recording X failed` log lines logged only the row count and swallowed the
+error, so this failure printed `rows=0` and nothing about why. That silence is
+what made the bug invisible; they now log the cause.
+
+### 3. REQUIRED — the two surviving verifier mutants
+
+`07-verifier-mutants-R1-R2.txt`.
+
+**R-1** — deleting the `doctor.CheckSchema` call site:
+
+```
+--- FAIL: TestDoctorReportsEveryCheck
+    `vizra doctor` does not report "schema".
+    reported: configuration, docker compose, database, database version, cache, cache version floor, search
+--- and internal/doctor's own tests still pass, which is exactly why this mutant survived before ---
+ok  github.com/yegamble/vizra-core/internal/doctor
+```
+
+That second line is the point: the verdicts were always covered, the WIRING was
+not. `cmd/vizra/doctor.go` now takes its I/O through an injectable `probes`
+struct, and `doctor_test.go` runs the REAL `collect()` against fakes — asserting
+every check appears, and that each of six real defects both FAILs and exits
+non-zero.
+
+**R-2** — removing the timeouts:
+
+```
+--- FAIL: TestAPIServerBoundsEveryPhaseOfAConnection
+    ReadTimeout is zero. In net/http zero means NO LIMIT, not a sensible default.
+    WriteTimeout is zero. ...
+    ReadHeaderTimeout (10s) exceeds ReadTimeout (0s); the header budget would never bite
+```
+
+### 4. WORDING
+
+Corrected in the round-1 section above and on the PR. Confirmed from the API:
+run 35532590902 concluded `failure`; jobs `append-only success`,
+`build-test failure`.
+
+### Not done, deliberately
+
+Nothing outside the four items. `api/`, `0001`, `0002` and `0004` untouched; no
+queued item started.
 
 ## Blockers and handoff
 - Free disk ~21 GiB. The libvips-from-tarball image build is the heaviest local

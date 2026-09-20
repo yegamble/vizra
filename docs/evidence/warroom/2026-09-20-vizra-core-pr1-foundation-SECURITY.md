@@ -1245,3 +1245,25 @@ Challenge:
 ```
 
 **Verdict:** Findings 1, 2 and 3 CLOSED; all five ride-alongs CLOSED. One new BLOCKING item (Finding 13), a one-quantifier edit in `migrations/0003_audit_events.up.sql` plus four test lines and a manifest regeneration. Nothing else in the delta blocks. Queued items untouched as instructed.
+
+
+---
+
+# Final closure check at b5f8f6aa0584d11a502e0415113ce5b52159d548 (after fix round 2)
+
+Same reviewer, resumed by the chair 2026-09-20. Verbatim, extracted from its transcript by script. **Chair note:** Finding 13 CLOSED; no new blocking issue; 0003 safe to freeze from the security seat.
+
+**HEAD confirmed `b5f8f6a…`, clean tree.** Only `0003` + manifest changed under `migrations/`.
+
+**FINDING 13 — CLOSED.** All criteria MET.
+
+- Three over-wide forms refused by name: MET — `golden_test.go` "a prefix more specific than /64 is refused" covers /96, /112, `a:b:c:d:e:f:1::`, plus `…def0::/48` (a suffix cannot launder the value) and `999.999.999.0`, each asserted on `audit_events_ip_prefix_shape`.
+- `2001:db8::`, `/48`, `/64`, `2001:db8:85a3:1::` accepted: MET, with `10.0.0.0`, `fe80::`, `2001:0db8:0000::` added.
+- Prior cases keep their verdicts: MET.
+- Manifest regenerated: MET — `d605494…` matches my own `shasum` of the file; only that one line moved, so the append-only merge-base diff stays additive.
+
+I re-evaluated both regexes against 33 forms. Nothing slips: `::`, `::1`, IPv4-mapped (hex and dotted), `/128`, `/0`, `/8`, leading-zero octets, zone IDs, leading whitespace, five-group `2001:db8:85a3:1:2::` — all refused. Trailing-newline is a Python `$` artifact; PostgreSQL's `$` is absolute end without the `n` flag, so it refuses.
+
+Header is honest: ENFORCED / NOT-enforced lists match the schema exactly, and the M1 contract states lowercase, Unmap first, /24 and /64, NULL when unusable. It does not editorialise that a /64 is one household — worth a sentence in M1, not a change now.
+
+**No new blocking issue in the delta.** From my seat, `0003` is safe to freeze.

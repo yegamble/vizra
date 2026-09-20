@@ -867,3 +867,22 @@ Challenge:
 ```
 
 **SAFE TO FREEZE: NOT YET.** `0001`, `0002` and `0004` are safe to freeze as they stand — I found nothing in them that M1 (`users`, `sessions`, `assets`, `asset_files`, `albums`) is forced to work around. `actor_user_id` takes its FK additively; `storage_locations.id` is ready for `asset_files.storage_location_id`; `sites_singleton` is correct per tenant database under M5; no tenant column anywhere; `jobs` needs no `site_id`. The only blocker is NEW-1, one regex on one line of `0003`. Fix that and I will call all four safe to freeze.
+
+
+---
+
+# Final closure check at b5f8f6aa0584d11a502e0415113ce5b52159d548 (after fix round 2)
+
+Same reviewer, resumed by the chair 2026-09-20. Verbatim, extracted from its transcript by script. **Chair note:** NEW-1 and NEW-2 CLOSED; the seat accepts the chair's lowercase ruling; ALL FOUR MIGRATIONS SAFE TO FREEZE. Carried forward (non-blocking): a future `vizra jobs retry` must reset `attempts`, to be recorded in `store/queries/jobs.sql` in the next core slice.
+
+Confirmed head `b5f8f6a`; only `0003` + `manifest.sha256` changed under `migrations/`. Reproduced on a disposable **postgres:18-alpine** (removed).
+
+**NEW-1: CLOSED.** All ten TOO LOOSE strings now REJECT — including `2001:db8:1234:5678:9abc:def0::` (/96), `…:1234::` (/112), the lying `/48` suffix, `999.999.999.0` and `256.0.0.0`. All thirteen lowercase prefixes ACCEPT, including `0.0.0.0`, `255.255.255.0`, zero-padded `2001:0db8:0000::` and `fe80::`. `2001:DB8::` refused and pinned at `golden_test.go:1299` alongside `FE80::` and `2001:Db8:85A3::`.
+
+**I accept the lowercase ruling.** No M1 workaround exists to name: `netip.Addr.String()` and `Prefix.Masked().Addr().String()` emit lowercase unconditionally, so a writer following the contract cannot produce a rejected value. The header at `migrations/0003_audit_events.up.sql:70-82` carries the full contract — Unmap() first, mask /24 and /64 never finer, lowercase, NULL when unusable — plus the reason the group count is bounded at four.
+
+**NEW-2: CLOSED.** `worker.go:478-497` backs off to a rune start then `ToValidUTF8` for already-invalid input. `TestSafeErrorNeverCutsARuneInHalf` drives pad 1990–2010 across 2/3/4-byte runes. The integration fixture is arithmetic-pinned, not lucky: head+pad is asserted at exactly 1999 bytes so a 3-byte rune starts at 2000, with a self-check that fails a misbuilt fixture.
+
+**No new blocking issue.** One gap: my M2 note — a future `vizra jobs retry` must reset `attempts` or it recreates the unclaimable-queued zombie — is recorded nowhere greppable. Add one line to `SweepExpiredLeases`' comment in `store/queries/jobs.sql`; not blocking.
+
+**SAFE TO FREEZE — all four.** `0001_sites`, `0002_jobs`, `0003_audit_events` and `0004_storage_locations` carry nothing M1 (`users`, `sessions`, `assets`, `asset_files`, `albums`) is forced to work around.
