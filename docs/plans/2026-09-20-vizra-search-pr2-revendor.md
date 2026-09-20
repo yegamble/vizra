@@ -104,9 +104,14 @@ Provenance of the *old* pin, recorded because it is the reason for this PR:
 `gh api repos/yegamble/vizra-core/compare/main...2b9c540…` → **`diverged`**; the remote has only
 `refs/heads/main`. Evidence: `vizra-search/docs/evidence/pr2/revendor-provenance.txt`.
 
-**What changed in the contract, and whether it forced code.** Nothing forced a code change. Core's
-diff between `2b9c540` and `415a6d1` is two additive prose insertions and nothing else
-(`2 files changed, 9 insertions(+)`, no deletions):
+**What changed in the contract, and whether it forced code.** Nothing forced a code change.
+
+Core's `api/` directory changed in **three** files between `2b9c540` and `415a6d1` —
+`api/README.md` (+29), `api/search-hmac-testvectors.json` (+1) and
+`api/search-internal.openapi.yaml` (+8), 38 insertions and 0 deletions in total.
+`api/README.md` is **not vendored** here, so nothing follows from it. Restricted to the two
+files this repository vendors the diff is `2 files changed, 9 insertions(+)`, no deletions —
+two additive prose insertions and nothing else:
 
 - `api/search-hmac-testvectors.json`: one new sibling field `key_utf8_warning` beside `key_utf8`.
   This is the "only the vectors file's warning string changed" case for that file.
@@ -191,7 +196,126 @@ Red/green (`docs/evidence/pr2/F8-after-the-fix-red-green.txt`):
 
 No existing test was weakened, deleted, renamed or skipped; the only test change is one added file.
 
-### CI on the head SHA
+### Fix round 2 — verifier FAIL on `1772270`, findings 1, 2, 3 and 4
+
+Verdict: `/Users/yosefgamble/github/vizra/docs/evidence/warroom/2026-09-20-vizra-search-pr2-revendor-VERIFY.md`.
+Both REQUIRED findings were residuals of the class this PR exists to remove — a check that
+reports green without having checked. Both reproduce; both are now closed.
+
+**FINDING 1 + 3 — `-run` deselected the guard that forbids `-run`.** The recipe check was an
+ordinary Go test *inside* the lane it polices, so `go test -run 'TestVerifier'` deselected it:
+the lane printed `ok … [no tests to run]` and exited 0 with a vendored file edited in place. My
+round-1 `-run` demonstration passed only because the regex I chose (`Contract|Drift|Schema`)
+happened to match the guard's own name — the transcript was honest, the conclusion drawn from it
+was not.
+
+The control now sits outside `go test`: `scripts/contract-drift-guard.py` is a recipe step.
+`recipe` runs before `go test`; `ran` runs after. `recipe` judges the lane by
+**`make --dry-run contract-drift`**, not by the Makefile text, which resolves variables,
+includes and duplicate targets in one move; it allows only `-count=1` and `-json`, refuses an
+environment-assignment prefix, a wrapper in place of `go test`, `GOFLAGS`/`GOTESTFLAGS` carrying
+a selecting flag in the environment, and any package holding a vendored-file guard that is
+missing. `ran` fails a lane that ran **zero** tests in any listed package. The Go tests are now
+the second layer and additionally drive the guard against all twelve bypasses.
+
+Evidence `vizra-search/docs/evidence/pr2/F7-round2-lane-guard-red-green.txt` — every mutation
+applied *together with* a real in-place edit of `api/search-internal.openapi.yaml`:
+
+| mutation | `make contract-drift` | refusal |
+|---|---|---|
+| none | exit 0 GREEN | `315 tests ran … none deselected` |
+| **`-run 'TestVerifier'`** (the verifier's exact case) | exit 2 RED | `the contract-drift lane carries -run` |
+| `-run 'TestNothingAtAll'` | exit 2 RED | same |
+| `-run` via `$(TESTFLAGS)` | exit 2 RED | same |
+| `GOFLAGS=-run=…` in the environment | exit 2 RED | `GOFLAGS in the environment carries -run` |
+| a duplicate `contract-drift:` target | exit 2 RED | `make reports a DUPLICATE … target` |
+| the flag from an included makefile | exit 2 RED | `carries -run` |
+| `go test` behind a wrapper script | exit 2 RED | `runs './scripts/drift-wrapper.sh' instead of \`go test\`` |
+| the guard step deleted from the recipe | exit 2 RED | second layer: `FIRST command must be …` |
+| the in-place edit alone | exit 2 RED | `TestEveryVendoredFileMatchesItsManifest` |
+| a manifest `sha256` zeroed | exit 2 RED | same |
+| fully restored | exit 0 GREEN | — |
+
+**FINDING 2 — an unevaluable reject fixture counted as "rejected".** The branch read any
+non-zero checker exit as proof of rejection, and a checker that cannot read or parse its input
+also exits non-zero. `check-workflows.py` now answers three ways (`0` clean, `1` VIOLATION,
+`2` UNEVALUABLE) and prints `VIOLATION <path> at=… key=… value=…`; each reject fixture declares
+the rule it must trip; the guard requires readable + non-empty *before* running the checker,
+exit `1` exactly, and the declared rule.
+
+Evidence `vizra-search/docs/evidence/pr2/F8-round2-fixture-rules-red-green.txt`:
+
+| mutation | guard | named failure |
+|---|---|---|
+| none | exit 0 GREEN | `6 fixtures exercised, floor 6` |
+| reject fixture `chmod 000` | exit 1 RED | `UNUSABLE FIXTURE: '…wf-plain.yml' exists but is not readable.` |
+| reject fixture **emptied** | exit 1 RED | `UNUSABLE FIXTURE: '…wf-quoted-key.yml' is empty.` |
+| reject fixture truncated to invalid YAML | exit 1 RED | `UNEVALUABLE FIXTURE: the workflow checker could not evaluate …` |
+| `wf-false.yml` value changed to `true` | exit 1 RED | `WRONG RULE TRIPPED: … not for the rule it declares` |
+| `wf-quoted-key.yml` key unquoted | exit 1 RED | same |
+| a reject fixture made actually valid | exit 1 RED | `the workflow checker ACCEPTED …` |
+| accept fixture `chmod 000` | exit 1 RED | `UNUSABLE FIXTURE: …` |
+| round-1 reds A–E re-run | exit 1 RED each | unchanged |
+
+**FINDING 4 (NIT)** — corrected here, in `docs/evidence/pr2/README.md` and in the PR body:
+core's `api/` changed in three files (`api/README.md` +29 is not vendored); the `2 files, 9
+insertions` count is the *vendored pair* only.
+
+Round-2 lanes (`vizra-search/docs/evidence/pr2/lanes-local.txt`): every lane exit 0;
+`make ci` exit 0; `make test-noskip` **338 pass events, 0 skips** (321 in round 1; +17 new
+lane-guard cases, none skipped); `make contract-drift` `315 tests ran across 4 package(s),
+0 failures, none deselected`. No existing test weakened, deleted or skipped.
+
+### Round 2b — CI caught a platform-dependent guard, which is the point of CI
+
+`562bb99` was green on every lane **locally** and red on three in CI (`contract-drift`, `test`,
+`test-noskip`), all on one subtest:
+`TestTheLaneGuardRefusesEveryKnownBypass/a_duplicate_contract-drift_target` —
+*"the guard refused the lane, but not for the expected reason."*
+
+The guard detected a duplicate target by matching make's warning text, and the wording is
+version-dependent: GNU Make **3.81** (macOS system make, my machine) says `overriding commands
+for target`; GNU Make **4.x** (every ubuntu-24.04 runner, the platform that gates merges) says
+`overriding recipe for target`. So on Linux that check never fired. The lane still went red in
+that test only because the duplicate recipe *also* carried `-run`; a duplicate target that was
+otherwise clean would have slipped past on Linux.
+
+The test caught it because it asserts the refusal **reason**, not a non-zero exit — the same
+principle as the fixture rules in Finding 2. Fixed in `e219fc6`: both wordings matched
+case-insensitively, plus any other make warning during resolution refused. The only code change
+between `562bb99` and `e219fc6` is that regex (`git diff --stat`: one script, +24/-?; the rest
+is evidence). No make 4.x exists on this machine, so the make-4 path is proven by that subtest
+running on ubuntu-24.04 in CI — recorded in
+`vizra-search/docs/evidence/pr2/F7-round2-make-version-portability.txt`.
+
+### FINAL CI — head `e219fc6b9f64d04d2adde87b830b2e9a4f388b5d`
+
+`gh api repos/yegamble/vizra-search/commits/e219fc6…/check-runs` → **12 check runs, conclusions
+`["success"]`**. Run `https://github.com/yegamble/vizra-search/actions/runs/35539255888`;
+`ci-required` run `35539255892`.
+
+| check | result | duration |
+|---|---|---|
+| `fmt` | pass | 17s |
+| `vet` | pass | 48s |
+| `echo-containment` | pass | 19s |
+| `build` | pass | 39s |
+| `contract-drift` | pass | 34s — `315 tests ran across 4 package(s), 0 failures, none deselected` |
+| `test` | pass | 1m17s |
+| `test-noskip` | pass | 54s — **338 pass events, 0 skips**, identical to local |
+| `tidy-check` | pass | 20s |
+| `govulncheck` | pass | 55s |
+| `docker-build` | pass | 49s |
+| `ci-required` | **pass** | 1m28s |
+| GitGuardian Security Checks | pass | 1s |
+
+The subtest that failed at `562bb99` is proven to run and pass on make 4.x: the same lane went
+from fail to pass with only the regex changed, and reports 338 pass events with 0 skips — so
+nothing was deselected or skipped to get there.
+
+READY_FOR_REVIEW at `e219fc6`. Not VERIFIED: the new SHA is re-verified before any merge.
+
+### CI on the round-1 head SHA (superseded)
 
 PR: https://github.com/yegamble/vizra-search/pull/2
 Head SHA: `17722700abf264813b7fa2f659e9cdccc922bfb7` (equals the local HEAD; the head has not moved
