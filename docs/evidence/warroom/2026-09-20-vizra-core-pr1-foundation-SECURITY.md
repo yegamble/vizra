@@ -1080,3 +1080,168 @@ Challenge:
   it tells an attacker exactly which decoders are linked, which is materially
   more useful against an image host than a version string.
 ```
+
+
+---
+
+# Closure check at 4f8d0fc207f94a2a516607d167fcf69abd7a2148 (after fix round 1)
+
+Same reviewer, resumed by the chair 2026-09-20. Verbatim, extracted from its transcript by script. **Chair ruling:** Findings 1, 2 and 3 and the five ride-alongs are CLOSED on this SHA. **Finding 13 is accepted as BLOCKING** — the `ip_prefix` CHECK was added this round, freezes on merge, and contradicts the migration's own header; it goes into fix round 2 (the builder's last under the two-round cap), which the chair holds until the backend seat and the verifier have reported so that the round is final.
+
+**HEAD confirmed `4f8d0fc…`, clean tree.** Delta reviewed: `git diff e45e784 4f8d0fc` (117 files).
+
+## Finding 1 — CLOSED
+
+| Criterion | Verdict | Proof |
+|---|---|---|
+| 21 Actions deny `""` and unrecognised labels, reason `visibility_unknown` | MET | `internal/authz/authz.go:288-291` — the `switch vis` returns `Deny, ReasonVisibilityUnknown` in `default`; `TestUnknownVisibilityDenies` drives `""`, `"PUBLIC"`, `"Public"`, `"scheduled"`, `"moderated"`, `"deleted"`, `" public"`, `"public\n"` × 21 Actions × 5 viewer classes, with the most permissive subject/resource otherwise |
+| Album page denies `AlbumPrivacy ""` for A, M, G | MET | `authz.go:321-327`; `TestUnknownAlbumPrivacyDenies` covers all five classes, not just three |
+| 315-case matrix unchanged | MET | `git diff --stat … -- internal/authz/testdata/adr007_matrix.tsv` is empty |
+| `HideExistence` hides anything not public/unlisted | MET | `authz.go:235-244`, `default: return true`; `TestHideExistenceForAnythingNotPublicOrUnlisted` |
+| DownloadSetting asymmetry commented as deliberate | MET | `authz.go:155-162` plus `TestDownloadSettingStillDefaultsToAll`, which pins it so nobody "fixes" it later |
+
+Second sweep for other zero-value ALLOW paths: none found. `owner` still requires `resource.OwnerID != ""`, so empty-equals-empty cannot match. `roleRank[""]` is 0 and `staff` needs `Staff && AtLeast(RoleManager)`, so a zero Subject cannot escalate. An Action with no `kindOf` row denies. `sites.privacy_mode` is `NOT NULL DEFAULT 'public'` with a two-value CHECK — and the new `sites_singleton` unique index (`0001:42`) closes a precedence ambiguity I had *not* raised: without it a second row made "is this site private" depend on handle sort order. Good catch by the builder.
+
+## Finding 2 — CLOSED
+
+`knownPublishedSecrets` (`config.go:170-176`) refuses both published keys by exact match, checked *before* the length rule, for `VIZRA_SEARCH_HMAC_KEY`, `VIZRA_SESSION_SECRET` and `VIZRA_MFA_KEY_KEK`; `TestProductionRefusesPublishedTestKeys` asserts the refusal does not echo the value and reads `key_utf8` from the vectors file at test time. Development still accepts. `placeholderSecret` was moved off the now-denylisted `Aa1Bb2…` and `TestTheTestBaselineIsNotAPublishedSecret` stops the suite passing vacuously.
+
+**Vectors semantics unchanged** — confirmed: the only `api/search-hmac-testvectors.json` change is one added `key_utf8_warning` line. `key_utf8`, all 5 accept vectors and all 24 negative vectors are byte-identical.
+
+## Finding 3 — CLOSED
+
+`RefuseIfPresent` (`keys.go:14-17`, `config.go:344-355`) refuses `VIZRA_DEV_AUTOLOGIN_USER` on any non-empty value; `TestValueBearingEscapeHatchIsRefusedWhenPresent` covers `alice`, `owner`, `0`, `false`, `off`, `no`, `1`, `true`, `" "`, `-`. Boolean hatches keep the `=false` affordance. `TestEveryEscapeHatchIsRefusedForItsRealisticValues` supplies the per-hatch value table. Whitespace is refused rather than trimmed — the fail-secure reading.
+
+## Ride-alongs
+
+All MET. **5**: `safeError() = truncate(obs.Redact(s))` at all four `LastError` writes (`worker.go:190`), plus `TestASecretStraddlingTheTruncationBoundaryIsRedacted`. **6**: `CheckRedirect → ErrUseLastResponse` on the shared client, so `ping` is covered too; two-server tests assert the attacker server saw no `X-Vizra-Signature`. **8**: guard is now a YAML parser; `continue-on-error` matched present-at-all after `lower()`+`_`→`-` normalisation, with bare/quoted/capitalised/expression/underscore/step fixtures; floor lanes must trigger on `pull_request`; missing PyYAML or python3 exits 2 ("BLOCKED, not passed"). **9**: `securityHeadersMiddleware` is registered *before* `siteMiddleware`, so the 404 path carries the headers; `TestEveryRouteCarriesHardeningHeaders` iterates `s.Routes()`; `ReadTimeout`/`WriteTimeout` 30 s. **4**: per-path exclusions each with a reason, no test glob, `.gitguardian.yaml` under CODEOWNERS; `.gitignore` covers `*.env` and `env/*.env` with `!.env.example` verified still tracked.
+
+## New items
+
+**`append-only` lane** — not bypassable beyond the known CODEOWNERS residual: it is in `FLOOR_LANES` (`ci-required-guard.py:79`), so deleting its manifest line turns the guard red. This PR passes it legitimately only because `main` carries no migrations — which is exactly what makes now the last editable moment.
+
+**`internal/doctor`** — no leak. `CheckDatabase` returns a fixed string with the comment naming why; `db.Open`/`cache.Open` still suppress at source; the one `err.Error()` path carries an env-file *path*, not a value.
+
+**Migrations** — `sites_singleton`, the `jobs` size bounds and the partial `jobs_claim` index are all correct and safe to freeze. One defect below.
+
+---
+
+```
+FINDING 13: migrations — the audit_events ip_prefix CHECK accepts up to 112 bits of IPv6, not the /48 or /64 its own comment promises
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     migrations/0003_audit_events.up.sql:60-65 (audit_events_ip_prefix_shape)
+             internal/integration/golden_test.go:1243-1285 (TestAuditEventsRefusesAFullIPAddress)
+  requirements: ADR-007 § audit_events
+
+Observed:
+  The IPv6 branch is
+
+      ip_prefix ~ '^[0-9a-f]{1,4}(:[0-9a-f]{1,4})*::(/(48|64))?$'
+
+  The repetition is unbounded, so it accepts one to seven leading groups, and
+  the /48|/64 suffix is optional. Evaluated against the address forms:
+
+      2001:db8::                      ACCEPTED   (intended)
+      2001:db8::/48, ::/64            ACCEPTED   (intended)
+      2001:db8::1                     refused    (correct)
+      2001:db8:0:0:0:0:0:dead         refused    (correct)
+      ::ffff:192.0.2.128              refused    (correct — starts with ':')
+      ::ffff:c000:280                 refused    (correct)
+      2001:DB8::                      refused    (fail-closed; lowercase class)
+      2001:db8:85a3:1::               ACCEPTED   <- 64 bits, fine
+      2001:db8:85a3:1:2:3::           ACCEPTED   <- 96 bits, NOT a /48 or /64
+      a:b:c:d:e:f:1::                 ACCEPTED   <- 112 bits, no suffix required
+      2001:db8:85a3:8a2e:370:7334:1234::  ACCEPTED   <- 112 bits
+
+  The migration's own header states the control it is providing: "ip_prefix
+  cannot hold a full address ... the column refuses one rather than relying on
+  a caller to truncate", and the inline comment enumerates exactly what is
+  meant to be accepted — "an IPv6 /48 or /64 ending in '::'". The regex does
+  not implement that.
+
+  The integration test does not catch it: every string in its "full address"
+  table is a form that does not end in '::', so the over-wide accept is
+  untested.
+
+  Separately, the IPv4 branch does not bound octets (999.999.999.0 is
+  accepted). Harmless — no host identity is expressible in an out-of-range
+  octet — but fix it in the same edit since the line is being touched.
+
+Failure:
+  The backstop does not hold the boundary it documents. The primary threat the
+  constraint was added for — an M1 caller passing c.RealIP() straight through —
+  IS blocked, because a real client address essentially never ends in '::'. The
+  residual is the second-most-likely caller: one that truncates to the wrong
+  boundary (a /96 or /112, or an interface-identifier strip that leaves the
+  subnet intact) and is waved through by a CHECK whose comment says it cannot
+  be. On a photo host, a /112 identifies a household; the whole point of
+  storing a prefix rather than an address is that it does not.
+
+  A reviewer reading 0003 in M2 will trust the header, because the header is
+  unusually careful about separating "ENFORCED by the database" from "NOT
+  enforced here, by decision". A promise in that list that the schema does not
+  keep is the specific failure that section was written to prevent.
+
+Perspective:
+  photographer, member (whose address prefix it is), instance-admin, developer
+
+Recommendation:
+  Bound the repetition to the documented boundary — at most four groups, so
+  /16 through /64 — and require nothing else to change:
+
+      ip_prefix ~ '^[0-9a-f]{1,4}(:[0-9a-f]{1,4}){0,3}::(/(48|64))?$'
+
+  Optionally bound the IPv4 octets in the same edit. Do NOT add a length cap on
+  the column as a substitute; the group bound already removes the unbounded
+  repetition.
+
+  Do it in 0003 now. After merge this needs a second migration, and although
+  that migration would succeed today — the table is empty until M1 writes to it
+  — "we can tighten it later while no rows exist" is a window that closes
+  silently the first time an audit row is written, and nothing marks the date.
+
+Acceptance criteria:
+  * '2001:db8:85a3:1:2:3::', 'a:b:c:d:e:f:1::' and
+    '2001:db8:85a3:8a2e:370:7334:1234::' are REFUSED with
+    audit_events_ip_prefix_shape.
+  * '2001:db8::', '2001:db8::/48', '2001:db8::/64' and '2001:db8:85a3:1::'
+    remain ACCEPTED.
+  * Every case already in TestAuditEventsRefusesAFullIPAddress keeps its
+    current verdict.
+  * migrations/manifest.sha256 is regenerated in the same commit, and the
+    append-only CI lane still passes — it will, because main carries no
+    migrations, which is the only reason this edit is possible at all.
+
+Tests:
+  internal/integration/golden_test.go, TestAuditEventsRefusesAFullIPAddress:
+  add the three over-wide forms to the "full address is refused" table and
+  '2001:db8:85a3:1::' to the accepted table. The harness exists and already
+  asserts on the constraint name, so this is four lines.
+
+  Add one mutation check to the evidence: with the current unbounded regex, the
+  new cases must fail.
+
+Cross-repo implications:
+  core: the constraint and the test. The M1 truncation helper should then be
+  written to produce exactly what the CHECK accepts, and should be the only
+  writer. user: an admin audit view must not render ip_prefix as a clickable
+  address. search: audit rows are never indexed. meta: none.
+
+Challenge:
+  The strongest counter is that this is fixable additively — the table is empty
+  until M1, so ALTER TABLE ... ADD CONSTRAINT would validate instantly, and
+  holding a PR for a regex quantifier is disproportionate. I accept that the
+  window does not slam shut at merge. What moves me to file it as blocking is
+  that the file is open right now for exactly this kind of correction, the fix
+  is one quantifier, and the constraint currently contradicts a header that
+  goes out of its way to distinguish enforced controls from aspirational ones.
+  A second-best counter — "a /112 prefix is not really PII" — I reject: 112
+  bits of IPv6 is a household, and the column exists precisely so that it is
+  not stored.
+```
+
+**Verdict:** Findings 1, 2 and 3 CLOSED; all five ride-alongs CLOSED. One new BLOCKING item (Finding 13), a one-quantifier edit in `migrations/0003_audit_events.up.sql` plus four test lines and a manifest regeneration. Nothing else in the delta blocks. Queued items untouched as instructed.
