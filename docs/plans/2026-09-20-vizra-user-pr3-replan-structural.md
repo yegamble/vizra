@@ -200,9 +200,55 @@ canary and the parser are not. Note the contrast with D13g: a `browser` fixture
 overridden through Playwright's built-in `playwright` fixture needs no import,
 so lint cannot see it — and the runtime does catch that one.
 
+---
+
+## Round 2 of 2 — DOCS ONLY (head `3b566c3`)
+
+Verification at `c669e40` returned **PASS**; FINDING 11 closed. The remaining
+merge condition was the chair's "no false guarantee merges". Findings 12, 13 and
+14 are **queued** and deliberately not fixed here.
+
+| # | Passage | Was | Is |
+|---|---|---|---|
+| 12 | the own-browser residual (`AGENTS.md`, `browser-errors.ts` header, evidence README) | "importing a Playwright package and calling `chromium.launch()` … **What catches that:** `vizra/no-unguarded-playwright-import` … the one shape where lint is the only automated control" | stated in terms of *the object the harness was never handed*; the three measured import-free routes (`Object.getPrototypeOf(browser).newContext.call(browser)`, `browser.browserType().launch()`, `playwright.chromium.launchPersistentContext(dir)`), the note that prototype `newPage` IS caught, and "**nothing catches these today**"; queued fix named |
+| 13 | artifact privacy (`AGENTS.md`, evidence README) | "**No URL query string leaves this repository, in any artifact**" / "Covered — URL query strings, fragments, and `Location`" | scheme-less `host:port/path?query` survives (how Playwright writes a step subtitle; any `page.goto(signedUrl)` produces one), with the three-line reduction, why D9 misses it, why nothing can leak today, and the queued fix |
+| 14 | the canary (`AGENTS.md`, `harness-canary.mjs` header, evidence README) | implied all four guarded kinds were covered | "**covers three of the four**" — `requestfailed` has no fixture and its removal is silent; queued |
+| — | two unstated limits | — | the flush window is finite (0 ms caught; 50 ms and 150 ms missed) and the `request` fixture is out of scope by design; "any HTTP >= 400 response fails the test" now reads "observed by a browser context" |
+
+**Docs-only, proved.** `git diff c669e40 --stat`:
+
+```
+ AGENTS.md                            | 128 +++++++++++++++++++++++++++++------
+ docs/evidence/VZ-FOUND-008/README.md |  78 ++++++++++++++++++---
+ e2e/harness/browser-errors.ts        |  30 ++++++--
+ scripts/ci/harness-canary.mjs        |  10 +++
+ 4 files changed, 213 insertions(+), 33 deletions(-)
+```
+
+No TypeScript or JavaScript statement, no workflow key, no JSON and no shell
+line changed. All 40 changed lines in the two code files are block-comment lines
+(`git diff … | grep -E "^[+-][^+-]" | grep -vE "^[+-] \*"` is empty), and no
+`.json`, `.yml` or `.sh` file is in the diff at all.
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run ci` | 0 | 12 files / **289** tests / 0 skipped — unchanged |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **102** cases / **109** assertions / 0 failed — unchanged |
+| `npx tsc --noEmit` | 0 | — |
+| `bash scripts/ci/check-e2e-lane.sh` | 0 | — |
+| `bash scripts/ci/check-required-floor.sh` | 0 | — |
+
+**CI on `3b566c3`:** all eight lanes pass; `ci-required` — "OK: every required
+check on 3b566c3b057a9a9a6748393000b4a3461ded2d49 concluded success". The `e2e`
+log still shows `18 passed`, `coverage floor: OK (9/9 9/9)`,
+`harness stamp: OK (18 succeeding result(s) verified)` and the canary's OK line.
+
 ## Blockers and handoff
-None. Next concrete action: the same independent verifier re-verifies
-`c669e4001738df3f7c7ec3fcf1feaf3c9e41ca4e`. GitGuardian remains FAILURE on the
+None. Next concrete action: the same independent verifier confirms
+`3b566c3b057a9a9a6748393000b4a3461ded2d49` (docs-only on top of the PASSed
+`c669e40`), then the chair merges. Findings 12, 13 and 14 carry forward as
+dependency-ready follow-ups for the next harness slice and the artifact-privacy
+slice. GitGuardian remains FAILURE on the
 same two historical findings from `951f18b` (an `hmr?id=` loopback dev-server
 value); a squash-merge drops that commit, and the check needs deliberate owner
 dismissal rather than being merged past.
