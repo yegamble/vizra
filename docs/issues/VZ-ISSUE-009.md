@@ -27,7 +27,7 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - cache invalidation test
 
 ## Dependencies / blockers
-Q-039
+Q-039 decided 2026-09-15 (core visibilities; audiences in VZ-PRIVACY-004, full)
 
 ## Definition of done
 Ledger entries updated with evidence; UI-control inventory updated where controls changed; execution plan checkpointed; PR opened as READY_FOR_REVIEW. Never self-merge; never mark VERIFIED without independent verification.

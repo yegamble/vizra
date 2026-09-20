@@ -4,7 +4,7 @@ SEEN = set()
 
 def req(id, title, outcome, area, kind, provenance, profiles=("core","full"), deps=(),
         success=(), negative=(), privacy=(), recovery=(), api=(), ui=(), cli=(),
-        evidence=(), edition=None, mechanism=None, unresolved=(), notes=None):
+        evidence=(), edition=None, mechanism=None, unresolved=(), decided=(), notes=None):
     assert id not in SEEN, f"duplicate id {id}"
     SEEN.add(id)
     REQS.append({
@@ -27,6 +27,7 @@ def req(id, title, outcome, area, kind, provenance, profiles=("core","full"), de
         "evidence_required": list(evidence),
         "competitor_mechanism_vs_equivalent": mechanism,
         "unresolved": list(unresolved),
+        "decided": list(decided),
         "notes": notes,
         "implementation_status": "PLANNED",
         "verification_status": "UNVERIFIED",

@@ -28,20 +28,20 @@ req("VZ-STORAGE-006","Backblaze B2 via S3-compatible API real-provider qualifica
 req("VZ-STORAGE-007","Backblaze B2 native (legacy) API adapter",
     "Operator: native B2 API adapter as a separate parity obligation (Pro), or an approved decision to satisfy it via S3-compatible only.",
     "storage", CHEV, [{"source":"CHEV-COMPARE","note":"Backblaze B2 (legacy) Pro"}], edition="Pro",
-    deps=["VZ-STORAGE-004"], success=["Adapter contract suite or approved substitution"], evidence=["provider lane or owner decision"], profiles=("full",), unresolved=["Q-030"],
+    deps=["VZ-STORAGE-004"], success=["Adapter contract suite or approved substitution"], evidence=["provider lane or owner decision"], profiles=("full",), decided=["Q-030"],
     mechanism="Chevereto keeps a legacy native B2 adapter. Proposed: satisfy via S3-compatible unless owner requires native.")
 req("VZ-STORAGE-008","Google Cloud Storage native adapter", "Operator: GCS adapter with JSON key auth passing the contract suite against a real bucket.",
-    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"Google Cloud Storage Pro"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Live run"], evidence=["provider lane"], profiles=("full",), unresolved=["Q-031"])
+    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"Google Cloud Storage Pro"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Live run"], evidence=["provider lane"], profiles=("full",), decided=["Q-031"])
 req("VZ-STORAGE-009","Microsoft Azure Blob native adapter", "Operator: Azure adapter passing the contract suite against a real account.",
-    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"Microsoft Azure Pro"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Live run"], evidence=["provider lane"], profiles=("full",), unresolved=["Q-031"])
+    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"Microsoft Azure Pro"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Live run"], evidence=["provider lane"], profiles=("full",), decided=["Q-031"])
 req("VZ-STORAGE-010","Alibaba Cloud OSS native adapter", "Operator: OSS adapter passing the contract suite (endpoint required).",
-    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"Alibaba Cloud OSS Pro"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Live run or S3-compatible qualification"], evidence=["provider lane"], profiles=("full",), unresolved=["Q-031"])
+    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"Alibaba Cloud OSS Pro"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Live run or S3-compatible qualification"], evidence=["provider lane"], profiles=("full",), decided=["Q-031"])
 req("VZ-STORAGE-011","OpenStack Swift native adapter", "Operator: Swift adapter (identity URL, service name, credentials) passing the contract suite.",
-    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"OpenStack Swift Pro"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Live run"], evidence=["provider lane"], profiles=("full",), unresolved=["Q-031"])
+    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"OpenStack Swift Pro"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Live run"], evidence=["provider lane"], profiles=("full",), decided=["Q-031"])
 req("VZ-STORAGE-012","SFTP storage adapter", "Operator: SFTP adapter (host, path, user, key/password) with a public URL mapping; disabled in multi-tenant mode.",
-    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"SFTP Pro"},{"source":"CHEV-RELEASES","note":"4.5.3 removed FTP/SFTP in SaaS environments"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Contract suite against a test SFTP server"], negative=["Host key verification enforced"], evidence=["provider lane"], profiles=("full",), unresolved=["Q-031"])
+    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"SFTP Pro"},{"source":"CHEV-RELEASES","note":"4.5.3 removed FTP/SFTP in SaaS environments"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Contract suite against a test SFTP server"], negative=["Host key verification enforced"], evidence=["provider lane"], profiles=("full",), decided=["Q-031"])
 req("VZ-STORAGE-013","FTP storage adapter", "Operator: FTP adapter as a parity obligation with an explicit insecure-transport warning; disabled in multi-tenant mode.",
-    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"FTP Pro"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Contract suite against a test FTP server"], negative=["Plain FTP requires explicit acknowledgement"], evidence=["provider lane"], profiles=("full",), unresolved=["Q-031"])
+    "storage", CHEV, [{"source":"CHEV-COMPARE","note":"FTP Pro"}], edition="Pro", deps=["VZ-STORAGE-004"], success=["Contract suite against a test FTP server"], negative=["Plain FTP requires explicit acknowledgement"], evidence=["provider lane"], profiles=("full",), decided=["Q-031"])
 req("VZ-STORAGE-014","CDN / custom URL mapping per location and universal CDN support",
     "Owner: map a location to a CDN or custom hostname; private assets never cacheable publicly; cache keys include visibility version.",
     "storage", CHEV, [{"source":"CHEV-COMPARE","note":"Universal CDN support"},{"source":"CHEV-UPLOAD-STORAGE","note":"URL mapped to the storage"}], edition="all",
@@ -59,7 +59,7 @@ req("VZ-IMPORT-001","Filesystem bulk importer with dry run, mapping, checkpoints
 req("VZ-IMPORT-002","Chevereto instance import (database + storage) preserving users, albums, categories, tags, privacy, timestamps",
     "Operator: import from a Chevereto MySQL export and its storage; dry run and mapping report; password hashes never assumed valid (users get reset flow); missing comments not invented.",
     "import", CHEV, [{"source":"CHEV-FEATURES","note":"Preserves users, albums, categories, tags, and file data"},{"source":"PROMPT-06","note":"imports"}], edition="all",
-    deps=["VZ-IMPORT-001"], success=["Fixture export imports with mapping report"], negative=["Unknown schema version refused with guidance"], evidence=["transcript"], profiles=("full",), unresolved=["Q-035"])
+    deps=["VZ-IMPORT-001"], success=["Fixture export imports with mapping report"], negative=["Unknown schema version refused with guidance"], evidence=["transcript"], profiles=("full",), decided=["Q-035"])
 req("VZ-IMPORT-003","Flickr data export import (photos, albums, favorites, tags, descriptions, dates, privacy)",
     "Photographer: imports a Flickr account export archive; dry run; mapping report; privacy mapped conservatively (default private on ambiguity).",
     "import", FLICKR, [{"source":"FLICKR-HELP","note":"account data download"},{"source":"CATALOG-F6","note":"Flickr source adapter"}],

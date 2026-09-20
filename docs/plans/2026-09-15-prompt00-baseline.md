@@ -39,3 +39,4 @@ Environment: macOS, Claude Code (Fable 5.1), read access to ~/github/vidra as re
 - Component repositories do not exist; creating them and any GitHub writes need owner authorization.
 - Open decisions are in docs/OPEN_QUESTIONS.md; the conservative proposals are applied provisionally and marked.
 - Next concrete action after this run: owner reviews OPEN_QUESTIONS.md and the core/full manifests, then Prompt 01 (architecture + executable foundation) starting with VZ-ISSUE-001.
+- 2026-09-15 (later): OPEN_QUESTIONS ratified — see docs/plans/2026-09-15-open-questions-ratification.md

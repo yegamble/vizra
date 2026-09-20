@@ -1,6 +1,6 @@
 # Proposed architecture and decisions to ratify
 
-This is a recommended starting architecture, not a description of existing code. Freeze decisions as ADRs during Prompt 01. Keep modular boundaries even when processes share a codebase.
+This is a recommended starting architecture, not a description of existing code. Decisions are frozen in docs/adr/ (ADR-001…009, Proposed 2026-09-15, awaiting owner approval); this document remains the narrative overview and defers to the ADRs where they differ. Keep modular boundaries even when processes share a codebase.
 
 ## Repository and runtime
 Owner decision 2026-09-15 (supersedes the kit's single-monorepo recommendation): Vizra mirrors the Vidra meta-repo shape. `vizra` is the meta repo (contract, spec, ledgers, compose files, `deploy/`, `env/`, `install.sh`, `bootstrap.sh`, `tests/`, `releases/`, CI fan-in). Component repos are checked out nested, gitignored here, and pinned detached at release tags on operator hosts. See docs/META_REPO.md for the install, topology and CI design.
@@ -14,9 +14,9 @@ vizra/                       # meta repo (this)
     cmd/api/  cmd/worker/  cmd/vizra/   # Echo API; media/import/outbox/analytics workers; installer/doctor/migrate/backup/restore CLI
     internal/  db/migrations/  db/queries/  api/openapi/  deploy/
   vizra-user/                # nested checkout: Next.js + TypeScript + Tailwind, packages/ui tokens + typed icons, generated API client [planned repo]
-  vizra-search/              # nested checkout: internal Go search service on PostgreSQL FTS/trigram + Redis [planned repo; may start inside core, Q-001]
+  vizra-search/              # nested checkout: internal Go search service on PostgreSQL FTS/trigram + Redis [planned repo; created in M0 as a real minimal service, SEARCH_MODE=off until M3 — Q-001 decided 2026-09-15]
 ```
-One Go module per Go repo. Keep API, background worker and CLI as separate entry points sharing one binary/image in `vizra-core`. Search stays an internal service that returns ranked IDs only and is never a hard dependency; whether it ships as a separate image from day one is open question Q-001. Do not add further services, a distributed queue cluster or Kubernetes without a measured need and owner approval.
+One Go module per Go repo. Keep API, background worker and CLI as separate entry points sharing one binary/image in `vizra-core`. Search stays an internal service that returns ranked IDs only and is never a hard dependency; it is created in M0 as a real minimal service (`not_indexed` until M3) with the `sql`/`remote` boundary frozen in core's `internal/search` and search-owned tables in PostgreSQL schema `search` (Q-001, decided 2026-09-15). Do not add further services, a distributed queue cluster or Kubernetes without a measured need and owner approval.
 
 ## Ownership
 PostgreSQL is authoritative for identity, sessions/revocation, authorization, media records, upload sessions, organization, social actions, quotas, moderation, and durable work. sqlc generates typed access from reviewed queries. Redis provides cache/rate-limit/ephemeral acceleration, not the sole copy of important state. ClickHouse stores analytical events/aggregates; it never authorizes media access or becomes necessary to complete an upload.
@@ -28,7 +28,7 @@ Media assets have stable internal IDs independent of object keys, slugs, URLs, o
 
 Albums have parent relationships with cycle prevention; asset membership is many-to-many. An album must not silently broaden a photo's permissions. Distinguish album-list visibility, asset permissions, and explicit share grants. Document cross-album access semantics before coding. Tags, categories, collections, and curated galleries are separate concepts where their behavior differs.
 
-Favorites, numeric ratings, and public likes have distinct semantics unless the product specification deliberately unifies two of them. Use unique constraints and transactional updates for one-user/one-action rules. Tenant/site isolation must be an explicit design decision if multitenancy remains in the parity target; a user account is not a tenant.
+Likes are unified with favorites (Q-018, decided 2026-09-15); favorites and numeric ratings stay distinct. Use unique constraints and transactional updates for one-user/one-action rules. Tenant/site isolation must be an explicit design decision if multitenancy remains in the parity target; a user account is not a tenant. Decided 2026-09-15 (Q-008): database-per-tenant routed from a tenant registry; no tenant column or per-tenant schema in core; the M0 plumbing checklist is in the OPEN_QUESTIONS ratification record.
 
 ## Media workflow
 Authorize upload → reserve quota → create upload session → transfer to quarantined storage → validate actual bytes and resource limits → finalize metadata → enqueue durable processing → publish only valid representations. Use bounded streaming, resumability, idempotent completion, checksum verification, atomic local publication, and orphan cleanup. Do not treat MIME headers or an object-store HEAD response as proof that media is safe. Do not equate S3 ETags with a universal content hash.

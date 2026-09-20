@@ -27,7 +27,8 @@ req("VZ-SEARCH-003","Suggestions/autocomplete for tags, users, albums with priva
 req("VZ-SEARCH-004","vizra-search internal service contract and SQL fallback",
     "Operator: search runs as an internal HMAC-authenticated service returning ranked IDs; core hydrates and authorizes; when unavailable core falls back to its own SQL; admin status shows index freshness and reconcile.",
     "search", META, [{"source":"VIDRA-REPO-MAP","note":"ranked IDs only; never hard dependency"},{"source":"OWNER-2026-09-15","note":"vizra-search repo"}],
-    deps=["VZ-SEARCH-001","VZ-JOBS-001"], success=["Kill search → results still served; reconcile catches up"], negative=["Port published off-host fails CI"], privacy=["Search never returns titles or viewer state"], api=["/internal/v1/search|suggestions|events"], ui=["/admin/search"], evidence=EV_OPS+["fault-injection transcript"], unresolved=["Q-001"])
+    deps=["VZ-SEARCH-001","VZ-JOBS-001"], success=["Kill search → results still served; reconcile catches up"], negative=["Port published off-host fails CI"], privacy=["Search never returns titles or viewer state"], api=["/internal/v1/search|suggestions|events"], ui=["/admin/search"], evidence=EV_OPS+["fault-injection transcript"], decided=["Q-001"],
+    notes="Q-001 decided 2026-09-15: repo created in M0 as a real minimal service returning not_indexed; SEARCH_MODE=off default before M3, managed default from M3; misconfiguration is a doctor FAIL with degraded readiness, served from SQL.")
 req("VZ-STATS-001","Basic operator statistics dashboard from authoritative PostgreSQL counts",
     "Owner: dashboard charts (files, disk, users, albums, tags) over 1W/1M/3M/6M/1Y with totals; per-item views count (definition documented); works with analytics OFF.",
     "search", CHEV, [{"source":"CHEV-DASHBOARD-HOME","note":"chart metrics and ranges"},{"source":"PROMPT-07","note":"basic stats useful when analytics off"}], edition="all",

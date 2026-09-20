@@ -43,15 +43,16 @@ by_area = collections.Counter(r["area"] for r in reqs)
 by_kind = collections.Counter(r["source_kind"] for r in reqs)
 core_n = sum(1 for r in reqs if "core" in r["profiles"])
 unresolved = sorted({q for r in reqs for q in r["unresolved"]})
+decided = sorted({q for r in reqs for q in r.get("decided", [])})
 out = {
-  "schema_version": 2,
+  "schema_version": 3,
   "generated": "2026-09-15",
-  "notice": "Atomic requirement ledger produced by Prompt 00 on 2026-09-15. Every entry is PLANNED/UNVERIFIED. No entry may be marked IMPLEMENTED or VERIFIED without recorded evidence (commands, exit codes, counts, SHA, artifacts). Removing or narrowing an entry requires an owner decision recorded in docs/OPEN_QUESTIONS.md.",
+  "notice": "Atomic requirement ledger produced by Prompt 00 on 2026-09-15. Every entry is PLANNED/UNVERIFIED. No entry may be marked IMPLEMENTED or VERIFIED without recorded evidence (commands, exit codes, counts, SHA, artifacts). Removing or narrowing an entry requires an owner decision recorded in docs/OPEN_QUESTIONS.md. Open questions ratified 2026-09-15; DECIDED ids are listed under `decided`, remaining open ids under `unresolved` — see docs/OPEN_QUESTIONS.md ratification record.",
   "parity_baseline_status": "UNVERIFIED",
   "status_vocabulary": {"implementation_status":["PLANNED","IN_PROGRESS","IMPLEMENTED","VERIFIED"],"verification_status":["UNVERIFIED","FAIL","BLOCKED","NOT_APPLICABLE","VERIFIED_AT_SHA"],"merge_status":["NOT_STARTED","READY_FOR_REVIEW","MERGED"],"release_status":["NOT_RELEASED","RELEASED"]},
   "source_kinds": {"explicit_user_requirement":"stated by the owner in the charter/prompt","chevereto_parity":"audited Chevereto Free/Lite/Pro capability (reference_edition = lowest edition that has it)","flickr_workflow":"Flickr-like community workflow clarified from official Flickr docs; Vizra's own design","requested_integration":"S3/AWS/Backblaze, ActivityPub, AT Protocol, IPFS","recommended_safeguard":"engineering/privacy/quality safeguard from AGENTS.md, DoD, release acceptance","operator_requirement":"install/operate/recover obligations","meta_repo_parity_with_vidra":"mechanism mirrored from the Vidra meta repo by owner direction"},
-  "summary": {"total": len(reqs), "core_profile": core_n, "full_profile": len(reqs), "by_area": dict(sorted(by_area.items())), "by_source_kind": dict(sorted(by_kind.items())), "open_questions_referenced": unresolved},
+  "summary": {"total": len(reqs), "core_profile": core_n, "full_profile": len(reqs), "by_area": dict(sorted(by_area.items())), "by_source_kind": dict(sorted(by_kind.items())), "open_questions_referenced": unresolved, "decided_questions_referenced": decided},
   "features": reqs,
 }
 json.dump(out, open(sys.argv[1],"w"), indent=2, ensure_ascii=False)
-print(f"OK {len(reqs)} requirements; core={core_n}; areas={dict(by_area)}; questions={unresolved}")
+print(f"OK {len(reqs)} requirements; core={core_n}; areas={dict(by_area)}; questions={unresolved}; decided={decided}")

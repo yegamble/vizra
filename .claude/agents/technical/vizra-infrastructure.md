@@ -51,7 +51,7 @@ a fresh install exposes.
    --no-build` → health probes. Never fold migrations into `up -d`.
 2. **Migrations ship inside the release image**; nothing bind-mounts a
    migrations directory from a checkout that `git pull` does not advance.
-3. **Compose ≥ 2.24 for the production overlay** (`!reset` / `!override`);
+3. **Compose ≥ 2.24.4 for the production overlay** (`!reset` / `!override`);
    older Compose ignores the tags silently and publishes database ports.
    Assert the rendered model, never a version string.
 4. **OFF creates no container; EXTERNAL suppresses the local container and

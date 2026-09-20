@@ -6,7 +6,7 @@ req("VZ-INSTALL-001","One-command installer that is idempotent and resumable",
     "install", META, [{"source":"VIDRA-INSTALL","note":"install.sh contract"},{"source":"CHARTER","note":"stranger installs with published instructions"}],
     deps=["VZ-FOUND-001","VZ-INSTALL-002"], success=["Fresh Ubuntu 24.04 amd64 → tree in /opt/vizra + CLI + interview started","--help needs no network/root/clone under /bin/sh"],
     negative=["Checksum mismatch aborts before writing","Non-tty without --yes refuses"], privacy=["Existing env/production.env is never regenerated"],
-    recovery=["Interrupted run resumes from the completed step"], cli=["install.sh --yes --ref --dir --owner --git"], evidence=["clean-target transcript; install_test.sh results"], unresolved=["Q-027"])
+    recovery=["Interrupted run resumes from the completed step"], cli=["install.sh --yes --ref --dir --owner --git"], evidence=["clean-target transcript; install_test.sh results"], decided=["Q-027"])
 req("VZ-INSTALL-002","`vizra setup` interview, loopback web wizard, non-interactive and --check modes write one validated env file",
     "Operator: the interview asks domain/TLS/instance name/release/storage/external PostgreSQL/Redis/analytics/IPFS/optional components/SMTP/registration/import questions; the same engine serves `--web` on loopback with a one-time link; `--non-interactive` with flags/answers file; `--check` validates; secrets minted, never blank; re-run preserves values; `--rotate` explicit; KEK rotation needs --yes-i-know.",
     "install", META, [{"source":"VIDRA-SETUP","note":"setup.go interview and usage"},{"source":"META-REPO","note":"question set"}],
@@ -27,11 +27,11 @@ req("VZ-INSTALL-004","Deployment bundle is deterministic and self-sufficient",
     deps=["VZ-TOPOLOGY-001"], success=["cmp of two builds equal; manifest schema version = migrations on disk"], negative=["A missing bind-mount source fails the content check"], evidence=["bundle lane logs"])
 
 req("VZ-TOPOLOGY-001","Base + production overlay + external-datastore overlays render the declared topology",
-    "Operator: docker-compose.yml (dev), docker-compose.prod.yml (loopback binds, pinned images, restart, log caps, named volumes, edge), and external overlays for PostgreSQL/Redis/ClickHouse/IPFS; explicit -f chain in production; Compose ≥ 2.24 enforced.",
+    "Operator: docker-compose.yml (dev), docker-compose.prod.yml (loopback binds, pinned images, restart, log caps, named volumes, edge), and external overlays for PostgreSQL/Redis/ClickHouse/IPFS; explicit -f chain in production; Compose ≥ 2.24.4 enforced.",
     "topology", META, [{"source":"VIDRA-COMPOSE","note":"!override profiles + !reset depends_on"},{"source":"CHARTER","note":"managed by default or external"}],
     deps=["VZ-FOUND-001"], success=["Every shape in META_REPO.md §2 renders; postgres/redis/search/clickhouse/ipfs RPC publish nothing"],
-    negative=["Compose < 2.24 refused by the scripts","Bare `docker compose` on a prod host is documented as wrong and compose.sh used instead"],
-    evidence=EV_OPS, unresolved=["Q-017"])
+    negative=["Compose < 2.24.4 (including 2.24.0–2.24.3) refused by install.sh, deploy, rollback, restore and doctor","Bare `docker compose` on a prod host is documented as wrong and compose.sh used instead"],
+    evidence=EV_OPS, decided=["Q-017"])
 req("VZ-TOPOLOGY-002","PostgreSQL: managed container by default, external DSN suppresses the container",
     "Operator: VIZRA_EXTERNAL_POSTGRES=true + DATABASE_URL disables the bundled service and every depends_on edge; migrations and api/worker/search use the DSN; invalid DSN fails boot, never forks a fresh local DB; backup ownership moves to the provider and the runbook says so.",
     "topology", EXPLICIT, [{"source":"CHARTER","note":"configured but invalid external service must not silently fall back"},{"source":"VIDRA-EXTERNAL-PG","note":"overlay mechanics"}],
@@ -92,9 +92,9 @@ req("VZ-OPS-006","Job administration UI/CLI",
     "operations", OPS, [{"source":"CATALOG-F9","note":"job administration"},{"source":"CHEV-COMPARE","note":"Background file queue handling"}],
     deps=["VZ-JOBS-001","VZ-ADMIN-001"], success=["Failed job retried from UI; audit event"], negative=["Cancel of a running job is bounded and safe"], api=["GET/POST /api/v1/admin/jobs"], ui=["/admin/jobs"], cli=["vizra jobs"], evidence=EV_API+EV_UI)
 req("VZ-OPS-007","Capacity and performance budgets declared and measured",
-    "Owner: reference hardware, dataset, request/media mix, p95/p99, error rate, queue drain, RPO/RTO recorded and approved before acceptance; metadata-only vs real-bytes workloads separated.",
+    "Owner: reference hardware, dataset, request/media mix, p95/p99, error rate, queue drain, RPO/RTO recorded and approved before acceptance; metadata-only vs real-bytes workloads separated; the load corpus is declared here (count, total bytes, megapixel mix; 10k photos proposed) separately from the VZ-FOUND-007 correctness corpus; budgets provisional until the first M0 measurement run, then frozen.",
     "operations", SAFE, [{"source":"RELEASE-ACCEPTANCE","note":"performance and recovery objectives"}],
-    deps=["VZ-FOUND-007"], success=["Budgets documented; load run recorded"], negative=["Budget changed to excuse a failed run is rejected in review"], evidence=["load report with environment"], unresolved=["Q-028"])
+    deps=["VZ-FOUND-007"], success=["Budgets documented; load run recorded","Declared load corpus (count, total bytes, megapixel mix; 10k photos proposed) recorded with the run","Oldest-pending-job age exposed as a metric and failing doctor/readiness above the declared threshold"], negative=["Budget changed to excuse a failed run is rejected in review"], evidence=["load report with environment"], unresolved=["Q-028"], decided=["Q-028"])
 req("VZ-OPS-008","Security posture on the host and images",
     "Operator: non-root containers, no-new-privileges, capped logs, images pinned by tag (digest records), secrets untracked, no Docker socket in web/API process.",
     "operations", SAFE, [{"source":"ARCH","note":"web/API must not gain unrestricted Docker-socket access"},{"source":"VIDRA-COMPOSE-PROD","note":"security_opt"}],

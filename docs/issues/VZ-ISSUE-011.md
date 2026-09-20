@@ -26,7 +26,7 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - integration + browser tests; second-tab state test
 
 ## Dependencies / blockers
-Q-018 ratified
+Q-018 ratified 2026-09-15
 
 ## Definition of done
 Ledger entries updated with evidence; UI-control inventory updated where controls changed; execution plan checkpointed; PR opened as READY_FOR_REVIEW. Never self-merge; never mark VERIFIED without independent verification.

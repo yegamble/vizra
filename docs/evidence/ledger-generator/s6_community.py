@@ -13,12 +13,23 @@ req("VZ-RATING-001","Numeric ratings (1–5) with one current vote per user, cha
 req("VZ-FAVORITE-001","Favorites: one durable favorite per user per item/album, personal favorites listing, public count, creator notification",
     "Member: favorites a photo or album (heart, keyboard L); repeated/retried requests keep one row; own favorites listing at /{username}/favorites; public 'favorited by' count/list where the item is public; owner notified; Explore signal.",
     "community", EXPLICIT, [{"source":"CHARTER","note":"favorites"},{"source":"CHEV-USER-LIKED","note":"liked listing; L shortcut"},{"source":"FLICKR-FAVES","note":"Faves tab; creator notified"}],
-    deps=["VZ-AUTH-001","VZ-VIEWER-001"], success=["Add/remove idempotent; second tab reflects state; listing correct"], negative=["Favoriting an inaccessible item denied without revealing details"], privacy=["Tightening privacy removes it from others' favorites views and counts"], api=["PUT/DELETE /api/v1/photos/{id}/favorite","GET /api/v1/users/{u}/favorites"], ui=["favorite control","/u/{username}/favorites"], evidence=EV_API+EV_UI+EV_NEG, unresolved=["Q-018"],
+    deps=["VZ-AUTH-001","VZ-VIEWER-001"], success=["Add/remove idempotent; second tab reflects state; listing correct"], negative=["Favoriting an inaccessible item denied without revealing details"], privacy=["Tightening privacy removes it from others' favorites views and counts"], api=["PUT/DELETE /api/v1/photos/{id}/favorite","GET /api/v1/users/{u}/favorites"], ui=["favorite control","/u/{username}/favorites"], evidence=EV_API+EV_UI+EV_NEG, decided=["Q-018"],
     mechanism="Chevereto 'likes' and Flickr 'faves' are both binary. Proposed decision: Vizra unifies likes and favorites into one action named Favorite (no separate public like).")
 req("VZ-FOLLOW-001","Follow/unfollow, followers and following lists, following feed",
-    "Member: follows users; lists at /{username}/followers and /following; a following feed sorted by recency; counts live; private profiles require approval (Q-040).",
+    "Member: follows users; lists at /{username}/followers and /following; a following feed sorted by recency; counts live; approval is VZ-FOLLOW-002 (full).",
     "community", CHEV, [{"source":"CHEV-COMPARE","note":"Followers (Lite/Pro)"},{"source":"CHEV-USER-FOLLOWING","note":"following feed sorted by most recent"},{"source":"FLICKR-CONTACTS","note":"asymmetric follow + friend/family labels"}], edition="Lite",
-    deps=["VZ-AUTH-001","VZ-ACCOUNT-001"], success=["Follow idempotent; feed shows only visible items"], negative=["Blocked user cannot follow"], privacy=["Feed respects per-item visibility and audiences"], api=["PUT/DELETE /api/v1/users/{u}/follow"], ui=["profile follow button","/feed"], evidence=EV_API+EV_UI+EV_NEG, unresolved=["Q-040"])
+    deps=["VZ-AUTH-001","VZ-ACCOUNT-001"], success=["Follow idempotent; feed shows only visible items"], negative=["Blocked user cannot follow"], privacy=["Feed respects per-item visibility"], api=["PUT/DELETE /api/v1/users/{u}/follow"], ui=["profile follow button","/feed"], evidence=EV_API+EV_UI+EV_NEG, decided=["Q-040"])
+req("VZ-FOLLOW-002","Follow requests with approval and re-evaluation on profile privacy change",
+    "Member: on a private profile a follow becomes a request; the owner approves or denies it from a pending list; approved followers may see follower-only items; the requester sees their own pending state and nobody else's; flipping a profile to private re-evaluates existing local and remote followers.",
+    "community", SAFE, [{"source":"CHEV-USERS-SETTINGS","note":"private profile setting"},{"source":"FLICKR-CONTACTS","note":"asymmetric follow; Flickr has no approval step"},{"source":"FLICKR-PRIVACY","note":"follower/friend audiences presuppose an approved relationship"}],
+    deps=["VZ-FOLLOW-001","VZ-ACCOUNT-001"],
+    success=["Private profile → follow becomes a request; approve/deny UI; pending state visible to requester only"],
+    negative=["Stranger self-follows a private profile → still denied follower-only items"],
+    privacy=["Flipping a profile to private re-evaluates existing local and remote (ActivityPub Follow/Accept/Reject/Undo) followers"],
+    recovery=["Re-evaluation job is idempotent"],
+    api=["PUT/DELETE /api/v1/users/{u}/follow","GET /api/v1/me/follow-requests","POST /api/v1/me/follow-requests/{id}/approve|deny"],
+    ui=["profile follow button pending state","/settings/follow-requests"],
+    evidence=EV_API+EV_UI+EV_NEG, profiles=("full",), decided=["Q-040"])
 req("VZ-FEED-001","Activity feed of people and groups you follow with filters and hide controls",
     "Member: home feed of uploads, comments, favorites from followed people and groups; filters (all/people/groups/audiences); hide a person/group from feed; cold start shows recommended public content.",
     "community", FLICKR, [{"source":"FLICKR-ACTIVITY-FEED","note":"filters; layouts; hide"}],
@@ -63,15 +74,15 @@ req("VZ-GROUP-003","Group discussions: topics, replies, edit/delete rules, stick
 req("VZ-NOTES-001","Positional notes on photos (rectangle + text) governed by owner permission",
     "Member: adds/edits/deletes rectangular notes when the owner allows; notes shown on hover/focus with accessible alternative.",
     "community", FLICKR, [{"source":"FLICKR-NOTES","note":"web-only in Flickr; permission shared with tags/people"}],
-    deps=["VZ-VIEWER-001","VZ-PRIVACY-001"], success=["Note persists with coordinates"], negative=["Permission 'nobody' hides control and rejects API"], api=["/api/v1/photos/{id}/notes*"], ui=["viewer notes layer"], evidence=EV_API+EV_UI, profiles=("full",), unresolved=["Q-041"])
+    deps=["VZ-VIEWER-001","VZ-PRIVACY-001"], success=["Note persists with coordinates"], negative=["Permission 'nobody' hides control and rejects API"], api=["/api/v1/photos/{id}/notes*"], ui=["viewer notes layer"], evidence=EV_API+EV_UI, profiles=("full",), decided=["Q-041"])
 req("VZ-PEOPLE-001","People tagging with subject consent and 'remove me from all' escape hatch",
     "Member: tags people in photos when permitted; a tagged person gains view access only through an explicit grant they can revoke; 'who can tag me' setting; bulk self-removal.",
     "community", FLICKR, [{"source":"FLICKR-PEOPLE","note":"tagging grants access to non-public — treated as explicit grant"}],
-    deps=["VZ-PRIVACY-001","VZ-NOTIFY-001"], success=["Tag, consent, revoke flows"], privacy=["No access before grant; removal revokes"], api=["/api/v1/photos/{id}/people*"], ui=["viewer people","/settings/privacy"], evidence=EV_API+EV_NEG, profiles=("full",), unresolved=["Q-041"])
+    deps=["VZ-PRIVACY-001","VZ-NOTIFY-001"], success=["Tag, consent, revoke flows"], privacy=["No access before grant; removal revokes"], api=["/api/v1/photos/{id}/people*"], ui=["viewer people","/settings/privacy"], evidence=EV_API+EV_NEG, profiles=("full",), decided=["Q-041"])
 req("VZ-MESSAGE-001","Private one-to-one messages between members",
     "Member: sends/reads/deletes direct messages; blocked users cannot message; used for system notices too.",
     "community", FLICKR, [{"source":"FLICKR-MAIL","note":"one-on-one; system channel"}],
-    deps=["VZ-BLOCK-001","VZ-NOTIFY-001"], success=["Send/receive; block enforced"], privacy=["Message bodies never logged"], api=["/api/v1/me/messages*"], ui=["/messages"], evidence=EV_API+EV_UI, profiles=("full",), unresolved=["Q-042"])
+    deps=["VZ-BLOCK-001","VZ-NOTIFY-001"], success=["Send/receive; block enforced"], privacy=["Message bodies never logged"], api=["/api/v1/me/messages*"], ui=["/messages"], evidence=EV_API+EV_UI, profiles=("full",), decided=["Q-042"])
 req("VZ-SPAM-001","Anti-abuse limits on faving, commenting, tagging, following, group invites; account-age gates",
     "Operator: configurable thresholds and account-age requirements for invites/publishing; violations rate-limited and surfaced to moderators.",
     "community", FLICKR, [{"source":"FLICKR-SPAM","note":"excessive faving/commenting; 30-day invite age"}],

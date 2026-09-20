@@ -1,6 +1,6 @@
 # Vizra product specification — baseline of 2026-09-15
 
-**Status:** PLANNED / UNVERIFIED. This document defines what Vizra must be; it describes no existing code. The atomic obligations live in `docs/quality/features.json` (188 requirements, IDs `VZ-<AREA>-<NNN>`); the release claims live in `docs/quality/release-profiles/{core,full}.json`; the UI-control inventory in `docs/quality/ui-controls.json`; evidence sources in `docs/SOURCE_REGISTER.md`; unresolved decisions in `docs/OPEN_QUESTIONS.md`; the install/CI/topology design in `docs/META_REPO.md`. Where this prose and the ledger differ, the ledger governs and the difference is a defect to fix.
+**Status:** PLANNED / UNVERIFIED. This document defines what Vizra must be; it describes no existing code. The atomic obligations live in `docs/quality/features.json` (190 requirements, IDs `VZ-<AREA>-<NNN>`); the release claims live in `docs/quality/release-profiles/{core,full}.json`; the UI-control inventory in `docs/quality/ui-controls.json`; evidence sources in `docs/SOURCE_REGISTER.md`; unresolved decisions in `docs/OPEN_QUESTIONS.md`; the install/CI/topology design in `docs/META_REPO.md`. Where this prose and the ledger differ, the ledger governs and the difference is a defect to fix.
 
 ## 1. Product statement
 
@@ -12,10 +12,10 @@ Vizra has **no billing**. Every capability a reference product paywalls (Chevere
 
 | | `core` | `full` |
 |---|---|---|
-| Requirements | 141 | 188 (every requirement) |
+| Requirements | 141 | 191 (every requirement) |
 | Users can | install with one command and a wizard, claim the owner account, upload photos (JPEG/PNG/GIF/WebP/AVIF/BMP; MP4/MOV/WebM store+poster), get correct derivatives with EXIF/GPS policy, organize into nested albums with per-item visibility, album privacy and share grants, tag/categorize, comment/rate/favorite, follow, get notified, explore/search permission-safely, moderate uploads and reports, brand the site, use local or S3-compatible storage, restart/backup/restore/upgrade | everything in core plus live-qualified AWS/Backblaze, native GCS/Azure/OSS/Swift/SFTP/FTP (or approved substitutions), multi-location storage migration, imports (filesystem/Chevereto/Flickr), site export, ActivityPub, AT Protocol (login, Bluesky cross-post, native records), IPFS, ClickHouse analytics and member stats, groups/pools/discussions, galleries, collections, notes, people tags, geo/map, licensing, content types, messages, multitenancy, external CAPTCHA/anti-spam/moderation/CSAM services, banners, i18n |
 | Topology | PostgreSQL/Redis managed or external; ClickHouse and IPFS OFF (must render, must not start) | all OFF/EXTERNAL/MANAGED shapes |
-| Not claimed | anything listed under full-only; ARM64 (Q-027) | nothing accepted may be deferred; a deferral is an owner decision in OPEN_QUESTIONS |
+| Not claimed | anything listed under full-only; ARM64 (Q-027 decided 2026-09-15: not claimed; CLI built for arm64) | nothing accepted may be deferred; a deferral is an owner decision in OPEN_QUESTIONS |
 
 A core-only release is never described as the completed application. Both claims are frozen per `docs/RELEASE_ACCEPTANCE.md` before any rehearsal.
 
@@ -32,7 +32,7 @@ Visitor (anonymous) · Member (`member`) · Photographer (a member acting on own
 - **Audience** (full): owner-maintained lists (e.g. followers, friends/family-style labels) usable as visibility targets.
 - **Collection** (full): tree of own albums or sub-collections, depth 5. **Gallery** (full): curated set of other members' public safe assets (≤500) with creator opt-out. **Group** (full): privacy public/invite-only/private, roles admin/moderator/member, pool with approval and explicit visibility grants, discussions with sticky/locked topics.
 - **Tag** (user-defined, phrase-capable, renamable, machine tags in full) · **Category** (admin-defined, URL key).
-- **Favorite**: unique (user, asset|album); personal listing; public count; notification. **Rating**: one current 1–5 vote per user per asset; aggregate average/count/distribution. **Comment**: threaded one level; sanitized allow-list formatting; edit/delete/report. Likes are unified with favorites (Q-018).
+- **Favorite**: unique (user, asset|album); personal listing; public count; notification. **Rating**: one current 1–5 vote per user per asset; aggregate average/count/distribution. **Comment**: threaded one level; sanitized allow-list formatting; edit/delete/report. Likes are unified with favorites (Q-018, decided 2026-09-15).
 - **Follow** (asymmetric) · **Block** (retroactive cleanup) · **Report** · **Notification** · **Message** (full).
 - **User**: roles; profile (avatar, background, bio, website, privacy); preferences (defaults for new uploads, EXIF keep, notifications, language, timezone, NSFW display); API keys (scoped, hashed); 2FA; sessions.
 - **Storage location**: type local/s3/…; capacity; URL/CDN mapping; capability flags. **Job/outbox**: durable, leased, idempotent. **Setting**: registry-backed runtime configuration with audit. **Audit event**. **Tenant** (full). **Remote publication**: AP object IDs, AT record URIs/CIDs, IPFS CIDs kept separate from local records.
@@ -76,22 +76,22 @@ Defined in `docs/META_REPO.md`: one-command installer → bundle → `vizra` CLI
 | Source section | Reconciled into | Notes |
 |---|---|---|
 | Chevereto compare §1.1–1.2 files/uploading | VZ-UPLOAD-001…013, VZ-MEDIA-001…009 | all rows mapped; moderation/watermarks Lite+ |
-| §1.3 storage APIs | VZ-STORAGE-001…015 | Pro adapters separate obligations (Q-030/Q-031) |
-| §1.4–1.8 content/organization/tags/albums/sharing | VZ-LISTING-001, VZ-ALBUM-*, VZ-TAG-*, VZ-CATEGORY-001, VZ-SHARE-*, VZ-EXPLORE-* | album privacy modes verbatim; per-item privacy added (Q-039) |
-| §1.9–1.10 users/social | VZ-AUTH-*, VZ-ACCOUNT-*, VZ-PROFILE-001, VZ-FOLLOW-001, VZ-FAVORITE-001, VZ-NOTIFY-001, VZ-BRAND-004, VZ-EXPLORE-002 | likes unified with favorites (Q-018) |
+| §1.3 storage APIs | VZ-STORAGE-001…015 | Pro adapters separate obligations (Q-030/Q-031, decided 2026-09-15) |
+| §1.4–1.8 content/organization/tags/albums/sharing | VZ-LISTING-001, VZ-ALBUM-*, VZ-TAG-*, VZ-CATEGORY-001, VZ-SHARE-*, VZ-EXPLORE-* | album privacy modes verbatim; per-item privacy added (Q-039, decided 2026-09-15) |
+| §1.9–1.10 users/social | VZ-AUTH-*, VZ-ACCOUNT-*, VZ-PROFILE-001, VZ-FOLLOW-001, VZ-FAVORITE-001, VZ-NOTIFY-001, VZ-BRAND-004, VZ-EXPLORE-002 | likes unified with favorites (Q-018, decided 2026-09-15) |
 | §1.11 security | VZ-AUTH-003, VZ-SECURITY-001…003 | |
 | §1.12–1.13 admin features/toggles | VZ-ADMIN-*, VZ-BRAND-*, VZ-PAGE-001, VZ-CONSENT-001, VZ-BANNER-001, VZ-SERVICES-*, VZ-I18N-001, VZ-SHARE-003, VZ-MEDIA-004/007, VZ-VIEWER-002, VZ-UPLOAD-005…013 | custom JS/PHP become sanitized equivalents (Q-014); Disqus → native + allowlist (Q-011) |
 | §1.14–1.15 system/tooling | VZ-TENANT-*, VZ-MEDIA-001, VZ-BRAND-001, VZ-UPDATE-001, VZ-OPS-004, VZ-EMAIL-001, VZ-SECURITY-003, VZ-ACCOUNT-002, VZ-OPS-005, VZ-JOBS-001, VZ-MEDIA-009, VZ-TOOLS-001 | xrDebug/REPL declined (Q-026) |
-| Chevereto API v1/v4, tenants | VZ-AUTH-008, VZ-UPLOAD-010, VZ-TENANT-001/002 | scopes/rate limits added (Q-033) |
+| Chevereto API v1/v4, tenants | VZ-AUTH-008, VZ-UPLOAD-010, VZ-TENANT-001/002 | scopes/rate limits added (Q-033, decided 2026-09-15) |
 | Chevereto admin manual (29 settings pages) | VZ-ADMIN-002 registry + per-area entries above | every setting name captured in the register |
 | Chevereto user manual | VZ-VIEWER-*, VZ-LIBRARY-*, VZ-ALBUM-003, VZ-UPLOAD-003/006/009, VZ-EXPLORE-*, VZ-SEARCH-001, VZ-UPLOAD-010/011 | shortcuts preserved |
-| Chevereto NOT SHIPPED (V5 API, tags badge) | excluded / Q-006 | |
+| Chevereto NOT SHIPPED (V5 API, tags badge) | excluded / Q-006, decided 2026-09-15 | |
 | Flickr organize/albums/collections/galleries | VZ-LIBRARY-*, VZ-ALBUM-001, VZ-COLLECTION-001, VZ-GALLERY-001 | desktop-only and empty-album deletion not copied |
 | Flickr groups | VZ-GROUP-001…003 | pool visibility as explicit grant |
 | Flickr faves/comments/notes/tags/people/geo | VZ-FAVORITE-001, VZ-COMMENT-001, VZ-NOTES-001, VZ-TAG-001/002, VZ-PEOPLE-001, VZ-GEO-001 | |
-| Flickr privacy/safety/content type/EXIF/download/licensing/guest passes | VZ-PRIVACY-001…003, VZ-NSFW-001, VZ-MEDIA-004, VZ-DOWNLOAD-001, VZ-LICENSE-001, VZ-ALBUM-002 | paywalls removed (Q-019) |
+| Flickr privacy/safety/content type/EXIF/download/licensing/guest passes | VZ-PRIVACY-001…003, VZ-NSFW-001, VZ-MEDIA-004, VZ-DOWNLOAD-001, VZ-LICENSE-001, VZ-ALBUM-002 | paywalls removed (Q-019, decided 2026-09-15) |
 | Flickr following/feed/mail/notifications | VZ-FOLLOW-001, VZ-FEED-001, VZ-MESSAGE-001, VZ-NOTIFY-001 | |
-| Flickr explore/search/stats/upload limits/sizes | VZ-EXPLORE-003, VZ-SEARCH-002, VZ-STATS-002, VZ-UPLOAD-013, VZ-MEDIA-001 | impression vs view (Q-020) |
+| Flickr explore/search/stats/upload limits/sizes | VZ-EXPLORE-003, VZ-SEARCH-002, VZ-STATS-002, VZ-UPLOAD-013, VZ-MEDIA-001 | impression vs view (Q-020, decided 2026-09-15) |
 | Flickr block/report/rules/deletion/export | VZ-BLOCK-001, VZ-REPORT-001, VZ-MOD-001, VZ-SPAM-001, VZ-ACCOUNT-002, VZ-EXPORT-001 | |
 | Flickr API (39 namespaces) | vocabulary only; VZ-AUTH-008 scopes read/write/delete-style | OAuth 1.0a not copied |
 | Requested integrations | VZ-STORAGE-003/006, VZ-AP-*, VZ-AT-*, VZ-IPFS-* | |
@@ -106,9 +106,9 @@ Defined in `docs/META_REPO.md`: one-command installer → bundle → `vizra` CLI
 | Flickr Help Center index enumerated (157) and workflow articles reconciled (76 fetched) | DONE; 25 documented gaps listed in the register |
 | Roadmap/unreleased items excluded | DONE (V5 API, tags badge) |
 | Paid/demo/private sources not inspected | CONFIRMED |
-| Ambiguous behavior resolved or explicitly blocked | 43 questions: 38 PROPOSED, 5 BLOCKED (Q-016 provider lane, Q-021/Q-022 credentials, Q-032 permissions, Q-036 owner domain) |
+| Ambiguous behavior resolved or explicitly blocked | 43 questions: 38 DECIDED 2026-09-15 (Q-028 method only, numbers provisional), 1 OWNER ACTION (Q-032), 4 BLOCKED (Q-016 provider lane, Q-021/Q-022 credentials, Q-036 owner domain) |
 | No unapproved scope reduction | CONFIRMED: videos, non-S3 storage, embedded uploader, imports, moderation integrations, multitenancy, operator features, forum plugins, banners, i18n all present in the full manifest; declines are listed for owner decision only |
-| Ledger validity | 188 entries, unique IDs, dependencies resolve, no cycles, core closure holds (core never depends on full-only), all PLANNED/UNVERIFIED |
+| Ledger validity | 191 entries, unique IDs, dependencies resolve, no cycles, core closure holds (core never depends on full-only), all PLANNED/UNVERIFIED |
 | Verification | UNVERIFIED — no test has run; the gate passes only when an independent reviewer re-reads the register against the live sources |
 
 ## 15. Smallest first runnable slice — `VZ-SLICE-01` (golden path)
@@ -118,11 +118,11 @@ Defined in `docs/META_REPO.md`: one-command installer → bundle → `vizra` CLI
 **Requirement IDs:** VZ-FOUND-001…008, VZ-CI-001…003, VZ-INSTALL-001…004, VZ-TOPOLOGY-001…003/006/007, VZ-OPS-001/002, VZ-BACKUP-001/002, VZ-AUTH-001/004, VZ-INSTALL-003, VZ-UPLOAD-001/003, VZ-QUOTA-001, VZ-JOBS-001, VZ-STORAGE-001, VZ-MEDIA-001/003/004, VZ-VIEWER-001, VZ-LIBRARY-001, VZ-ALBUM-001/002, VZ-PRIVACY-001, VZ-DESIGN-001, VZ-A11Y-001, VZ-RESPONSIVE-001, VZ-CONTROLS-001.
 
 **Exact information its tests need (to be supplied or created before implementation):**
-1. Target host: one disposable Ubuntu 24.04 amd64 VM (2 vCPU/4 GB proposed, Q-028) with Docker Engine + Compose ≥ 2.24 or installer permission to install them; a second identical host for the restore rehearsal; SSH access; no production DNS.
+1. Target host: one disposable Ubuntu 24.04 amd64 VM (2 vCPU/4 GB minimum supported host; Q-028 numbers provisional until the first M0 run) with Docker Engine + Compose ≥ 2.24.4 or installer permission to install them; a second identical host for the restore rehearsal; SSH access; no production DNS.
 2. Domain/TLS: a lab hostname with `VIZRA_TLS_MODE=internal` or `plain-http` (documented as lab-only); ACME not required.
 3. Fixtures with recorded sha256 and license: one JPEG with EXIF orientation 6 and GPS tags; one PNG with alpha; one truncated JPEG; one oversized-dimension image; one polyglot/active SVG; one animated GIF (VZ-FOUND-007 manifest).
 4. Accounts: owner (claimed via token), member B, anonymous session; the claim token read from the API log.
-5. Budgets to assert: upload-to-thumbnail ≤ 30 s p95 on the reference host; restore checksum match 100%; RTO measured and recorded (Q-028 numbers pending approval).
+5. Budgets to assert: upload-to-thumbnail ≤ 30 s p95 on the reference host; restore checksum match 100%; RTO measured and recorded (Q-028 provisional targets; calibrated once by the first M0 run, then frozen).
 6. Commands that must exist and be recorded in `docs/quality/COMMANDS.md`: install, setup (non-interactive answers file), deploy, doctor, backup, restore, the browser E2E command, and the compose render assertions.
 7. Evidence to retain: install/deploy transcripts with exit codes, rendered compose model, `/readyz` responses, decoded thumbnail hashes, browser traces and 390/1440 light/dark screenshots, privacy negative-test output (member B and anonymous → 403/404 on every surface incl. object URLs and cached responses), backup manifest and restore checksum report, source SHA and image digests.
 

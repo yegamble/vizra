@@ -84,6 +84,7 @@
     "VZ-MEDIA-007",
     "VZ-MEDIA-008",
     "VZ-MEDIA-009",
+    "VZ-MEDIA-010",
     "VZ-QUOTA-001",
     "VZ-QUOTA-002",
     "VZ-JOBS-001",
@@ -137,10 +138,12 @@
     "VZ-PRIVACY-001",
     "VZ-PRIVACY-002",
     "VZ-PRIVACY-003",
+    "VZ-PRIVACY-004",
     "VZ-COMMENT-001",
     "VZ-RATING-001",
     "VZ-FAVORITE-001",
     "VZ-FOLLOW-001",
+    "VZ-FOLLOW-002",
     "VZ-FEED-001",
     "VZ-NOTIFY-001",
     "VZ-BLOCK-001",
@@ -198,7 +201,7 @@
     "VZ-RESPONSIVE-001",
     "VZ-CONTROLS-001"
   ],
-  "required_feature_count": 188,
+  "required_feature_count": 191,
   "topology": {
     "postgres": [
       "managed",
@@ -266,7 +269,7 @@
     },
     {
       "provider": "Backblaze B2 native",
-      "evidence_kind": "adapter lane or owner-approved substitution (Q-030)",
+      "evidence_kind": "adapter lane or owner-approved substitution (Q-030) — decided 2026-09-15",
       "status": "PLANNED"
     },
     {
@@ -281,7 +284,7 @@
     },
     {
       "provider": "Alibaba OSS",
-      "evidence_kind": "live lane or S3-compatible qualification (Q-031)",
+      "evidence_kind": "live lane or S3-compatible qualification (Q-031) — decided 2026-09-15",
       "status": "PLANNED"
     },
     {
@@ -335,7 +338,7 @@
     "architecture": "amd64",
     "hardware": null,
     "status": "PROPOSED_NOT_QUALIFIED",
-    "arm64": "separate qualification before any claim (Q-027)"
+    "arm64": "not claimed; CLI built for arm64; separate qualification before any claim (Q-027 decided 2026-09-15)"
   },
   "performance_budgets": null,
   "recovery_objectives": null,
