@@ -374,6 +374,168 @@ nothing to check. Revisit with VZ-SEARCH-001 (M3).
 That is the last commit touching `api/`; `e45e784` follows it and changes only
 `.github/`.
 
+
+## Review round 1 — backend seat, security seat, independent verifier
+
+Head after the round: `4f8d0fc207f94a2a516607d167fcf69abd7a2148`. **`api/` last touched by `866eeb8c2028b18e68eec86fcce36ea545d1af55`** — `vizra-user`
+and `vizra-search` re-vendor from that SHA.
+
+All five required checks green on `4f8d0fc207f94a2a516607d167fcf69abd7a2148`: `append-only`, `build-test`,
+`cache-matrix` (both legs), `govulncheck`, `docker-build`, and the `ci-required`
+fan-in. **900 tests, 0 skips** (`go test -count=1 -tags=integration -v ./...`,
+exit 0), of which 315 are the frozen authz matrix.
+
+### Blockers
+
+**Security 1 — the evaluator was default-ALLOW on an unset visibility.**
+`Decide` normalised `""` to `VisibilityPublic`, so a zero-valued `Resource`
+granted an anonymous viewer `item_page`, `original_download`, `derivative_url`,
+`embed`, `search`, `explore`, `shared_cache`, `federation_outbound` and
+`count_contribution`. The verifier's mutant "any unrecognised visibility →
+public" survived both `make ci` and `make test-integration`.
+
+RED transcript `R2-authz-red.txt`, with the new tests against the
+normalisations still in place:
+
+```
+--- FAIL: TestUnknownVisibilityDenies/item_page/""
+    item_page with visibility "" ALLOWED for viewer class A (reason "public").
+--- FAIL: TestUnknownVisibilityDenies/federation_outbound/""
+--- FAIL: TestUnknownVisibilityDenies/ipfs_publication/""
+```
+
+The fix removes both `"" →` normalisations and denies with
+`ReasonVisibilityUnknown`. `TestUnknownVisibilityDenies` drives 21 Actions × 8
+unknown values (`""`, `PUBLIC`, `Public`, `scheduled`, `moderated`, `deleted`,
+`" public"`, `"public\n"`) × 5 viewer classes; `TestZeroResourceDeniesEverySurface`
+kills the verifier's exact mutant directly. `HideExistence` now hides anything
+not public/unlisted. **The 315-case frozen matrix is unchanged** (re-counted:
+315 PASS). `DownloadSetting` keeps its permissive default with the asymmetry
+explained in the struct field.
+
+**Backend 1 — a crash-looping job wedged the queue.** RED transcript
+`R2-crashloop-red.txt` reproduces the reviewer's own failure against the
+pre-fix queries:
+
+```
+cycle 3: ClaimJob failed: ERROR: new row for relation "jobs" violates
+check constraint "jobs_attempts_bounded" (SQLSTATE 23514)
+```
+
+`ClaimJob` now filters `attempts < max_attempts`; `SweepExpiredLeases`
+dead-letters an exhausted row in one statement with a `last_error` naming lease
+exhaustion and `finished_at` set. `attempts` is documented as counting CLAIMS,
+with the reasoning. GREEN in `R2-crashloop-green.txt`.
+
+**Backend 2 — the append-only guarantee was not enforced.** Proven with two
+throwaway PRs against `feat/m0-foundation` (not `main`: the rule bites only for
+migrations that exist on the BASE branch, and these four are not on main yet, so
+basing on this branch is the faithful simulation of an edit after merge).
+
+| | PR | Run | Result |
+|---|---|---|---|
+| negative — edit `0002`, regenerate the manifest | [#2](https://github.com/yegamble/vizra-core/pull/2) | [35532576593](https://github.com/yegamble/vizra-core/actions/runs/35532576593) | **FAILED**, naming the file |
+| positive — only ADD `0005` | [#3](https://github.com/yegamble/vizra-core/pull/3) | [35532590902](https://github.com/yegamble/vizra-core/actions/runs/35532590902) | **PASSED** |
+
+```
+##[error]a migrations/manifest.sha256 line was REMOVED or CHANGED.
+    -af8405894ae1c130235453835ddbefef872b551115963da3fe525d3a1c74de07  0002_jobs.up.sql
+```
+```
+append-only: ok (2 migration file hash(es) added, none removed or changed)
+```
+
+`migrate-lint` was GREEN on the negative branch before it was pushed — the
+regeneration restored self-consistency, which is exactly the laundering the CI
+job exists to catch. Both PRs closed, both branches deleted; `git ls-remote`
+shows only `main` and `feat/m0-foundation`. CODEOWNERS gains `migrations/**` and
+`api/**`; `migration-manifest.sh`'s header now names all three layers and claims
+only controls that exist.
+
+**Verifier 2 — `vizra doctor` had zero tests.** The verdicts moved to
+`internal/doctor` as pure functions (`cmd/vizra` does only I/O). All three
+mutants go red — transcript `R2-doctor-mutants.txt`:
+
+| Mutant | Result |
+|---|---|
+| M8a schema-drift reports `statusOK` | RED — 3 sub-tests, "A doctor that reports OK on a drifted schema actively misdirects the investigation" |
+| M8b cache floor check deleted | RED — `no check named "cache version floor"` |
+| M8c invalid config reports `statusOK` | RED — 5 keys, plus "an invalid configuration exits 0; `vizra doctor && deploy` would proceed" |
+
+Coverage: schema current/behind/ahead/dirty/unreadable; cache flavour, version
+floor (12 cases including fail-closed on unparseable); database unreachable and
+not leaking the DSN; invalid config; compose floor (10 cases); search off vs
+configured-unreachable. Every case asserts the STATUS and the EXIT CODE.
+
+### Schema, still editable and frozen on merge
+
+Backend 3 `jobs_claim` is now `(priority, run_after) WHERE state = 'queued'`;
+`TestClaimPlanDoesNotSortTheBacklog` asserts no Sort node at 10k queued rows and
+`TestClaimIndexExcludesTerminalRows` asserts the partial predicate.
+Backend 4 CHECK bounds on `payload` (64 KiB), `kind`, `correlation_id`,
+`last_error`; `ErrPayloadTooLarge` in Go AND the raw-INSERT rejection asserted,
+which is the half that proves the bound is in the database.
+Backend 5 `CREATE UNIQUE INDEX sites_singleton ON sites ((true))`, and
+`GetDefaultSite` drops `ORDER BY`/`LIMIT`.
+Backend 6 `audit_events_ip_prefix_shape` refuses a full IPv4/IPv6 address
+(accepts `203.0.113.0/24`, `2001:db8::/48`, NULL). Per the chair's ruling the
+UPDATE/DELETE trigger waits for M1; the migration header now separates what the
+schema ENFORCES from what it only asks for.
+
+### Ride-alongs
+
+Backend 7 outcome writes use a detached 10 s context and the drain is bounded by
+`DrainGrace`; `TestGracefulShutdownRecordsTheOutcomeOfAnInFlightJob` asserts the
+job reaches `succeeded` and the sweep reclaims nothing. Backend 8 a real ladder
+walk at `MaxAttempts 3` asserting `run_after` moves out, plus worker-level crash
+recovery; the misleading comment is gone. Backend 9 `Priority` 0 documented as
+unset, `PriorityUrgent`/`PriorityBackground` added.
+Security 5 `safeError` = `truncate(obs.Redact(...))` at every `last_error` write,
+with a straddling-boundary test. Security 6 `CheckRedirect` returns
+`http.ErrUseLastResponse` on both the call path and `ping`; the two-server test
+asserts the second host received **no request and no `X-Vizra-*` header**.
+Security 8 the guard is now Python parsing YAML: `continue-on-error` present at
+all, any spelling, on a floor lane's job or steps, plus "is this floor lane
+triggered on `pull_request`"; 13 fixture workflows under `scripts/testdata/guard/`.
+Security 9 one hardening-headers middleware asserted by iterating `Routes()` and
+through the 404 path, plus `ReadTimeout`/`WriteTimeout`.
+Security 2/3 production refuses by EXACT value anything this repository
+publishes — the test reads `key_utf8` from the vectors file at test time — and a
+value-bearing hatch is refused on PRESENCE (`alice`, `0`, `false`, whitespace).
+Security 4 `.gitguardian.yaml` with five per-path exclusions each carrying a
+written reason, under CODEOWNERS, no `*_test.go` glob; `.gitignore` gains
+`*.env`, `.env.*` and `env/*.env` with `!.env.example`.
+
+### Verifier 3 — claims made true rather than kept
+
+a. The guard's test-selection check now reads the **Makefile**. Demonstrated in
+`R2-scripts-mutants.txt`: `PKGS := ./internal/buildinfo/` → `FAIL PKGS is
+'./internal/buildinfo/', not './...'`; an emptied `-run` → `FAIL 1 -run
+pattern(s) are empty`.
+b. `VIZRA_MAX_INTERNAL_BODY_BYTES` is REMOVED from core's registry and template.
+Core is the client; the contract now states that `vizra-search` configures and
+enforces it, and that core bounds the response direction at a fixed 8 MiB.
+`config-template-check` still passes.
+
+### Verifier 3 — the shell scripts gained negative cases
+
+`scripts/scripts_test.go` drives migrate-lint, the gate guard and the import lint
+against `scripts/testdata/` (30 fixtures). Mutant M6 — removing `COLUMN` from the
+destructive alternation — now goes RED:
+
+```
+--- FAIL: TestMigrateLintFixtures/drop-column
+    exit 0 (failed=false), want failed=true.
+```
+
+### GitGuardian — still red, still not a required check
+
+7 findings, **all in historical commits** (`fe6101f`, `2b9c540`), none at
+`4f8d0fc207f94a2a516607d167fcf69abd7a2148`. No real credential; nothing to rotate. Causes fixed at HEAD, and the
+exclusions are now committed with per-path reasons. Clearing the history needs
+either a rewrite — which breaks the `api/` SHA `b0dbeb6` already vendored — or
+the owner resolving them in the dashboard. Owner decision.
+
 ## Blockers and handoff
 - Free disk ~21 GiB. The libvips-from-tarball image build is the heaviest local
   step; if it cannot complete locally it is run in CI on `ubuntu-24.04` and the
