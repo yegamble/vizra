@@ -784,3 +784,487 @@ The verification clone was deleted; the one image I built
 left at the size it was; no container or image belonging to another workstream
 was touched. Nothing in `vizra-core` was modified — it was read through
 `git show` and the GitHub API only.
+
+---
+---
+
+# Re-verification at `ab41219` — fix round 1
+
+| | |
+|---|---|
+| **Verdict** | **PASS** |
+| Re-verified SHA | `ab41219bb99cd4fdec483d967ff361ce5f577ae8` (head had **not** moved; confirmed at start and finish) |
+| Previous verdict | FAIL at `7f483ad` (above). It does not carry over; everything below was re-established from a fresh clone. |
+| Delta | 5 commits, 59 files, +4422 −223 |
+| Date | 2026-09-20 |
+| Verifier | same independent agent; still did not write this code; no source, test, workflow, manifest, baseline or budget modified; nothing pushed |
+
+**One-line verdict:** the BLOCKER is closed — closed properly, at the root, with
+the arithmetic made unreachable rather than the symptom patched — and all five of
+my other findings are closed with tests that kill the exact mutants that
+survived last round. Two new non-blocking findings, both about lane scoping
+rather than product behaviour.
+
+## R1. Environment and commands
+
+Host macOS 25.5.0 darwin/arm64, `go1.27.1` (resolved via `go.mod`'s toolchain
+directive), Docker 29.8.0 linux/arm64, 15–17 GiB free throughout. Fresh
+`git clone` of `yegamble/vizra-search` at `ab41219` in the session scratchpad,
+plus a read-only scratch clone of the local `vizra-core` at `2b9c540` for the
+cross-repo vector check. Both deleted at the end.
+
+| Command | Exit | Result |
+|---|---|---|
+| `make ci` (clean clone) | **0** | fmt-check · vet · echo-containment · build · contract-drift (3 pkgs) · `go test -race` (6 pkgs) · test-noskip · **tidy-check** |
+| `make test-noskip` | **0** | **320 pass events, 0 skips** — matches the builder's claim exactly |
+| `go test -count=1 -json ./...` | 0 | `pass=320 skip=0 fail=0`; 314 run events; **162** top-level `Test` functions (was 122) |
+| `./scripts/ci-required-guard.sh` | **0** | manifest · **workflows parsed: 2; no continue-on-error** · floor · bare names · job existence · digest pinning · **testdata fixture self-test** |
+| `go test ./internal/search/ -run Vector` in `vizra-core@2b9c540` | 0 | core's own vector suite, for the cross-repo comparison |
+
+`tidy-check` is now inside `make ci` (ride-along delivered).
+
+## R2. Re-vendored contract and vectors (instruction A)
+
+| File | Vendored sha256 | Bytes | vs `vizra-core@2b9c540` |
+|---|---|---|---|
+| `api/search-internal.openapi.yaml` | `9723a4582e075bab77c2dd802bd1f03f163e1c03af5335aefa2b305b32b0614a` | 24 797 | **byte-identical** (`diff` empty) |
+| `api/search-hmac-testvectors.json` | `3b6b0595bc4cf5f85210ad981dc2c42daf1e73b3beaf191b95eecf0923113cb2` | 21 939 | **byte-identical** |
+
+`api/CONTRACT-SOURCE.json` was restructured from flat keys to a `files[]` array
+and states both digests and both byte counts truthfully, pinned to the full
+40-character commit `2b9c540e81960954ee39e6a2aeec027e0f764a67`. I confirmed
+independently that `2b9c540` is still core's **last commit touching `api/`** —
+core's branch head has since moved to `e45e784`, but nothing after `2b9c540`
+changes either file, so the vendoring target is correct.
+
+Mutation evidence that both digests are enforced (under `make ci`):
+
+| Mutation | `make ci` |
+|---|---|
+| the OpenAPI file edited in place | **KILLED** — `TestEveryVendoredFileMatchesItsManifest` |
+| the vectors file edited in place | **KILLED** — also by `TestVerifierReproducesTheSharedVectors` |
+| `CONTRACT-SOURCE.json` vectors sha256 replaced with zeros | **KILLED** |
+| `CONTRACT-SOURCE.json` OpenAPI sha256 replaced with zeros | **KILLED** |
+
+The instruction's sub-clause "and that **contract-drift** checks both digests" is
+where NEW FINDING 7 below applies: the digest test runs, but not in that lane.
+
+## R3. THE BLOCKER — closed (instruction B)
+
+### Behaviour: the real router, genuine signatures, 19 wire values
+
+Every value outside the rule returned the **uniform 401** with a byte-identical
+body; the control returned 200.
+
+```
+"1789932049"           -> 200  control: now
+"4102444800"           -> 401  MaxTimestampUnix exactly (in range, far outside window)
+"4102444801"           -> 401  MaxTimestampUnix+1
+"11013301708"          -> 401  one below my old boundary
+"11013301709"          -> 401  MY OLD BLOCKER BOUNDARY  (was 200 at 7f483ad)
+"253402300799"         -> 401  year 9999                (was 200 at 7f483ad)
+"4611686018427387904"  -> 401  1<<62                    (was 200 at 7f483ad)
+"9223372036854775807"  -> 401  max int64
+"0"                    -> 401     "-1"          -> 401     "999999999"    -> 401
+"1000000000"           -> 401  MinTimestampUnix exactly (far past -> stale)
+"01789929623"          -> 401  leading zero
+"+1789929623"          -> 401  plus sign
+"  1789929623  "       -> 401  surrounding whitespace
+"1789929623 "          -> 401  trailing space
+"0x6AF7B0D7"           -> 401  hex
+"1789929623.0"         -> 401  decimal point
+"１７８９９２９６２３"  -> 401  fullwidth digits
+```
+
+Confirmed again against a **running process** (native binary, production mode):
+`ts=253402300799` → 401, `ts=+<now>` → 401.
+
+### Mechanism: the hole is unreachable, not merely unreached
+
+`internal/hmacauth/hmacauth.go:357-384` now shape-checks
+`^[1-9][0-9]*$` (`isBareDecimalDigits`, ≤ 20 chars), then range-checks the
+magnitude against `[MinTimestampUnix=1000000000, MaxTimestampUnix=4102444800]`,
+and only then computes `skewSeconds := nowUnix - unixSeconds` on plain `int64`.
+No `time.Duration` in the file is derived from an unvalidated header. The
+verifier's own clock is range-checked first and fails closed
+(`ReasonVerifierClock`).
+
+### Reopen attempts — all seven die
+
+| Mutation | `make ci` | Killed by |
+|---|---|---|
+| range check neutered | **2** | `TestTimestampWindowClosesAcrossTheWholeMagnitudeRange` (4 subtests) |
+| upper bound only removed | **2** | same — `one_above_the_range_ceiling`, `year_9999`, both boundary rows |
+| lower bound only removed | **2** | same — `one_below_the_range_floor`, `one` |
+| **reverted to the old `v.now().Sub(time.Unix(...))` + sign fold** | **2** | `TestTheSkewArithmeticCannotSaturate` |
+| bare-digit shape check neutered | **2** | `zero`, `leading_zero`, `leading_zeros`, `leading_plus` |
+| leading-zero rule relaxed to `[0-9]` | **2** | same, **and** `TestVerifierRefusesEveryNegativeVector` |
+| verifier's own-clock check removed | **2** | `TestAVerifierWithAnInsaneClockFailsClosed` |
+
+`TestTheSkewArithmeticCannotSaturate` is the right kind of test: it reads the
+package source and asserts both that the skew is computed on `int64` seconds and
+that the range check **precedes** the arithmetic — pinning the ordering property,
+not just the symptom.
+
+**FINDING 1 (BLOCKER): CLOSED.**
+
+## R4. My five other findings — all CLOSED
+
+Each of the six mutants that survived `make ci` at `7f483ad` was re-applied
+verbatim to `ab41219`:
+
+| # | Mutation (unchanged from round 1) | Then | Now | Killed by |
+|---|---|---|---|---|
+| S2 | `readBounded(req.Body, 1<<62)` | survived | **KILLED (2)** | `TestAnUndeclaredLengthBodyAboveTheLimitIsRefusedAfterLimitPlusOneBytes` (all 3 paths) |
+| S3 | `io.LimitReader(r, limit+1)` → `limit` | survived | **KILLED (2)** | same |
+| S4 | `DefaultMaxClockSkew` 300s → 720h | survived | **KILLED (2)** | `TestTheContractsFixedNumbersMatchTheImplementation` |
+| S5 | `DefaultMaxBodyBytes` 1 MiB → 1 GiB | survived | **KILLED (2)** | same |
+| S6 | drain 503 moved ahead of HMAC verify | survived | **KILLED (2)** | `TestADrainingServerStillRefusesAnUnsignedRequestFirst` (all 3 paths) |
+| S7 | raw body logged on the 401 refusal path | survived | **KILLED (2)** | `TestTheRefusalPathNeverLogsTheRequestBody` (`unsigned`, `wrong_key`) |
+
+- **FINDING 2 (streaming body bound untested): CLOSED.**
+- **FINDING 3 (contract-fixed numbers unpinned): CLOSED**, and hardened beyond
+  what I asked: `MaxProductionClockSkew` (= the contract's 300 s) and
+  `MaxProductionBodyBytes` (8 MiB) are now *refused* at boot in production, not
+  merely asserted in a test. Verified live:
+  `VIZRA_SEARCH_MAX_CLOCK_SKEW=1h` → boot refused; `MAX_INTERNAL_BODY_BYTES=99999999`
+  → boot refused. `CheckEnv` reports the same refusals
+  (`TestCheckEnvReportsTheCeilingRefusals`). Seven further mutations of the
+  ceilings — removing either one, no-oping `ceilings()`, widening the constant
+  10× — all die.
+- **FINDING 4 (drain ordering): CLOSED.**
+- **FINDING 5 (refusal-path logging): CLOSED.**
+- **FINDING 6 (contract had moved): CLOSED** — see R2 and R7.
+
+## R5. New code this round — mutation sweep
+
+| Mutation | `make ci` / guard | Killed by |
+|---|---|---|
+| `Verify(..., req.URL.EscapedPath(), ...)` → `c.Path()` | **KILLED** | `TestTheVerifiedPathIsTheRequestPathNotTheRouteTemplate` |
+| query-string refusal removed | **KILLED** | `TestASignedRequestWithAQueryStringIsRefused` (4 forms) |
+| duplicate-header rule relaxed to first-value | **KILLED** | `TestVerifierRefusesEveryNegativeVector/timestamp-duplicated-header` |
+| `IsPublishedKey` neutered | **KILLED** | 4 tests incl. `TestTheVectorsPublishedKeyIsStillTheOneWeRefuse` |
+| `VectorsHMACKey` constant drifted by one character | **KILLED** | "the vendored vectors publish a key this loader does not refuse" |
+| `publishedTestKeys` emptied | **KILLED** | — |
+| `ceilings()` no-op / skew ceiling / body ceiling / ceiling widened 10× | **KILLED** ×4 | `TestProductionRefusesAnOverwideSkewWindow`, `TestProductionRefusesAnOverlargeBodyCap`, `TestDefaultsMatchTheCanonicalContract` |
+| `continue-on-error` as a **quoted key** | **KILLED (guard 1)** | `check-workflows.py` names `jobs.govulncheck.continue-on-error` |
+| `continue-on-error` **capitalised** (`Continue-On-Error`) | **KILLED (guard 1)** | same, case-folded |
+| `continue-on-error: ${{ true }}` (**expression**) | **KILLED (guard 1)** | same — "the value is irrelevant" |
+| `FORBIDDEN` constant in the checker neutered | **KILLED (guard 1)** | the guard's own testdata self-test |
+| the checker made case-sensitive | **KILLED (guard 1)** | same |
+
+The `continue-on-error` guard is a genuine improvement: at `7f483ad` it was a
+`grep` for a YAML key pattern; it is now a parser that unquotes and case-folds
+the key, ignores the value, fails closed on an unparseable workflow, and is
+itself exercised against six fixtures on every run.
+
+**Live re-confirmation on the running binary** (production mode, fresh key):
+signed search → 200 `not_indexed`; same signature **+ `?x=1`** → 401; far-future
+timestamp → 401; `+<now>` timestamp → 401; duplicated `X-Vizra-Timestamp` → 401;
+uppercase-hex nonce → 401. Log contained **0** occurrences of the key and **0**
+of the query term `sunset`; refusal reasons appear only as log fields
+(`query_string_not_permitted`, `timestamp_out_of_range`, `malformed_timestamp`,
+`duplicate_header`, `malformed_nonce`) and never in a response body.
+
+I did **not** rebuild the image locally. The Dockerfile is unchanged this round
+apart from the binary it compiles, I validated the image shape at `7f483ad`
+(non-root UID 65532, `FROM scratch` the only undigested base), and the
+`docker-build` lane on `ab41219` ran the full end-to-end on `ubuntu-24.04`
+amd64: dev key refused, probes served, `search_schema_version is null, as Q-001
+requires`, unsigned call 401, signed call `not_indexed`.
+
+## R6. TEST-CHANGE CHECK (instruction 4) — the chair's specific concern
+
+I read every removed and changed line in all six files. **No assertion was
+weakened.** Ruling file by file:
+
+| File | Removed | Ruling |
+|---|---|---|
+| `internal/httpapi/routes_test.go` (−1) | one `hmacauth.Sign(…)` → `SignAt(…)` | **Legitimate.** Forced rename: `Sign` now takes the verbatim timestamp **string**; `SignAt` is the `time.Time` convenience wrapper. No assertion touched. |
+| `internal/hmacauth/hmacauth_test.go` (−7) | six `Sign` → `SignAt`; `SigningString(m, p, 1_774_000_000, …)` → `SigningString(m, p, "1774000000", …)` | **Legitimate.** Same forced rename. The golden `want` string is **character-for-character unchanged** — `"v1\nPOST\n/internal/v1/search\n1774000000\n" + testNonce + "\n953d56a8…"`. Only the call form changed. |
+| `internal/httpapi/server_test.go` (−5) | three `Sign` → `SignAt`; `const testKey = "9f2c…"` | **Legitimate and stronger.** The literal *had* to go — production now refuses every key committed to this repository. It became `var testKey = mustFreshKey()` in the new `freshkey_test.go`: a fresh random key per run that is re-drawn if it collides with a published key. |
+| `cmd/vizra-search/main_test.go` (−1) | `const strongKey = "9f2c…"` | **Legitimate and stronger.** Same cause, same replacement; plus three *new* tests (dev-mode warning, no warning in production, `make run` binds loopback). |
+| `internal/config/config_test.go` (−19) | `const strongKey`, and `envWith(…)` → `envWith(t, …)` throughout | **Legitimate and stronger.** The literal is now a refused published key; `envWith` mints a fresh one per call. The key round-trip assertion survives as `if string(cfg.HMACKey) != env[config.EnvHMACKey]`. |
+| `internal/httpapi/contract_drift_test.go` (−24) | the flat single-file manifest struct and `TestVendoredContractMatchesItsManifest` | **Legitimate and materially stronger.** Replaced by `TestEveryVendoredFileMatchesItsManifest`, which loops over **both** vendored files checking sha256 *and* byte count, asserts `source_path == vendored_path` per file, asserts a full 40-character `source_commit`, asserts a non-empty `role`, and — the part that matters most — asserts the manifest **still pins both known paths**, so silently dropping one from `files[]` fails. One file checked became two, with more properties each. |
+
+### The two corrections the builder made — both upheld
+
+**(i) An empty `X-Vizra-Timestamp` value is "present-but-malformed", not
+"missing".** Upheld, and it is not a weakening.
+
+- The contract's only normative statement here is that rejection is "always 401
+  with body `{"error":{"code":"signature_rejected"}}` and MUST NOT say which
+  rule was broken" (line 303). It imposes **no** requirement on the internal
+  reason code.
+- The vectors' `timestamp-empty` case carries only
+  `"must_reject": true` and a prose `"reject_because": "the header must be
+  present and non-empty"`. I enumerated every field of every negative vector:
+  **no vector names a reason or code an implementation must return.**
+  `must_reject: true` is satisfied either way, and search's vector test passes it.
+- The new classification is *more* accurate — the header **is** present, with an
+  empty value; `exactlyOnce` correctly distinguishes present-once-empty from
+  absent — and the genuinely absent case is still covered by
+  `TestVerifyRejectsAMissingTimestamp` (still present, alongside the missing
+  signature and nonce tests).
+- The reason is log-only and never reaches the caller; I re-confirmed the 401
+  body is byte-identical across all six live rejection causes.
+
+**(ii) ACCEPT vectors are judged against their own timestamps, because
+`verifier_now_unix` is scoped to the negative vectors.** Upheld — this is what
+core's file literally says and what core's own verifier does.
+
+- The vector file's own `_comment` ends: *"Negative vectors are judged against
+  `verifier_now_unix` as the verifier's clock."* It scopes the field to the
+  negative half explicitly. In the raw JSON, `verifier_now_unix` sits **after**
+  `vectors` and immediately before `window`/`negative_vectors`.
+- The alternative reading is self-contradictory. `verifier_now_unix` is
+  `1789000000` and `max_clock_skew_seconds` is `300`, but the ACCEPT vectors
+  carry timestamps `1789000000`, `1789000000`, `1789000123`, `1789000456`,
+  `1789000789` — **two of the five would be stale** at that clock. The vector
+  file would fail against itself.
+- **Decisive cross-repo check:** core's `TestHMACTestVectors` (the ACCEPT half,
+  `internal/search/search_test.go:75`) does not reference `VerifierNowUnix` at
+  all and never calls `Verify` — it checks body hash, canonical string and
+  signature only. `vf.VerifierNowUnix` appears solely in core's
+  `TestHMACNegativeTestVectors`. **Core scopes the field exactly as the builder
+  read it.**
+- Worth recording: search's `TestVerifierReproducesTheSharedVectors` goes
+  *further* than core's accept-half — it actually runs `Verify` against each
+  accept vector at that vector's own timestamp. Stronger, not weaker.
+
+**No cross-repo disagreement on either point.**
+
+## R7. Vector agreement (instruction 5)
+
+Ran core's own suite in a read-only scratch clone at `2b9c540`:
+
+| Suite | vizra-search | vizra-core |
+|---|---|---|
+| ACCEPT vectors | `TestVerifierReproducesTheSharedVectors` — **5/5 pass** | `TestHMACTestVectors` — **5/5 pass** |
+| REJECT vectors | `TestVerifierRefusesEveryNegativeVector` — **24/24 pass** | `TestHMACNegativeTestVectors` — **24/24 pass** |
+| Signature genuineness | (covered by the accept half) | `TestNegativeVectorSignaturesAreGenuine` — pass |
+
+**Both implementations accept and reject exactly the same 5 + 24 vectors**, name
+for name, including every case that was the divergence: `method-lowercase`,
+`method-mixed-case`, `timestamp-leading-plus/zero/zeros/space`,
+`timestamp-trailing-space`, `timestamp-underscores`, `timestamp-hex`,
+`timestamp-empty`, `timestamp-zero/one`, `timestamp-year-10000`,
+`timestamp-duration-overflow-ahead/far`, `timestamp-max-int64(-overflow)`,
+`nonce-uppercase-hex/not-hex/too-short/empty`, `timestamp-duplicated-header`.
+
+## R8. CI on `ab41219` (instruction 6)
+
+**12 check runs, all `completed` / `success`**, every one with real start and
+finish timestamps:
+
+```
+build 19:15:17→19:15:54   ci-required 19:15:17→19:16:45   contract-drift 19:15:19→19:16:10
+docker-build 19:15:17→19:16:07   echo-containment 19:15:17→19:15:34   fmt 19:15:17→19:15:36
+GitGuardian 19:15:14→19:15:15    govulncheck 19:15:17→19:16:09   test 19:15:18→19:16:40
+test-noskip 19:15:18→19:15:59    tidy-check 19:15:18→19:15:40    vet 19:15:17→19:16:04
+```
+
+`ci-required` ran **on this SHA** (run 35531691429) and its guard step printed
+the manifest, `workflows parsed: 2; no continue-on-error on any job or step`,
+the floor, bare names, job existence, digest pinning and the new fixture
+self-test. `govulncheck` printed `Go: go1.27.1 / Scanner: govulncheck@v1.8.0 /
+DB updated: 2026-09-16` → `No vulnerabilities found`. `test-noskip` printed
+`320 pass events, 0 skips`. Manifest lanes (10) == lanes that executed (10).
+
+### The new latest-check-run aggregate, unit-tested
+
+`scripts/ci-required-select.sh` extracted from the workflow and driven directly
+with synthetic TSV:
+
+| Input | Exit | Behaviour |
+|---|---|---|
+| two lanes, both success | 0 | pass |
+| one lane `failure` | 1 | fail |
+| `skipped` / `cancelled` / `timed_out` / `neutral` | 1 each | **none is a pass** |
+| a required lane absent from the rows | 2 | `NEVER RAN` |
+| no rows at all | 2 | every lane `NEVER RAN` |
+| `in_progress` | 2 | pending |
+| **stale `success` listed first, newer `failure` second** | **1** | `AMBIGUOUS — 2 check-runs share this name and their conclusions disagree`, rows printed |
+| newer `success`, older `failure` | 1 | same — fails loudly rather than picking a winner |
+| two agreeing successes | 0 | `(2 runs with this name, all agreeing)` then pass |
+| older completed success + newer still running | 2 | pending, not a pass |
+
+The order-dependence that could have let a stale SUCCESS mask a current FAILURE
+is closed, and the "disagreeing duplicates" case fails loudly rather than
+silently choosing — which is the correct call.
+
+---
+
+## NEW FINDING 7: the vendored-digest test dropped out of the `contract-drift` lane when it was renamed
+
+```
+Severity:    SHOULD
+Confidence:  high
+```
+
+**Affected**
+- repo: `vizra-search`
+- files: `Makefile:61-63` (the `contract-drift` recipe);
+  `internal/httpapi/contract_drift_test.go:75`
+- requirements: `VZ-SEARCH-004`; ADR-002 § Contracts; fix-round instruction (A)
+  "…and that **contract-drift** checks both digests"
+
+**Observed**
+
+The `contract-drift` lane selects tests by regex:
+
+```
+go test -count=1 -run 'Contract|Drift|Schema|Q001|Secured|Vector|Shared|Negative|Window|RejectClass' \
+        ./internal/httpapi/ ./internal/contract/ ./internal/hmacauth/
+```
+
+The digest test was renamed this round:
+`TestVendoredContractMatchesItsManifest` → `TestEveryVendoredFileMatchesItsManifest`.
+The old name contained `Contract` and matched; the new one matches no alternative
+in the regex. Enumerating what the lane actually runs in `internal/httpapi`
+confirms it: 14 tests selected, and `TestEveryVendoredFileMatchesItsManifest` is
+**not** among them.
+
+Consequence, by mutation:
+
+```
+the OpenAPI file edited in place          -> make contract-drift  exit 0  (SURVIVES)
+CONTRACT-SOURCE.json sha256 zeroed        -> make contract-drift  exit 0  (SURVIVES)
+                    the same two mutations -> make ci              exit 2  (KILLED)
+```
+
+The vectors file is still caught in the lane, but by its *content*
+(`TestVerifierReproducesTheSharedVectors` matches `Vector`), not by its digest.
+
+**Failure**
+
+Nothing is unprotected: `make ci` and the `test` lane both catch every case, and
+`test` is a floor lane, so the guarantee remains inside the floor. What is wrong
+is narrower and still worth fixing — the lane whose *name* and whose place in the
+floor exist to mean "the vendored contract has not been edited" no longer runs
+the test that proves it, and the fix-round instruction asked specifically for
+that lane. A future developer reading a green `contract-drift` would draw a
+conclusion the lane no longer supports, and a `-run` regex is a silent coupling:
+renaming a test can remove it from a lane with no signal at all.
+
+**Perspective** developer, operator
+
+**Recommendation**
+
+Smallest fix: add `Manifest|Vendored` to the `contract-drift` regex. Better:
+have the lane assert it selected the tests it means to — or drop the regex and
+give the drift tests their own build tag or package, so a rename cannot silently
+de-scope them.
+
+**Acceptance criteria**
+- `make contract-drift` runs `TestEveryVendoredFileMatchesItsManifest`.
+- Editing either vendored file in place, or zeroing either sha256 in
+  `CONTRACT-SOURCE.json`, makes **`make contract-drift`** exit non-zero.
+- Renaming a drift test cannot remove it from the lane without a failure.
+
+**Tests** A lane-composition assertion: enumerate the selected test names and
+fail if any test in `contract_drift_test.go` is missing from the selection.
+
+**Cross-repo implications** core: none · user: none · search: this finding · meta: none
+
+**Challenge** The protection is fully intact under `make ci`, which is what CI
+runs and what `ci-required` gates, so this is arguably cosmetic. Fair — hence
+SHOULD, not REQUIRED. It is recorded because a `-run` regex that silently
+de-scopes on rename is exactly the kind of false-confidence coupling this
+project's review rules tell reviewers to hunt.
+
+---
+
+## NEW FINDING 8: the workflow-checker's fixture self-test passes silently if its fixture directory disappears
+
+```
+Severity:    NIT
+Confidence:  high
+```
+
+**Affected**
+- repo: `vizra-search`
+- files: `scripts/ci-required-guard.sh:114-128`
+
+**Observed**
+
+```bash
+for fixture in scripts/testdata/wf-*.yml; do
+```
+
+Pointing that glob at a directory that does not exist leaves the guard at
+**exit 0**: the unmatched glob passes through as a literal, `check-workflows.py`
+fails on the non-existent file, the `if` is therefore false, and no error is
+raised. Mutation `scripts/testdata` → `scripts/testdata-absent` survives.
+
+**Failure**
+
+Nothing today — the six fixtures exist and are exercised on every run, and I
+proved they catch a neutered checker. But a self-test that cannot notice its own
+fixtures vanishing is one deletion away from being decorative.
+
+**Perspective** developer
+
+**Recommendation** Count the fixtures and fail if fewer than expected, e.g.
+`shopt -s nullglob`, collect into an array, and require the clean fixture plus at
+least four negatives.
+
+**Acceptance criteria** Removing or renaming `scripts/testdata/` makes
+`./scripts/ci-required-guard.sh` exit non-zero.
+
+**Tests** The guard is itself the harness; one added count assertion suffices.
+
+**Cross-repo implications** core: none · user: none · search: this finding · meta: none
+
+**Challenge** It is a self-test of a self-test; the real gate is the parser
+running against the real workflows, which is unconditional. Agreed — NIT.
+
+---
+
+## R9. Finding status at `ab41219`
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | **BLOCKER** — HMAC timestamp window open above `11013301709` | **CLOSED** — behaviour verified across 19 wire values and live; 7 reopen-mutations all die; fixed at the root (absolute range before arithmetic, `int64` seconds) |
+| 2 | streaming body bound untested | **CLOSED** — both mutants die |
+| 3 | contract-fixed numbers unpinned | **CLOSED** — pinned to the contract *and* enforced as production boot ceilings |
+| 4 | drain 503 ahead of authentication | **CLOSED** — mutant dies |
+| 5 | refusal-path body logging uncovered | **CLOSED** — mutant dies |
+| 6 | core's contract had moved | **CLOSED** — both files re-vendored byte-identical at `2b9c540`, both digests pinned, vectors consumed, cross-repo agreement proven against core's own suite |
+| 7 | digest test dropped out of the `contract-drift` lane | **OPEN** — SHOULD, non-blocking |
+| 8 | guard fixture self-test passes if fixtures vanish | **OPEN** — NIT |
+
+## R10. Verdict
+
+**PASS.**
+
+- Every in-scope acceptance bullet reproduced by me, from a clean clone, at this
+  SHA — including the six negative-path behaviours I drove against a running
+  process.
+- `ci-required` is green on `ab41219`; all 12 checks executed with real
+  durations; manifest lanes == lanes that ran; the aggregate's new
+  latest-check-run logic behaves correctly on all ten unit cases I put to it.
+- The head has not moved.
+- No blocking finding. The two open findings are SHOULD and NIT, both about lane
+  scoping rather than product behaviour, and neither leaves anything
+  unprotected under `make ci`.
+- The test-change check found **no weakening**. Both corrections the builder
+  made are what core's contract and vector file actually say, and core's own
+  verifier agrees.
+
+This PASS is not a merge and does not make any ledger entry VERIFIED — the chair
+records those. Per Q-032, no ledger entry reaches VERIFIED on CI evidence alone
+until branch protection is confirmed applied, which remains an owner action.
+
+Findings 7 and 8 are small enough to fold into the next slice that touches this
+repository rather than gating this one; that is the chair's call, not mine.
+
+## R11. Housekeeping
+
+Both scratch clones — `vizra-search@ab41219` and the read-only copy of
+`vizra-core@2b9c540` — were deleted. No image was built this round, so nothing
+was added to the Docker store and no prune was needed; no container or image
+belonging to another workstream was touched. Nothing in the real
+`/Users/yosefgamble/github/vizra/vizra-core` checkout was modified — it was read
+via `git show`, `git ls-tree` and a `git clone` that does not write to its
+source. The only file I wrote is this evidence record.
