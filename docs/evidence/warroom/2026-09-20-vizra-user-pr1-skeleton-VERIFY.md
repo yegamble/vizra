@@ -737,3 +737,489 @@ Clone at `…/scratchpad/verify/vizra-user` deleted. Probe files
 tree was confirmed clean. Docker image `vizra-user:verify` and container
 `vizra-user-verify` removed and the build cache I created pruned. The container
 `refpin-spike-kubo` was not touched.
+
+---
+---
+
+# RE-VERIFICATION AT 9767015
+
+**Everything above this line describes SHA `5672bfd` and does not carry over.**
+This section is a complete, independent re-verification of the new head after
+the chair's round-1 fix round.
+
+**Verdict: PASS.** Finding 1 **CLOSED**. Finding 2 **CLOSED**. Finding 4
+**CLOSED**. Findings 3 and 5 remain **OPEN** and unchanged (both were SHOULD,
+both are acknowledged in the PR; neither was in the fix round's scope). One new
+narrower finding, **FINDING 6**, and one NIT, **FINDING 7**.
+
+| | |
+|---|---|
+| Head SHA verified | `9767015444fa8bdbf1a1326f1cc58b41d068ba14` |
+| Previous SHA | `5672bfdb5718cf9916174ddb6c25cd5ac39e5f88` (my PASS-with-findings) |
+| Delta | one commit, `fix(m0): fail the identity lint control closed; pin the gate's floor`, 16 files, +948 −189 |
+| Head moved during re-verification? | No — re-read at start and end, unchanged |
+| Clone | fresh, second clone; the round-1 clone was already deleted |
+| Environment | identical to round 1 (macOS arm64, Node v22.14.0, npm 10.9.2, Docker linux/arm64, shellcheck 0.11.0) |
+
+## R1. CI entry point and the guards, from the clean clone
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm ci` | 0 | clean install, tree clean afterwards |
+| `npm run ci` | 0 | lint clean; typecheck clean; **5 files, 116 tests passed, 0 skipped, 0 todo**; production build |
+| `npm run check:contract` | 0 | unchanged from round 1; same spec sha256 `128d0509238a…`, same source commit |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **55 cases, 62 assertions, 0 failed** |
+| `bash scripts/ci/check-required-manifest.sh` | 0 | 4 entries, all defined |
+| `bash scripts/ci/check-required-floor.sh` | 0 | `still requires the floor: frontend contract` |
+| `bash -n` + `shellcheck -x` over `scripts/ci/*.sh` | 0 | clean, all **four** scripts |
+| `docker build` + container run | 0 | see R6 |
+
+Builder's claimed 116 tests / 0 skipped and 55 cases / 62 assertions both
+reproduce exactly. `grep -rnE '\.skip\(|\.todo\(|xit\(|xdescribe'` over `lib`,
+`eslint-rules`, `app` → no test skips.
+
+## R2. All nine round-1 bypasses, re-run — plus twelve new ones
+
+Probe files created, linted, deleted; tree clean. A case is REPORTED if either
+rule fires anywhere the construct appears (an alias is reported at its
+declaration, which is what makes the construct unwritable).
+
+| # | Shape | round 1 | now | Reported by |
+|---|---|---|---|---|
+| B1 | `headers: { ...identityHeaders() }` | GREEN | **REPORTED** | identity `unreadable` + `rawFetch` |
+| B2 | `new Headers()` + `.set()` | GREEN | **REPORTED** | identity `unreadable` + `rawFetch` |
+| B3 | wrapper fn holding the cache posture | GREEN | **REPORTED** | `aliasedFetch` |
+| B4 | `const alias = fetch` | GREEN | **REPORTED** | `aliasedFetch` at the declaration (line 23) |
+| B4b | `const { fetch: d } = globalThis` | GREEN | **REPORTED** | `aliasedFetch` at the declaration (line 27) |
+| B5 | init hoisted into a variable | GREEN | **REPORTED** | identity `unreadable` + `rawFetch` |
+| B6 | init assembled by spread | GREEN | **REPORTED** | identity `unreadable` + `rawFetch` |
+| B7 | second alias of the headers variable | GREEN | **REPORTED** | identity `unreadable` + `rawFetch` |
+| B8 | computed header key | GREEN | **REPORTED** | identity `unreadable` + `rawFetch` |
+| B9 | `Object.assign(headers, …)` | GREEN | **REPORTED** | identity `unreadable` + `rawFetch` |
+
+**All nine closed.** New shapes I tried against the fail-closed rules:
+
+| # | Shape | Result |
+|---|---|---|
+| N1 | `Reflect.apply(fetch, null, [...])` | REPORTED `aliasedFetch` |
+| N2 | `fetch.call(null, url, init)` | REPORTED `aliasedFetch` |
+| N3 | `fetch.bind(null)` then call | REPORTED `aliasedFetch` |
+| N4 | `new Request(url, {cookie})` + `fetch(req, {revalidate})` | REPORTED `unreadable` + `rawFetch` |
+| N4b | `fetch(new Request(url, {cookie}))`, single-arg | REPORTED `rawFetch` |
+| N6 | `(0, fetch)(url, init)` | REPORTED `aliasedFetch` |
+| N7 | `[fetch][0](url, init)` | REPORTED `aliasedFetch` |
+| N8 | `fetch?.(url, init)` optional call | REPORTED `unreadable` + `rawFetch` |
+| N9 | `const o = { fetch }; o.fetch(url, init)` | REPORTED `aliasedFetch` |
+| N11 | `fetch(url, opts)` — unreadable init | REPORTED `unreadable` + `rawFetch` |
+| N12 | `{ headers: {cookie}, ...posture }` | REPORTED `unreadable` + `rawFetch` |
+| N13 | `new Headers(raw)` non-literal | REPORTED `unreadable` + `rawFetch` |
+
+**Two stayed silent:**
+
+- **N5 — `globalThis["fetch"](…)`**, the computed-member spelling. Four
+  variants (`globalThis["fetch"]`, `window["fetch"]`, aliased-then-called, and
+  a template-literal key `` globalThis[`fetch`] ``) in a real page file
+  produced **zero lint messages of any kind**. This is a genuine remaining
+  bypass of both rules, and the runtime test does **not** catch it: the
+  `lib/api/fetch.test.ts` table asserts the two helpers' behaviour, and a page
+  that reaches the global this way is not exercised by any test. See FINDING 6.
+- **N10 — a different HTTP client** (`await import("undici")` → `request(…)`).
+  Silent, but out of scope by construction: `undici` is not a dependency, no
+  rule named `no-raw-fetch` can be expected to ban every client, and
+  `node:http` would be the same category. Recorded as a known residual, not a
+  finding — the control against it is review plus the helpers-only
+  architecture, which AGENTS.md already states.
+
+## R3. TEST-WEAKENING CHECK — the chair's specific concern
+
+I extracted every `code:` string from the `valid` and `invalid` arrays of both
+rule test files at each SHA and set-differenced them, rather than reading the
+diff:
+
+| File | valid | invalid | cases removed |
+|---|---|---|---|
+| `no-identity-headers-in-cached-fetch.test.mjs` | 10 → 10 | 14 → **30** | **1** |
+| `no-raw-fetch.test.mjs` | 4 → **8** | 3 → **10** | **0** |
+
+**Zero valid cases were removed from either file, so nothing moved
+invalid→valid.** That is the shape a weakening would take, and it did not
+happen. The −52 lines in the diff are almost entirely *reformatting*:
+nine cases that were written as multi-line `{ code: … }` objects were collapsed
+to one line, so the diff shows them as removed and re-added. Ruling case by
+case on everything the diff marks removed:
+
+| Removed by the diff | Ruling |
+|---|---|
+| `fetch(url,{headers:{cookie:session},cache:"no-store"})` (valid) | **Reformatted, still present.** Legitimate. |
+| `fetch(url,{headers:{Authorization:token},cache:"no-store"})` (valid) | **Reformatted, still present.** Legitimate. |
+| `fetch(url,{headers:{Cookie:c},next:{revalidate:0}})` (valid) | **Reformatted, still present.** Legitimate. |
+| `headers["cookie"]=jar` + revalidate (invalid) | **Reformatted, still present**, same `messageId` and `data`. Legitimate. |
+| `headers.authorization=bearer` + unmarked (invalid) | **Still present**, same assertion. Legitimate. |
+| `const headers={cookie:jar}` + `force-cache` (invalid) | **Still present.** Legitimate. |
+| `const h={cookie:jar}` + `revalidate:5` (invalid) | **Still present.** Legitimate. |
+| `globalThis.fetch(…)` + revalidate (invalid) | **Still present**, collapsed to one line. Legitimate. |
+| `fetch(url,{headers:{authorization:bearer},next:{revalidate:30}})` (invalid) | **GENUINELY DELETED — the only one.** See below. |
+| 3 comment lines in `no-raw-fetch.test.mjs` | Comment rewording only. Legitimate. |
+| 4 lines of the `cookies` mock in `fetch.test.ts` | **Strengthened, not removed**: the mock gained a `cookiesCalls` counter; the `get` logic is byte-identical. Legitimate. |
+
+**Ruling on the one genuine deletion.** It asserted lowercase `authorization` +
+`next: { revalidate: 30 }` → `revalidated`. Every dimension it covered survives
+in at least two other cases: `AUTHORIZATION` + `force-cache` (authorization as
+identity, uppercase), `Authorization` + `no-store` (valid, so identity is still
+recognised), `headers.authorization = bearer` (unmarked), `cookie` +
+`revalidate: 60` and `"Cookie"` + `revalidate: 3600` (the revalidated posture and
+casing). To be sure rather than to argue, I ran the deleted snippet against the
+**current** rule as a standalone RuleTester case:
+
+```
+Tests  1 passed (1)   // deleted-case-still-caught
+```
+
+The behaviour it asserted is still enforced. **Verdict: a redundant duplicate
+removed, coverage-neutral — not a weakening.** My only comment is that it cost
+one line and should have been kept; I am not raising a finding for it.
+
+Also worth recording as the opposite of weakening: `eslint.config.mjs` **removed**
+the `"vizra/no-raw-fetch": "off"` exemption that `scripts/**` and
+`eslint-rules/**` previously enjoyed. The rule now applies there too.
+
+## R4. The shell suite's exit-code pattern
+
+**No instance of `if ! cmd; then rc=$?` remains anywhere in `scripts/ci`.** The
+only two places an exit status is captured both use the correct form:
+`require-checks_test.sh:177` (`wait "$pid" || rc=$?`) and `:432`
+(`… || rc=$?`). The two surviving `if !` constructs are a `grep` in an `elif`
+and a `grep` condition in `require-checks.sh:121` — neither captures `$?`.
+
+**Were the pre-existing 45 Vidra-adapted cases silently passing for the same
+reason? No.** I read the `expect()` helper as it stood at `5672bfd`: it already
+used `wait "$pid" || rc=$?`. The bug was confined to the newly written
+`floor_expect`, and the builder found and fixed it before this SHA.
+
+I did not take that on reading alone. Two mutations to guards the **pre-existing**
+cases cover:
+
+| Mutation | Suite result |
+|---|---|
+| baseline | 55 cases, 62 assertions, **0 failed** |
+| M1 — delete the abbreviated-SHA guard in `require-checks.sh` | 55 cases, **1 failed** |
+| M2 — make a non-success conclusion pass (`if (0) bad = bad …`) | 55 cases, **14 failed** |
+| restored | 55 cases, **0 failed** |
+
+The suite is genuinely armed, not vacuously green.
+
+## R5. D5 reproduced — the floor guard
+
+Mutating `.github/required-checks.txt` myself, running the guard directly:
+
+| Mutation | Exit | Message |
+|---|---|---|
+| delete the `frontend` line | **1** | `frontend: missing. It is not listed, so \`ci-required\` would not wait for it.` |
+| `frontend` → `?frontend` | **1** | `frontend: marked optional (\`?frontend\`). An optional lane passes when it never runs, so this is a removal with extra steps.` |
+| `contract` → `?contract` | **1** | `contract: marked optional (\`?contract\`) …` |
+| restored | **0** | `OK: .github/required-checks.txt still requires the floor: frontend contract.` |
+
+Tree clean afterwards. **D5 reproduced, red by name each time.**
+
+**Is the floor list in a CODEOWNERS-covered path?** Yes. The floor is the default
+in `scripts/ci/check-required-floor.sh:37` (`FLOOR=${FLOOR:-"frontend contract"}`),
+and `.github/CODEOWNERS` covers `/scripts/ci/` and `/.github/` (and
+`/eslint-rules/` and `/contracts/`) with `@yegamble`, plus a `*` default so no
+path is silently unowned. `ci-guard.yml` invokes the guard with **no `FLOOR`
+override**, so the reviewed default applies. The path filter on `ci-guard`
+already includes `.github/required-checks.txt`, so a PR that edits the manifest
+triggers the lane that checks it.
+
+The builder's CODEOWNERS header states plainly that the file does nothing until
+the owner applies a ruleset requiring Code Owner review — which matches ADR-002
+items 9–10 and is honest rather than an implied protection claim.
+
+## R6. Timeout
+
+Read and then mutation-tested, not taken on assertion:
+
+- **Default applies when the caller passes none** — `boundedSignal` uses
+  `apiTimeoutMs()` (default 10 000 ms) when `timeoutMs === undefined`.
+- **A caller cannot extend past the ceiling** —
+  `Math.max(1, Math.min(timeoutMs, ceiling))`, so a longer request is clamped.
+- **`apiTimeoutMs()` cannot be disabled by typo** — unset, empty, non-numeric,
+  zero and negative all fall back to the default rather than removing the bound.
+- **The caller's own signal is composed**, not replaced (`AbortSignal.any`), and
+  an external abort is reported as `network`, not `timeout`.
+
+Mutations:
+
+| Mutation | `lib/api/fetch.test.ts` |
+|---|---|
+| T1 — remove the default (unbounded when the caller passes none) | **2 failed** / 51, run took 10 098 ms |
+| T2 — remove the ceiling clamp (`Math.max(1, timeoutMs)`) | **1 failed** / 51 |
+| restored | 51 passed |
+
+**Does the timeout test really exercise an aborted request, or assert a
+constant?** A real abort. The `neverAnswers()` stub returns a promise that only
+settles by rejecting on the abort signal (including one already aborted at call
+time), and T1's run spent 10.1 s on real timers before failing — a constant
+assertion would have failed instantly. **FINDING 2 CLOSED.**
+
+## R7. False positives, and the "two spellings" question
+
+**No false positives reachable by a normal author.** I wrote a realistic page
+using both helpers in six shapes — revalidated read, no-store read with an
+interpolated query, viewer read, POST with a JSON body, upload with
+`uploadIntent` and a shorter `timeoutMs`, and options passed as a variable —
+and linted it: **zero messages**. The fail-closed rule only inspects `fetch`
+calls, and `no-raw-fetch` already bans those outside `lib/api/fetch.ts`, so the
+entire pressure of failing closed lands on **one file** — the file whose author
+is, by definition, changing the privacy control. That is the right blast radius.
+
+**Is `publicFetch`'s "two spellings" sound or a contortion?** Sound, and I would
+have accepted it without the comment. The previous code chose its cache posture
+with a spread (`...(freshness === "no-store" ? … : …)`), which the fail-closed
+rule now correctly reports as an init it cannot read. The rewrite is a ternary
+over two fully literal inits, duplicating `method`, `headers` and `signal` across
+roughly six lines. It is mild duplication in the single most safety-critical
+function in the repository, it is visible rather than hidden, the comment states
+the trade, and the alternatives — exempting the file, or an inline
+`eslint-disable` — are both strictly worse. Not a contortion that would push a
+future author to disable the rule; the rule is unreachable from the code future
+authors actually write.
+
+## R8. CI on 9767015
+
+All four manifest lanes executed and concluded `success`; none skipped,
+cancelled or timed out:
+
+| Check | Conclusion | Window |
+|---|---|---|
+| `guard` | success | 18:23:54 → 18:24:06 |
+| `contract` | success | 18:23:54 → 18:24:27 |
+| `frontend` | success | 18:23:55 → 18:24:48 |
+| `docker-build` | success | 18:23:55 → 18:24:54 |
+| `ci-required` | success | 18:24:30 → 18:25:21 |
+| `GitGuardian Security Checks` | success | third-party app, not in the manifest |
+
+The fan-in log confirms it gated **this** SHA and waited:
+
+```
+CHECK_SHA: 9767015444fa8bdbf1a1326f1cc58b41d068ba14
+ci-required: manifest .github/required-checks.txt
+waiting: frontend (in_progress) docker-build (in_progress)
+OK: every required check on 9767015444fa8bdbf1a1326f1cc58b41d068ba14 concluded success.
+```
+
+The `guard` log confirms the **new** floor step and the enlarged suite both ran
+in CI on this SHA:
+
+```
+OK: all 4 entries in .github/required-checks.txt map to a defined job.
+OK: .github/required-checks.txt still requires the floor: frontend contract.
+require-checks_test: 55 cases, 62 assertions, 0 failed
+```
+
+`frontend` reports `Test Files 5 passed (5) / Tests 116 passed (116)`.
+
+## R9. D2 re-run at this SHA — both layers
+
+Weakening `viewerFetch` from `cache: "no-store"` to `next: { revalidate: 60 }`
+(`lib/api/fetch.ts:240`) now fails **twice**:
+
+| Layer | Result |
+|---|---|
+| `npm run lint` | **exit 1** — `vizra/no-identity-headers-in-cached-fetch` at 240:15 |
+| `lib/api/fetch.test.ts` | **31 of 51 failed** — the method × json × uploadIntent table |
+| restored | lint exit 0, 51 passed, tree clean |
+
+That is the defence in depth the fix round was asked for: a syntactic
+rearrangement that kept lint green would still be caught by the runtime table,
+which asserts `init.cache === "no-store"` and `init.next === undefined` across
+all 30 combinations, plus `cookies()` being consulted on every `viewerFetch`
+path (1 call per invocation, 0 for `publicFetch`).
+
+## R10. Finding 4 (round 1) — closed
+
+`Dockerfile` now uses `addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs nextjs`.
+In the container I built and ran from this SHA:
+
+```
+$ docker exec vizra-user-verify2 id
+uid=1001(nextjs) gid=1001(nodejs) groups=1001(nodejs)
+$ ls -ln /app/server.js
+-rw-r--r-- 1 1001 1001 7198 … /app/server.js
+```
+
+Still non-root, and the `--chown=nextjs:nodejs` group half is now real.
+`GET /health` → 200; the leak scan (env var names, the configured upstream,
+`API_TIMEOUT_MS`, the session cookie name) returns nothing. **FINDING 4 CLOSED.**
+
+## R11. Findings at 9767015
+
+```
+FINDING 6: globalThis["fetch"] — the computed-member spelling still escapes both rules
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     eslint-rules/no-raw-fetch.mjs:110-113 (`MemberExpression(node) { if (node.computed) return; … }`)
+  requirements: VZ-FOUND-002; ADR-003 § SSR identity
+
+Observed:
+  The alias ban closed `const alias = fetch` and
+  `const { fetch: d } = globalThis`, and every indirection I could think of —
+  Reflect.apply, .call, .bind, (0, fetch), [fetch][0], { fetch } — is now
+  reported. The bracket spelling is not. In a page file, all four of these
+  produced ZERO lint messages of any rule:
+
+      const a = await globalThis["fetch"](url, { headers: { cookie }, next: { revalidate: 60 } });
+      const b = await window["fetch"](url,     { headers: { cookie }, next: { revalidate: 60 } });
+      const g = globalThis["fetch"]; const c = await g(url, { headers: { cookie }, next: { revalidate: 60 } });
+      const d = await globalThis[`fetch`](url, { headers: { cookie }, next: { revalidate: 60 } });
+
+  `no-raw-fetch.mjs`'s MemberExpression visitor returns immediately on
+  `node.computed`, and the identity rule does not recognise the call as a fetch,
+  so neither looks. The runtime test does NOT cover this: `lib/api/fetch.test.ts`
+  asserts the two helpers' behaviour, and a page reaching the global this way is
+  exercised by no test at all.
+
+Failure:
+  A page can send `__Host-vizra_session` on a `next: { revalidate: 60 }` request
+  with a completely clean lint run — the same shared-cache leak, by the same
+  mechanism, as the alias hole just closed. Nothing leaks on this SHA: no
+  product code calls the API yet.
+
+Perspective:
+  visitor, member, developer
+
+Recommendation:
+  In the MemberExpression visitor, instead of returning on any computed access,
+  read a computed property that is a string Literal (or a TemplateLiteral with
+  no expressions) and treat the value "fetch" exactly as the non-computed
+  spelling is treated. Roughly four lines, symmetrical with the fix already made.
+
+Acceptance criteria:
+  - `globalThis["fetch"](url, {})` and `window["fetch"](url, {})` are errors
+    outside the allow-list, and `globalThis["fetch"]` as a VALUE is
+    `aliasedFetch` in every file including lib/api/fetch.ts.
+  - The template-literal spelling behaves the same.
+  - A genuinely dynamic computed access (`globalThis[name]`) is still allowed,
+    or is reported — either is defensible, but say which.
+  - `client["fetch"](…)` on some other object stays clean.
+
+Tests:
+  `eslint-rules/no-raw-fetch.test.mjs` — four invalid cases and one valid case
+  as above. The harness exists and runs under `npm run test`.
+
+Cross-repo implications:
+  core: none | user: as above | search: none | meta: none
+
+Challenge:
+  Nobody writes `globalThis["fetch"]` by accident, so this is only reachable by
+  someone deliberately evading a control they could equally evade with
+  `eslint-disable-next-line`, and no syntactic rule ever terminates. That is the
+  strongest argument, and it is why I rated this SHOULD rather than REQUIRED —
+  unlike `const alias = fetch`, which arises from ordinary refactoring (extracting
+  a helper, injecting fetch for testability), the bracket form does not. My
+  answer is only that it is the same hole shape the fix round just closed, the
+  fix is symmetrical and four lines, and leaving one spelling open invites the
+  question of why the others were worth closing.
+```
+
+```
+FINDING 7: a whitespace-only FLOOR override passes vacuously
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     scripts/ci/check-required-floor.sh:37,43
+  requirements: VZ-FOUND-002; ADR-002 § CI fan-in
+
+Observed:
+  `FLOOR=${FLOOR:-"frontend contract"}` then `for want in $FLOOR`. An EMPTY
+  FLOOR correctly falls back to the default (`:-` treats empty as unset) — I
+  checked, and `FLOOR="" bash check-required-floor.sh` still enforces
+  `frontend contract`. But a whitespace-only value is non-empty, so the default
+  does not apply and the loop iterates zero times:
+
+      $ FLOOR=" " bash scripts/ci/check-required-floor.sh .github/required-checks.txt
+      OK: .github/required-checks.txt still requires the floor:  .
+      EXIT=0
+
+Failure:
+  Nothing today: `ci-guard.yml` invokes the script with no FLOOR override, and
+  both the script and the workflow are CODEOWNERS-covered. It is a latent
+  vacuous-pass in a gate-integrity script whose entire purpose is to refuse to
+  pass vacuously — the same class of defect as the empty-manifest case the
+  suite already covers ("an empty manifest fails rather than vacuously passing").
+
+Perspective:
+  developer
+
+Recommendation:
+  After resolving FLOOR, fail when it contains no non-whitespace token — one
+  line, mirroring the existing empty-manifest guard.
+
+Acceptance criteria:
+  `FLOOR=" "` and `FLOOR=""` both either enforce the default or exit non-zero;
+  neither prints OK with an empty floor list.
+
+Tests:
+  `scripts/ci/require-checks_test.sh` — one `floor_expect 1` case with a
+  whitespace-only FLOOR. The harness exists.
+
+Cross-repo implications:
+  core: none | user: as above | search: same script when it lands | meta: same.
+
+Challenge:
+  FLOOR is only ever set by the test suite, so this is unreachable in practice.
+  Agreed — hence NIT.
+```
+
+**Carried over, unchanged and still OPEN:** FINDING 3 (the manifest's
+`source_commit` is provenance no check verifies — still gated on the read-only
+`vizra-core` token, still recorded as Owed in the repo's AGENTS.md) and
+FINDING 5 (ADR-001's licence table still carries `[pin at PR time; verify]` for
+React, Tailwind and TypeScript — a meta-repo follow-up this PR cannot make).
+Neither was in the fix round's scope and neither regressed.
+
+## R12. Verdict at 9767015
+
+**PASS.**
+
+- **FINDING 1 — CLOSED.** All nine bypasses I found in round 1 are now reported;
+  twelve further indirection shapes I invented are reported; the false backstop
+  sentence is gone from the docblock and the replacement text states the rule's
+  reach accurately; and a runtime layer now asserts the property directly, which
+  I confirmed by mutation (lint red *and* 31 runtime tests red).
+- **FINDING 2 — CLOSED.** Default and ceiling both present, both mutation-tested,
+  timeout path exercises a real abort.
+- **FINDING 4 — CLOSED.** `gid=1001(nodejs)` in the running container.
+- **No test was weakened.** Zero valid cases removed from either rule test file;
+  the single deleted invalid case is coverage-neutral and I proved the behaviour
+  it asserted is still enforced. The test surface grew 50 → 116 tests and
+  14 → 30 invalid rule cases, and an eslint exemption was removed rather than added.
+- **The shell suites are armed**, including the 45 pre-existing Vidra cases,
+  which were never affected by the `if ! cmd` bug — proven by mutation, not by
+  reading.
+- **CI green on this SHA**, all four manifest lanes executed, fan-in gated the
+  real head, and the new floor step and enlarged suite both ran in CI.
+- FINDING 6 (SHOULD) and FINDING 7 (NIT) are new and neither blocks: no product
+  code calls the API on this SHA, and FINDING 6 needs conscious evasion rather
+  than ordinary refactoring.
+
+Unchanged from round 1 and still true: this PASS covers **vizra-user's half of
+VZ-FOUND-002 only**. Core's route↔spec both-direction test has not landed, so
+the ledger entry must not reach VERIFIED on this evidence alone; and the `main`
+ruleset (required `ci-required` context, Code Owner review, force-push and
+deletion blocks, linear history) remains an owner action that CODEOWNERS being
+committed does not substitute for.
+
+## R13. Cleanup (re-verification)
+
+Second clone at `…/scratchpad/verify2/vizra-user` deleted. Probe files
+(`lib/api/probe.ts`, `app/probe/page.tsx`, `app/fp/page.tsx`,
+`eslint-rules/deleted-case.test.mjs`) and every mutation were reverted and the
+tree confirmed clean before deletion. Docker image `vizra-user:verify2` and
+container `vizra-user-verify2` removed; the build cache I created pruned. The
+containers `vizra-verify-run`, `vizra-pr1-redis`, `vizra-pr1-cache`,
+`vizra-pr1-pg` and the `vidra-ipfs-071-*` set are not mine and were left alone.
