@@ -1311,3 +1311,56 @@ PASS is not a merge and does not make the ledger entry VERIFIED — the chair re
 
 *Verifier scratch clone `…/scratchpad/vfy-r3/` was deleted after this record was written. Nothing
 outside this evidence file was created or modified in the meta repo, and nothing was pushed.*
+
+---
+---
+
+# Confirmation at `744c607`
+
+**Verdict: PASS. Merge condition CLOSED. FINDING 8 CLOSED.**
+Head `744c60719dd1feaa5786498cbc4b9c243c60843b`, unchanged before and after; `7babbd3` is an
+ancestor (`4cd380b`, `744c607`).
+
+**1. Docs-only — confirmed mechanically.** Changed: `AGENTS.md`, `Makefile`,
+`docs/evidence/pr2/README.md`, `scripts/contract-drift-guard.py`. Nothing under `api/`,
+`.github/`, or any `*.go`. Every changed `Makefile` line is a comment or blank (checked by
+stripping `#`/blank lines from the diff — zero remained). For the guard I parsed both revisions
+and compared ASTs with every docstring expression removed: **identical**, `d91884b34532f917` both
+sides; the file still compiles. No executable change, so the round-3 measurements stand and no
+re-verification is needed.
+
+**2. Every guarantee sentence is now exactly true**, checked against what I measured at `7babbd3`:
+`-` and `|| true` red at all three readings; duplicate target red at readings 2 and 3 with
+`make contract-drift` alone green; anchor mutations red on `ci-required` and `test`, not on
+`contract-drift` itself; and the residual stated in full — `SHELL := /usr/bin/true` or
+`MAKEFLAGS += -i` is **one line**, no-ops `contract-drift`, `test` and `test-noskip` alike, **no CI
+lane catches it today** because the workflows invoke `make test`/`make test-noskip` rather than
+`go test`, and the only command that goes red is a direct `go test ./internal/httpapi/`. It says
+the exposure is generic, equally true of `main`, not introduced here, and that closing it is
+**queued, not done**. That matches my measurements sentence for sentence.
+
+**The `.SHELLFLAGS` restraint is right.** `.SHELLFLAGS` does not exist in GNU Make 3.81 (added in
+3.82), so my local exit 2 was make ignoring the variable entirely and the ordinary lane catching
+the drift — it is evidence about nothing. Claiming it as either caught or uncaught would have been
+a claim about CI's make 4.x from a host that cannot test it. The builder mentions `.SHELLFLAGS`
+only inside the *queued* fix, which is a statement of intent, not of current behaviour. Correct.
+
+**The narrowed coverage bullet matches the code.** Final wording — "a package holding a
+vendored-file guard dropped from the lane's package list, or listed but running zero tests" —
+is exactly `check_coverage` (refuses a package containing a vendored-file-guard test that is
+missing from the list) plus `cmd_ran` (refuses a listed package with no result or zero tests). It
+no longer implies that dropping *any* listed package is refused. Both halves are the behaviours I
+reproduced at `e219fc6` as P11 and P20.
+
+**The Correction is honest.** `F5-F6-round3-one-edit-bypasses-red-green.txt` is **byte-unchanged**
+(empty diff). `docs/evidence/pr2/README.md` quotes the wrong annotation verbatim, says plainly
+"that annotation is wrong, and it is corrected here rather than rewritten — the transcript is a
+record of what was run and is left as it was recorded", explains the cause (the `T` column was a
+direct `go test`, not `make test`), and the transcript's index row points the reader to the
+correction. Amending the record would have destroyed it; this is the right handling.
+
+**3. CI on `744c607`:** 12 check-runs, **0 non-success**, all 10 manifest lanes plus `ci-required`
+and GitGuardian green on this SHA.
+
+Nothing outstanding. Scratch clone `…/scratchpad/vfy-r4/` deleted; no push, and no file outside
+this record touched.
