@@ -442,3 +442,7 @@ behaviour — but if it is a typo it belongs in `vizra-core`, and this repositor
 after.
 
 Next action: independent verification of PR #2 against its head SHA.
+
+## Correction by the chair — 2026-09-20
+
+This plan (written by the round-1/2 builder) states that after a Makefile-level override "the drift is still caught … because the required `test` and `test-noskip` lanes run `go test` directly". **That is false**, as the independent verifier measured at `7babbd3` (Finding 8) and a second builder re-measured at `744c607`: CI invokes `make test` and `make test-noskip`, so `SHELL := /usr/bin/true` or `MAKEFLAGS += -i` no-ops them too; the only command that goes red is a direct `go test ./internal/httpapi/`, which no CI lane runs. The text above is left as recorded; the corrected statement lives in the repository's `AGENTS.md`, the guard docstring and `docs/evidence/pr2/README.md`, and the fix is queued as cross-repo hardening item 2g on the war-room board.
