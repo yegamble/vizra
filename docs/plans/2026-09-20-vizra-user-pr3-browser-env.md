@@ -232,6 +232,62 @@ The `e2e` lane on GitHub-hosted `ubuntu-24.04` / linux-amd64
   `mobile-chromium-390`, ending with
   `e2e coverage floor: OK (desktop-chromium-1440=9 mobile-chromium-390=9)`.
 
+### Fix round 1 — verifier FAIL on `112291e`, closed at `44dac20`
+Verifier evidence: `docs/evidence/warroom/2026-09-20-vizra-user-pr3-browser-env-VERIFY.md`.
+Its reproductions were treated as acceptance tests.
+
+| Finding | Sev | What was wrong | What closed it |
+|---|---|---|---|
+| 1 | BLOCKER | the spec guard matched import SYNTAX (braces + double quotes); `import * as pw from "@playwright/test"` and single quotes both passed, and the verifier's 404-and-throw spec gave `npm run ci` 0 and `npm run e2e` 0, "20 passed, floor OK" | AST rule `vizra/no-unguarded-playwright-import` over `e2e/specs/**` and `e2e/demos/**`: every spelling (named, namespace, default, side-effect, `require`, dynamic `import()`, either quote style, re-export, shim) is an error, and `test`/`expect` may come only from the harness entry. 33 RuleTester cases; the vitest sweep now asserts the rule is WIRED as an error. `/e2e/specs/` and `/e2e/demos/` added to CODEOWNERS |
+| 2 | BLOCKER | `check-e2e-lane.sh` never asserted the step that runs Playwright; the verifier's three mutations all printed "OK" | `scripts/ci/check-e2e-lane.mjs` PARSES the workflow (`yaml` 2.9.1) and asserts the step graph: exactly one step whose `run` is exactly `npm run e2e`, unconditional, not `continue-on-error`, `E2E_BASE_URL` matching a published `docker run` port, floor step after it. 13 fixture cases in `require-checks_test.sh` |
+| 3 | SHOULD | the floor was 1/project, so `--grep` ran one test and printed OK | minima in `e2e/harness/required-projects.json` (CODEOWNERS path) at today's counts 9/9; filtered runs refused; `scripts/ci/check-coverage-floor-ran.mjs` re-checks from the finished report OUTSIDE the Playwright process |
+| 4 | REQUIRED | a `?X-Amz-Signature=` value survived verbatim into uploaded `trace.zip` members | `scripts/ci/redact-artifacts.sh` before upload (choice stated: redact in place, keep uploading traces); `trace.sources` off |
+| 5 | NIT | the `if: failure()` upload had never executed; `if-no-files-found: warn` | `error`, plus a real CI run that produced and stored an artifact |
+
+**Two things the D9 demonstration found that my first fix had missed**, recorded
+because they are why the demonstration exists: the redactor matched only
+absolute URLs while the trace records relative ones (what Next emits
+everywhere), and a HAR `*.network` member stores the query a second time already
+parsed as `"queryString":[…]`, which no URL rewriting reaches. Both closed.
+
+**One defect the new tests found in CI, not a reviewer:** `ci-guard` never ran
+`npm ci`, so the parser-based lane guard could not load `yaml` and 13 of the new
+cases failed with "Cannot find package 'yaml'". Fixed; the guard now reports a
+missing parser as BLOCKED by name.
+
+#### Commands on `44dac20`
+| Command | Exit | Counts |
+|---|---|---|
+| `npm run ci` | 0 | vitest **9 files / 206 tests**, 0 skipped (was 8/177) |
+| `npm run e2e` (built image, local arm64) | 0 | 18 passed, floor `desktop=9/9 mobile=9/9` |
+| `node scripts/ci/check-coverage-floor-ran.mjs` | 0 | same counts, from the report |
+| `npm run e2e:demos` | 0 | **39 halves passed, 0 blocked, 0 failed** (was 18) |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **86 cases / 93 assertions**, 0 failed (was 73/80) |
+| `npx vitest run eslint-rules/no-unguarded-playwright-import.test.mjs` | 0 | 33 cases |
+| shellcheck over `scripts/ci/*.sh` and `scripts/e2e/*.sh` | 0 | clean |
+
+#### CI on `44dac201c120e2a6d0c689cf53aafb218ca341a3`
+`ci-required` **pass** (2m25s). `e2e` **pass**, `guard` **pass** (86 cases / 93
+assertions / 0 failed; the lane guard OK), `frontend`, `contract`,
+`docker-build`, `deps-scan`, `image-scan` all pass. GitGuardian still red — see
+below; it now scans 4 commits and the finding is still only in `951f18b`.
+
+The CI `e2e` job log confirms it did real work: Chromium `chromium-1243`
+installed, image built, `OK: 'vizra-user:e2e' contains no browser-harness path
+and no fixture token`, and `OK: the browser lane satisfied its coverage floor
+from the report (desktop-chromium-1440=9/9 mobile-chromium-390=9/9)`.
+
+#### The artifact path, proved once (FINDING 5 + FINDING 4 on real CI bytes)
+Throwaway branch `chore/e2e-artifact-upload-proof` and PR
+yegamble/vizra-user#4 (based on this branch, **never merged**, closed and the
+branch deleted). Run
+<https://github.com/yegamble/vizra-user/actions/runs/35536837315>: `e2e` RED as
+intended, the `if: failure()` path executed for the first time, GitHub stored
+`playwright-artifacts-35536837315-1` (1,251,268 bytes, 48 files). The artifact
+was **downloaded** and swept: **182 files, 8 archives unpacked, the sentinel in
+0 members, the request path still readable in 46**. Recorded in
+`vizra-user/docs/evidence/VZ-FOUND-008/ci-artifact-proof.md`.
+
 ### Open item for the chair: the GitGuardian check is red
 **Facts.** GitGuardian scans every commit in the PR, not just the head. The
 first commit (`951f18b`) committed the Next **dev server's** HMR WebSocket URL,
