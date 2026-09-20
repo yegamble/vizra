@@ -1804,3 +1804,441 @@ If the chair judges FINDING 9 a follow-up slice rather than a blocker for this
 PR, the honest disposition is to merge with the ledger entry at IMPLEMENTED and
 the finding carried as its own dependency-ready item — not to mark it VERIFIED,
 because the claim that entry makes is exactly the one still defeasible.
+
+---
+
+# Re-verification at f6f1f59
+
+**Verdict: FAIL** — one blocking finding, new, and it defeats the *structural*
+control rather than the lint layer. **Findings 9 and 10 are CLOSED, and so is
+every earlier finding.** The re-plan was the right call and the design is sound;
+it proves a slightly narrower proposition than it needs to.
+
+| | |
+|---|---|
+| Head SHA verified | `f6f1f59a7c15a15e50c052602c3da88a425e5d35` — unmoved at start and finish |
+| Ancestry | `git merge-base --is-ancestor 0ac9fb6… HEAD` → **yes**; one commit |
+| Delta | 82 files, +3342 −452 (+3676/−452 including evidence) |
+| Environment | macOS arm64, Node v22.14.0, @playwright/test 1.63.0, Chromium `chromium-1243` (already cached); Docker available, 13 GiB free, local image build **ran** |
+| Clone | fresh, `<scratch>/verify-f6f1f59/vizra-user`, deleted on completion |
+
+## 1. Counts — every claim matched
+
+| Command | Exit | Result | Claim |
+|---|---|---|---|
+| `npm run ci` | 0 | **12 files / 269 tests / 0 skipped** | 12 / 269 / 0 — **matches** |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **102 cases / 109 assertions / 0 failed** | 102 / 109 — **matches** |
+| `npx playwright test` | 0 | 18 passed; `coverage floor: OK (9/9 9/9)`; **`e2e harness stamp: OK (18 succeeding result(s) verified)`** | **matches** |
+| `node scripts/ci/check-coverage-floor-ran.mjs` | 0 | floor OK + `every succeeding result carried a valid harness stamp (18 verified…)` | — |
+| `node scripts/ci/harness-canary.mjs` | 0 | `failed all 3 fault-injection fixtures, each for its own named reason` | — |
+| `npm run e2e:demos` | 0 | **74 halves passed, 0 blocked, 0 failed** | 74 — **matches** |
+
+The demo script's two gitignored mutant configs are removed on exit:
+`git status --porcelain` was empty after the run, and no
+`playwright.config.*mutant*` or `Dockerfile.fixtures-mutant*` remained.
+
+## 2. The three historical doors — all RED at runtime
+
+| Door | Lint | Runtime |
+|---|---|---|
+| (a) `import * as pw from "@playwright/test"` in `e2e/specs/` | red | **exit 1** — "1 passed", then `__a.spec.ts:3 … succeeded WITHOUT the harness stamp` |
+| (b) `/* eslint-disable … */`, run against a **mutant ESLint config with `noInlineConfig` stripped** so lint is genuinely **GREEN** | **green** | **exit 1** — `__b.spec.ts:3 … succeeded WITHOUT the harness stamp` |
+| (c) `e2e/other/x.spec.ts` | red | **not collected at all** (`--list` → 0 matches; `npx playwright test e2e/other` → "Error: No tests found"), because `testDir` is now `./e2e/specs` |
+
+Door (b) is the decisive one: with lint fully defeated, the runtime still refused
+the run and named the file. That is the property the re-plan was for, and it
+holds.
+
+A raw-runner spec inside the **full** lane turns both checks red, naming both
+projects — in-process (`lane exit 1`) and out-of-process (`exit 1`),
+independently.
+
+## 3. Forging the stamp — 13 attempts, 13 refused
+
+| Attempt | Result |
+|---|---|
+| read `VIZRA_E2E_STAMP_KEY` at module top-level | REFUSED — undefined (test asserting so passed and verified) |
+| read it in the test body / in `beforeAll` | REFUSED — undefined |
+| read it from a spawned `child_process` | REFUSED — `"undefined"` |
+| `claimSigner()` from a spec (body) | REFUSED — "already been claimed" |
+| `claimSigner()` at spec module top-level | REFUSED — "already been claimed" |
+| `reporterKeyHex()` from a spec | REFUSED — "not readable from a Playwright worker process" |
+| ESM cache-bust re-import `../harness/stamp.ts?vizra=bust` then `claimSigner()` | REFUSED — "already been claimed" |
+| `createRequire` + `delete require.cache` + re-require | REFUSED — spec fails to load (`require is not defined`) |
+| forge with a **stale** `.vizra-e2e/stamp-key.json` from a previous run | REFUSED — "does not verify against this run's key" |
+| **replay** a sibling test's valid stamp onto a raw test | REFUSED — "does not verify against this run's key" (identity-bound) |
+| fabricated 64-hex annotation | REFUSED — "does not verify" |
+| harness stamp **plus a duplicate** | REFUSED — "carries 2 harness stamps; exactly one is written" |
+| `test.fail()` (expected-failure status) on a raw test | REFUSED — counted as success, flagged "WITHOUT the harness stamp" |
+
+`test.skip` / `test.fixme` on a raw test leave no succeeding result and count
+zero toward the floor — they hide nothing because they prove nothing.
+
+**The stale-key chain, which is the one I expected to work, fails for a subtle
+and correct reason.** With the in-process reporter deleted from the config *and*
+a stale key file deliberately left in the workspace, the out-of-process check
+reads the stale key — and then **every honest test's stamp fails to verify**,
+because those were signed with the new run's key. The run goes red naming the
+real specs. A forger who leaves a stale key to sign with must simultaneously
+make every genuine test unverifiable. Measured: `out-of-process exit=1`,
+"health.spec.ts:16 … carries a harness stamp that does not verify against this
+run's key".
+
+**Is the builder's statement of what forging takes honest and complete?**
+`e2e/harness/stamp.ts` lists three routes (recover the key; import the sealed
+module and call the signer; edit `e2e/harness/**`, `playwright.config.ts` or
+`eslint-rules/**`). Routes (a) and (b) I could not breach in eight attempts
+each way. Route (c) is correctly named as the residual. It is honest and, for
+the threats it contemplates, complete — but it contemplates only *reaching the
+signer*. It does not contemplate **keeping the signer and removing the guard**,
+which is FINDING 11 below.
+
+## 4. Out-of-process check
+
+- **In-process stamp reporter deleted from the config** → the lane exits 0 (as
+  expected, that check is gone) and the out-of-process check exits **1** by
+  name: the key file is never written, "its absence means that reporter is no
+  longer in playwright.config.ts, so nothing proved the tests went through the
+  harness. A lane whose proof is missing did not prove anything."
+- **Spec tampering with the report** (`afterAll` writing `{"suites":[]}` to
+  `playwright-report/results.json`) → **does not stick**: Playwright's json
+  reporter writes after all tests, and the file held 20 tests afterwards.
+- **Stale report** → covered by the same fail-closed read as at 44dac20.
+
+## 5. Canary
+
+| Mutation of `e2e/harness/browser-errors.ts` | Canary |
+|---|---|
+| console listener neutered | **exit 1** |
+| pageerror listener neutered | **exit 1** |
+| response (HTTP ≥ 400) listener neutered | **exit 1** |
+| **`unallowedRecords` body emptied, all identifiers left in place** (the silent case from 0ac9fb6) | **exit 1** |
+
+The silent case is closed — `check-e2e-lane.sh` is still string-presence only on
+the harness and stays green on that mutation, but the canary catches it, which
+is what the canary is for. A fixture edited to stop being broken is also caught
+(canary exit 1). The parser asserts the canary step exists, exactly once, is
+unconditional and does not `continue-on-error`.
+
+**One weakness.** The canary does **not** reliably fail when a fixture fails for
+the *wrong* reason. Replacing `console.error(token)` in
+`e2e/demos/console-error.demo.ts` with a 404 sub-resource leaves the canary
+**green**, because Chromium reports the failed load on the console and the
+harness formats it as `console.error: Failed to load resource…`, which satisfies
+that fixture's expected diagnostic. So the claim in `harness-canary.mjs:160` and
+`AGENTS.md:377` that each fixture fails "for its own named reason" is slightly
+overstated. It is not a path to a green lane on a broken page — all four
+neutering mutations are still red — so it is recorded as a residual, not a
+finding.
+
+## 6. FINDING 10 — **CLOSED**
+
+| Mutation | Result |
+|---|---|
+| second **ungated** `upload-artifact` step | **red by name** — "the artifact upload at step 16 (`actions/upload-artifact@…`)" |
+| second **gated** upload (legitimate) | correctly green |
+| `actions/upload-artifact` swapped for another action | red — "no step uploads artifacts" |
+| upload via a **composite action** (`uses: ./.github/actions/…`) | **not seen** |
+| upload via `curl` in a `run:` step | **not seen** |
+
+**What the parser cannot see, plainly:** any `run:` step and any non-`uses:
+actions/upload-artifact` publisher. A composite action or a `curl`/`gh` line can
+move bytes anywhere, and no workflow parser closes that. AGENTS.md's residuals
+section says exactly this ("An arbitrary `run:` step can still exfiltrate … the
+protection for the rest is review"), which is the honest framing.
+
+## 7. Regression sweep — Findings 2, 3, 5, 6, 7 all stay **CLOSED**
+
+Two canaries each, all exit 1:
+
+```
+F2  delete the lane step 1   |  npm run e2e || true 1
+F3  --grep one test      1   |  delete one test      1
+F5  if-no-files-found:warn 1 |  redactor removed     1
+F6  namespace import     1   |  eslint-disable       1
+F7  upload ungated       1   |  redact continue-on-error 1
+```
+
+**Privacy still holds**: a query-string sentinel went 3 members → **0** after
+`redact-artifacts.sh`, path still readable.
+
+**No test or demonstration weakened or deleted.** Numstat over every test, rule
+and spec file: `browser-errors.test.ts` +118/−0, `collection.test.ts` +71/−0
+(new), `stamp.test.ts` +155/−0 (new), `require-checks_test.sh` +100/−0,
+`no-unguarded-playwright-import.test.mjs` +77/−0,
+`no-credentials-in-specs.test.ts` +24/−2, the rule +51/−3. **All five removed
+lines are broadenings**, ruled individually:
+
+| Removed | Replaced by |
+|---|---|
+| `for (const dir of ["specs","demos"]) walk(...)` | `walk(e2eRoot)` skipping only `harness` — **wider** |
+| `/\.(spec\|demo)\.ts$/.test(entry)` | `/\.ts$/.test(entry)` — **wider** |
+| `properties: { harnessEntry: … }` (one line) | the same property in a multi-line schema that gained another — **wider** |
+| two × `if (value !== undefined && referencesPlaywright(value)) reportPackage(...)` | the same guard opened into a block with more logic — **equal or wider** |
+
+**AGENTS.md frames it correctly**: "#### The control is the RUNTIME STAMP. Lint
+is the early warning.", a "What forging a stamp would take, stated honestly"
+list, and a "Residuals — what is still only as strong as review" section that
+names CODEOWNERS being unenforced, arbitrary `run:` exfiltration, the
+sealed-module ban being lint, the credential sweep being a tripwire (citing the
+four evasions I measured last round, as measured), and the redactor's scope.
+That residuals list is accurate against everything I could measure — except that
+it does not yet contain FINDING 11.
+
+## 8. CI on f6f1f59
+
+```
+ci-required success 22:35:42   contract success   docker-build success
+e2e         success 22:35:24   frontend success   guard        success
+deps-scan   success            image-scan success
+GitGuardian Security Checks    FAILURE
+
+  - frontend / - contract / - ?guard / - ?docker-build / - e2e
+waiting: … e2e (in_progress)   ×3
+OK: every required check on f6f1f59a7c15a15e50c052602c3da88a425e5d35 concluded success.
+```
+
+The `e2e` job log carries all three lines:
+
+```
+18 passed (9.6s)
+e2e coverage floor: OK (desktop-chromium-1440=9/9 mobile-chromium-390=9/9).
+e2e harness stamp: OK (18 succeeding result(s) verified).
+OK: the browser lane satisfied its coverage floor from the report (9/9 9/9).
+OK: every succeeding result carried a valid harness stamp (18 verified, from .vizra-e2e/stamp-key.json).
+OK: the harness canary failed all 3 fault-injection fixtures, each for its own named reason…
+```
+
+**Key hygiene — verified, not assumed.** The per-run key is 64 hex chars. Locally
+it appears **0** times in the lane's stdout/stderr, **0** times under
+`playwright-report/`, **0** times under `test-results/`; `.vizra-e2e` is
+gitignored (`.gitignore:67`), is **not** in the workflow's upload paths, and has
+**0** tracked files. In CI, 38 64-hex strings appear in the `e2e` log — all of
+them Docker layer/image digests and npm cache keys, in the image-build and
+setup-node steps; **0** in the lane, floor or canary steps, and `0` occurrences
+of `VIZRA_E2E_STAMP_KEY`. Zero artifacts on this green run.
+
+**GitGuardian**: 2 secrets across 7 commits — the same historical pair from
+`951f18b`. The delta `0ac9fb6..f6f1f59` adds no credential-shaped content and no
+live query strings.
+
+---
+
+## Findings
+
+```
+FINDING 11: a spec can keep the harness stamp and still remove the guard, by overriding the `page` fixture — the whole gate stays green on a page that 404s and throws
+Severity:    BLOCKER
+Confidence:  high
+Class:       the same family as 6 and 9, but this one defeats the RUNTIME
+             control, not the lint layer. New; not a regression from this round.
+
+Affected:
+  repo:      vizra-user
+  files:     e2e/harness/test.ts:88-108   (`vizraHarnessStamp`, auto, stamps)
+             e2e/harness/test.ts:110-147  (`page` override, where the guard lives)
+             e2e/harness/stamp.ts:47-65   ("WHAT FORGING THE STAMP WOULD TAKE")
+             eslint-rules/no-unguarded-playwright-import.mjs (no rule about `.extend`)
+  requirements: VZ-FOUND-008
+
+Observed:
+  The guard and the stamp live in DIFFERENT fixtures. The stamp is written by an
+  `auto: true` fixture that depends on nothing; the console / pageerror /
+  requestfailed / HTTP>=400 guard is in the `page` fixture. Playwright's
+  `test.extend` can replace one without the other, and replacing `page` is a
+  documented, first-class feature.
+
+  A spec that imports the harness `test` — so the stamp fixture still runs and
+  the stamp verifies — and overrides `page`:
+
+      import { test as base } from "../harness/test";
+      const test = base.extend({
+        page: async ({ browser }, provide) => {
+          const ctx = await browser.newContext();
+          await provide(await ctx.newPage());
+        },
+      });
+      test("stamped, guard never ran", async ({ page }) => {
+        await page.addInitScript(() => {
+          globalThis.addEventListener("DOMContentLoaded", () => {
+            const i = new Image(); i.src = "/VERIFIER_F6_MISSING.png";
+            document.body.appendChild(i);
+            setTimeout(() => { throw new Error("VERIFIER_F6_UNCAUGHT"); }, 0);
+          });
+        });
+        await page.goto("/"); await page.waitForLoadState("networkidle");
+      });
+
+  Measured on the pristine tree, with the production server rebuilt and
+  restarted so nothing was stale:
+
+      npm run ci                                    -> exit 0   (LINT GREEN)
+      npx playwright test  (full lane, floor armed) -> exit 0   20 passed
+          ✓ [desktop-chromium-1440] __ov.spec.ts  stamped, guard never ran
+          ✓ [mobile-chromium-390]   __ov.spec.ts  stamped, guard never ran
+          e2e coverage floor: OK (desktop-chromium-1440=10/9 mobile-chromium-390=10/9)
+          e2e harness stamp: OK (20 succeeding result(s) verified)
+      node scripts/ci/check-coverage-floor-ran.mjs  -> exit 0
+          OK: every succeeding result carried a valid harness stamp (20 verified)
+      node scripts/ci/harness-canary.mjs            -> exit 0
+      bash scripts/ci/check-e2e-lane.sh             -> exit 0
+      npx vitest run e2e/harness/                   -> exit 0
+
+  The page really is broken: the identical body through the plain harness `test`
+  produces `[pageerror] VERIFIER_F6_UNCAUGHT`,
+  `[response] http 404: GET …/VERIFIER_F6_MISSING.png` and the matching
+  `[console]` record, and fails.
+
+  An earlier draft of this attack was caught by ESLint — but only by accident:
+  `react-hooks/rules-of-hooks` fires on a fixture whose second parameter is
+  named `use`. Renaming that parameter to `provide` makes it lint-clean, as
+  above. Nothing in the repository mentions `.extend` or fixture override:
+  I grepped the rule, `collection.test.ts`, `browser-errors.test.ts`,
+  `scripts/ci/*.mjs` and AGENTS.md.
+
+  Overriding the stamp fixture INSTEAD is refused (the guard still runs and
+  fails the broken page); overriding BOTH is refused ("WITHOUT the harness
+  stamp"). Exactly one combination forges: keep the stamp, replace `page`.
+
+Failure:
+  The stamp proves "this test came from the harness `test` object". The property
+  the ledger entry claims is "this test ran the guard". Fixture override
+  separates the two, and the gap is green in `npm run ci`, in the lane, in both
+  floor checks, in the canary and in the workflow parser. Every later UI slice
+  is judged through this harness, and one `.extend` in a spec — a normal-looking
+  Playwright idiom, not an obvious opt-out — silently exempts it.
+
+Perspective:
+  developer, and through them visitor and member, who receive the broken page.
+
+Recommendation:
+  Make the fixture that cannot be removed be the fixture that guards. Move the
+  listener attachment and the teardown assertion OUT of the `page` override and
+  INTO the auto `vizraHarnessStamp` fixture, declaring `page` as its dependency:
+
+      vizraHarnessStamp: [
+        async ({ page }, runTest, testInfo) => {
+          const records = collectBrowserErrors(page);
+          testInfo.annotations.push({ type: STAMP_ANNOTATION, description: signStamp({...}) });
+          await runTest();
+          await flushBrowserEvents(page);
+          ...assert unallowedRecords...
+        },
+        { auto: true },
+      ],
+
+  Then overriding `page` hands the OVERRIDDEN page to the guard rather than
+  removing it, and removing the guard means removing the stamp — which both
+  checks already refuse. That restores the invariant "stamped ⟹ guarded" with no
+  new machinery.
+
+  Add the lint half as the early warning it is meant to be: refuse
+  `base.extend({ page: … })` and `.extend({ vizraHarnessStamp: … })` in
+  `e2e/specs/**` and `e2e/demos/**`. No spec uses `.extend(` today, so the ban
+  costs nothing.
+
+Acceptance criteria:
+  - The spec above fails the lane by name, and fails `check-coverage-floor-ran.mjs`.
+  - A spec overriding `page` fails `npm run ci` by name (lint early warning).
+  - `test.use({ browserErrorPolicy: … })` still works, and the three demos and
+    all 18 lane tests still pass, with `harness stamp: OK (18 …)` unchanged.
+  - `npm run e2e:demos` still reports 74/74.
+
+Tests:
+  A new D11 half in scripts/e2e/demonstrate.sh: the override spec above, asserted
+  RED with "WITHOUT the harness stamp" (or the new guard message), plus a GREEN
+  half with the override removed. The harness to run it exists — this is the
+  same shape as the D11 stamp demonstrations already there.
+  Add RuleTester cases for the two banned overrides in
+  eslint-rules/no-unguarded-playwright-import.test.mjs.
+
+Cross-repo implications:
+  core: none | user: as above | search: none
+  meta: VZ-FOUND-008 must not reach VERIFIED until this is closed — every later
+  UI slice's evidence runs through this harness.
+
+Challenge:
+  "Overriding `page` is a deliberate, visible act in a diff, and `e2e/specs/` is
+  a CODEOWNERS path — this is the accepted residual (c) in stamp.ts, edits to
+  gate files." It is not: `e2e/specs/` is where every slice legitimately adds
+  code, and the spec above touches no gate file, no harness file, no config and
+  no workflow. It is four lines of ordinary Playwright in a normal spec, it
+  passes lint, and it is the idiom the Playwright documentation teaches for
+  customising a fixture. The residual the builder accepted is "someone edits a
+  file whose job is to be a gate"; this is not that. The honest counter is
+  priority — this is the fourth round — but the fix is a fixture-dependency
+  change of about ten lines, and until it lands the ledger entry's central claim
+  is still false.
+```
+
+## Residuals: accepted-by-design vs real holes
+
+**Accepted by design** — edits to files whose job is to be a gate, all under
+`.github/CODEOWNERS` (which, as AGENTS.md correctly says, enforces nothing until
+an owner applies a ruleset):
+
+- `e2e/harness/**`, `playwright.config.ts`, `eslint-rules/**`, `.github/**`.
+  Each is at least not silent: neutering the rule fails `npm run test`;
+  neutering the guard's bodies fails the canary; deleting the stamp reporter
+  fails the out-of-process check; every workflow mutation I tried but two is red
+  by name.
+- Arbitrary `run:` steps and composite actions can exfiltrate; no parser closes
+  that, and AGENTS.md says so.
+- The credential sweep is a tripwire with four measured evasions, declared.
+
+**Real holes:**
+
+- **FINDING 11** — fixture override keeps the stamp and removes the guard.
+  Blocking. Touches no gate file.
+- The canary's "each for its own named reason" is overstated for the console
+  fixture (a 404 satisfies its diagnostic). Not blocking; worth one line of
+  wording or a sharper expected string.
+
+## Status of all findings
+
+| # | Finding | Status |
+|---|---|---|
+| 1–8 | earlier rounds | CLOSED |
+| 9 | spec outside `e2e/specs` unguarded | **CLOSED** — not collected (`testDir: ./e2e/specs`), lint glob widened to `e2e/**` minus harness, and the runtime stamp catches it regardless |
+| 10 | parser checks only the first upload step | **CLOSED** — second ungated upload red by name; second gated upload correctly green |
+| 11 | fixture override keeps the stamp, drops the guard | **OPEN — blocking** |
+
+## Verdict at f6f1f59
+
+**FAIL**, on FINDING 11 alone.
+
+The re-plan was correct and the execution is the strongest work in this PR. The
+guarantee genuinely moved to the runtime: door (b) — my `eslint-disable` exploit
+run against a mutant ESLint config with `noInlineConfig` stripped, so lint was
+truly green — was still refused by the stamp reporter, by name. Thirteen forge
+attempts failed, including the stale-key chain, which fails for the right reason
+rather than by luck. The key is unreadable from a worker, from a child process,
+from disk during a run, and never appears in a log, a report, an artifact or CI
+output. Deleting the in-process reporter fails closed out of process. The canary
+closes the silent-guard case that was silent at 0ac9fb6. Findings 9 and 10 are
+closed, all nine earlier findings stay closed under two canaries each, no test
+was weakened, and all five removed lines are broadenings. Every count matched,
+74 of 74 demonstration halves reproduced from my clean clone, and CI on this SHA
+shows the floor line, the stamp line and the canary line.
+
+It fails because the stamp proves the wrong proposition by a hair. It certifies
+that a test came from the harness `test` object; the claim the ledger makes is
+that the test ran the guard. Playwright's `test.extend` separates those two, and
+a four-line, lint-clean, entirely ordinary-looking spec that overrides the `page`
+fixture keeps its valid stamp while the console/page-error/404 guard never runs —
+`npm run ci` exit 0, the lane exit 0 with "20 passed, coverage floor: OK,
+harness stamp: OK (20 verified)", the out-of-process check exit 0, the canary
+exit 0, the workflow parser exit 0 — on a page that 404s a sub-resource and
+throws on every load.
+
+The fix is small and in the spirit of the design already chosen: make the
+un-removable auto fixture the one that guards, by giving it `page` as a
+dependency, so that overriding `page` feeds the guard instead of deleting it and
+"stamped" once again implies "guarded". Add the `.extend` ban as the lint early
+warning; no spec uses `.extend(` today.
+
+VZ-FOUND-008 must not reach VERIFIED until FINDING 11 is closed and
+re-verified. If the chair judges it a follow-up, the honest disposition is merge
+at IMPLEMENTED with FINDING 11 as its own dependency-ready item — not VERIFIED,
+because "a test cannot pass without the guard" is precisely the sentence that is
+still false.
