@@ -500,6 +500,28 @@ Recommended shape: define the light palette on `:root`, redefine only the 36 `Co
 should **not** be emitted as CSS variables — they are an implementation layer and are `scopes = []`
 in Figma for the same reason.
 
+### 8.1 DO NOT MIRROR INTO CODE — `Meter fit (fill width)`
+
+One variable collection in this file is **not a design token set** and must never be mirrored into
+Tailwind, CSS custom properties, or any generated token artifact:
+
+| Collection | `Meter fit (fill width)` — `VariableCollectionId:67:1772` |
+|---|---|
+| Modes | `Natural 320`, `Column 670`, `Column 308` |
+| Variables | `meter/fill-62`, `meter/fill-91`, `meter/fill-100` (FLOAT, `scopes = ["WIDTH_HEIGHT"]`) |
+
+It exists only because a Figma instance cannot override nested geometry, so the `Meter` fill could
+not otherwise draw the percentage its label states once the instance was stretched to a column
+width. It encodes three hard-coded percentages against three hard-coded column widths — a layout
+workaround, not a semantic role.
+
+**In production the storage meter computes its own width** (`width: used / allowed`) and needs none
+of these values. They are marked `hiddenFromPublishing`, carry a `DO NOT MIRROR INTO CODE`
+description on the collection and on every variable, and deliberately have **no** `var(--vz-…)` web
+code syntax — unlike every real token in §8. A mirroring script should key on the presence of the
+`var(--vz-…)` code syntax, not on "every local variable", so that this collection and any future
+Figma-only workaround are excluded by construction.
+
 ---
 
 ## 9. Verification performed

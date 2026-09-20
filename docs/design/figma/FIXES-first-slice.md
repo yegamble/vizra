@@ -193,3 +193,188 @@ Honest, after looking at the renders.
 10. **Nothing here has been reviewed.** This is a single-pass fix round by one agent, checked against
     its own screenshots. `AGENTS.md` requires independent review, and the owner has not approved any
     of it. Status remains **PROPOSED**.
+
+---
+---
+
+# Second pass — response to "Re-check after the fix pass"
+
+Scope: the two things the re-check would not show an owner (§R5), the one regression the first pass
+introduced (§R2.1), the tidy list, and the `Meter fit` disclosure. Same rulings: M1 shell canonical,
+owner questions stay as drawn, fix in the component, additive/corrective only, look at every change
+in **both themes** before claiming it.
+
+## S1 — `BulkBar` Delete, and the V5 sheet's Delete
+
+**Fixed in the component, so all three instances inherit.** `BulkBar` (`30:191`) is a single
+component; its `btn:Delete` (`30:205`) went from `Kind=Danger` (filled red) to **`Kind=Quiet` with a
+`color/danger` label and a leading `icon/Trash2`** (`Leading icon#7:75` = true, `Icon#7:100` =
+`5:32`, 5 glyph vectors rebound to `color/danger`), preceded by a new divider **`78:5032`** so the
+destructive action is separated from the constructive pair — the same treatment the other five
+surfaces already had. The filled danger style is now reserved for the confirm button inside the
+destructive-confirmation dialogs (`54:2684`, `54:2715`, `54:2740`, `54:3027`) and nowhere else.
+
+The four Deletes demoted in the first pass — `44:3991` (V1), `50:1954` (A1), `48:1805` (V4),
+`48:1939` (V5) — **also gained the `Trash2` glyph**, so no demoted destructive control anywhere is
+carried by colour alone: it is word + glyph + colour + separation.
+
+**Checked:** rendered `38:2460` (L1, **Light**) and `41:1282` (L4, **Dark**) at 1.6×. In both, the
+bar reads "3 photos selected · [Add to album] [Set visibility] │ 🗑 Delete … Clear selection" — two
+outlined Secondary buttons, a rule, a red-glyph-plus-red-label quiet Delete, and an accent quiet
+"Clear selection". The library page's only filled button is now "Upload".
+
+**V5 sheet Delete — position fixed too.** `48:1904` was reordered so the benign control is the
+thumb-resting one: `… Download original › divider (73:2895) › Delete › divider (78:5087) ›
+Show Exif and file details`. Delete now sits between two rules and is no longer bottom-most.
+
+Because that added 9px, the whole V5 stage was re-fitted (this also closes the re-check's A7
+residual, below): photo `48:1892` → **187 × 280 at (102, 68)**, zoom cluster `69:4961` → y 356–400,
+sheet `48:1904` → y 408, ending **exactly on 844**; step controls `48:1894` / `48:1899` re-centred on
+the new photo at y 186. Measured after the move: `overlapPhotoCluster: false`,
+`overlapClusterSheet: false`.
+
+**Checked:** rendered `48:1878` at 1.1× (Dark): the zoom cluster sits in the gutter **below** the
+photograph, nothing overlaps, Delete is fenced by two rules, "Show Exif and file details" is last.
+
+**Still wrong:** the photograph is now 187 × 280 in a 390 viewport — small. That is the honest cost
+of a six-action sheet plus a zoom cluster plus a 44px-target rule on an 844-tall phone; I chose a
+smaller photo over an overlapping control. No `Close`/`Cancel` row was added at the bottom of the
+sheet (the canonical iOS answer) because it would have forced the photo down to roughly 152 × 228.
+
+## S2 — The "1:1" labels on the queue thumbnails
+
+**Choice: the label is removed from the queue previews, and the reason is stated on the canvas.**
+
+Reason, against the brief: `DESIGN_BRIEF.md` forbids destructive cropping **of the photograph**
+("Preserve the image's aspect ratio; do not default to destructive cropping"). A 56 × 56 row preview
+in an upload queue is a list affordance, not the photograph — the original is untouched, and the
+library grid and the viewer are where the brief's rule bites. Re-labelling the square preview "3:2"
+would have been worse than leaving it: the *drawing* would still be square, so the label would
+contradict the pixels rather than the copy. So the ratio claim is withdrawn, not falsified.
+
+`ratio-label` set `visible = false` on **17** queue previews across six frames — 7 in `33:65`, 4 in
+`37:1977`, 2 in `37:2151`, 4 in `36:332` — every 56 × 56 `AspectPlaceholder` inside an `UploadRow`.
+Visibility *is* overridable inside an instance even though geometry is not, which is why this worked
+where the resize did not.
+
+The design note of every upload frame (`33:381`, `37:2120`, `37:2263`, `36:513`, `36:652`, `32:100`)
+now ends with: *"Queue rows use a 56×56 centre-cropped PREVIEW of the file, so no ratio is stated on
+them — a list preview is not the photograph. The photograph itself is never cropped: the library
+grid draws 3:2 / 2:3 / 1:1 / 16:9 / 3:1 cells at their real ratio and the viewer stage is
+contain-fitted."*
+
+**Checked:** rendered `37:1977` at 0.42× and `33:65`: the queue rows now show plain neutral previews
+with no ratio claim beside "6240 × 4160".
+
+**Still wrong:** the previews are square placeholders, so the *centre-crop* itself is asserted rather
+than drawn. Nested-instance geometry remains blocked (`relative-transform` cannot be overridden); the
+reproducer from the first pass stands.
+
+## S3 — REGRESSION: `Quiet` had converged on `Secondary`
+
+**Cause:** the first pass gave `Kind=Quiet` a 1px `color/line` hairline. `Secondary` is 1.5px
+`color/line` plus a `bg-elevated` fill — at normal viewing distance, the same thing.
+
+**Fix, at the component.** The hairline is removed from all six Quiet surfaces (`7:75`, `7:81`,
+`7:87`, `7:93`, `7:99`, `7:105`) and the affordance is carried by colour-of-type instead: Quiet's
+label is now `color/accent` (`7:79` Default, `7:97` Focus, `7:109` Loading), `color/accent-hover`
+(`7:85`) and `color/accent-pressed` (`7:91`). `Disabled` (`7:103`) stays `color/ink-3`. The existing
+`color/bg-tint` hover and pressed **surfaces** are untouched, so a quiet button still lifts under the
+pointer, and `Kind=Quiet, State=Focus` still carries its 2px `color/focus-ring` root stroke — the
+visible focus state that motivated A11 is intact.
+
+Three ranks now differ on **two** axes each, not one:
+
+| Rank | Surface | Border | Label |
+|---|---|---|---|
+| Primary | `color/accent` fill | none | `color/on-accent` |
+| Secondary | `color/bg-elevated` fill | 1.5px `color/line` | `color/ink` |
+| Quiet | none (tint on hover/pressed) | none | `color/accent` |
+
+**Checked side by side in both themes, as asked.** Built a standing board
+**`78:10` — `⟦hierarchy check⟧ Primary / Secondary / Quiet — Light and Dark`** on the Button page
+(`4:21`), rows `78:11` (Light) and `78:38` (Dark, via `setExplicitVariableModeForCollection` on the
+`Color` collection), and rendered it at 3×. Solid blue / outlined white / blue text, unmistakably
+three weights in **both** rows. Contrast is D1's own measured pair: accent as label **4.72:1 on
+`color/bg` and 4.93:1 on `color/bg-elevated` (Light), 7.70:1 (Dark)** — above 4.5:1 without the
+hairline doing any work.
+
+Re-checked the three surfaces the re-check named as flattened: `38:2460` / `41:1282` (bulk bar,
+both themes), `42:3331` (390 bulk bar) and `44:3966` (V1 action column). Hierarchy reads in all of
+them.
+
+**Still wrong:** Quiet is now closer to a link than to a button, which is the trade for separating it
+from Secondary. It is the treatment the original review itself proposed ("accent colour for
+navigation"), but a designer may want a tint chip for the *action* instances rather than accent for
+all of them. Nothing relies on the accent colour alone to convey meaning — every quiet control is
+labelled in words.
+
+## S4 — Tidy
+
+| Item | What changed | Checked |
+|---|---|---|
+| Two false design notes | `54:3035` — "so the thumb's resting position is never on Delete" → "so the destructive action never holds focus on open. It is still the bottom-most control in the destructive sheet — a deliberate trade, recorded in FIXES-first-slice.md." (first attempt silently failed on a curly apostrophe; retried and confirmed `changed: true`). `48:1947` — "nothing sits over the image except the close, visibility and step controls" → "nothing sits over the image at all: the close and visibility controls are in the top bar, the step controls sit in the side gutters, and the zoom cluster sits in the gutter between the image and the sheet", which the re-fit in S1 made true. | Both read back after writing |
+| `42:3331` two stacked header rules | `42:3332` bottom stroke removed (1 stroke → 0), so the phone library opens with the app bar's rule only, like D2a's `43:3320`. | Rendered `42:3331` at 0.5×: one rule |
+| U5 / U6 wore a back-bar on a tab root | `AppBar / M1` `State=Signed in` inserted at index 0 of `37:1977` (**`80:2929`**) and `37:2151` (**`80:2937`**); the local bars `37:1978` / `37:2152` renamed `page-title (Upload)` with their bottom rules removed; their Back buttons moved out (see below). Frames hug to 1793 / 1470. | Rendered `37:1977` at 0.42×: wordmark + account, "Upload" title, no back arrow, Upload tab active — the same shell as `42:3331` and the auth pages |
+| Three stale tab-bar layer names | `37:2121`, `37:2264`, `42:3502` renamed **`TabBar / M1 (fixed to the bottom of the viewport)`**. Layer names only; no component or variable renamed. | Read back; a name-based census no longer mis-reads them |
+| The surviving A8-class string | `53:2655` ("In flight: the confirm button is the busy control (aria-busy, stable name)…") moved out of the live dialog body `53:2646` into the frame's annotation `53:2848`, renamed `moved out of the dialog: in-flight contract`. Dialog `53:2638` shrank 398 → 322 and still overflows its row by **0**. | Moved and re-measured |
+| V2's featureless stage | `46:1633` re-panned to y **100**, so the photograph's **top edge is visible inside the stage** and the image runs off the bottom — a real pan position rather than an edge-to-edge field, with the library grid still showing in the side gutters. Placeholder label set to "2:3 · shown at 200%". | Rendered `46:1577` at 0.66× (Dark) |
+| V5 zoom cluster overlapping the photo | Closed by the S1 re-fit — cluster in the gutter, measured `overlapPhotoCluster: false`. | Rendered `48:1878` |
+
+## S5 — `Meter fit` marked as Figma-only
+
+In Figma: the collection `Meter fit (fill width)` (`VariableCollectionId:67:1772`) now carries
+`hiddenFromPublishing = true` and a description beginning **"DO NOT MIRROR INTO CODE."**; all three
+variables (`meter/fill-62`, `meter/fill-91`, `meter/fill-100`) are likewise
+`hiddenFromPublishing = true` with the same warning in their descriptions. Both properties were
+accepted by the API (`collectionHidden: true`, `collectionDescription: set`).
+
+In the repository: a new **§8.1 "DO NOT MIRROR INTO CODE — `Meter fit (fill width)`"** in
+`docs/design/figma/README.md`, inside the mirroring section where a builder will actually be
+standing, naming the collection, its modes, its variables, and the rule that a mirroring script
+should key on the presence of `var(--vz-…)` code syntax rather than on "every local variable".
+
+**Still wrong:** `get_variable_defs` on a Meter instance will still return `meter/fill-91` in the
+same payload as the real tokens — publishing flags are not visible there. The README rule and the
+absent code syntax are the defence.
+
+## S6 — Parent-relative overflow audit, re-run on `32:2`
+
+**Should hidden nodes count? Yes — and rather than argue it, I removed the cause.** A hidden node
+whose geometry no longer fits its parent is exactly the stale-layout signal an audit exists to
+catch, so this run counts hidden and visible nodes separately. The re-check's two extra offenders
+were `42:3334` and `42:3339`, the superseded search and upload controls left hidden inside
+`page-title (Library)`. They are no longer hidden inside a product frame: together with the two U5/U6
+Back buttons they were **moved out** into a dashed, labelled page-level holder
+**`80:2927` — `⟦superseded⟧ Local 390 bar controls — replaced by AppBar / M1`** and made visible
+there. `42:3332` now contains exactly one child, `header-title`.
+
+| Page | Nodes scanned | Offenders (hidden included) | Offenders (visible only) |
+|---|---|---|---|
+| `32:2` | 4,258 across 23 top-level nodes | **1** | **1** |
+
+The single offender is `46:1633` — the V2 photograph, deliberately larger than the 1440 × 900
+viewport so that "200% · arrows pan · 0 resets" states what is drawn. It is the fix for A12, not a
+defect. Both counts now agree, and both agree with the re-check once its two hidden offenders are
+accounted for.
+
+## S7 — What still looks wrong after the second pass
+
+1. **The V5 photograph is small** (187 × 280) — the cost of a non-overlapping zoom cluster plus a
+   six-action sheet on an 844-tall phone. No `Close` row was added for the same reason.
+2. **V5's Delete is off the bottom but still reachable**; "Show Exif and file details" is now the
+   thumb-resting control.
+3. **`Quiet` now reads as a link more than a button** — the price of separating it from Secondary.
+4. **The V2 stage is still a flat placeholder.** A visible top edge and a truthful chip are as far as
+   this can go with **no real photographs anywhere in the file** — still the single largest gap
+   between "designed" and "proven".
+5. **Queue previews assert a centre crop they do not draw** (nested-instance geometry, still blocked).
+6. **`Meter` correctness still depends on a builder picking the right mode**, and `get_variable_defs`
+   still surfaces those values beside real tokens.
+7. **The duplicated components survive** (`visibility marker` vs `VisibilityBadge`, `ProgressBar` vs
+   `Meter` for quota, `Checkbox` vs `SelectionCheckbox`) — deprecation is in the descriptions only,
+   because resolving them needs a rename or a delete.
+8. **No signed-out public photo page**, unchanged, and correctly the owner's decision rather than a
+   defect.
+9. **Still nothing independently verified.** Two passes by one agent, checked against its own
+   screenshots. Status remains **PROPOSED**.
