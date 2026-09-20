@@ -83,3 +83,69 @@ not passing vacuously.
 Still true after this run: nothing here is VERIFIED. The `ci-required` ruleset
 is not applied yet (owner action, ADR-002 items 9–10), and ADR-002 item 10 says
 no ledger entry may reach VERIFIED on CI evidence alone until it is.
+
+
+---
+
+# Fix round 1 (chair ruling 2026-09-20: verifier PASS on the acceptance bullets, NOT mergeable)
+
+Two reviewers independently broke the identity-header control, and the CI gate
+could be redefined by the PR it gates. Both are structural fixes, not more AST
+cases. Nothing below weakens or deletes an existing test.
+
+## What changed
+
+| Requirement | Change |
+|---|---|
+| A1 fail closed | `no-identity-headers-in-cached-fetch` reports `unreadable` for an init that is not an object literal, a spread or computed key in it, and any `headers` it cannot resolve to a literal (a call, a parameter, a reassigned or escaping binding, `new Headers(x)`). `fetch(url)` with no init stays valid. |
+| A2 alias ban | `no-raw-fetch` reports any reference to the global `fetch` binding that is not the callee of a direct call — `const f = fetch`, `const { fetch } = globalThis`, `wrap(fetch)` — in **every** file, including `lib/api/fetch.ts`. The rule also stays enabled for `scripts/**` and `eslint-rules/**`, where it had been switched off. |
+| A3 runtime pin | `lib/api/fetch.test.ts` asserts `init.cache === "no-store"` and `init.next === undefined` over method x json x uploadIntent (30 rows), that `cookies()` is consulted on every `viewerFetch` path, and that `publicFetch` never consults it. |
+| A4 honest docblock | The LIMITS section states what the rule does and does not reach, and no longer claims a backstop that was false. |
+| B1 gate floor | `scripts/ci/check-required-floor.sh` + a ci-guard step: `frontend` and `contract` must be present and non-optional. 10 new cases in `scripts/ci/require-checks_test.sh`. |
+| B2 CODEOWNERS | `.github/CODEOWNERS` covers `/.github/`, `/scripts/ci/`, `/eslint-rules/`, `/contracts/`. The ruleset that enforces it is an owner action, not part of this PR. |
+| C bounded requests | `apiTimeoutMs()` (`API_TIMEOUT_MS`, default 10 s) is both default and ceiling; the caller's signal composes with the deadline; six tests including the `reason: "timeout"` path. |
+| Verifier F4 | `adduser -S -u 1001 -G nodejs nextjs` — the container now reports `gid=1001(nodejs)`, asserted in the docker-build lane. |
+
+## Local commands after the fixes
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run ci` | 0 | **5 files, 116 tests passed, 0 skipped** (was 50) |
+| `npm run check:contract` | 0 | unchanged |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **55 cases, 62 assertions, 0 failed** (was 45/52) |
+| `bash scripts/ci/check-required-manifest.sh` | 0 | 4 entries |
+| `bash scripts/ci/check-required-floor.sh` | 0 | floor present and non-optional |
+| `bash -n` + `shellcheck -x` over `scripts/ci/*.sh` | 0 | clean, four scripts |
+| `docker build` | 0 | native arm64; `/health` 200; `id` → `uid=1001(nextjs) gid=1001(nodejs)` |
+
+## Demonstrations added
+
+| File | Shows |
+|---|---|
+| `D4-identity-control-fail-closed.md` | weakening `viewerFetch` fails `npm run ci` in BOTH the inline (exit 1) and the hoisted-init (exit 1) spelling, the second also failing 31 runtime assertions; an aliased fetch in a page fails lint (exit 1); a non-literal init fails lint (exit 1); bare `fetch(url)` in the allowed file still passes (exit 0); restored → exit 0 |
+| `D5-gate-floor.md` | deleting `frontend` and demoting it to `?frontend` each fail the floor guard by name (exit 1) while the pre-existing manifest guard says OK (exit 0) on both; restored → exit 0; 10 new regression cases |
+
+D1, D2 and D3 above are unchanged and still hold; D2's transcript describes the
+rule as it was before this round, and D4 supersedes it.
+
+**A bug found while writing D5's cases, worth reading:** the new floor cases in
+`require-checks_test.sh` initially used `if ! cmd; then rc=$?`, where `$?` is the
+status of the *negation* — every failing case recorded exit 0. A suite that
+passes while testing nothing is the exact failure this repository's gates exist
+to prevent. It is `|| rc=$?` now, with the reason in a comment.
+
+## CI run on the fix-round-1 head
+Head `9767015444fa8bdbf1a1326f1cc58b41d068ba14`, GitHub-hosted `ubuntu-24.04`.
+
+| Check | Result | Duration | Detail |
+|---|---|---|---|
+| `frontend` | pass | 53s | run 35528922893 — **5 files / 116 tests passed** |
+| `contract` | pass | 33s | run 35528922892 |
+| `guard` | pass | 12s | run 35528922882 — floor check "still requires the floor: frontend contract"; fan-in suite **55 cases / 62 assertions / 0 failed** |
+| `docker-build` | pass | 59s | run 35528922889 — linux/amd64 image; `runtime identity: uid=1001(nextjs) gid=1001(nodejs)`; `/health` served ok |
+| `ci-required` | pass | 51s | run 35528922843 — "OK: every required check on 9767015… concluded success" |
+| GitGuardian | pass | 2s | repository-level app, not in the manifest |
+
+Still not VERIFIED: the ruleset requiring `ci-required` and Code Owner review is
+an owner action (ADR-002 items 9–10), and this head has not been independently
+re-verified.

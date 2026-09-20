@@ -206,6 +206,45 @@ GitHub-hosted `ubuntu-24.04`: `frontend` pass 38s (50 tests, 0 skipped),
 `ci-required` pass 1m39s ("OK: every required check on 5672bfd… concluded
 success"). Full table in `docs/evidence/warroom/VZ-FOUND-002/README.md`.
 
+### Fix round 1 (chair ruling 2026-09-20 — verifier PASS, NOT mergeable)
+Inputs: `docs/evidence/warroom/2026-09-20-vizra-user-pr1-skeleton-SECURITY.md`
+(Findings 1, 2) and `…-VERIFY.md` (Findings 1, 2, 4).
+
+Both blocking findings were the same class of mistake on my part: I treated a
+syntactic rule as a control, and I let the file that defines the gate live
+inside the gate. Both are fixed structurally rather than case by case.
+
+- **The lint control fails closed.** `no-identity-headers-in-cached-fetch` now
+  reports what it cannot read — a non-literal init, a spread or computed key, a
+  `headers` binding it cannot resolve or that escapes — instead of returning.
+  `no-raw-fetch` bans aliasing the global `fetch` in every file, the
+  allow-listed one included, which was the shape that escaped both rules. The
+  runtime property is asserted directly in `lib/api/fetch.test.ts` (method x
+  json x uploadIntent, plus `cookies()` on every path), because lint reads
+  syntax and syntax can be rearranged without changing behaviour. The docblock
+  no longer claims a backstop that was false.
+- **The gate has a floor.** `scripts/ci/check-required-floor.sh`, run by
+  ci-guard, fails by name when `frontend` or `contract` stops being a
+  non-optional entry of the manifest. `.github/CODEOWNERS` is committed; the
+  ruleset that enforces it stays an owner action.
+- **Requests are bounded.** `API_TIMEOUT_MS` (default 10 s) is both the default
+  deadline and the ceiling; the caller's signal composes with it.
+- Verifier F4: `adduser -G nodejs`, asserted in the docker-build lane.
+
+Counts after the round: `npm run ci` exit 0 with **116 tests** (was 50);
+`require-checks_test.sh` **55 cases / 62 assertions** (was 45/52). No test was
+weakened or deleted. Transcripts: `D4-identity-control-fail-closed.md`,
+`D5-gate-floor.md`.
+
+CI on the round-1 head `9767015444fa8bdbf1a1326f1cc58b41d068ba14`: all six
+checks green on `ubuntu-24.04` — `frontend` 53s (116 tests), `contract` 33s,
+`guard` 12s (floor check plus the 62-assertion suite), `docker-build` 59s
+(`gid=1001(nodejs)` asserted), `ci-required` 51s.
+
+Queued by the chair, NOT started in this round: security headers/CSP,
+`server-only`, digest-pinned base image and a scan lane, the non-local `$ref`
+guard, reading `source_commit`, and the ADR-001 licence table.
+
 ## Blockers and handoff
 - **Not blocking this PR.** Nothing external stopped the work.
 - **Owed, and recorded in the repo's `AGENTS.md` and the PR body:** the
