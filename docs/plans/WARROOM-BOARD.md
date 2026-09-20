@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-20 (tick 0 — war room created, wave 1 dispatched).
+Last tick: 2026-09-20 (tick 0 — war room created; wave 1 dispatched. A first dispatch was stopped by the owner for a session restart so the `vizra-builder`/`vizra-verifier` agent types would register; it left no branches, commits or PRs. Wave 1 was re-dispatched with the registered types).
 
 ## Owner decisions
 
@@ -40,7 +40,7 @@ Contract rule for this wave: the core builder owns `api/` and commits it first; 
 
 | # | Slice | Repo | Depends on | Notes |
 |---|---|---|---|---|
-| 1 | meta PR-A: Prompt 00/01 baseline docs, owner decisions, war room, design import, minimal `validate` lane + `ci-required` | vizra | — | Chair commits; a builder adds the workflow (ledger generator reproduces `docs/quality/*` with no diff). First meta PR runs its own CI. |
+| 1 | meta PR-A: Prompt 00/01 baseline docs, owner decisions, war room, design import — **OPEN as yegamble/vizra#2** (`chore/m0-meta-baseline`, head `b76dd6b` at open), READY_FOR_REVIEW; not mergeable by the war room until `ci-required` exists | vizra | — | Next meta slice (dispatch when a builder slot frees): minimal `validate` lane + `required-checks.txt` + `ci-required` — the ledger generator reproduces `docs/quality/*` with no diff — in a worktree on a branch stacked on `chore/m0-meta-baseline`. The main meta checkout stays on `chore/m0-meta-baseline` so the docs stay on disk for builders. |
 | 2 | core PR2: public search contract (`GET /api/v1/search`, suggestions) with `SEARCH_MODE=off` semantics | vizra-core | core PR1 merged | Unblocks the Search page against a real contract. Promoted ahead of fixtures because the owner asked for the Search page. |
 | 3 | user PR2: Playwright harness on the production build (VZ-FOUND-008) | vizra-user | user PR1 merged | Desktop + mobile projects; console/network error fails the lane (demonstrated). |
 | 4 | core PR3: fixture corpus (VZ-FOUND-007) | vizra-core | core PR1 merged | exiftool only in the CI image. |
@@ -56,7 +56,7 @@ Source rule (DESIGN_BRIEF): Claude Design mockups are exploration input; approve
 
 | Step | State |
 |---|---|
-| Import Claude Design project "goimg" (13 files, sha256 table) → `docs/design/claude-design/` | DONE 2026-09-20, uncommitted |
+| Import Claude Design project "goimg" (13 files, sha256 table) → `docs/design/claude-design/` | DONE 2026-09-20 — committed `b76dd6b` on yegamble/vizra#2 |
 | Search page inventory + control-to-action matrix → `INVENTORY-search.md` | IN_PROGRESS |
 | Inventory of the other 10 pages; gap list against `docs/quality/ui-controls.json` and the first-slice workflow | PLANNED |
 | Figma: Vizra token/component library from the mockups (light + dark) | PLANNED |
