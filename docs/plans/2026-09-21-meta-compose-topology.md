@@ -89,8 +89,10 @@ list (red).
 
 ## Progress and evidence
 
-Head SHA `69e197e1583d9adb90b0130b4a7c28d78b0878a3` on `feat/m0-compose-topology`,
-PR https://github.com/yegamble/vizra/pull/4.
+Head SHA **`3261ad3edd63684855ff9d2346895a70522b5a8b`** on
+`feat/m0-compose-topology`, PR https://github.com/yegamble/vizra/pull/4.
+(Round 1 of review applied on top of the reviewed `69e197e`; no force-push, so
+the reviewed SHA is still in the history.)
 
 CI on that head: `validate` success, `ci-required` success, `GitGuardian
 Security Checks` success. State is READY_FOR_REVIEW — not VERIFIED.
@@ -190,3 +192,50 @@ caddy 2.11.4-alpine, clickhouse-server 25.8 and ipfs/kubo v0.39.0 digests from
    name keys no service reads.
 
 Next action: CI on the head SHA, then independent verification.
+
+
+## Review round 1 (2026-09-21)
+
+Infrastructure seat F1-F4 + F5/F6/F9/F10, verifier V1-V4/V6-V9. Five commits on
+top of `69e197e`, no force-push.
+
+Counts: topology rules 19 → **23**; shapes 12 → **13**; coverage rules 9 → **10**;
+lane checkers 3 → **4**; demo cases/assertions 12/32 → **34/61**.
+
+CI on `3261ad3`: `validate` **success**, `ci-required` **success**,
+GitGuardian **failure** — see below.
+
+### The GitGuardian check is red for a historical commit, not the head
+
+Incident `37486665`, "Generic Password", `docs/evidence/compose-topology/demo.sh`
+at commit **`a96f188`**. My redaction demonstration injected values with literal
+`POSTGRES_PASSWORD='zzMARKERzz…'` assignments; a committed line of that shape is
+credential-shaped whatever the string says, and the scanner is right to flag it.
+
+Fixed at `bb8163f`: the marker is assembled at runtime, so every committed
+assignment is an interpolation and the tree contains no literal. The head is
+clean. **The check stays red because GitGuardian scans every commit in the pull
+request**, and the literal is in `a96f188`'s diff — the same incident id as the
+earlier occurrence, not a new one.
+
+Clearing it requires rewriting the branch history, which the chair forbade for
+this round ("plain push, no force") because the head is under review. This is
+the chair's call, not mine; the options are (a) leave it red with this note,
+(b) authorise a squash once the verifier has judged the head.
+
+### Snapshot corrections the F1 re-snapshot surfaced
+
+Re-snapshotting `env/registry/core.json` from `keys.go` at core `main` `4a80a1e`
+moved three things beyond the rename. All three were errors in my snapshot, none
+a change in core: `VIZRA_PUBLIC_ORIGIN` and `VIZRA_CACHE_URL` had no default
+recorded though core declares one, and `VIZRA_SEARCH_URL` recorded
+`http://search:8081` — the **compose** default, not core's, which declares none.
+
+### Two checker defects the round surfaced in my own work
+
+- `find_leaks` validated a discarded copy while the ORIGINAL was written,
+  stamped `secret_values_redacted: true` (verifier V1). Dead control, false
+  stamp.
+- The drift check counted a retired name as undeclared, which would have pushed
+  an author toward deleting the retired-key declaration to silence it — the one
+  edit that lets an old spelling back in unnoticed.

@@ -1,5 +1,11 @@
 # Independent verification — meta PR #4, VZ-ISSUE-002 (compose topology)
 
+> **Round 1 verdict below is SUPERSEDED.** The builder's fix round 1 moved the
+> head to `3261ad3e`. See **“Re-verification at 3261ad3 (2026-09-21)”** at the
+> end of this file for the current verdict.
+
+## Round 1 — verification at 69e197e (2026-09-21)
+
 **Verdict: FAIL** — every VZ-ISSUE-002 acceptance bullet reproduced MET by my own
 evidence, `validate` and `ci-required` green on the verified SHA, but one
 **BLOCKER** finding outside the acceptance bullets: the renderer's secret
@@ -1233,3 +1239,765 @@ directory and are removed by exact path. The three component checkouts under
 only; nothing was checked out, fetched into a working tree, or modified in them,
 and no branch was switched in the chair's checkout. No container was started and
 no image was pulled or built.
+
+---
+
+# Re-verification at 3261ad3 (2026-09-21)
+
+Same verifier, same method, **new clean clone** in a private `mktemp -d`
+directory — not the builder's worktree, not the shared scratchpad, not the
+chair's checkout. Started no container. The only file I write anywhere is this
+one.
+
+| | |
+|---|---|
+| Head SHA verified | `3261ad3edd63684855ff9d2346895a70522b5a8b` |
+| Head moved during verification? | No. `gh pr view 4` read `3261ad3e` at the start, and the CI/artifact queries below all name it. |
+| Round-1 head | `69e197e1…` (superseded; five commits on top, **plain push**, no rewrite) |
+| Base | `main` |
+| Environment | macOS arm64, Python 3.9.6, PyYAML 6.0.3, Docker Engine 29.8.0, **Compose v5.5.1** (CI: Engine 28.0.4, Compose v2.38.2 — both above the 2.24.4 floor) |
+
+Commits added since my FAIL, all reachable, none rewritten:
+
+```
+a96f188 fix(compose): review round 1 — infrastructure seat + verifier findings
+df55226 fix(compose): deliver SEARCH_HMAC_KEY only, against core main 4a80a1e
+9eaf8c9 docs(evidence): transcripts for df55226…
+bb8163f fix(evidence): assemble the redaction demo's marker at runtime
+3261ad3 docs(evidence): transcripts for bb8163f…
+```
+
+The transcript commits are separate and each names the code commit it
+transcribes — V9 as claimed.
+
+## 1. Lanes, from the clean clone
+
+| Command | Exit | Result |
+|---|---|---|
+| `./scripts/check-generated-ledger.sh` | 0 | reproduces byte-for-byte (UTF-8 and C/POSIX), 191 requirements, core=141 |
+| `./scripts/check-quality-json.py` | 0 | 4 JSON files, 191 ids, 287 references (204 distinct) across 14 documents |
+| `./scripts/check-doc-links.py` | 0 | 94 markdown files; **and new**: `compose comments: 6 env//deploy/ path(s) across 8 file(s), all resolve (2 allow-listed as generated-and-absent)` — the F9 fix |
+| `./scripts/ci-required-guard.sh` | 0 | floor `validate`; 6 / 7 / 10 fixtures (floors 6 / 7 / 10) |
+| `./scripts/check-template-claims.py` | 0 | `10 operator-facing file(s), 9 command reference(s); 5 shipped, 11 declared future; 0 violations` |
+| `./scripts/compose-render.py --list` | 0 | **13 shapes** |
+| `./scripts/compose-render.py --all --out build/compose-models` | 0 | 13 rendered |
+| `./scripts/check-compose-topology.py build/compose-models` | 0 | **`13 shape(s) … 23 rules, 0 violations; 2 known-false probe(s) named above`** |
+| `./scripts/check-config-coverage.py build/compose-models` | 0 | **`34 component keys …, 57 template keys, 57 interpolated variables, 13 shapes; 1 declared alias(es); 1 retired key(s) refused; 0 violations`** |
+| `./scripts/check-config-coverage.py --drift` (no checkouts) | **2** | BLOCKED, as documented |
+| `bash docs/evidence/compose-topology/demo.sh` | 0 | **`RESULT: 61 assertion(s) passed, 0 failed`**, `tree is clean` |
+
+Every claimed count reproduces: **13 shapes, 23 topology rules, 10 coverage
+rules, 61 assertions, 1 alias, 1 retired key, 4 lane checkers.**
+
+**Demonstration count.** The script makes **33** `case_header` calls and **33**
+cases ran — none skipped. (`grep -c '^case_header'` returns 34 because it also
+matches the function *definition*; that is where the “34 cases” figure comes
+from. See finding R-4.) Each case prints a sha256 either side of its mutation,
+refuses to score a mutation that did not apply, and the run ends on a
+whole-tree cleanliness assertion.
+
+**Demonstrations ran on CI** for this SHA — `validate` run `35572579144`, step
+`every compose guard still fails against a controlled mutation` = success,
+`RESULT: 61 assertion(s) passed, 0 failed` in the log.
+
+## 2. Acceptance bullets, re-derived from my own renderer at this SHA
+
+I re-rendered all 13 shapes with plain `docker compose config --format json`
+(my own script, replicating only the `-f` chain, `--env-file` and `--profile`
+list) and re-ran my own audit — not the builder's checker. **0 violations
+found by me**, now including the new `mem_limit` requirement:
+
+| Shape | Services | Published |
+|---|---|---|
+| dev-default | api,frontend,migrate,postgres,redis,search,worker | api 127.0.0.1:8080; frontend 127.0.0.1:3000 |
+| dev-build-from-checkouts | same (+`build:` on the five component services) | same |
+| prod-default | api,caddy,frontend,migrate,postgres,redis,worker | + caddy 0.0.0.0:80/443 |
+| prod-external-tls | (no caddy) | api/frontend loopback only |
+| prod-worker-split | **worker only** | **NOTHING** |
+| **prod-frontend-only** (new) | **frontend only** | frontend 127.0.0.1:3000 |
+| prod-all-optional | all ten | + ipfs 0.0.0.0:4001 tcp **and** udp |
+| prod-external-postgres | **no postgres** | — |
+| prod-external-redis | **no redis** | — |
+| prod-external-both | **neither** | — |
+| prod-external-clickhouse | **no clickhouse** | — |
+| prod-external-ipfs | **no ipfs, no swarm port** | — |
+| bundle-no-checkouts | all ten, no `build:` | rendered with the component dirs absent |
+
+- postgres / redis / search / clickhouse / migrate / worker publish **nothing**
+  in any of the 13.
+- api and frontend bind **127.0.0.1** only; caddy is the only thing on 80/443
+  and only under `edge`; ipfs 4001 is the only other public port, declared.
+- Every long-running service: `restart: unless-stopped`, json-file with
+  `max-size` **and** `max-file`, a real `healthcheck.test`, and in every
+  production shape a `mem_limit`. `migrate` is `restart: "no"`, exempt from
+  healthcheck and mem_limit as a one-shot.
+- No `build:` in any production shape; no `latest`/untagged image.
+- `frontend → api` is now `service_started` / `required: false` (F3).
+
+**All three VZ-ISSUE-002 acceptance bullets remain MET**, now across 13 shapes.
+Invalid/missing/host-less external DSNs still exit 1 naming the variable and
+never echoing the value.
+
+## 3. V1 — the BLOCKER. Fixed, and verified on the bytes.
+
+The fix is structural and correct: `redacted` is the object that is stamped,
+leak-checked and serialised (`scripts/compose-render.py:437-455`). My evidence:
+
+- **All 8 declared secret values, all 13 locally written models: 0
+  occurrences.** The composite `DATABASE_URL` — assembled from
+  `POSTGRES_PASSWORD` in `docker-compose.yml:80` — renders `'<redacted>'`. The
+  only injected values that survive are `VIZRA_*_TAG` and `VIZRA_PUBLIC_ORIGIN`,
+  which belong in a model.
+- **Real-shaped values**, supplied through the two caller-controlled doors
+  (`DATABASE_URL`, `VIZRA_CACHE_URL`), including a password containing `@` and
+  `#`: 0 occurrences in the written file.
+- **The CI artifact for THIS SHA**, downloaded from run `35572579144`
+  (`meta-validate-compose-models`, 36 170 B): **14 files, 0 secret-value hits**;
+  `prod-default` `api.DATABASE_URL` = `'<redacted>'`, stamp `true` and now true.
+- **Case 18b reproduced by me**: deleting `POSTGRES_PASSWORD` from `redact_keys`
+  (leaving it in `secret_keys`) makes the renderer exit 1 and write **0 files** —
+  `a value this renderer injected survived into the model at
+  $.services.postgres.environment.POSTGRES_PASSWORD. Nothing is written.` The
+  stamp can no longer be true of an unredacted file, because an unredacted file
+  is not written.
+- A secret shorter than `MIN_SECRET_LEN` is still redacted **by key**, so the
+  length floor only limits substring substitution, not the primary path.
+
+**A correction to my own round-1 finding, which I got partly wrong.**
+`compose-render.py:312` is `env.update(man.get("ci_overrides", {}))` — an
+unconditional overwrite. A caller therefore **cannot** inject a real value for
+`POSTGRES_PASSWORD`, `VIZRA_SESSION_SECRET`, `VIZRA_MFA_KEY_KEK`,
+`SEARCH_HMAC_KEY` or `CLICKHOUSE_PASSWORD`; only `DATABASE_URL` and
+`VIZRA_CACHE_URL` are caller-controlled (`if var not in os.environ`, line 326),
+and the render reads `env/production.env.example`, never an operator's real
+`env/production.env`. So my round-1 sentence "a developer or operator running it
+has real values in the shell … the result is a plaintext file on disk" was true
+for two of the eight keys, not eight. The defect I named — a guard inspecting
+something other than the bytes it guards, under a false stamp — was real, and
+the fix is right. The blast radius I attached to it was overstated, and I should
+have checked line 312 before writing it.
+
+### R-1 — the residual gap (new)
+
+Nothing forces a **new** secret key to be classified. See finding R-1 below: I
+added `VIZRA_SMTP_PASSWORD` the fully correct way — `"secret": true` in
+`env/registry/core.json`, an entry in `env/production.env.example`, delivered by
+the compose files — and it was written raw into all 13 models (47 occurrences)
+under `secret_values_redacted: true`, with **render, topology, coverage and
+template-claims all exit 0**.
+
+## 4. V2 / V3 / V4 / V6 / V7 / V8 — my own attacks
+
+| Attack | Result |
+|---|---|
+| `healthcheck: {test: ["NONE"]}` (V2) | ✅ `missing-healthcheck` |
+| `healthcheck: {disable: true}` | ✅ `missing-healthcheck` |
+| `healthcheck: {test: NONE}` (string form) | Compose renders this as `["CMD-SHELL","NONE"]` — a probe that always goes **red**, i.e. fail-safe, not a disabled probe. The checker's string branch is defensive and unreachable through Compose. Not a hole. |
+| service on profile `backup` publishing `0.0.0.0:5432` (V3) | ✅ `profile-not-enumerated`, naming the enumerated set — **my exact round-1 pgadmin-tunnel block** |
+| `postgres:18@sha256:…` → `postgres:18` (V4) | ✅ `unpinned-image`, third-party branch |
+| api 8080 published over **UDP** (V8) | ✅ `port-not-allowed … (allowed: ['8080/tcp'])` |
+| alias flipped to `authorised: false` (V6) | ✅ `alias-floor … is declared with authorised=false, so it is not authorised and must not be wired` |
+| second alias added without moving the floor (V6) | ✅ `alias-floor … declares floor=1 but lists 2 alias(es)` |
+| `env/registry/user.json` `source_commit` (V7) | ✅ `90896beb…` = `vizra-user` `origin/main` exactly |
+| `--drift` against all three components' `origin/main` (materialised read-only with `git show`, then deleted) | ✅ `every snapshot matches its component source`, exit 0; exit **2 BLOCKED** with the checkouts absent |
+
+Carried over from round 1 and re-confirmed green at this SHA: long-syntax ports,
+empty `host_ip`, `[::]`, port ranges, env-interpolated ports, `network_mode:
+host`, `include:`, `extends:`, caddy via `profiles: []`, per-service log driver,
+`restart: "no"`.
+
+## 5. F1 — the retired key. Verified against core `main` myself.
+
+- `env/registry/core.json` `source_commit` = `4a80a1e3f36b8001c2954d0568bea29268e739fe`,
+  which **is** `vizra-core` `origin/main` today.
+- I parsed `internal/config/keys.go` at that commit and compared **every** key:
+  22 registry keys, 22 found, **0 field mismatches** on name, `default` or
+  `secret`. The only names in `keys.go` and not in `keys` are the seven
+  `VIZRA_DEV_*` hatches, which the registry carries under `escape_hatches`. The
+  three defaults the builder says it corrected are correct at this SHA.
+- `VIZRA_SEARCH_HMAC_KEY` is in core's `RetiredKeys` at `keys.go:91-99`
+  (*"every name production refuses because it was renamed"*), and
+  `config.go:214` reads `get("SEARCH_HMAC_KEY")`. So the rename is real and
+  delivering the old name would make every core container refuse to boot.
+- My own render confirms compose delivers **`SEARCH_HMAC_KEY` only** —
+  `VIZRA_SEARCH_HMAC_KEY` absent from api, worker, migrate and search in all 13
+  shapes.
+- I re-added `VIZRA_SEARCH_HMAC_KEY` to the shared core anchor: **exit 1, 34 ×
+  `rule=retired-key-delivered`**, message naming the snapshot commit and the
+  boot consequence. The dedicated rule fires, not merely the generic
+  `service-key-unknown`.
+
+## 6. F2 — the template-claims checker and its 2-line window
+
+| Attack | Result |
+|---|---|
+| `vizra setup` **3 lines** from its `VZ-ISSUE-004` marker | ✅ `unmarked-future-command`, with the “a qualifier further down the same comment block launders the claim” reasoning |
+| `vizra setup` **1 line** from its marker | allowed — by design; that is the window |
+| `vizra setup` inside a compose **`:?` interpolation message**, no marker nearby | ✅ caught at `docker-compose.yml:80`. (My first attempt at this landed two lines from an existing `VZ-ISSUE-004` and correctly passed — operator error on my part, re-run properly.) |
+| `vizra setup --rotate` in an env template comment, no marker | ✅ caught |
+| an invented `vizra rekey --all` | ✅ `unknown-command`, listing the shipped set |
+| the same claim in `docs/OPERATOR-NOTES.md` | **not caught** — see R-4; the scanned set is `env/*.env.example` + `docker-compose*.yml`, which the docstring states |
+
+The checker scans **every line**, not only comments, which is stricter than its
+own docstring says (“`docker-compose*.yml` comments”). Erring strict.
+
+## 7. F3 — known-false probes. Works as specified; the specification has a floor.
+
+- `service_healthy` edge onto `api` (declared known-false), injected through the
+  **overlay**: ✅ `probe-gates-readiness`, in every shape where both render.
+- Changing the api probe to `vizra --help` so the declaration no longer matches:
+  ✅ `stale-known-false-probe` for **both** api and worker.
+- Both probes are printed **by name, with the reason and the thing that empties
+  them**, on every run — pass or fail. I confirmed the same block in the CI log
+  for this SHA.
+- `frontend → api` is `service_started` / `required: false` in my own render.
+
+**But "real" means "not on the list."** Replacing postgres's real `pg_isready`
+probe with `["CMD","true"]` — a probe that can never go red — leaves the three
+existing `service_healthy` edges (`api→postgres`, `worker→postgres`,
+`migrate→postgres`) pointing at it, and the lane is **green: 23 rules, 0
+violations**. `probe_state()` classifies anything that is not absent, not
+disabled and not an exact match for a declared entry as `PROBE_REAL`.
+
+Said plainly, because the coordinator asked for it: **the rule guarantees that
+no readiness gate points at a probe someone has *admitted* is false. It cannot
+tell a real probe from a fake one nobody declared, and it never claims to.**
+`docs/META_REPO.md:152-161` and `COMMANDS.md:347` are both accurate on this —
+they say "declared known-false" throughout — but neither states the converse.
+See R-3.
+
+## 8. F4 — memory caps
+
+| Attack | Result |
+|---|---|
+| `mem_limit: 0` | ✅ `missing-mem-limit` (Compose renders 0 falsy) |
+| `mem_limit: ${PG_MEM:-}` (empty default) | ✅ the **render refuses** — Compose rejects the empty value before any checker runs |
+| `mem_limit` deleted, `deploy.resources.limits.memory: 2g` instead | ✅ `missing-mem-limit` — `deploy.resources` is swarm-only and does not satisfy the rule on a non-swarm engine |
+
+Per the coordinator, I did not re-argue the capacity numbers; the seat owns
+those.
+
+## 9. The demonstration harness under interruption
+
+`demo.sh` sets `trap cleanup EXIT` (line 45) and restores from a `mktemp -d`
+backup, so an ordinary interrupt restores. A `SIGKILL` bypasses the trap, which
+is what left the builder's detached run mutated. **The committed tree at this
+SHA is clean** (`git status --porcelain` empty in a fresh clone), so nothing
+from that incident was committed.
+
+It does **not refuse** a dirty start: it prints `dirty: N file(s)` in its header
+and continues. I measured what happens rather than inferring it — starting the
+run with one stray comment appended to `docker-compose.prod.yml` gave:
+
+```
+dirty: 1 file(s)
+...
+RESULT: 57 assertion(s) passed, 5 failed
+  tree is clean - every mutation was reverted
+exit=1
+```
+
+So a dirty start is **fail-closed and loud**: five case assertions went red and
+the run exited 1. (My first reading of the code predicted it would fail only on
+the closing whole-tree assertion; that prediction was wrong — the perturbation
+shows up in the per-case digests first, and the closing check actually passed
+because the backup/restore machinery put the stray line back. Recording the
+measurement, not the prediction.)
+
+Adequate as it stands. A refusal at the top would be clearer than five confusing
+red cases, and would let the run distinguish "a guard stopped working" from "the
+tree was dirty when you started" — which the script's own closing message says
+it cannot do. R-4 material at most.
+
+## 10. GitGuardian and the history question
+
+- **The head tree contains no credential-shaped literal.** I swept for
+  `(password|secret|token|hmac|api_key)\s*=\s*['"]…['"]` across `*.sh`, `*.py`,
+  `*.yml`, `*.json`, `*.example`: **no hits**. I swept for
+  `scheme://user:pass@host`: the only hits are in
+  `docs/evidence/warroom/2026-09-20-vizra-core-pr1-foundation-SECURITY.md`,
+  which is **pre-existing on `main`, not in this PR's diff**, and which labels
+  each one SYNTHETIC.
+- **Nothing real was ever committed on this branch.** I read the incident commit
+  `a96f188` myself. The literals were `zzMARKERzzPOSTGRESzz`,
+  `zzMARKERzzSESSIONzz`, `zzMARKERzzKEKzz`, `zzMARKERzzHMACzz`,
+  `zzMARKERzzCLICKHOUSEzz` and a `db.ci.invalid` DSN carrying
+  `zzMARKERzzDSNzz`. Every one is a synthetic marker; `.invalid` is RFC 2606.
+  Nothing needs rotating. `bb8163f` assembles the marker at runtime
+  (`MARKER="zz$(printf 'MARK')ERzz"`) so no committed line is a
+  credential-shaped assignment, with a comment telling the next author not to
+  "simplify" it back.
+- **I agree with leaving history alone.** A second rewrite would buy nothing:
+  the strings are provably fake, a force-push does not remove a blob from
+  GitHub's object store anyway (I demonstrated that in round 1 — `864f77f5` is
+  still served by the API), and a squash-merge keeps `a96f188` off `main`. The
+  cost of a rewrite — orphaning the CI results and the transcript commits that
+  name them — is real and the benefit is zero. Dismissing the incident is the
+  owner's call, not mine or the chair's.
+
+## 11. CI on `3261ad3e`
+
+| Check run | Status | Conclusion | In the manifest? |
+|---|---|---|---|
+| `validate` | completed | **success** | **yes** — the manifest's only entry |
+| `ci-required` | completed | **success** | (the aggregate itself) |
+| `GitGuardian Security Checks` | completed | failure | **no** |
+
+`.github/required-checks.txt` at this SHA contains exactly one live line,
+`validate`, and **is not touched by this PR** (`git diff --name-only
+origin/main...HEAD | grep -c required-checks` → 0). GitGuardian is not a required
+check and does not gate the merge — confirmed by reading the manifest at this
+SHA, not by taking the claim.
+
+All **18** `validate` steps succeeded, none skipped, including the new
+`no template claims a command that does not exist` step. From the log:
+
+```
+Docker version 28.0.4 / Docker Compose version v2.38.2
+KNOWN-FALSE PROBES: 2 service(s) …
+compose topology: 13 shape(s) … 23 rules, 0 violations; 2 known-false probe(s) named above
+ALIASES: 1 operator key(s) feeding two service spellings
+config coverage: 34 component keys …, 57 template keys, 57 interpolated variables, 13 shapes; 1 declared alias(es); 1 retired key(s) refused; 0 violations
+template claims: 10 operator-facing file(s), 9 command reference(s); … 0 violations
+RESULT: 61 assertion(s) passed, 0 failed
+```
+
+The `pull_request` caveat from round 1 still applies: the lane tests
+`refs/pull/4/merge`, so a green on this head means the merge into `main` **as it
+stood at 07:21 UTC**. Re-run if `main` moves before the merge.
+
+## 12. Scope
+
+| Check | Result |
+|---|---|
+| Component repositories modified? | **No** — 0 paths under `vizra-core/`, `vizra-user/`, `vizra-search/` in the whole PR diff |
+| `docs/quality/features.json` | **byte-identical to `main`** (empty diff) |
+| `docs/evidence/ledger-generator/` | **untouched**; `build.py:20` gate intact verbatim |
+| `.github/required-checks.txt` | **untouched** |
+| Secrets in the diff | none real; markers are runtime-assembled |
+
+## 13. Truthfulness — sentences that promise more than their control
+
+Accurate, and I checked each: `META_REPO.md` §2a on known-false probes and on
+"the port is closed means the model publishes nothing"; `COMMANDS.md` §4 on the
+two redaction lists (it correctly says `secret_keys` is *"a separate list,
+identical in content today"* and openly records the defect it replaced);
+`COMMANDS.md` §5 "What this does NOT prove"; `env/registry/README.md` on
+snapshots; the corrected MFA/KEK template sentences (no command is promised —
+`docker-compose.yml:91` now says *"do NOT change it after first boot … nothing
+re-seals them"*, which is true).
+
+Not accurate — see R-2 and R-4:
+
+- `scripts/compose-render.py` docstring, bullet 3: *"Every value this renderer
+  INJECTED — `redact_keys`, `ci_overrides` and `external_dsn_overrides`
+  together — drives the LEAK CHECK … **The wider set is the point**"*. The code
+  reads `secret_keys`, which is **identical** to `redact_keys`; the inline
+  comment twelve lines below even says *"Deliberately NOT everything this
+  renderer injects"*. The file contradicts itself and the docstring is the
+  wrong half.
+- `docs/quality/COMMANDS.md:282` "the **twelve** shapes" → 13.
+- `docs/quality/COMMANDS.md:327` "**Nineteen** rules" → 23.
+- `docs/quality/COMMANDS.md:492` "61 assertions across **34** cases" → 33.
+- `docs/quality/COMMANDS.md:342` the `unpinned-image` table row still reads "no
+  image, no tag, or `:latest`", omitting the digest requirement that the
+  paragraph two below it correctly describes.
+- `docs/META_REPO.md:84` "**Twelve** shapes are rendered on every run" → 13.
+- **The PR body is stale** — see R-5.
+
+---
+
+# Findings — round 2
+
+```
+FINDING R-1: nothing forces a new secret key into redact_keys/secret_keys
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/compose-render.py:412-433 (secret_keys read from the manifest only);
+             scripts/compose-shapes.json (`redact_keys`, `secret_keys`);
+             env/registry/core.json (already carries a per-key `"secret": true` flag)
+  requirements: VZ-OPS-008, VZ-CI-002
+
+Observed:
+  The leak check looks only for values of keys listed in the manifest's
+  `secret_keys`. A key that is not in that list is neither redacted nor checked.
+
+  Reproduced at this SHA by adding a new secret key the FULLY CORRECT way —
+  declared to the component, documented for the operator, delivered by compose:
+
+    1. docker-compose.yml, on the shared core anchor:
+         VIZRA_SMTP_PASSWORD: ${VIZRA_SMTP_PASSWORD:-}
+    2. env/registry/core.json  keys += {"name":"VIZRA_SMTP_PASSWORD","secret":true,…}
+    3. env/production.env.example += VIZRA_SMTP_PASSWORD=
+
+    $ env VIZRA_SMTP_PASSWORD='zzREALSMTPSECRETzz9f2a7c4e' \
+        ./scripts/compose-render.py --all --out build/compose-models   # exit 0
+    $ ./scripts/check-compose-topology.py  build/compose-models        # exit 0
+    $ ./scripts/check-config-coverage.py   build/compose-models        # exit 0
+    $ ./scripts/check-template-claims.py                               # exit 0
+    $ grep -rc 'zzREALSMTPSECRETzz9f2a7c4e' build/compose-models/*.json | ...
+      47
+    api.VIZRA_SMTP_PASSWORD -> 'zzREALSMTPSECRETzz9f2a7c4e'
+    stamp secret_values_redacted -> True
+
+  Every one of the four lane checkers is green and the value is in every model
+  under a stamp saying it is not.
+
+  Note what does NOT save it: the coverage checker refuses an UNREGISTERED key
+  (I confirmed: `service-key-unknown` + `variable-untemplated`, 35 violations),
+  so an author cannot land a new key carelessly. They can land one carefully and
+  still miss the classification, because no check connects the registry's own
+  `"secret": true` flag to `redact_keys`.
+
+Failure:
+  The V1 control is now correct for every secret it knows about and has no way
+  to learn about a new one. The next slice that adds an SMTP password, an S3
+  secret key, an OAuth client secret or a captcha secret — all of them are on
+  the M1-M3 ledger — reintroduces exactly the condition I raised in round 1: a
+  model file stamped `secret_values_redacted: true` that is not redacted. In CI
+  the value would be the template's blank, so the artifact stays clean; the
+  exposure is a developer or operator running the documented command with the
+  value exported, and the file's own stamp is what makes it look safe to attach
+  to an issue.
+
+Perspective:
+  operator, developer
+
+Recommendation:
+  Derive the set instead of hand-maintaining it. `env/registry/*.json` already
+  marks each key `"secret": true`; have the renderer union those names into
+  `secret_keys`, and have `check-config-coverage.py` fail when a registry key
+  marked secret, or a template key whose name ends in `_PASSWORD`/`_SECRET`/
+  `_KEY`/`_TOKEN`/`_DSN`/`_URL`-with-credentials, is absent from `redact_keys`.
+  A new rule id (`unclassified-secret-key`) keeps the failure legible.
+
+Acceptance criteria:
+  - Adding a key marked `"secret": true` to any component registry without
+    adding it to `redact_keys` fails a lane, exit 1, naming the key.
+  - Rendering with that key set to a recognisable value writes no model
+    containing it (or refuses to write at all).
+  - The existing eight keys still pass unchanged.
+  - Removing a key from `redact_keys` still makes the renderer write nothing
+    (case 18b must not regress).
+
+Tests:
+  docs/evidence/compose-topology/demo.sh, a new case beside 18a/18b: register a
+  secret key without classifying it, assert the lane goes red with the new rule
+  id, restore, assert green. Same idiom, no new dependency.
+
+Cross-repo implications:
+  core: none — the `secret` flag it already publishes becomes load-bearing here |
+  user: none | search: none | meta: renderer + coverage checker + one demo case.
+
+Challenge:
+  "The eight secrets that exist are all classified, and I proved zero leaks."
+  True — this is a durability finding, not a present defect, and it is the same
+  shape as the profile hole the builder just closed. The counterargument I take
+  seriously is that a name-pattern heuristic will misfire on something like
+  `VIZRA_SESSION_SECRET_ROTATION_DAYS`; that is why the registry's explicit
+  `"secret": true` should be the primary signal and the pattern only a
+  secondary net.
+```
+
+```
+FINDING R-2: the renderer's docstring describes a wider leak-check set than the code uses
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/compose-render.py:36-41 (docstring) vs :412-424 (code and its
+             own inline comment)
+  requirements: VZ-CI-002
+
+Observed:
+  Docstring:
+
+    * Every value this renderer INJECTED — `redact_keys`, `ci_overrides` and
+      `external_dsn_overrides` together — drives the LEAK CHECK … The wider set
+      is the point
+
+  Code:
+
+      secret_keys = set(man.get("secret_keys") or [])
+
+  and its own inline comment: "A SEPARATE list from `redact_keys`, and identical
+  to it today … Deliberately NOT everything this renderer injects:
+  `VIZRA_CORE_TAG` and `VIZRA_PUBLIC_ORIGIN` are injected too and belong in a
+  rendered model."
+
+  Measured: `secret_keys == redact_keys` is True; the injected keys NOT in
+  `secret_keys` are `VIZRA_CORE_TAG`, `VIZRA_USER_TAG`, `VIZRA_SEARCH_TAG`,
+  `VIZRA_PUBLIC_ORIGIN`. There is no wider set.
+
+  `docs/quality/COMMANDS.md` §4 gets this right, so the error is isolated to the
+  module docstring — the first thing a maintainer reads.
+
+Failure:
+  The mechanism the docstring credits for catching a de-classified key is not
+  the mechanism that catches it. What actually works is that the two lists are
+  read independently, which I verified (case 18b, reproduced). A maintainer who
+  believed the docstring would think every injected value is watched — the exact
+  belief that produces R-1.
+
+Perspective:
+  developer
+
+Recommendation:
+  Replace that sub-bullet with what COMMANDS.md §4 already says: a separate
+  list, identical in content today, and the INDEPENDENCE is the mechanism, not
+  the width.
+
+Acceptance criteria:
+  - No sentence in the file claims a set the code does not build.
+  - The docstring and COMMANDS.md §4 say the same thing.
+
+Tests:
+  None mechanical. Adjacent to R-1's checker, which would make the claim true if
+  the set is genuinely widened instead.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: one docstring bullet.
+
+Challenge:
+  "It is a comment." It is a comment in the file whose last defect was a control
+  that did not do what its comment said — and this PR's own COMMANDS.md says
+  recorded figures in this repository are meant to be trustable.
+```
+
+```
+FINDING R-3: probe-gates-readiness cannot see a false probe nobody declared
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/check-compose-topology.py probe_state() and check_probes();
+             docs/META_REPO.md:152-161; docs/quality/COMMANDS.md:347
+  requirements: VZ-TOPOLOGY-002, VZ-OPS-008
+
+Observed:
+  `probe_state()` returns PROBE_REAL for any healthcheck that is present, not
+  disabled, and not an exact match for a `known_false_probes` entry. The gate
+  rule fires only when `dep in known_false`.
+
+  Reproduced: replace postgres's real probe in the production overlay with one
+  that can never go red —
+
+      postgres:
+        healthcheck: !override
+          test: ["CMD", "true"]
+          interval: 10s
+
+  The three real readiness edges onto postgres (`api`, `worker` and `migrate`
+  all gate on it with `condition: service_healthy`) now gate on nothing, and:
+
+      compose topology: 13 shape(s) … 23 rules, 0 violations; 2 known-false probe(s)
+
+  For contrast, both declared cases ARE caught: a `service_healthy` edge onto
+  `api` injected through an overlay gives `probe-gates-readiness` in every shape,
+  and changing the api probe to `vizra --help` gives `stale-known-false-probe`
+  for api and worker.
+
+Failure:
+  The rule's guarantee is narrower than a reader is likely to take from
+  "a gate that cannot go red is worse than no gate". It guarantees no gate
+  points at an ADMITTED placeholder. A placeholder nobody admitted — including
+  the two most natural ones, `["CMD","true"]` and `["CMD-SHELL","exit 0"]` —
+  reads as real. Since META_REPO.md says the known-false list "must be empty
+  before VZ-ISSUE-004's boot lane lands", the pressure at that moment is to
+  empty the list, and emptying it by weakening a probe rather than by shipping
+  `vizra healthcheck` would be invisible here.
+
+Perspective:
+  operator
+
+Recommendation:
+  Two small things, in order of value:
+  1. Say it plainly in META_REPO.md §2a and the COMMANDS.md rule row: *a probe
+     not on the known-false list is treated as real; this rule cannot detect an
+     undeclared placeholder.*
+  2. Refuse the handful of probes that are placeholders by construction —
+     `["CMD","true"]`, `["CMD-SHELL","exit 0"]`, `["CMD-SHELL",":"]`, and a
+     `test` whose only argument is `--help`/`version` on a binary that is a
+     `depends_on: service_healthy` target. A denylist is not a classifier, and
+     should be described as what it is.
+
+Acceptance criteria:
+  - The documentation states the converse explicitly.
+  - `test: ["CMD","true"]` on any service that is the target of a
+    `service_healthy` edge fails the lane with a named rule.
+  - The two declared known-false probes still produce their standing named
+    output, and `vizra version` on api/worker is not newly refused (it is
+    already declared).
+
+Tests:
+  demo.sh beside case 15: an undeclared always-green probe on a
+  `service_healthy` target, red for the new rule id, restored, green.
+
+Cross-repo implications:
+  core: `vizra healthcheck` (already queued, 2h) is what removes the need |
+  user: none | search: none | meta: checker + two doc sentences.
+
+Challenge:
+  "You cannot decide from a rendered model whether a probe is honest, so the
+  declared list is the only sound mechanism." I agree — that is exactly why
+  recommendation 1 matters more than recommendation 2, and why I filed this as
+  SHOULD rather than REQUIRED. What I am refusing is the silence, not the
+  design.
+```
+
+```
+FINDING R-4: stale figures in the two documents whose purpose is trustable figures
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     docs/quality/COMMANDS.md:282, :327, :342, :492; docs/META_REPO.md:84
+  requirements: VZ-CI-002
+
+Observed:
+  Measured against the tree at this SHA (13 shapes from `--list`, 23 ids in
+  check-compose-topology.py's RULES, 10 in check-config-coverage.py's, 33
+  `case_header` CALLS of which 33 ran):
+
+  | Says | Is |
+  |---|---|
+  | COMMANDS.md:282 "the twelve shapes" | 13 |
+  | COMMANDS.md:327 "Nineteen rules" | 23 |
+  | COMMANDS.md:492 "61 assertions across 34 cases" | 61 across **33** |
+  | META_REPO.md:84 "Twelve shapes are rendered on every run" | 13 |
+  | COMMANDS.md:342 `unpinned-image` row: "no image, no tag, or `:latest`" | also refuses a third-party image with no digest |
+
+  The "34" is almost certainly `grep -c '^case_header'`, which counts the
+  function DEFINITION as well as its 33 calls — I made the same mistake before
+  checking. COMMANDS.md:314's "ten of twelve models" is a correct HISTORICAL
+  statement about the 69e197e artifact and matches what I measured; leave it.
+
+  Also: `demo.sh` uses the fixed shared paths /tmp/vizra-redaction-demo and
+  /tmp/vizra-redaction-demo2. Exact paths, never a glob, so the `rm -rf` is
+  safe — but two concurrent runs (two worktrees on one machine) would collide.
+
+Failure:
+  Documentary. COMMANDS.md argues in its own voice that "a number that goes
+  stale on its own is worse than no number in a file whose purpose is that
+  recorded figures can be trusted" — and then carries four.
+
+Perspective:
+  developer
+
+Recommendation:
+  Correct the five; reuse the existing convention of not quoting a number that
+  will drift where the exact value is not load-bearing. For demo.sh, use
+  `mktemp -d` as the script already does for its backup directory.
+
+Acceptance criteria:
+  - Every count in COMMANDS.md and META_REPO.md §2a matches the tree.
+  - The `unpinned-image` row mentions both branches.
+  - demo.sh uses no fixed shared /tmp path.
+
+Tests:
+  None mechanical. A `check-recorded-counts.py` would be over-engineering for
+  five numbers; the honest alternative is not writing counts that drift.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: docs + one demo line.
+
+Challenge:
+  "Five numbers, after a round that fixed thirteen real findings." Agreed —
+  NIT, and I have capped myself. I record them because they are the kind of
+  drift this repository has already decided it cares about.
+```
+
+```
+FINDING R-5: the PR body still describes the round-0 tree
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     yegamble/vizra#4 pull-request body
+  requirements: VZ-CI-002
+
+Observed:
+  Read from `gh pr view 4 --json body` at this SHA. It still says:
+
+  - "**Twelve shapes rendered on every run**" (13)
+  - "`./scripts/check-compose-topology.py` | 0 | 12 shapes, 19 rules" (13, 23)
+  - "34 component keys, 47 template keys, 47 interpolated variables, **2
+    aliases**" (57, 57, **1**)
+  - "### Red/green — **32 assertions**" (61)
+  - "Head **`69e197e1…`** — `validate` ✅, `ci-required` ✅, **GitGuardian ✅**"
+    (head is `3261ad3e`; GitGuardian is **red** on this PR)
+  - Open item 3: "`VIZRA_PUBLIC_ORIGIN` / `PUBLIC_ORIGIN` … **has not been ruled
+    on** … with a floor of **2**" — the chair ruled on it on 2026-09-21 and the
+    floor is now 1, which is exactly what `env/registry/aliases.json` records.
+
+Failure:
+  The PR body is the first artifact a reviewer, the chair, or the owner reads,
+  and it is the one place in this PR that still asserts a green GitGuardian and
+  an unresolved alias question. A merge decision made from it would be made on
+  superseded facts — including the one fact (GitGuardian) the owner has to act
+  on personally.
+
+Perspective:
+  developer, instance-admin
+
+Recommendation:
+  Update the body in the same round as the next push: the counts, the head SHA,
+  the GitGuardian status with the reason it is red and that it is not in the
+  required-check manifest, and the alias item to record the ruling.
+
+Acceptance criteria:
+  - Every figure in the body matches the head it names.
+  - The body names the current head SHA.
+  - The GitGuardian line says red, why, and that it does not gate.
+  - The alias item records the chair's ruling rather than asking for one.
+
+Tests:
+  None mechanical.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: PR body only.
+
+Challenge:
+  "The evidence files are the record; the PR body is a narrative." AGENTS.md
+  makes the opposite call — "report what passed, what did not run, and the
+  remaining gate" — and a stale "GitGuardian ✅" is the single sentence most
+  likely to stop someone looking at a red check.
+```
+
+---
+
+# Round-1 findings — disposition
+
+| Round-1 finding | Severity | Status at `3261ad3e` | How I verified |
+|---|---|---|---|
+| **1** renderer writes unredacted models under a true stamp | BLOCKER | **CLOSED** | redacted copy is stamped and serialised; 0 secret values in 13 local models **and** in the CI artifact for this SHA; case 18b reproduced (writes 0 files). Residual gap filed as **R-1**; my round-1 blast-radius claim corrected above. |
+| **2** `test: ["NONE"]` defeats `missing-healthcheck` | REQUIRED | **CLOSED** | four explicit probe states; my own mutation now red. String form is unreachable via Compose and fail-safe. |
+| **3** service on an unenumerated profile never asserted | REQUIRED | **CLOSED** | `profile-not-enumerated` catches my exact pgadmin-tunnel block and names the enumerated set. |
+| **4** tag-only pin accepted for third-party images | SHOULD | **CLOSED** | origin split; `postgres:18` now red. |
+| **5** `.github/required-checks.txt` stale comment | SHOULD | **OPEN, correctly** | still not edited — the manifest rule forbids it in this PR. Owner-reviewed follow-up. |
+| **6** un-ruled alias tolerated silently | SHOULD | **CLOSED** | `authorised`/`authorised_by`/`removed_when`, printed every run; `authorised: false` and a floor mismatch are both violations; the chair ruled and floor is 1. |
+| **7** `user.json` stamped off `main` | NIT | **CLOSED** | `90896beb…` = vizra-user `origin/main`. |
+| **8** protocol-blind port allowance | NIT | **CLOSED** | keyed `<published>/<protocol>`; UDP on an allowed TCP port red. |
+| **9** transcripts stamped at a superseded SHA | NIT | **CLOSED** | transcripts are separate evidence-only commits naming the code commit they transcribe. |
+
+All four `vizra-infrastructure` chair blockers (F1 retired key, F2 template
+claim, F3 probe gate, F4 memory caps) reproduce as fixed by my own mutations,
+with the limit on F3 recorded as R-3.
+
+## Cleanup
+
+Clone and all scratch output were created under a private `mktemp -d`
+directory and are deleted by exact path. The three component checkouts were read
+with `git -C … show origin/main:<path>` only — nothing checked out, fetched into
+a working tree, or modified; no branch switched in the chair's checkout. No
+container started, no image pulled or built. The only file written outside my
+scratch directory is this one.
+
+FINAL VERDICT: PASS — SHA 3261ad3edd63684855ff9d2346895a70522b5a8b
