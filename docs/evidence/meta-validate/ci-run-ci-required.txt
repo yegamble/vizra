@@ -1,17 +1,16 @@
-CI run: ci-required fan-in on ubuntu-24.04
-PR: https://github.com/yegamble/vizra/pull/3
-run: https://github.com/yegamble/vizra/actions/runs/35547267154
-head SHA: 78f0b7169b1bea08cb7b989dd33d1b9081765856
-conclusion: success (48s)
+CI run: ci-required fan-in on ubuntu-24.04 (fix round 1)
+run: https://github.com/yegamble/vizra/actions/runs/35548599138
+head SHA: dd31782e0d5b749c5d8d8d5240ebb821de9ce56e
+conclusion: success (30s)
 
-ci-required	Set up job	﻿2026-09-21T00:18:07.8928711Z Current runner version: '2.337.0'
+ci-required	Set up job	﻿2026-09-21T00:43:37.9316963Z Current runner version: '2.337.0'
 ci-required	Set up job ##[group]Runner Image Provisioner
 ci-required	Set up job Hosted Compute Agent
 ci-required	Set up job Version: 20260828.587
 ci-required	Set up job Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
 ci-required	Set up job Build Date: 2026-08-28T16:44:25Z
-ci-required	Set up job Worker ID: {22214069-8f1a-4f4e-b161-114f0038259b}
-ci-required	Set up job Azure Region: northcentralus
+ci-required	Set up job Worker ID: {2a2c8101-f614-468b-b323-04761757940a}
+ci-required	Set up job Azure Region: westus3
 ci-required	Set up job ##[endgroup]
 ci-required	Set up job ##[group]Operating System
 ci-required	Set up job Ubuntu
@@ -37,7 +36,7 @@ ci-required	Set up job Prepare all required actions
 ci-required	Set up job Getting action download info
 ci-required	Set up job Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
 ci-required	Set up job Complete job name: ci-required
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-09-21T00:18:09.1377741Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-09-21T00:43:38.9585033Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 with:
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   repository: yegamble/vizra
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   token: ***
@@ -60,7 +59,7 @@ ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Workin
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git version
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 git version 2.55.0
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[endgroup]
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Temporarily overriding HOME='/home/runner/work/_temp/6946a3fc-78d8-4651-b243-5a37d6b88b2b' before making global git config changes
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Temporarily overriding HOME='/home/runner/work/_temp/f9093950-b48b-49d8-a4bb-f6b46cfada41' before making global git config changes
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Adding repository directory to the temporary git global config as a safe directory
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vizra/vizra
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Deleting the contents of '/home/runner/work/vizra/vizra'
@@ -97,16 +96,16 @@ ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [comma
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Removing includeIf entries pointing to credentials config files
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-8d12d9e6-b80a-44d4-80a0-f52fc0af35cd.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/vizra/vizra/.git.path /home/runner/work/_temp/git-credentials-8d12d9e6-b80a-44d4-80a0-f52fc0af35cd.config
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/vizra/vizra/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-8d12d9e6-b80a-44d4-80a0-f52fc0af35cd.config
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-8d12d9e6-b80a-44d4-80a0-f52fc0af35cd.config
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-8d12d9e6-b80a-44d4-80a0-f52fc0af35cd.config
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-4b55e72e-b3cf-4230-98d3-1d8a05dc6bf4.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/vizra/vizra/.git.path /home/runner/work/_temp/git-credentials-4b55e72e-b3cf-4230-98d3-1d8a05dc6bf4.config
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/vizra/vizra/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-4b55e72e-b3cf-4230-98d3-1d8a05dc6bf4.config
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-4b55e72e-b3cf-4230-98d3-1d8a05dc6bf4.config
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-4b55e72e-b3cf-4230-98d3-1d8a05dc6bf4.config
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[endgroup]
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[group]Fetching the repository
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +33b1ab03c892618c90ea4b7c64bf6dd754de3d34:refs/remotes/pull/3/merge
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4185347a2989caaaa36444419bdbf78b952b2278:refs/remotes/pull/3/merge
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 From https://github.com/yegamble/vizra
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  * [new ref]         33b1ab03c892618c90ea4b7c64bf6dd754de3d34 -> pull/3/merge
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  * [new ref]         4185347a2989caaaa36444419bdbf78b952b2278 -> pull/3/merge
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[endgroup]
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[group]Determining the checkout info
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[endgroup]
@@ -131,11 +130,11 @@ ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   git 
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Turn off this advice by setting config variable advice.detachedHead to false
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 HEAD is now at 33b1ab0 Merge 78f0b7169b1bea08cb7b989dd33d1b9081765856 into 3b63c0ef7eac2550f4d47dd5d854fec55a225df4
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 HEAD is now at 4185347 Merge dd31782e0d5b749c5d8d8d5240ebb821de9ce56e into 5f0cd6631fc5e19d17ab0d25f806df0a68582841
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[endgroup]
 ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git log -1 --format=%H
-ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 33b1ab03c892618c90ea4b7c64bf6dd754de3d34
-ci-required	ensure a YAML parser is available	﻿2026-09-21T00:18:10.1568793Z ##[group]Run set -euo pipefail
+ci-required	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 4185347a2989caaaa36444419bdbf78b952b2278
+ci-required	ensure a YAML parser is available	﻿2026-09-21T00:43:41.7428995Z ##[group]Run set -euo pipefail
 ci-required	ensure a YAML parser is available ^[[36;1mset -euo pipefail^[[0m
 ci-required	ensure a YAML parser is available ^[[36;1mpython3 -c 'import yaml' 2>/dev/null \^[[0m
 ci-required	ensure a YAML parser is available ^[[36;1m  || python3 -m pip install --quiet --break-system-packages 'pyyaml==6.0.3'^[[0m
@@ -143,7 +142,7 @@ ci-required	ensure a YAML parser is available ^[[36;1mpython3 -c 'import yaml; p
 ci-required	ensure a YAML parser is available shell: /usr/bin/bash -e {0}
 ci-required	ensure a YAML parser is available ##[endgroup]
 ci-required	ensure a YAML parser is available PyYAML 6.0.1
-ci-required	guard the manifest and the workflows	﻿2026-09-21T00:18:10.3102334Z ##[group]Run ./scripts/ci-required-guard.sh
+ci-required	guard the manifest and the workflows	﻿2026-09-21T00:43:41.8167822Z ##[group]Run ./scripts/ci-required-guard.sh
 ci-required	guard the manifest and the workflows ^[[36;1m./scripts/ci-required-guard.sh^[[0m
 ci-required	guard the manifest and the workflows shell: /usr/bin/bash -e {0}
 ci-required	guard the manifest and the workflows ##[endgroup]
@@ -153,10 +152,11 @@ ci-required	guard the manifest and the workflows workflows parsed: 2; no continu
 ci-required	guard the manifest and the workflows workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
 ci-required	guard the manifest and the workflows floor: every non-optional lane is present in the manifest
 ci-required	guard the manifest and the workflows manifest entries are bare job names
-ci-required	guard the manifest and the workflows every required check is defined by a job
+ci-required	guard the manifest and the workflows lane integrity: 1 required lane(s) defined by a real job across 2 workflow file(s); no shell override, no conditional step
 ci-required	guard the manifest and the workflows the workflow checker rejects every continue-on-error spelling in scripts/testdata/ (6 fixtures exercised, floor 6)
 ci-required	guard the manifest and the workflows the pin checker rejects every unpinned-action and untriggered-lane spelling in scripts/testdata/ (7 fixtures exercised, floor 7)
-ci-required	every required check succeeded on this SHA	﻿2026-09-21T00:18:11.4041751Z ##[group]Run set -euo pipefail
+ci-required	guard the manifest and the workflows the lane checker rejects every shell-override, conditional-step and missing-job case in scripts/testdata/ (7 fixtures exercised, floor 7)
+ci-required	every required check succeeded on this SHA	﻿2026-09-21T00:43:42.7838542Z ##[group]Run set -euo pipefail
 ci-required	every required check succeeded on this SHA ^[[36;1mset -euo pipefail^[[0m
 ci-required	every required check succeeded on this SHA ^[[36;1mecho "evaluating $HEAD_SHA"^[[0m
 ci-required	every required check succeeded on this SHA ^[[36;1m^[[0m
@@ -198,17 +198,16 @@ ci-required	every required check succeeded on this SHA ^[[36;1mdone^[[0m
 ci-required	every required check succeeded on this SHA shell: /usr/bin/bash -e {0}
 ci-required	every required check succeeded on this SHA env:
 ci-required	every required check succeeded on this SHA   GH_TOKEN: ***
-ci-required	every required check succeeded on this SHA   HEAD_SHA: 78f0b7169b1bea08cb7b989dd33d1b9081765856
+ci-required	every required check succeeded on this SHA   HEAD_SHA: dd31782e0d5b749c5d8d8d5240ebb821de9ce56e
 ci-required	every required check succeeded on this SHA ##[endgroup]
-ci-required	every required check succeeded on this SHA evaluating 78f0b7169b1bea08cb7b989dd33d1b9081765856
-ci-required	every required check succeeded on this SHA   validate: in_progress
+ci-required	every required check succeeded on this SHA evaluating dd31782e0d5b749c5d8d8d5240ebb821de9ce56e
 ci-required	every required check succeeded on this SHA   validate: in_progress
 ci-required	every required check succeeded on this SHA   validate: success
-ci-required	every required check succeeded on this SHA ci-required: every required check succeeded on 78f0b7169b1bea08cb7b989dd33d1b9081765856
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-09-21T00:18:52.9467492Z Post job cleanup.
+ci-required	every required check succeeded on this SHA ci-required: every required check succeeded on dd31782e0d5b749c5d8d8d5240ebb821de9ce56e
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-09-21T00:44:04.6909066Z Post job cleanup.
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git version
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 git version 2.55.0
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Temporarily overriding HOME='/home/runner/work/_temp/91078b86-1af3-4473-b5e6-2fbfa8ad253f' before making global git config changes
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Temporarily overriding HOME='/home/runner/work/_temp/5b300e15-a724-4ebe-818f-14cb6bd7297f' before making global git config changes
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Adding repository directory to the temporary git global config as a safe directory
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vizra/vizra
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Removing SSH command configuration
@@ -224,17 +223,17 @@ ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 i
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 includeif.gitdir:/github/workspace/.git.path
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 includeif.gitdir:/github/workspace/.git/worktrees/*.path
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/vizra/vizra/.git.path
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /home/runner/work/_temp/git-credentials-8d12d9e6-b80a-44d4-80a0-f52fc0af35cd.config
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/vizra/vizra/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-8d12d9e6\-b80a\-44d4\-80a0\-f52fc0af35cd\.config
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /home/runner/work/_temp/git-credentials-4b55e72e-b3cf-4230-98d3-1d8a05dc6bf4.config
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/vizra/vizra/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-4b55e72e\-b3cf\-4230\-98d3\-1d8a05dc6bf4\.config
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/vizra/vizra/.git/worktrees/*.path
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /home/runner/work/_temp/git-credentials-8d12d9e6-b80a-44d4-80a0-f52fc0af35cd.config
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/vizra/vizra/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-8d12d9e6\-b80a\-44d4\-80a0\-f52fc0af35cd\.config
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /home/runner/work/_temp/git-credentials-4b55e72e-b3cf-4230-98d3-1d8a05dc6bf4.config
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/vizra/vizra/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-4b55e72e\-b3cf\-4230\-98d3\-1d8a05dc6bf4\.config
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /github/runner_temp/git-credentials-8d12d9e6-b80a-44d4-80a0-f52fc0af35cd.config
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-8d12d9e6\-b80a\-44d4\-80a0\-f52fc0af35cd\.config
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /github/runner_temp/git-credentials-4b55e72e-b3cf-4230-98d3-1d8a05dc6bf4.config
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-4b55e72e\-b3cf\-4230\-98d3\-1d8a05dc6bf4\.config
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /github/runner_temp/git-credentials-8d12d9e6-b80a-44d4-80a0-f52fc0af35cd.config
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-8d12d9e6\-b80a\-44d4\-80a0\-f52fc0af35cd\.config
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /github/runner_temp/git-credentials-4b55e72e-b3cf-4230-98d3-1d8a05dc6bf4.config
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-4b55e72e\-b3cf\-4230\-98d3\-1d8a05dc6bf4\.config
 ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
-ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Removing credentials config '/home/runner/work/_temp/git-credentials-8d12d9e6-b80a-44d4-80a0-f52fc0af35cd.config'
-ci-required	Complete job	﻿2026-09-21T00:18:53.1941095Z Cleaning up orphan processes
+ci-required	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Removing credentials config '/home/runner/work/_temp/git-credentials-4b55e72e-b3cf-4230-98d3-1d8a05dc6bf4.config'
+ci-required	Complete job	﻿2026-09-21T00:44:04.8919731Z Cleaning up orphan processes

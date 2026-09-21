@@ -1,20 +1,21 @@
-CI run: validate lane on ubuntu-24.04
+CI run: validate lane on ubuntu-24.04 (fix round 1)
 PR: https://github.com/yegamble/vizra/pull/3
-run: https://github.com/yegamble/vizra/actions/runs/35547267071
-head SHA: 78f0b7169b1bea08cb7b989dd33d1b9081765856
-conclusion: success (44s)
+run: https://github.com/yegamble/vizra/actions/runs/35548599169
+head SHA: dd31782e0d5b749c5d8d8d5240ebb821de9ce56e
+conclusion: success (9s)
 
-This is the LINUX evidence that could not be produced on the macOS host:
-the ledger generator reproduces docs/quality/features.json byte-for-byte
-under Python 3.12.14 on ubuntu-24.04.
+The C/POSIX locale regression runs here on LINUX, where LC_ALL=C with
+PYTHONCOERCECLOCALE=0 PYTHONUTF8=0 genuinely yields an ASCII preferred
+encoding - the environment in which the pre-fix generator truncated the
+ledger. Output is byte-identical under both locales.
 
-validate	Set up job	﻿2026-09-21T00:18:44.9819124Z Current runner version: '2.337.0'
+validate	Set up job	﻿2026-09-21T00:43:39.0553053Z Current runner version: '2.337.0'
 validate	Set up job ##[group]Runner Image Provisioner
 validate	Set up job Hosted Compute Agent
 validate	Set up job Version: 20260828.587
 validate	Set up job Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
 validate	Set up job Build Date: 2026-08-28T16:44:25Z
-validate	Set up job Worker ID: {8c7b2ebb-0ded-434b-b2be-a9e0077d8430}
+validate	Set up job Worker ID: {69e2f56e-fc07-4f78-91f3-c59b1da2de3e}
 validate	Set up job Azure Region: westus2
 validate	Set up job ##[endgroup]
 validate	Set up job ##[group]Operating System
@@ -40,7 +41,7 @@ validate	Set up job Getting action download info
 validate	Set up job Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
 validate	Set up job Download action repository 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97' (SHA:5fda3b95a4ea91299a34e894583c3862153e4b97)
 validate	Set up job Complete job name: validate
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-09-21T00:18:45.8169880Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-09-21T00:43:39.9581986Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 with:
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   fetch-depth: 1
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   repository: yegamble/vizra
@@ -63,7 +64,7 @@ validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Working d
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git version
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 git version 2.55.0
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[endgroup]
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Temporarily overriding HOME='/home/runner/work/_temp/adcfbe4d-0b68-42a7-8ac4-623538cf2b5b' before making global git config changes
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Temporarily overriding HOME='/home/runner/work/_temp/8952436b-bdfe-4e1b-82ae-e0483354ab03' before making global git config changes
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Adding repository directory to the temporary git global config as a safe directory
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vizra/vizra
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Deleting the contents of '/home/runner/work/vizra/vizra'
@@ -100,16 +101,16 @@ validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Removing includeIf entries pointing to credentials config files
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-8e698b51-ec5b-41a5-bd6a-895ef1aa1723.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/vizra/vizra/.git.path /home/runner/work/_temp/git-credentials-8e698b51-ec5b-41a5-bd6a-895ef1aa1723.config
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/vizra/vizra/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-8e698b51-ec5b-41a5-bd6a-895ef1aa1723.config
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-8e698b51-ec5b-41a5-bd6a-895ef1aa1723.config
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-8e698b51-ec5b-41a5-bd6a-895ef1aa1723.config
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-facdc5f2-653c-4ea8-83b9-1430eee643b3.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/vizra/vizra/.git.path /home/runner/work/_temp/git-credentials-facdc5f2-653c-4ea8-83b9-1430eee643b3.config
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/vizra/vizra/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-facdc5f2-653c-4ea8-83b9-1430eee643b3.config
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-facdc5f2-653c-4ea8-83b9-1430eee643b3.config
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-facdc5f2-653c-4ea8-83b9-1430eee643b3.config
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[endgroup]
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[group]Fetching the repository
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +33b1ab03c892618c90ea4b7c64bf6dd754de3d34:refs/remotes/pull/3/merge
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4185347a2989caaaa36444419bdbf78b952b2278:refs/remotes/pull/3/merge
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 From https://github.com/yegamble/vizra
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  * [new ref]         33b1ab03c892618c90ea4b7c64bf6dd754de3d34 -> pull/3/merge
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  * [new ref]         4185347a2989caaaa36444419bdbf78b952b2278 -> pull/3/merge
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[endgroup]
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[group]Determining the checkout info
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[endgroup]
@@ -134,11 +135,11 @@ validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   git swi
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Turn off this advice by setting config variable advice.detachedHead to false
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 HEAD is now at 33b1ab0 Merge 78f0b7169b1bea08cb7b989dd33d1b9081765856 into 3b63c0ef7eac2550f4d47dd5d854fec55a225df4
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 HEAD is now at 4185347 Merge dd31782e0d5b749c5d8d8d5240ebb821de9ce56e into 5f0cd6631fc5e19d17ab0d25f806df0a68582841
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 ##[endgroup]
 validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git log -1 --format=%H
-validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 33b1ab03c892618c90ea4b7c64bf6dd754de3d34
-validate	Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97	﻿2026-09-21T00:18:47.0848704Z ##[group]Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+validate	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 4185347a2989caaaa36444419bdbf78b952b2278
+validate	Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97	﻿2026-09-21T00:43:40.9968914Z ##[group]Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
 validate	Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 with:
 validate	Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97   python-version: 3.12.14
 validate	Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97   check-latest: false
@@ -150,12 +151,12 @@ validate	Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 ##[en
 validate	Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 ##[group]Installed versions
 validate	Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 Successfully set up CPython (3.12.14)
 validate	Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 ##[endgroup]
-validate	record the environment	﻿2026-09-21T00:18:47.2376038Z ##[group]Run set -euo pipefail
+validate	record the environment	﻿2026-09-21T00:43:41.1694246Z ##[group]Run set -euo pipefail
 validate	record the environment ^[[36;1mset -euo pipefail^[[0m
 validate	record the environment ^[[36;1mpython3 --version^[[0m
 validate	record the environment ^[[36;1mpython3 -c 'import locale,sys; print("filesystem encoding:", sys.getfilesystemencoding()); print("preferred encoding:", locale.getpreferredencoding(False))'^[[0m
 validate	record the environment ^[[36;1mgit --version^[[0m
-validate	record the environment ^[[36;1mecho "source SHA: 78f0b7169b1bea08cb7b989dd33d1b9081765856"^[[0m
+validate	record the environment ^[[36;1mecho "source SHA: dd31782e0d5b749c5d8d8d5240ebb821de9ce56e"^[[0m
 validate	record the environment shell: /usr/bin/bash -e {0}
 validate	record the environment env:
 validate	record the environment   pythonLocation: /opt/hostedtoolcache/Python/3.12.14/x64
@@ -169,8 +170,8 @@ validate	record the environment Python 3.12.14
 validate	record the environment filesystem encoding: utf-8
 validate	record the environment preferred encoding: UTF-8
 validate	record the environment git version 2.55.0
-validate	record the environment source SHA: 78f0b7169b1bea08cb7b989dd33d1b9081765856
-validate	the generated ledger matches its sources	﻿2026-09-21T00:18:47.7693451Z ##[group]Run ./scripts/check-generated-ledger.sh
+validate	record the environment source SHA: dd31782e0d5b749c5d8d8d5240ebb821de9ce56e
+validate	the generated ledger matches its sources	﻿2026-09-21T00:43:41.2582662Z ##[group]Run ./scripts/check-generated-ledger.sh
 validate	the generated ledger matches its sources ^[[36;1m./scripts/check-generated-ledger.sh^[[0m
 validate	the generated ledger matches its sources shell: /usr/bin/bash -e {0}
 validate	the generated ledger matches its sources env:
@@ -183,8 +184,9 @@ validate	the generated ledger matches its sources   LD_LIBRARY_PATH: /opt/hosted
 validate	the generated ledger matches its sources ##[endgroup]
 validate	the generated ledger matches its sources regenerating with: Python 3.12.14
 validate	the generated ledger matches its sources OK 191 requirements; core=141; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 14, 'upload': 13, 'media': 13, 'storage': 15, 'import': 4, 'activitypub': 4, 'atproto': 2, 'ipfs': 2, 'organization': 24, 'community': 19, 'search': 12, 'admin': 26, 'design': 4}; questions=['Q-016', 'Q-021', 'Q-022', 'Q-028', 'Q-032', 'Q-036']; decided=['Q-001', 'Q-002', 'Q-003', 'Q-004', 'Q-005', 'Q-006', 'Q-007', 'Q-008', 'Q-009', 'Q-010', 'Q-011', 'Q-012', 'Q-013', 'Q-014', 'Q-015', 'Q-017', 'Q-018', 'Q-023', 'Q-024', 'Q-027', 'Q-028', 'Q-029', 'Q-030', 'Q-031', 'Q-033', 'Q-034', 'Q-035', 'Q-037', 'Q-038', 'Q-039', 'Q-040', 'Q-041', 'Q-042', 'Q-043']
-validate	the generated ledger matches its sources generated ledger reproduces byte-for-byte: docs/quality/features.json
-validate	quality JSON parses and every requirement id resolves	﻿2026-09-21T00:18:47.9876820Z ##[group]Run ./scripts/check-quality-json.py
+validate	the generated ledger matches its sources locale regression: re-running under LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0
+validate	the generated ledger matches its sources generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+validate	quality JSON parses and every requirement id resolves	﻿2026-09-21T00:43:41.4728553Z ##[group]Run ./scripts/check-quality-json.py
 validate	quality JSON parses and every requirement id resolves ^[[36;1m./scripts/check-quality-json.py^[[0m
 validate	quality JSON parses and every requirement id resolves shell: /usr/bin/bash -e {0}
 validate	quality JSON parses and every requirement id resolves env:
@@ -197,8 +199,8 @@ validate	quality JSON parses and every requirement id resolves   LD_LIBRARY_PATH
 validate	quality JSON parses and every requirement id resolves ##[endgroup]
 validate	quality JSON parses and every requirement id resolves json parsed: 4 file(s) under docs/quality/
 validate	quality JSON parses and every requirement id resolves ledger: 191 requirement id(s) in docs/quality/features.json
-validate	quality JSON parses and every requirement id resolves requirement ids: 139 distinct VZ-… reference(s) across 14 document(s); every one resolves
-validate	relative documentation links resolve	﻿2026-09-21T00:18:48.0612681Z ##[group]Run ./scripts/check-doc-links.py
+validate	quality JSON parses and every requirement id resolves requirement ids: 191 written reference(s) expanded to 287 id(s), 204 distinct, across 14 document(s); every one resolves
+validate	relative documentation links resolve	﻿2026-09-21T00:43:41.5265287Z ##[group]Run ./scripts/check-doc-links.py
 validate	relative documentation links resolve ^[[36;1m./scripts/check-doc-links.py^[[0m
 validate	relative documentation links resolve shell: /usr/bin/bash -e {0}
 validate	relative documentation links resolve env:
@@ -209,12 +211,12 @@ validate	relative documentation links resolve   Python2_ROOT_DIR: /opt/hostedtoo
 validate	relative documentation links resolve   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.14/x64
 validate	relative documentation links resolve   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.14/x64/lib
 validate	relative documentation links resolve ##[endgroup]
-validate	relative documentation links resolve relative links: none exist yet across 88 markdown file(s) (checked nothing); 6 external URL(s) recorded and not fetched
-validate	Post Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97	﻿2026-09-21T00:18:48.1734539Z Post job cleanup.
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-09-21T00:18:48.3269784Z Post job cleanup.
+validate	relative documentation links resolve relative links: none exist yet across 92 markdown file(s) (checked nothing); 7 external URL(s) recorded and not fetched
+validate	Post Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97	﻿2026-09-21T00:43:41.6772485Z Post job cleanup.
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-09-21T00:43:41.8158158Z Post job cleanup.
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git version
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 git version 2.55.0
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Temporarily overriding HOME='/home/runner/work/_temp/2cfca9c2-10ba-408e-8c06-a4e8b5df9dfb' before making global git config changes
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Temporarily overriding HOME='/home/runner/work/_temp/013eb7b5-6e23-45e8-b576-a1549e6812ba' before making global git config changes
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Adding repository directory to the temporary git global config as a safe directory
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vizra/vizra
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Removing SSH command configuration
@@ -230,17 +232,17 @@ validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 incl
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 includeif.gitdir:/github/workspace/.git.path
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 includeif.gitdir:/github/workspace/.git/worktrees/*.path
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/vizra/vizra/.git.path
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /home/runner/work/_temp/git-credentials-8e698b51-ec5b-41a5-bd6a-895ef1aa1723.config
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/vizra/vizra/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-8e698b51\-ec5b\-41a5\-bd6a\-895ef1aa1723\.config
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /home/runner/work/_temp/git-credentials-facdc5f2-653c-4ea8-83b9-1430eee643b3.config
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/vizra/vizra/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-facdc5f2\-653c\-4ea8\-83b9\-1430eee643b3\.config
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/vizra/vizra/.git/worktrees/*.path
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /home/runner/work/_temp/git-credentials-8e698b51-ec5b-41a5-bd6a-895ef1aa1723.config
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/vizra/vizra/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-8e698b51\-ec5b\-41a5\-bd6a\-895ef1aa1723\.config
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /home/runner/work/_temp/git-credentials-facdc5f2-653c-4ea8-83b9-1430eee643b3.config
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/vizra/vizra/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-facdc5f2\-653c\-4ea8\-83b9\-1430eee643b3\.config
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /github/runner_temp/git-credentials-8e698b51-ec5b-41a5-bd6a-895ef1aa1723.config
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-8e698b51\-ec5b\-41a5\-bd6a\-895ef1aa1723\.config
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /github/runner_temp/git-credentials-facdc5f2-653c-4ea8-83b9-1430eee643b3.config
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-facdc5f2\-653c\-4ea8\-83b9\-1430eee643b3\.config
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /github/runner_temp/git-credentials-8e698b51-ec5b-41a5-bd6a-895ef1aa1723.config
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-8e698b51\-ec5b\-41a5\-bd6a\-895ef1aa1723\.config
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 /github/runner_temp/git-credentials-facdc5f2-653c-4ea8-83b9-1430eee643b3.config
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-facdc5f2\-653c\-4ea8\-83b9\-1430eee643b3\.config
 validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
-validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Removing credentials config '/home/runner/work/_temp/git-credentials-8e698b51-ec5b-41a5-bd6a-895ef1aa1723.config'
-validate	Complete job	﻿2026-09-21T00:18:48.5756275Z Cleaning up orphan processes
+validate	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 Removing credentials config '/home/runner/work/_temp/git-credentials-facdc5f2-653c-4ea8-83b9-1430eee643b3.config'
+validate	Complete job	﻿2026-09-21T00:43:42.0667129Z Cleaning up orphan processes
