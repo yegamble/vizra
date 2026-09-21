@@ -101,7 +101,60 @@ other verifications.
 | GitHub `ci-required` on the head SHA | merge gate |
 
 ## Progress and evidence
-(appended below as it happens)
+
+### Decision on item 3 (the flush window): a bounded 250 ms settle, ADOPTED
+
+Measured on this machine (macOS arm64, Node v22.14.0, @playwright/test 1.63.0,
+Chromium 1243) against the local production server, with faults scheduled at
+0 / 50 / 150 / 250 / 400 / 600 ms after the test body returns:
+
+| Settle | Caught | Missed |
+|---|---|---|
+| 0 ms (the behaviour before this slice) | 0 | 50, 150, 250, 400, 600 |
+| 100 ms | 0, 50 | 150, 250, 400, 600 |
+| **250 ms (shipped)** | 0, 50, 150, 250 | 400, 600 |
+| 400 ms | 0, 50, 150, 250, 400 | 600 |
+
+The 0 ms row reproduces the verifier's measurement exactly (0 caught, 50 and 150
+missed). Cost, on the real 18-test lane against the production server:
+
+| Configuration | Before | After | Delta |
+|---|---|---|---|
+| local worker count | 3.2 s (3 runs: 3.74/3.68/3.71 s wall) | 4.4 s (4.88/4.75/5.39 s wall) | +1.2 s |
+| `--workers=2` (the CI shape, 9 tests/worker) | 4.8 s | 6.9 s | +2.1 s ≈ 250 ms × 9 |
+
+Determinism: **20 consecutive runs at `--workers=2`, every one `18 passed`,
+`coverage floor: OK (9/9 9/9)`, `harness stamp: OK (18 …)`, exit 0**, 6.3–7.0 s.
+
+**Adopted** because the window it replaces was effectively "whatever the driver
+had already delivered" — a Next.js hydration effect or deferred fetch that
+throws just after the last assertion was invisible — and the cost is a constant
+250 ms per test on a lane that already builds a Docker image. It **widens** the
+window; it does not close it. 400 ms is still missed, and D14 pins both ends so
+the number in AGENTS.md cannot drift from the code.
+
+### What ran
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run ci` | 0 | 14 files / **341 tests** / 0 skipped (baseline on `main`: 13 / 316) |
+| `npx playwright test` (local prod server) | 0 | 18 passed, floor OK (9/9 9/9), stamp OK (18) |
+| 20× `npx playwright test --workers=2` | 0 ×20 | 18 passed every run |
+| `node scripts/ci/harness-canary.mjs` | 0 | failed all **4** fixtures with the exact kind sets |
+| `bash scripts/ci/check-e2e-lane.sh` | 0 | — |
+| `bash scripts/ci/require-checks_test.sh` | 0 | 102 cases / 109 assertions / 0 failed |
+| `npm run e2e:demos` | 0 | see the evidence README for the half count |
+
+### A defect my own demonstration found
+
+The first version of the two new `check-e2e-lane.mjs` checks used
+`guard.includes("armCreationGuard")`. D13q's controlled mutation removed the
+CALL and left the import — and the check passed (exit 0, measured). Both now
+require a call (`/armCreationGuard\s*\(/`). Noted for the chair: the
+pre-existing checks in that same block (`guardBrowser`, `validatePolicy`,
+`unallowedRecords`, `claimSigner`) have the same weakness, since each name also
+appears on an import line. Not changed here — outside this slice — and reported
+rather than silently fixed.
 
 ## Blockers and handoff
-(none yet)
+None. Nothing was BLOCKED; every command above ran.
