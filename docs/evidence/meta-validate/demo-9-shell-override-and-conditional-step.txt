@@ -1,17 +1,15 @@
 
-########## DEMO 9 — shell override and conditional step on the REAL validate lane (FINDING 3) ##########
+########## DEMO 9 — every way to neuter the REAL validate lane (FINDINGS 3, 7) ##########
 
-BASE SHA: 4b2269043831548b91f00201b494fc53c7673769
+BASE SHA: c47c4ba8b931c4700c5f96e071295afce1f97fb4
 
-continue-on-error was refused in five spellings, but two strictly simpler
-ways to neuter the same lane were unchecked. Both are applied to the real
-workflow here, not only to fixtures.
+continue-on-error is demo 6. These are the five other constructs, each
+applied to the real .github/workflows/validate.yml, not only to fixtures.
 
-########## RED 9a — workflow-level defaults.run.shell that swallows non-zero exits ##########
+########## RED 9a — workflow-level defaults.run.shell ##########
 
-  sha256(.github/workflows/validate.yml) = 260bbf6426904460
+  sha256(.github/workflows/validate.yml) = 68031b0719ceba2f
 inserted workflow-level defaults.run.shell
-  sha256(.github/workflows/validate.yml) = fa4c1084f221b097
 $ ./scripts/ci-required-guard.sh
 required checks:
   - validate
@@ -43,9 +41,26 @@ VIOLATION .github/workflows/validate.yml reason=defaults-shell-override where=jo
 a required lane is undefined, shell-overridden, or has a conditional step
 EXIT=1
 
-########## RED 9c — step-level 'if: false' on the ledger check ##########
+########## RED 9c — step-level shell: (NEW in round 2) ##########
 
-inserted if: false on the ledger step
+inserted step-level shell: on the ledger step
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+VIOLATION .github/workflows/validate.yml reason=step-shell-override lane=validate where=jobs.validate.steps[3] shell='bash -c "eval \\"$@\\" || true" --'
+  A step-level `shell:` is exactly the `defaults.run.shell` rule with the key
+  in a different place: a shell that swallows non-zero exits makes this step
+  report success whatever the command does.
+a required lane is undefined, shell-overridden, or has a conditional step
+EXIT=1
+
+########## RED 9d — step-level 'if: false' ##########
+
+inserted if: false
 $ ./scripts/ci-required-guard.sh
 required checks:
   - validate
@@ -61,9 +76,10 @@ VIOLATION .github/workflows/validate.yml reason=constant-false-if lane=validate 
 a required lane is undefined, shell-overridden, or has a conditional step
 EXIT=1
 
-########## RED 9d — a step-level 'if:' expression nothing can evaluate ##########
+########## RED 9e — a step-level 'if:' nothing can evaluate ##########
 
-inserted a non-constant if: on the ledger step
+inserted a non-constant if:
+  111:        if: ${{ github.event.repository.owner.login == 'nobody' }}
 $ ./scripts/ci-required-guard.sh
 required checks:
   - validate
@@ -78,7 +94,43 @@ VIOLATION .github/workflows/validate.yml reason=conditional-step-on-required-lan
 a required lane is undefined, shell-overridden, or has a conditional step
 EXIT=1
 
-########## RED 9e — the required lane's job renamed, so the manifest names no job ##########
+########## RED 9f — runs-on a self-hosted runner (NEW in round 2) ##########
+
+switched the required lane to a self-hosted runner
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+VIOLATION .github/workflows/validate.yml reason=self-hosted-runner lane=validate runs-on=['self-hosted', 'linux', 'x64']
+  A required lane must run on the GitHub-hosted target the contract names
+  (ubuntu-24.04; ADR-009/Q-027). A self-hosted runner is a machine this
+  repository does not describe, cannot reproduce and does not control, so a green
+  check from it does not mean what a green check is supposed to mean.
+a required lane is undefined, shell-overridden, or has a conditional step
+EXIT=1
+
+########## RED 9g — the lane replaced by a reusable-workflow call (NEW in round 2) ##########
+
+replaced the validate job with a reusable-workflow call
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 2 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+VIOLATION .github/workflows/validate.yml reason=reusable-workflow lane=validate uses='./.github/workflows/elsewhere.yml'
+  This required lane is a call to a reusable workflow, so what it actually runs
+  lives somewhere this checker cannot see: every rule here — shell overrides,
+  conditional steps, action pins — would be enforced against an empty job while
+  the real steps went unchecked.
+a required lane is undefined, shell-overridden, or has a conditional step
+EXIT=1
+
+########## RED 9h — the required lane's job renamed ##########
 
 renamed the validate job
 $ ./scripts/ci-required-guard.sh
@@ -95,6 +147,7 @@ EXIT=1
 
 ########## GREEN ##########
 
+  sha256(.github/workflows/validate.yml) = 68031b0719ceba2f
 $ ./scripts/ci-required-guard.sh
 required checks:
   - validate
@@ -102,8 +155,8 @@ workflows parsed: 2; no continue-on-error on any job or step
 workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
 floor: every non-optional lane is present in the manifest
 manifest entries are bare job names
-lane integrity: 1 required lane(s) defined by a real job across 2 workflow file(s); no shell override, no conditional step
+lane integrity: 1 required lane(s) defined by a real job across 2 workflow file(s); GitHub-hosted, steps in this repository, no shell override at workflow/job/step level, no conditional step
 the workflow checker rejects every continue-on-error spelling in scripts/testdata/ (6 fixtures exercised, floor 6)
 the pin checker rejects every unpinned-action and untriggered-lane spelling in scripts/testdata/ (7 fixtures exercised, floor 7)
-the lane checker rejects every shell-override, conditional-step and missing-job case in scripts/testdata/ (7 fixtures exercised, floor 7)
+the lane checker rejects every shell-override (workflow/job/step), conditional-step, self-hosted-runner, reusable-workflow and missing-job case in scripts/testdata/ (10 fixtures exercised, floor 10)
 EXIT=0
