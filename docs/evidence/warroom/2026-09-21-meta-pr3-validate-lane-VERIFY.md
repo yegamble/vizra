@@ -1221,3 +1221,42 @@ no secrets; scope confined to `scripts/`, `docs/quality/COMMANDS.md` and
 
 PASS is not a merge and does not make any ledger entry VERIFIED — the chair
 records those.
+
+---
+
+# Confirmation at `f9b8553`
+
+**PASS.** Head `f9b85537fa1f596b6d01556bd868e280e27c3570`, unmoved. `5dfa75c` is an
+ancestor. All four ledger JSON files byte-identical to base (`25231b84…`,
+`7bc463af…`, `a86d3b27…`, `ecef0842…`). Fresh clone; all four lane scripts exit 0.
+
+**F8 CLOSED.** `docs/evidence/VZ-FOUND-008/2026-09-21.md` → green, expands to
+`[VZ-FOUND-008]`. `VZ-TOPOLOGY-001…003/006/007` → exactly five ids.
+`VZ-CI-001/888` and `VZ-FOUND-001…999` still exit 1. Width is derived from the
+ledger: against a scratch 4-digit ledger the rule follows (`widths={4}`,
+`VZ-FOUND-0001…0008` expands, the 4-digit path id reads correctly). Docstring
+matches the code.
+
+**F7 CLOSED.** `step-shell-override`, `reusable-workflow`, `self-hosted-runner`
+each red by name via fixtures (10 now) **and** on the real `validate.yml`.
+Job-level `if:` stated out of scope in the script and COMMANDS.md; I confirmed
+the fan-in exits 1 on `skipped`.
+
+**F6 CLOSED.** "Equal in both directions" is gone; script header, COMMANDS.md
+and PR body all now say "change detector, not a set comparison". "92" corrected.
+
+**F5 CLOSED but for one mislabelled line — NIT, OPEN.** The lane now prints head
+and `git rev-parse HEAD`, both correct and consistent
+(`pull/3/merge` = `9bd22ae`, parents `a6b3d32` + `f9b8553`), and checkout is not
+pinned. But the middle value, printed *"PR base SHA (the base this was merged
+into): 3b63c0e"*, is `github.event.pull_request.base.sha` — the merge-base, stale
+by 7 commits. The base actually merged in is `a6b3d32` (`HEAD^1`). Fix: print
+`git rev-parse HEAD^1` on `pull_request`.
+
+**Demos 8/9.** Digests before/after present; demo 9 shows 8 reds across 8
+distinct declared reasons, no `UNEVALUABLE` — the wrong-reason bug is fixed.
+
+**CI on `f9b8553`:** `validate` and `ci-required` both `success`, `pull_request`,
+`ci/meta-validate`.
+
+No other sentence in COMMANDS.md or a script header overstates.
