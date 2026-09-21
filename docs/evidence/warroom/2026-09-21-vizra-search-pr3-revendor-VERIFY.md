@@ -627,3 +627,489 @@ touch `api/`, so the provenance I verified above carries forward unchanged to th
 FINDING 2 (SHOULD) and FINDING 3 (NIT) are reported for completeness and do not drive the verdict.
 
 FINAL VERDICT: FAIL — SHA aa1c3fb7…
+
+---
+---
+
+# Re-verification at `2997e64` — 2026-09-21 (fix round 1 of 2)
+
+**SHA verified:** `2997e6427abd5de6c09d5855d4fd8577b1b591c9`
+**History:** `581bffc` → `aa1c3fb` (my FAIL) → `2997e64`. I confirmed **no force-push**:
+`git merge-base --is-ancestor aa1c3fb 2997e64` exits 0, and `2997e64`'s parent is `aa1c3fb`.
+**Branch head at the end of this re-verification:** `2997e64…` — unmoved.
+**Fresh clone**, new private `mktemp -d` (`…/scratchpad/vzv-s3rv2-AAmKgY/`), deleted at the end.
+The working trees `/Users/yosefgamble/github/vizra/vizra-core` and `…/vizra-search` were never
+touched; the adversarial core checkouts below are **copies** made inside my own scratch dir.
+Same environment as §0 (Darwin arm64, go1.27.1, GNU Make 3.81, python3 3.9.6).
+
+## R1. My two bypasses, re-run verbatim — both REFUSED
+
+I rebuilt the exact adversarial `vizra-core` checkout from round 1: a branch `fake/main` whose
+`api/search-hmac-testvectors.json` has `key_utf8` replaced with
+`ATTACKERKEYATTACKERKEYATTACKER12`, plus a tag `main` and a tag `origin/main` on that poisoned
+commit. Manifest sha256 recorded before each attempt and compared after.
+
+| attempt | round 1 | **round 2 (this SHA)** | manifest | poisoned bytes vendored |
+|---|---|---|---|---|
+| `--ref main` (tag named `main`) | **ACCEPTED, exit 0** | **REFUSED, exit 1** — `--ref 'main' resolves to refs/tags/main, not refs/remotes/origin/main` + `('main' is ambiguous; it also matches refs/heads/main)` | untouched | 0 |
+| `--ref fake/main` (poisoned branch) | **ACCEPTED, exit 0** | **REFUSED, exit 1** — `resolves to refs/heads/fake/main, not refs/remotes/origin/main` | untouched | 0 |
+| `--ref refs/tags/main` | — | **REFUSED**, names both refs | untouched | 0 |
+| `--ref refs/heads/fake/main` | — | **REFUSED**, names both refs | untouched | 0 |
+| `--ref origin/main` while a **tag** `origin/main` shadows the remote-tracking ref | — | **REFUSED** — `resolves to refs/tags/origin/main` + `(ambiguous; it also matches refs/remotes/origin/main)`. git itself warns `refname 'origin/main' is ambiguous` here, so the resolver reproduces git's real precedence | untouched | 0 |
+
+Every refusal names the ref it resolved, the ref it wanted, and every other ref that matched. On
+refusal the manifest is byte-identical — the tool dies before writing anything.
+**FINDING 1's bypass is closed.**
+
+## R2. Attacking the NEW resolver the way I found the old hole
+
+Adversarial checkouts built in my scratch dir. `try()` recorded the manifest digest before and
+after each run.
+
+### Refs, and argv injection
+
+| attack | result |
+|---|---|
+| `--ref refs/remotes/origin/HEAD` | **REFUSED** — `resolves to refs/remotes/origin/HEAD, not …/main` |
+| `--ref origin/HEAD` | **REFUSED** — same |
+| `--ref=--upload-pack=/bin/echo` | **REFUSED** — `does not name any ref` |
+| `--ref=+refs/heads/main` | **REFUSED** — `does not name any ref` |
+| `--ref 'origin/main^'`, `'origin/main@{1}'`, `'origin/main..HEAD'`, `'../../etc/passwd'` | **REFUSED** — all `does not name any ref` |
+| `--remote=--upload-pack=x` | **REFUSED** — `has no remote '--upload-pack=x' (git remote get-url exit 129)` |
+| `--commit=--output=/tmp/pwn` | **REFUSED**; `/tmp/pwn` was not created |
+
+No argv injection is reachable: the `--ref` string is now only ever a **dict key** looked up
+against `git for-each-ref` output — it is never passed to git at all. The only ref that reaches a
+git command is the constructed `refs/remotes/<remote>/main`. `--remote` and `--commit` reach git
+as argv elements and git rejects option-shaped values with a non-zero exit, which the script dies
+on. No `shell=True`, `os.system` or `os.popen` anywhere.
+
+### Remote name vs remote URL
+
+Built a checkout with **two** remotes: `origin` → `https://github.com/attacker/vizra-core.git`,
+`upstream` → the canonical URL, with `refs/remotes/upstream/main` present.
+
+| attack | result |
+|---|---|
+| `--remote origin` (canonical *name*, fork *URL*) | **REFUSED** — `remote 'origin' of … is https://github.com/attacker/vizra-core.git which is github.com/attacker/vizra-core, not github.com/yegamble/vizra-core` |
+| `--remote upstream` (non-default *name*, canonical *URL*) | **ACCEPTED**, and honestly records `source_ref: refs/remotes/upstream/main` — the refname it actually resolved, not a normalised fiction |
+
+The name is no longer load-bearing; the URL is measured and the recorded ref is the resolved one.
+
+### `--commit`
+
+| attack | result |
+|---|---|
+| `--commit <ancestor of main that does NOT touch api/>` (`c043df72…`) | **ACCEPTED.** It vendors **that commit's** api bytes — I verified `git show c043df72:api/search-hmac-testvectors.json \| shasum` equals the file on disk (`ff21e6b8…`) — records `source_commit: c043df72…` **and** `source_ref_tip: 4a80a1e…`, so the manifest distinguishes the pinned commit from the ref tip. Honest. `--check --core` then flags it: `the manifest pins c043df72…, but the current last api/ commit on refs/remotes/origin/main is 4a80a1e… — re-vendor` |
+| `--commit <the poisoned fake/main commit>` with `--ref refs/remotes/origin/main` | **REFUSED** — `commit 38d0ce99… is NOT an ancestor of refs/remotes/origin/main` |
+
+The ancestry refusal is now reachable and real, rather than the decorative check I flagged.
+
+### A stale / rewound `refs/remotes/origin/main`
+
+I rewound `refs/remotes/origin/main` to the real earlier commit `415a6d19…`. The tool **accepts**
+and records `source_ref_tip: 415a6d19…`, `source_commit: 415a6d19…`. That is honest — the field
+is named "the tip that refname pointed at", and it pointed there. It does not fetch, which
+AGENTS.md, the docstring and `$provenance_note` all now state explicitly. `--check --core` against
+a *fresh* clone catches it: `the manifest pins 415a6d19…, but the current last api/ commit … is
+4a80a1e… — re-vendor`.
+
+### `insteadOf` rewrites — handled correctly, and I had expected a hole here
+
+`git remote get-url` **does** apply `url.<base>.insteadOf`, so it reports the URL git would
+actually use, not the raw config string. Both directions behave right:
+
+| config | `get-url` reports | tool |
+|---|---|---|
+| remote = `attacker/vizra-core`, `insteadOf` rewriting it to the canonical URL | canonical | **ACCEPTED** — correct: that clone really does fetch from `yegamble/vizra-core` |
+| remote = canonical, `insteadOf` rewriting it to `evil.example` | `https://evil.example/x.git` | **REFUSED** — correct: that clone really fetches from evil.example |
+
+Measuring the *effective* URL is the right choice and it is what the code does.
+
+### URL normalisation — 19 URLs through the real `parse_remote_url` / `redact_url`
+
+| URL | expected | observed |
+|---|---|---|
+| `https://github.com/yegamble/vizra-core[.git][/]` | accept | **accept** |
+| `https://GitHub.COM/YeGamble/Vizra-Core.git` (mixed case) | accept | **accept** (host and owner/repo both lower-cased) |
+| `git@github.com:yegamble/vizra-core[.git]` (scp-like) | accept | **accept** |
+| `ssh://git@github.com[:22]/yegamble/vizra-core.git` | accept | **accept** |
+| `https://x-access-token:ghp_…@github.com/yegamble/vizra-core.git` | accept, redacted | **accept**, printed as `https://***@github.com/…` |
+| `https://github.com.evil.example/yegamble/vizra-core.git` | refuse | **refuse** (host `github.com.evil.example`) |
+| `https://evil.example/github.com/yegamble/vizra-core` | refuse | **refuse** (host `evil.example`) |
+| `git@github.com.evil.example:yegamble/vizra-core` | refuse | **refuse** |
+| `https://github.com/attacker/vizra-core.git` | refuse | **refuse** |
+| `https://github.com/yegamble/vizra-user.git` | refuse | **refuse** |
+| `https://gitlab.com/yegamble/vizra-core.git` | refuse | **refuse** |
+| `https://github.com/yegamble/vizra-core.git.evil` | refuse | **refuse** |
+| `/local/path/vizra-core`, `file:///tmp/vizra-core` | refuse | **refuse** |
+| `https://github.com/attacker/x/yegamble/vizra-core` | refuse | **accept** — see FINDING 6 (NIT) |
+
+**Token redaction, end to end.** I set a core clone's origin to
+`https://x-access-token:ghp_SECRETTOKEN…@github.com/yegamble/vizra-core.git` and ran a real vendor
+and a real `--check --core`:
+
+- occurrences of the token in stdout+stderr: **0** in both paths;
+- occurrences in `api/CONTRACT-SOURCE.json`: **0** — the manifest stores `source_repository`
+  (`yegamble/vizra-core`), the *parsed* owner/repo, never the URL;
+- printed line: `remote origin     : https://***@github.com/yegamble/vizra-core.git   [measured: git remote get-url]`.
+
+**FINDING 2 is closed**, and the "measured, not restated" property is now visible in the transcript
+itself.
+
+## R3. `--check` against a hand-edited manifest (the chair's item 2)
+
+I hand-edited one field at a time and ran all three controls. This is the honest picture:
+
+| field forged to | `--check` | `--check --core` | `make contract-drift` (the CI lane) |
+|---|---|---|---|
+| `source_ref` = `refs/remotes/origin/evil` | 0 (missed) | **1** — `the manifest records source_ref 'refs/remotes/origin/evil', but this checkout resolves 'refs/remotes/origin/main'` | 0 (missed) |
+| `source_ref` = `main` | **1** — `it must be the FULL refname … not a short name a caller could have laundered` | **1** | 0 (missed) |
+| `source_ref` = 40 zeros | **1** | **1** | 0 (missed) |
+| **`source_ref_tip` = `refs/remotes/origin/evil`** | **0** | **0** | **0** |
+| **`source_ref_tip` = `main`** | **0** | **0** | **0** |
+| **`source_ref_tip` = 40 zeros** | **0** | **0** | **0** |
+
+`source_ref_tip` is **write-only**: nothing validates it, not even `--check --core`, which already
+holds the correct value in a local variable. See FINDING 4 (SHOULD). No document claims it is
+validated, so this is a gap rather than an over-promise.
+
+`contract-drift` — the only one of the three that runs in CI — validates `source_repository`,
+`source_commit`'s length and the two digests, and no other provenance field. AGENTS.md describes it
+exactly that way ("fails on any drift between the vendored bytes and the manifest"), so that is
+accurate.
+
+## R4. Claims audit (the chair's item 3)
+
+I checked every remaining refusal claim against the code and against a fired fixture.
+
+| claim (AGENTS.md / docstring / `$provenance_note`) | true? |
+|---|---|
+| "`git remote get-url` is **measured** … must be `github.com/yegamble/vizra-core`" | **true** — R2 |
+| "normalised across https / ssh / scp-like / userinfo forms" | **true** — 19-URL battery |
+| "the ref is resolved to a **full refname** and must equal `refs/remotes/<remote>/main` exactly" | **true** — R1, R2 |
+| "a tag named `main`, a tag named `origin/main` shadowing the remote-tracking ref, `refs/heads/main`, and any branch `x/main` all resolve elsewhere and are named in the refusal" | **true** — all four reproduced, each names both refs |
+| "`merge-base --is-ancestor <commit> refs/remotes/<remote>/main`, checked against the **resolved** ref … Reachable via `--commit`" | **true** — `--commit` exists and the refusal fires |
+| "a shallow clone is refused" | **true** — fixture fires; message names `fetch --unshallow` |
+| "the manifest records the full refname **resolved** and the tip it pointed at. No string derived from `--ref` is ever written" | **true** — `--remote upstream` records `refs/remotes/upstream/main`; the laundering line is gone |
+| "It only ever reads the core checkout (`remote get-url`, `rev-parse`, `for-each-ref`, `log`, `merge-base`, `show`)" | **true** — that is the complete set of git subcommands in the file |
+| "userinfo is redacted before printing, because a remote URL can carry a token" | **true** — end-to-end check, 0 occurrences in either path and in the manifest |
+| "**It defends against a mistake, not against someone who controls the checkout it is pointed at**, and it does not authenticate core's bytes" | **true, and this is the sentence that matters.** It appears in AGENTS.md, in the script docstring, and in `api/CONTRACT-SOURCE.json`'s `$provenance_note` — the provenance record now carries its own limit |
+| "a poisoned *non-normative* field would not be caught by those tests" | **true** — matches what I measured in round 1, where a poisoned *key* was caught by the 29 consumed vectors |
+| AGENTS.md's explicit retraction: "An earlier version of this section claimed … The first half could not fire and the second was a string-suffix test that an independent verifier walked past twice." | **accurate** |
+
+The one over-promising sentence I found is **not** in an authoritative file — it is a stale
+paragraph left standing in the **PR description** (see FINDING 5, NIT).
+
+**The builder's stated residual — is it said at the right strength?** AGENTS.md says
+`vendor-contract-selftest` "needs neither a core checkout nor a network and therefore could be
+[a CI lane]; that is proposed to the chair rather than done here", and the Makefile comment and PR
+body say the same. That is honest about the fact. It stops just short of naming the consequence —
+*nothing in CI notices if a future edit deletes a refusal*. There is a real local floor
+(`EXPECTED_CASES = 11`), which I fired by deleting one case from the registry:
+`10 case(s) registered, the floor is 11. A refusal lost its fixture.` (exit 1). But that floor only
+runs when someone runs it. I record this as an accurate-but-incomplete statement, not an
+over-promise, and leave the lane decision to the chair, which is where the builder put it.
+
+## R5. Negative fixtures and the D-G demonstration
+
+`make vendor-contract-selftest` — **exit 0, 11/11**, every adversarial repository built with
+`git init` in a temp dir:
+
+```
+tag named 'main' OK | tag shadowing origin/main OK | branch 'fake/main' OK
+local branch refs/heads/main OK | non-ancestor --commit OK | foreign origin URL OK
+foreign origin (scp-like ssh) OK | userinfo redacted in output OK
+no refs/remotes/origin/main OK | shallow clone OK | happy path accepted OK
+vendor-contract-selftest: all 11 fixtures behaved as documented
+```
+
+**No network — tested, not asserted.** With `http_proxy=https_proxy=ALL_PROXY=http://127.0.0.1:1`,
+`GIT_TERMINAL_PROMPT=0` and `GIT_SSH_COMMAND=/usr/bin/false`: **exit 0, 11/11**. Nothing left
+behind: `git status --porcelain` empty, no stray `vendor-contract-selftest-*` or
+`revendor-demo-pristine-*` directory.
+
+I also ran it with `GIT_ALLOW_PROTOCOL=none`, which blocks the **local `file://` transport** the
+shallow-clone fixture uses to build a real shallow clone offline. That is stricter than "no
+network" and is not a fair test of the claim — but the result is worth recording because it is the
+*right* failure mode: the harness reported
+`FAIL: case_shallow_clone raised RuntimeError: could not build a shallow clone` and exited 2,
+rather than counting the unrunnable fixture as a pass. A fixture that cannot run is not a pass,
+which is exactly what AGENTS.md demands.
+
+**D-G** (`docs/evidence/pr3/D-G-guard-fixtures-red-green.txt`) applies the PR's own mutation
+discipline to the guard: the script's sha256 is recorded before and after reverting the resolver to
+the suffix test (`1fe2773d…` → `3b067f75…` → `1fe2773d…`), the patched region is printed, and the
+transcript shows the reverted guard vendoring from `refs/tags/main`, `refs/tags/origin/main`,
+`refs/heads/fake/main` (the poisoned commit) and `refs/heads/main`. `0 unexpected results`. I read
+the transcript and it is internally consistent with the code at this SHA; the fixtures I ran myself
+reproduce its state-0 and state-2 rows exactly.
+
+## R6. Pins and artifact (the chair's item 4)
+
+| claim | verified |
+|---|---|
+| both vendored files byte-identical to `aa1c3fb` | **yes** — blob ids identical at both commits: `848503cc…`, `1509da85…` |
+| both byte-identical to core `main@4a80a1e` | **yes** — `a78d8aa7…` / `f95623b0…` on both sides, from my own core clone |
+| `git diff --name-only aa1c3fb 2997e64 -- api/` lists only the manifest | **yes** |
+| manifest digests still match | **yes** — `make vendor-contract-check` exit 0 |
+| `source_commit` still `4a80a1e…` | **yes**; `source_ref` is now the full refname `refs/remotes/origin/main` and `source_ref_tip` `4a80a1e…` |
+| the manifest is not in its own `files` array, so no digest covers it | **yes** — confirmed; it was regenerated *through* the fixed tool (`--note`), not hand-edited |
+| 5 ACCEPT + 24 REJECT, 0 skips | **yes** — my own `go test -json` parse: `ACCEPT 5 REJECT 24 | pass 347 skip 0 fail 0` |
+| one-byte edit still reddens both lanes by name | **yes** — `Generate a real key with` → `real kez with` (file still parses as JSON): `make contract-drift` exit 2 and `make ci` exit 2, both printing `contract_drift_test.go:106: the vendored api/search-hmac-testvectors.json does not match its manifest` and `CONTRACT-DRIFT LANE REFUSED: 1 test(s) failed: …TestEveryVendoredFileMatchesItsManifest`; restore → `make ci` exit 0 |
+
+## R7. Lanes and scope (items 5)
+
+| lane | exit | evidence |
+|---|---|---|
+| `make ci` | **0** | `contract-drift: 324 tests ran across 4 package(s), 0 failures, none deselected`; `test-noskip: 347 pass events, 0 skips`; `tidy-check: tidy` |
+| `make vendor-contract-check` | **0** | both files OK |
+| `make vendor-contract-selftest` | **0** | 11/11, also with the network blocked |
+| `./scripts/ci-required-guard.sh` | **0** | |
+| `./scripts/check-workflows.py` | **0** | |
+| `docker-build` | **not runnable locally** (arm64 host / amd64 target) — green in CI on this SHA |
+
+Scope vs `origin/main` — 15 files, and the only non-evidence, non-script files are the same four:
+
+```
+M AGENTS.md   M Makefile   M api/CONTRACT-SOURCE.json   M api/search-hmac-testvectors.json
+A scripts/vendor-contract.py   A scripts/vendor-contract-selftest.py   A scripts/revendor-demo.sh
+A docs/evidence/pr3/*  (8 files)
+```
+
+- `git diff --stat origin/main...2997e64 -- .github/` → **empty**. No workflow, no
+  `required-checks.txt`, no CODEOWNERS, no guard script.
+- `git diff --name-only origin/main...2997e64 -- '*.go'` → **empty**. No production code, no test.
+- `VIZRA_SEARCH_MODE` / `VIZRA_MODE` in the whole diff: **0 occurrences**.
+- **Make integrity:** `git diff --unified=0 origin/main...2997e64 -- Makefile` contains **no `-`
+  lines** — still a pure append. `ci:` is byte-identical at the same line 33 in both trees:
+  `ci: fmt-check vet echo-containment build contract-drift test test-noskip tidy-check`.
+  No lane reordered, renamed or removed; no `SHELL`/`.SHELLFLAGS`/`MAKEFLAGS`.
+- Hygiene: `grep -rnoE '/Users/[a-z]+' docs/evidence/pr3/ scripts/` → **no match** (FINDING 3
+  closed). No token, PAT, AWS key or private key anywhere in the new files.
+
+## R8. CI on `2997e64` (item 6)
+
+My own `gh` calls:
+
+```
+$ gh api repos/yegamble/vizra-search/commits/2997e6427abd5de6c09d5855d4fd8577b1b591c9/check-runs
+total_count = 12 ; unique conclusions = ["success"]
+```
+
+All 10 names in `.github/required-checks.txt` — `fmt, vet, echo-containment, build, contract-drift,
+test, test-noskip, tidy-check, govulncheck, docker-build` — are present as **completed, successful**
+check runs on this SHA, plus `ci-required` (success) and GitGuardian (success). No listed lane is
+missing, skipped, cancelled or never-executed. `ci` run 35575111391 and `ci-required` run
+35575111453, both `head_sha = 2997e64…`, both `success`.
+
+**Which tree CI tested:** the `pull_request` event, so the merge commit — parents
+`808a5499…` (current `main`) and `2997e64…`. Its tree is **byte-identical** to the head tree:
+
+```
+tree(2997e64)          = 18fb147f207c2e92557477d51b00047add167e72
+tree(refs/pull/3/merge)= 18fb147f207c2e92557477d51b00047add167e72
+```
+
+## Findings at `2997e64`
+
+**Round-1 findings: FINDING 1 (REQUIRED) — CLOSED. FINDING 2 (SHOULD) — CLOSED. FINDING 3 (NIT) — CLOSED.**
+Each closure is reproduced above by me, not read from a transcript.
+
+```
+FINDING 4: source_ref_tip is recorded as provenance and validated by nothing
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra-search
+  files:     scripts/vendor-contract.py:447 (written), :487 (printed, not compared),
+             :512-540 (--check --core, where `tip` is in hand and unused),
+             internal/httpapi/contract_drift_test.go:34-36 (the struct has no field for it)
+  requirements: acceptance 1 (provenance)
+
+Observed:
+  The fix adds `source_ref_tip` to api/CONTRACT-SOURCE.json. I hand-edited it to
+  `refs/remotes/origin/evil`, to `main`, and to 40 zeros. In every case:
+  `vendor-contract.py --check` exit 0; `--check --core <real core clone>` exit 0;
+  `make contract-drift` exit 0. Nothing anywhere notices.
+
+  `--check --core` already computes the correct value — resolve_ref returns
+  (full_ref, tip) at :518 — and compares `full_ref` and `commit`, but never
+  `tip`. The Go manifest test does not unmarshal the field at all.
+
+  No document claims it IS validated, so this is a gap rather than a repeat of
+  FINDING 1. It is the same *class* though: a provenance field a later hand-edit
+  can falsify silently.
+
+Failure:
+  A reviewer re-deriving provenance from the manifest reads a tip that no control
+  has ever checked. It is the one new provenance field the fix introduced and the
+  only one with no verification path.
+
+Perspective:
+  developer, operator
+
+Recommendation:
+  One line in check(), inside the `if args.core:` block that already has `tip`:
+  compare `tip` against `m.get("source_ref_tip")` and append a problem naming
+  both. Optionally also require it to be 40 hex characters in the no-core path,
+  the way source_commit already is at :472.
+
+Acceptance criteria:
+  - `--check --core` exits non-zero when source_ref_tip differs from the tip the
+    resolved ref points at, naming both values.
+  - `--check` (no core) exits non-zero when source_ref_tip is not a 40-character
+    SHA.
+  - A selftest fixture fires each of those.
+
+Tests:
+  scripts/vendor-contract-selftest.py, as a 12th case (raise EXPECTED_CASES to
+  12): build the happy-path repo, vendor, corrupt source_ref_tip, assert
+  `--check --core` exits non-zero and names the field.
+
+Cross-repo implications:
+  core: none.  user: none.  search: as above.  meta: none.
+
+Challenge:
+  It is a belt-and-braces field — source_commit is the one that matters and it IS
+  checked three ways, so a forged tip misleads nobody who checks the commit. True,
+  which is why this is SHOULD and not REQUIRED. But the field was added precisely
+  so a reviewer could re-derive provenance without a core checkout, and an
+  unvalidated field does not do that.
+```
+
+```
+FINDING 5: a superseded paragraph in the PR description still asserts the guard
+           that was retracted
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-search
+  files:     PR #3 description, section "## The vendoring command (new)"
+             (the authoritative files are correct — AGENTS.md:73-130,
+             scripts/vendor-contract.py:18-67, api/CONTRACT-SOURCE.json:11-26)
+  requirements: none
+
+Observed:
+  The PR body still reads, in the original section:
+
+    "It resolves the source commit itself, **refuses** a commit that is not an
+     ancestor of the branch tip and a `--ref` that is not a `main` branch, and
+     digests the bytes it reads back off disk after writing them. It only ever
+     reads the core checkout (`rev-parse`, `log`, `merge-base`, `show`) ..."
+
+  At this SHA that sentence is wrong in two directions: there is no `main`-branch
+  suffix test any more (the requirement is the exact full refname, which is
+  stronger), and the git subcommand list is now missing `remote get-url` and
+  `for-each-ref`. It also omits the remote-URL refusal entirely.
+
+  The later "Fix round 1" section describes the real behaviour accurately, and
+  AGENTS.md carries an explicit retraction of this exact sentence. So the
+  authoritative documents are right and only the narrative is stale.
+
+Failure:
+  A chair reading the PR top to bottom meets a description of a control that no
+  longer exists as described before reaching the correction.
+
+Perspective:
+  developer
+
+Recommendation:
+  Edit that paragraph in the PR body to point at the "Fix round 1" section, or
+  delete it. No code change.
+
+Acceptance criteria:
+  No sentence in the PR description describes a refusal that the code at the head
+  SHA does not implement as written.
+
+Tests:
+  None — prose.
+
+Cross-repo implications:
+  core: none.  user: none.  search: as above.  meta: none.
+
+Challenge:
+  PR bodies are narratives of a PR's history and the fix section explicitly
+  supersedes it, so "correcting" history is arguably worse. Fair — which is why
+  this is a NIT and does not affect the verdict; a one-line "superseded by Fix
+  round 1 below" is enough.
+```
+
+```
+FINDING 6: the remote-URL matcher takes the last two path segments, so a deeper
+           path under github.com is accepted
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-search
+  files:     scripts/vendor-contract.py:175-178 (`parts[-2:]`)
+
+Observed:
+  `parse_remote_url("https://github.com/attacker/x/yegamble/vizra-core")` returns
+  `("github.com", "yegamble/vizra-core")` and is ACCEPTED. Every other URL in my
+  19-case battery behaves correctly, including the host-confusion cases
+  (`github.com.evil.example`, `evil.example/github.com/...`) and every ssh /
+  scp-like / userinfo / trailing-slash / mixed-case form.
+
+Failure:
+  Essentially none in practice: github.com does not serve repositories at
+  four-segment paths, so a clone from such a URL could not have fetched core's
+  objects in the first place, and the documented LIMIT ("a local clone's remote
+  URL is whatever its owner set it to") already covers a hand-set URL. It is a
+  looser match than the check advertises ("must be github.com/yegamble/vizra-core").
+
+Perspective:
+  developer
+
+Recommendation:
+  Require exactly two path segments: `if len(parts) != 2: return host, None`.
+
+Acceptance criteria:
+  A remote URL with more than two path segments under github.com is refused.
+
+Tests:
+  One more assertion in the existing case_foreign_origin fixture family.
+
+Cross-repo implications:
+  core: none.  user: none.  search: as above.  meta: none.
+
+Challenge:
+  Unreachable in practice and the fix is a one-line tightening that could in
+  principle break a legitimate enterprise-GitHub path layout. Hence NIT.
+```
+
+## Verdict at `2997e64`
+
+The blocking finding is fixed **in the control, not in the prose** — which is the distinction I
+asked for. Both of my round-1 bypasses are refused by name with the manifest untouched, and so are
+nine further attacks I had not tried before (tag shadowing, `refs/remotes/origin/HEAD`, four
+argv-injection shapes, fork-URL-under-the-name-`origin`, non-ancestor `--commit`, shallow clone).
+The remote is measured rather than restated, normalisation survives a 19-URL battery including the
+host-confusion cases, and a token in the remote URL reaches neither stdout nor the manifest in
+either code path. The manifest no longer launders anything: it records the resolved refname, and
+`--remote upstream` proves it by recording `refs/remotes/upstream/main`.
+
+The refusals are backed by 11 fixtures that I ran myself, that pass with the network blocked, that
+leave nothing behind, and that fail loudly rather than silently when a fixture cannot run. The
+`EXPECTED_CASES` floor fires when a fixture is deleted — I fired it.
+
+Most importantly for a provenance artifact: AGENTS.md, the script's docstring and the manifest's
+own `$provenance_note` now all carry the limit — *"it defends against a mistake, not against
+someone who controls the checkout it is pointed at"*, and *"it does not authenticate core's
+bytes"*. That is the honest statement of what a local-clone check can and cannot prove, written
+into the record a future reviewer will read.
+
+The artifact is untouched and still correct: both vendored files are byte-identical to `aa1c3fb`
+and to core `main@4a80a1e`, `source_commit` is unchanged, 5/5 + 24/24 vectors pass with 0 skips,
+and a one-byte edit still reddens `make contract-drift` and `make ci` by name. Scope is clean, the
+Makefile is still a pure append with `ci:` byte-identical, and `ci-required` plus all 10 manifest
+lanes are green on this SHA against a merge tree byte-identical to the head tree.
+
+FINDING 4 (SHOULD), 5 (NIT) and 6 (NIT) are real but none is blocking: FINDING 4 is a gap in a
+belt-and-braces field that no document claims is checked, and 5 and 6 are cosmetic. All three are
+one-line fixes the chair may fold into fix round 2 or schedule separately.
+
+FINAL VERDICT: PASS — SHA 2997e642…
