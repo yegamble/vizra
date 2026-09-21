@@ -156,5 +156,75 @@ pre-existing checks in that same block (`guardBrowser`, `validatePolicy`,
 appears on an import line. Not changed here — outside this slice — and reported
 rather than silently fixed.
 
+## Round 7 — the fix round (verifier FAIL on FINDING 1 at `7730500`)
+
+Verdict on round 6: **FAIL**, one blocking ground. F12 and F14 CLOSED, every
+count reproduced, the 250 ms table reproduced under CPU contention, nothing
+weakened. The blocker: a page opened and navigated in `test.beforeAll` was never
+observed — lint-green, type-green, **1 passed** on a page that 404s and throws,
+with the fixture's attachment reading `{ contextsGuarded: 2,
+contextsUnguarded: 0, creationViolations: [], records: [] }`. The listeners were
+installed by the TEST-scoped fixture, which Playwright sets up after `beforeAll`.
+
+### Runtime facts measured for this round (installed 1.63.0, probes, not assumed)
+
+```
+worker-auto SETUP
+  beforeAll
+  test-auto SETUP → beforeEach → body → afterEach → test-auto TEARDOWN
+  test-auto SETUP → beforeEach → body → afterEach → test-auto TEARDOWN
+  afterAll
+worker-auto TEARDOWN
+```
+
+- A worker-scoped AUTOMATIC fixture **is** set up before the first `beforeAll`.
+- A throw from a worker-fixture teardown gives `npx playwright test` **exit 1**
+  with "1 error was not a part of any test", even when every test passed.
+- Playwright refuses to redefine an auto worker fixture as non-auto; the attack
+  shape is `{ scope: "worker", auto: true }`, which the brand check refuses.
+
+### What changed
+
+1. **`e2e/harness/worker-guard.ts` (new)** — `vizraWorkerGuard`, worker-scoped
+   and automatic, installs `guardBrowser` + the creation guard for the worker.
+   The record buffer is append-only, so an index is a monotonic sequence number.
+2. **`vizraHarnessGuard`** keeps only the ACCOUNTING: phase 1 = everything since
+   the previous test finished, phase 2 = everything during the body; both judged
+   under the same allow-list; the failure names the phase.
+3. **The late edge for hooks** — decided: fail from the worker fixture's
+   teardown (measured exit 1), not a second per-run record. The lane guard greps
+   the assertion by call so deleting it is not silent.
+4. **Stamped ⟹ guarded, one scope up** — `createWorkerHarness` brands what it
+   builds in a module-private `WeakSet`; `vizraHarnessGuard` throws before
+   stamping if what it was handed is not branded.
+5. **FINDING 2** — `browser.newBrowserCDPSession()` refused at runtime and added
+   to the lint ban; `context.newCDPSession(page)` stays legal.
+6. **FINDING 3** — all eight `check-e2e-lane.mjs` harness checks now require a
+   CALL, with comments stripped first (the first version of that fix was
+   satisfied by a sentence in the fixture's own header comment).
+7. **FINDINGS 4 and 5** — the stamp-key prose corrected to what was measured; a
+   transcript normaliser (path, durations, Playwright completion order, browser
+   record-delivery order) plus a `mutation-digests.txt` ledger.
+
+### What ran (round 7)
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run ci` | 0 | 15 files / **355 tests** / 0 skipped |
+| `npx playwright test` (local prod) | 0 | 18 passed, floor OK (9/9 9/9), stamp OK (18) |
+| `node scripts/ci/check-coverage-floor-ran.mjs` | 0 | 18 verified |
+| `node scripts/ci/harness-canary.mjs` | 0 | all 4 fixtures, exact kind sets |
+| `bash scripts/ci/check-e2e-lane.sh` | 0 | — |
+| 20 × `npx playwright test --workers=2` | 0 ×20 | 18 passed every run, 7.1–9.7 s (round 6: 6.3–7.0 s) |
+| `npm run e2e:demos` | 0 | **123 halves passed, 0 blocked, 0 failed** (104 in round 6) |
+
+### Self-found during this round
+
+D13q's first version mutated `test.ts` for `armCreationGuard`, which had moved
+to `worker-guard.ts`; the half went green and the suite failed by name. The
+`unallowedRecords` mutation removed one of two call sites and the check rightly
+still passed. Both were fixed by the demonstration failing, which is what the
+demonstrations are for.
+
 ## Blockers and handoff
 None. Nothing was BLOCKED; every command above ran.
