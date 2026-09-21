@@ -20,8 +20,18 @@ set -euo pipefail
 
 manifest=".github/required-checks.txt"
 test -s "$manifest" || { echo "$manifest is missing or empty"; exit 1; }
-required="$(grep -vE '^\s*(#|$)' "$manifest" | tr -d '\r')"
-test -n "$required" || { echo "$manifest lists no checks"; exit 1; }
+# `|| true` is load-bearing. grep exits 1 when nothing matches, and under
+# `set -e` the assignment then kills this script on the spot — so a manifest
+# emptied down to its comments exited 1 with NO MESSAGE AT ALL, which is a
+# terrible error for the one gate that decides whether a PR may merge. The
+# explicit test below is what must report it.
+required="$(grep -vE '^\s*(#|$)' "$manifest" | tr -d '\r' || true)"
+test -n "$required" || {
+  echo "EMPTY MANIFEST: $manifest lists no checks."
+  echo '  Every line is blank or a comment, so ci-required would require nothing and'
+  echo '  pass trivially. A manifest that gates nothing is not a manifest.'
+  exit 1
+}
 echo "required checks:"; echo "$required" | sed 's/^/  - /'
 
 # ADR-002: the fan-in guard rejects `continue-on-error` on any required lane,
