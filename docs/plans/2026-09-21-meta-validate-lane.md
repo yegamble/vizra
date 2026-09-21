@@ -265,6 +265,42 @@ that did not land cannot be mistaken for a demonstration. Transcripts:
 `docs/evidence/meta-validate/demo-1…9`, `ci-run-validate.txt`,
 `ci-run-ci-required.txt`.
 
+### Fix round 2 — verifier findings 5–8 at `5dfa75c`
+
+Head after the round: **`f9b85537fa1f596b6d01556bd868e280e27c3570`**.
+`validate` success (5s), `ci-required` success (9s). Ledger byte-identical to
+base on all four quality JSON files.
+
+**Finding 8 — a latent FALSE RED I introduced in round 1.** Range expansion read
+`docs/evidence/VZ-FOUND-008/2026-09-21.md` as `VZ-FOUND-008` + list member
+`2026`, inventing `VZ-FOUND-0008` and `VZ-FOUND-2026` and turning the lane red
+on a correct document. Reproduced before fixing. A continuation now requires a
+non-digit, non-hyphen boundary AND the same digit width as the id it continues,
+that width derived from `features.json`. Verified: the path stays green,
+`VZ-TOPOLOGY-001…003/006/007` still expands to five, `VZ-CI-001/888` still red.
+
+**Finding 5 — provenance named the wrong tree.** The lane now prints PR head,
+base, and `git rev-parse HEAD`. This run: head `b470a0e`, base `3b63c0e`, tree
+under test `386fbfc`. COMMANDS.md explains what a green `ci-required` covers.
+
+**Finding 7 — three more lane rules**: step-level `shell:`, self-hosted
+`runs-on`, job-level `uses:`. Fixture floor 5 → 8. Job-level `if:` stays
+unchecked and is stated as such with its reason.
+
+**Finding 6 — wording.** "Equal in both directions" was overstated; the
+undeclared-output check is a change detector. Corrected in the script header,
+COMMANDS.md and the PR body, along with the "92 markdown files" claim (that
+count came from the merge tree; the head has 88).
+
+**Two process errors in this round, both recorded rather than smoothed over:**
+the first re-run of demos 8 and 9 was silently reverted by the demo script's own
+`git reset --hard` trap (the evidence files are tracked now), and demo 9e was
+initially red for the WRONG reason — a broken one-liner truncated `validate.yml`
+so the checker reported `UNEVALUABLE (file is empty)` instead of
+`conditional-step-on-required-lane`. Transcripts are now written outside the
+repository and copied in after the reset, and the mutation asserts it grew the
+file.
+
 ## Blockers and handoff
 
 No blockers. State is **READY_FOR_REVIEW**, not VERIFIED: an independent
