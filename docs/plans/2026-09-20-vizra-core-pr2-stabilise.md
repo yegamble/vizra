@@ -220,6 +220,58 @@ PR #1, plus the two new tests).
 `append-only` and `docker-build` run only in CI. `migrations/` and `api/` are untouched
 (`git diff main -- migrations/ api/` is empty), so `append-only` has nothing to object to.
 
+### 7. Round 1 after verifier FAIL at `1a6d8bd`
+
+Verifier evidence:
+`/Users/yosefgamble/github/vizra/docs/evidence/warroom/2026-09-20-vizra-core-pr2-stabilise-VERIFY.md`.
+V-1, V-2 and the `attempts` note were CLOSED and the root cause independently proven
+(175 of 300 claims returned no rows at base, 0 of 300 at head). One BLOCKER and two
+SHOULDs against my own work.
+
+**FINDING 1, BLOCKER — my new test introduced a 1-in-30 flake.**
+`TestAWorkerWithAPlainHandlerLogsNoCredentials` waited on `c.Attempts >= 1`. `ClaimJob`
+increments `attempts` at CLAIM time, so the wait was satisfied before the handler
+returned, before `RetryJob` ran, and before `jobs: retrying` reached the buffer the test
+asserts against. Fixed by waiting on the log buffer — the observable the assertion reads.
+Demonstrated deterministically with a 3 s sleep in the `leaky-retry` handler: old wait
+RED 3/3, new wait GREEN 3/3 with the sleep still in place, sleep then removed and not
+committed. Transcript and an audit of every other wait this PR added or touched:
+`docs/evidence/pr2/ROUND1-wait-on-the-observable.md`. Only this one waited on a proxy.
+
+**FINDING 2, SHOULD — the AGENTS.md row overclaimed.** It said `safeError` was applied
+"at every error log site"; 8 of 11 still passed unredacted text (pgx driver errors).
+Rather than narrow the sentence, `safeError` is applied at **all 11** — the safety of the
+eight rested on how a third-party library formats its errors today, and a no-op call
+costs nothing. A sentence is not enforcement, which is how the overclaim happened, so
+`TestEveryErrorLogSiteInTheWorkerIsRedacted` parses `worker.go`'s AST, asserts every
+`"error"` value is `safeError(...)`, and fails if the count drifts from 11. Unwrapping
+one site is RED with file and line.
+
+**FINDING 3, SHOULD — GitGuardian.** Two per-path entries with written reasons added to
+`.gitguardian.yaml` in its own one-path-one-reason style, no blanket glob:
+`internal/integration/golden_test.go` (the flagged hit is the `s3cr3tpw` fixture the next
+assertion requires to be absent) and `docs/evidence/pr2/` (the transcripts quote those
+fixtures verbatim), scoped to this slice so a future slice needs its own reason. The
+triage table moved from a PR comment into the PR body.
+
+**But the entries cannot turn the check green, and that is a finding for the chair.**
+`grep -rn "ggshield\|gitguardian" .github/` finds no workflow step — only the CODEOWNERS
+line protecting the file. The red check is the GitGuardian **GitHub App**, which scans
+server-side and reports to the dashboard; `.gitguardian.yaml` is a **ggshield CLI**
+config. Measured: the App reported `1 secret uncovered … scan of 4 commits` both before
+and after adding an exclusion naming the flagged file — if the file were read, the count
+would be 0. So the five pre-existing entries have never been applied by the check that is
+red either. No further entry will fix it. Turning it green needs a dashboard-side ignore
+(owner action on the GitGuardian account) or a `ggshield secret scan` CI step — a new
+lane, and `required-checks.txt` / `FLOOR_LANES` is owner territory. Flagged, not acted
+on. GitGuardian is not a required lane.
+
+**FINDING 4, NIT — recorded:** a **third** test carried the V-1 clock defect,
+`TestAJobWhoseWorkerDiedIsReclaimedAndCompleted` (`golden_test.go:1196`). Neither the
+PR #1 verifier nor my round-0 write-up named it; the same one-line fix closed it, and it
+did not fail once in the verifier's 120 runs at head. Its own wait is on `succeeded`,
+which is what it asserts — it does not carry FINDING 1's proxy-wait defect.
+
 ## Blockers and handoff
 
 No blockers. Containers `vizra-pr2-pg`, `vizra-pr2-valkey`, `vizra-pr2-redis` removed at
