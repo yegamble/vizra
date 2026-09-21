@@ -365,3 +365,211 @@ Challenge: "Nothing secret reaches it today." I could not construct a leak, whic
 ---
 
 BLOCKING FINDINGS OPEN AT 32b616d: N-1 (already-claimed 409 writes one permanent audit row per anonymous request; `internal/httpapi/setup.go:341`)
+
+---
+
+## Chair note on the security seat's re-review at `59a19c5` (2026-09-21, tick 114)
+
+Everything the seat flagged at `32b616d` is CLOSED (N-1…N-6, S-5, S-8, S-10); the migration delta is comment-only and the frozen object did not move; the restructured claim leaks nothing new and leaves no partial state when `vizra claim-token` supersedes mid-claim; the cache-first 409 cannot be poisoned; `ErrUnavailable` cannot carry the DSN. **One NEW blocker, a regression introduced by the round:** putting `claim-status` under the hard ceiling was right, but it shares ONE counter with the POST — 600 body-less anonymous GETs exhaust the window and the operator's valid token is answered 429 for 15 minutes, repeatable at ~40 requests/minute, on the endpoint that advertises `claimed:false`. Fix: a ceiling key per route, a test that a status flood does not starve the claim (and vice versa), and a mutation collapsing the keys. Taken in the same round: NEW-4 (deny when either origin normalises to ""), and the first half of NEW-2 (log the wrapped cause of a 503 once, through `obs.Redact`, where `ErrUnavailable` is mapped). Queued: NEW-2's httpapi redaction-coverage test → core sweep B3; NEW-3 (the pool guard wants a CONCURRENCY bound, not a fixed-window count that 600 requests can trip into a 15-minute lockout) → M1-B, with the number and the accepted residual recorded on VZ-INSTALL-003 meanwhile. Consolidated with the backend seat's NEW-1 (the same endpoint's undeclared 429 in the OpenAPI contract) and the verifier's verdict as fix round 2 of 2. The seat's re-review follows verbatim.
+
+---
+
+# Re-review at `59a19c5`
+
+**Date:** 2026-09-21 · **Head:** `59a19c5cc7eeef4154c5e39b6d13ab84f60b5290` (confirmed; worktree clean, one commit on `32b616d`, no force-push) · Read-only. I verified the migration delta is **comment-only** — `git diff 32b616d 59a19c5 -- migrations/` contains no DDL line, only the ASCII-username rationale block and the two re-pinned manifest digests. The frozen object did not move.
+
+## Status per finding
+
+| # | Status at 59a19c5 | Reason (file:line) |
+|---|---|---|
+| **N-1** — per-request `already_claimed` audit row | **CLOSED** | Row removed; the monotonic cache short-circuits 409 before the pool is touched — `internal/httpapi/setup.go:241-256` (cache-first 409), `:375-380` (`ErrAlreadyClaimed` now only sets the bit, no `recordClaimRefusal`). `TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail` `internal/integration/owner_claim_test.go:1584`. The authoritative in-transaction gate stays (`internal/ownerclaim/ownerclaim.go:441-448`). |
+| **N-2** — claim-status bypassed the cache and the ceiling | **CLOSED (with a regression, see NEW-1)** | `setup.go:194-206`: now `allowClaimRequest` + `instanceClaimed`; comment corrected at `internal/httpapi/setup_limits.go:59-69`. `TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed` `:1839`, `TestClaimStatusIsBoundedByTheHardCeiling` `:1872`. |
+| **N-3** — raw-string Origin comparison | **CLOSED** | `internal/config/origin.go:36-85` (case, trailing slash, trailing dot, default port, IPv6 literal bracketing; `""` for path/query/fragment/userinfo/non-ASCII); normalised once at load and **stored** `internal/config/config.go:294-304`; non-ASCII is a boot refusal whose message names a generic punycode example and **does not echo the configured value** (`config.go:297`); `setup.go:345-352` compares values; `vizra doctor` check `internal/doctor/doctor.go:356-386`. Five tests in `internal/config/origin_test.go` including the userinfo, query, fragment and non-ASCII negatives at `:68-83`. |
+| **N-4** — correct-but-dead token bought a derivation | **CLOSED** | Liveness pre-check on the column the query already returns — `ownerclaim.go:408-419`, returning the same `ErrTokenNotAccepted`. `TestACorrectButDeadTokenCostsNoDerivation` `:1124`. |
+| **N-5** — boot read liveness outside the advisory lock | **CLOSED** | Every decision now inside the lock — `ownerclaim.go:222-251` (`onlyIfNoLiveToken`, `ErrLiveTokenExists`); `announce.go:75-95` announces the command with the live generation instead of minting. `TestConcurrentBootsMintExactlyOneToken` `:1671`, forced deterministically with a third connection holding the lock. |
+| **N-6** — mint guard was application-only | **CLOSED** | `store/queries/owner_claim.sql:36-39` — `INSERT … SELECT … WHERE NOT EXISTS (SELECT 1 FROM users)`, so a claimed instance yields `ErrNoRows` → `ErrHasUsers` (`ownerclaim.go:277-284`). `TestMintIsRefusedByTheDatabaseOnAClaimedInstance` `:1748`. |
+| **N-7** — `errorHandler` logs `err.Error()` unredacted | **PARTIAL** | Improved by accident and regressed in one way — see NEW-2. `internal/httpapi/middleware.go:154-157` is unchanged. |
+| **S-5** — anonymous input is not an unbounded writer into the undeletable table | **CLOSED** | Both sibling paths now hold: 429 writes nothing per request and one row per bucket per window (`setup.go:436-448`); 409 writes nothing (`:375-380`). |
+| **S-8** — request posture | **CLOSED** | Content type, `MaxBytesReader`, `DisallowUnknownFields`, `dec.More()`, origin posture and the doctor clause all present (`setup.go:249-289`, `:325-362`; `doctor.go:356-386`). `c.Bind` still unused anywhere. |
+| **S-10** — zero derivations on every non-201 path | **CLOSED** | Read phase / write phase split (`ownerclaim.go:360-470`); the one real exception is now stated rather than implied, in `AGENTS.md` and in the code. |
+
+**Nothing I flagged is still OPEN.** Two new items below, one of which I am calling blocking because this round introduced it.
+
+---
+
+## What the restructure changed from the attacker's side
+
+I re-walked the whole path. Answers to the specific questions:
+
+- **Read phase outside a transaction — can anything be learned or amplified?** No new information. A wrong token now returns after two pooled reads with no hash; a *correct but dead* token returns at the same point (`ownerclaim.go:415-419`), so the ~26 ms shoulder I flagged at `32b616d` is gone and the five 403 causes are now close to indistinguishable in latency as well as in status, code and message. The only remaining timing divergence is "correct **and live**" (which then hashes) — and that is knowable from the 201. A stale read cannot do harm: the authoritative `AnyUserExists` re-runs inside the transaction (`:441-448`), the redeem CTE re-matches the digest against the **committed** row under READ COMMITTED, and `users_one_owner` is the final arbiter.
+- **Two holders of the valid token both hashing.** Bounded: `credential.Argon2id.sem` at `DefaultConcurrency()` = min(GOMAXPROCS, 4), waiters honour the request context and fail `ErrBusy` → 503 (`internal/credential/credential.go:111-129`, `setup.go:386-388`). Peak transient ≈ 76 MiB. No pooled connection is held during the derivation any more, which removes the worse version of this (idle-in-transaction pool exhaustion).
+- **A claimant that passes the read phase while `vizra claim-token` supersedes.** Traced: the CLI's `Mint` overwrites `token_sha256` in place, so the in-flight claimant's `row.TokenSha256` no longer matches the committed row; the redeem CTE's `token_sha256 = $1` predicate matches nothing → empty CTE → `owner` selects from nothing → no rows → `pgx.ErrNoRows` → `LiveOwnerExists` false → uniform 403. The transaction rolls back with **no partial state** — no user, no orphan credential, token not consumed. Correct.
+- **Cache-first 409 — can it deny a claim, or let a request through?** No, in both directions. `claimedCache.get` returns `true` only from `claimed.Load()` (`setup.go:76-85`), and `set(true, …)` is reachable only from a real observation that users exist (201, `ErrAlreadyClaimed`, 23505 on `users_one_owner`, `LiveOwnerExists` true, or a real status lookup). There is no path that sets it from attacker input, so a false 409 on an unclaimed instance is unreachable. The reverse is harmless: a cold or stale-`false` cache merely lets the request proceed to `Claim`, whose read-phase and in-transaction gates both answer 409.
+- **Origin normalisation edge cases.** userinfo, query, fragment and a path all normalise to `""` and are therefore **boot refusals** (`config.go:294-297`) rather than silently-unmatchable values; `https://h:443` ≡ `https://h`; `http://h:8080` keeps its port; IPv6 literals round-trip with brackets; a trailing dot is stripped; a wildcard host normalises to something no browser can send. The boot-refusal message names a generic `xn--` example and never the operator's value.
+- **Does an `ErrUnavailable` `%v` leak the DSN?** No. `unavailable` (`ownerclaim.go:114-120`) formats the driver error, but pgconn already redacts: `ParseConfigError` runs `redactPW` (`pgx/v5@v5.11.0/pgconn/errors.go:143,236`) and `connectError`'s prefix is `failed to connect to \`user=%s database=%s\`` (`errors.go:68`) — no password, no host. And the 503 body is a fixed string (`setup.go:390-396`); the cause never reaches the client.
+- **No new logging or printing of secrets.** The diff introduces **zero** new `Logger`/`Fprint` sites in product code (only in `demonstrate.sh` mutations).
+
+---
+
+## BLOCKING-BEFORE-MERGE
+
+```
+FINDING NEW-1: the claim-status GET now shares one hard-ceiling bucket with the POST, so a trivial anonymous GET flood denies the operator's claim
+Severity:    BLOCKER
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     internal/httpapi/setup_limits.go:70-77 — a single key, st.CacheKey("rl","setup.claim","ceiling"), limit 600, window 15m
+             internal/httpapi/setup.go:194-200 (handleClaimStatus now calls allowClaimRequest)
+             internal/httpapi/setup.go:236-240 (handleClaimOwner calls the same)
+             internal/integration/owner_claim_test.go:1872 (TestClaimStatusIsBoundedByTheHardCeiling trips it in 700 GETs and stops there)
+  requirements: VZ-INSTALL-003; chair adoption line S-7 — "a request with the valid token is never answered 429 by the failure limiter"
+
+Observed:
+  At 32b616d only the POST consumed the ceiling. This round — correctly — put the GET
+  under it too, but through the SAME counter. A GET needs no body, no content type, no
+  origin header and no token. 600 of them in a few seconds exhaust the shared window, and
+  for the remainder of those 15 minutes the operator's POST carrying the correct token is
+  answered 429 before it is ever parsed (setup.go:236 runs first). Repeat indefinitely at
+  ~40 requests/minute.
+  `claim-status` is also the endpoint that advertises `claimed:false`, so a scanner already
+  has both the target list and the cheapest possible way to hold every unclaimed instance
+  shut.
+
+Failure:
+  Denial of claim by an unauthenticated stranger — the exact failure the failure-keyed
+  limiter was adopted to remove — reachable more cheaply than before this round, and only
+  during the unclaimed window, which is the one window where it matters. It is not a data
+  or privacy failure: nothing is lost or exposed, and the endpoint recovers when the window
+  rolls. But an operator has no application-level workaround, and the 429 is
+  indistinguishable to them from legitimate load.
+
+  I am calling it blocking because it is a REGRESSION this round introduced, not the ruled
+  trade being re-litigated: the ruling said the ceiling may refuse a valid token; it never
+  said status polling should compete for the operator's budget. (For the record, the
+  broader "600 in a fixed window is deliberately trippable by anyone" was already true for
+  POSTs at 32b616d and I did not raise it — that half is NEW-3 below, and mine to own.)
+
+Perspective: operator (cannot claim a new instance), business (a scanner-visible first-run failure)
+
+Recommendation:
+  Split the bucket: a separate ceiling key per route (…"ceiling.status" and …"ceiling.claim"),
+  so a GET flood cannot consume the POST's budget. Three lines and one constant.
+  Optionally raise the status ceiling, since after N-2 a claimed instance serves it from
+  memory and an unclaimed one performs one trivial read.
+
+Acceptance criteria:
+  After exhausting the status ceiling, a POST carrying the valid token still succeeds.
+  After exhausting the POST ceiling, claim-status still answers.
+
+Tests:
+  `TestAStatusFloodDoesNotStarveTheClaim` (integration: drive claim-status past its ceiling,
+  then claim with a valid token -> 201). Extend TestClaimStatusIsBoundedByTheHardCeiling to
+  assert the POST is unaffected. Mutation: collapse the two keys back into one -> red.
+
+Cross-repo implications: core | user: if the claim page polls claim-status, its interval must
+  be stated so the status ceiling can be chosen against it | search: none | meta: none
+
+Challenge:
+  "The ceiling's trade was ruled and stated." It was — for the POST. Nothing ruled that the
+  read surface and the write surface share one counter, and the code's own comment
+  ("BOTH setup routes call it — which is what the name claims") reads as if sharing were the
+  intent rather than a side effect.
+```
+
+---
+
+## FOLLOW-UPS
+
+```
+FINDING NEW-2: the 503 path now discards the cause, and the 500 path still logs it unredacted
+Severity:    SHOULD
+Confidence:  high
+Slice:       M1-B, or core hardening sweep B
+
+Affected:
+  repo:      vizra-core
+  files:     internal/httpapi/setup.go:390-396 (ErrUnavailable -> codedError with a canned message; the wrapped cause is dropped)
+             internal/httpapi/middleware.go:143-157 (a codedError >= 500 logs ce.Error(), i.e. the canned text; a non-coded 500 logs err.Error() raw, unredacted)
+  requirements: AGENTS.md "No credential ... ever reaches a log line"; ADR-003 503-not-401
+
+Observed:
+  ErrUnavailable is the right fix for F1 and closes the contract gap. Its side effect is that
+  a database outage on the claim endpoint now produces a 503 whose ONLY log line is
+  "the instance state could not be read" — the pgconn cause is never written anywhere. That
+  is a diagnostic regression on the one endpoint an operator cannot skip (readiness and
+  doctor still cover it, which is why this is a SHOULD).
+  The other half of my N-7 is unchanged: a genuine 500 logs err.Error() with no obs.Redact,
+  and internal/httpapi still has no equivalent of the worker's
+  TestEveryErrorLogSiteInTheWorkerIsRedacted coverage test. I could construct no leak —
+  pgconn redacts the password and omits DETAIL — so this remains a hardening gap, not a defect.
+
+Recommendation: log the wrapped cause once, through obs.Redact, at the point ErrUnavailable
+  is mapped; and add the httpapi twin of the worker's redaction-coverage test.
+Tests: `TestADatabaseOutageIsDiagnosableFromTheLog`; `TestEveryErrorLogSiteInTheAPIIsRedacted`.
+Cross-repo implications: core | meta: none
+Challenge: "An operator reads /readyz, not the request log." Usually — but the 503 they were
+  handed carries a request id that now resolves to nothing.
+```
+
+```
+FINDING NEW-3: the hard ceiling is a fixed-window count, so it is trippable on purpose; the pool it guards wants a concurrency bound
+Severity:    SHOULD
+Confidence:  high
+Slice:       M1-B or core hardening sweep B
+
+Affected:
+  repo:      vizra-core
+  files:     internal/httpapi/setup_limits.go:34-40 (claimHardCeiling = 600 / 15 min), :70-77
+  requirements: chair adoption line S-7
+
+Observed:
+  The control's stated job is "keep a flood of one-row SELECTs from exhausting the connection
+  pool" — a CONCURRENCY property. It is implemented as a fixed-window request count, which
+  means 600 cheap requests buy a 15-minute lockout of a valid claim. This predates 59a19c5
+  (it applied to POSTs at 32b616d) and I did not raise it in round 1; recording it as my miss.
+Recommendation: bound in-flight setup requests with a semaphore sized to a slice of the pool,
+  and keep the window counter only as a far-above-plausible backstop. A concurrency bound
+  protects the pool exactly and can never lock an operator out for a fixed period.
+Tests: `TestTheSetupPoolGuardIsAConcurrencyBoundNotALockout`.
+Cross-repo implications: core | meta: if the chair prefers to keep the window, record the
+  number and the accepted residual on VZ-INSTALL-003 rather than leaving it in a comment.
+Challenge: "A flood past it is a network-level DoS anyway." 600 requests in 15 minutes is not
+  a flood; it is a cron job.
+```
+
+```
+FINDING NEW-4: checkOrigin would match on two unnormalisable values — unreachable today, one line to make impossible
+Severity:    NIT
+Confidence:  high
+Slice:       M1-B
+
+Affected:
+  repo:      vizra-core
+  files:     internal/httpapi/setup.go:345-352 (`NormalizeOrigin(origin) != NormalizeOrigin(want)`)
+             internal/config/origin.go:34-35 (the doc comment asserts a caller "can never match on
+             'both were unparseable'" — that property comes from the BOOT REFUSAL, not from this code)
+
+Observed:
+  If Config.PublicOrigin ever normalised to "", an `Origin: null` request (which also
+  normalises to "") would pass the check. In production it cannot: LoadFrom refuses such a
+  value at boot (config.go:294-297) and stores the normalised form, and
+  TestProductionRefusesAnOriginItCannotCompare pins that. So this is unreachable — but the
+  comparison itself is fail-open, and a hand-built Deps.Config in a future test or tool would
+  reach it.
+Recommendation: deny when either side normalises to "". One line, and it makes the doc
+  comment true of the code rather than of a neighbouring package.
+Tests: add `Origin: null` against an empty configured origin to TestOriginsAreComparedNormalisedNotAsStrings.
+Cross-repo implications: none
+Challenge: "It is unreachable." It is — which is why this is a NIT and not a finding I would
+  hold a merge for.
+```
+
+**Residual I accept without a finding, recorded so it is not rediscovered:** `MintOwnerClaimToken`'s `WHERE NOT EXISTS (SELECT 1 FROM users)` is evaluated at statement snapshot under READ COMMITTED, so an operator running `vizra claim-token` at the exact instant a claim commits can leave a live token row on a now-claimed instance. It is inert — the claim gate is `EXISTS(users)`, checked before the token is ever read — and the next boot supersedes it (`announce.go:63-72`). Closing it would need SERIALIZABLE or a lock on `users`; not worth it.
+
+**New things this round introduced that I have no objection to:** the ASCII-username rationale frozen into 0005's header (comment-only, and the homograph reasoning is correct for a URL-bearing handle); `ErrLiveTokenExists` and the `superseded` audit row on re-mint; the `superseded_at` predicate kept and labelled as defence-in-depth with an accurate note that it is unreachable today; `TestUsersOneOwnerFiresThroughTheHandler`'s uncommitted-blocker technique; the CLI driven as a real binary; and the three AGENTS.md rows rewritten to what is true rather than to what was aimed at — including the honest "one exception" on the zero-derivations claim. The round also reported a defect in its own evidence (`TestNoConnectionIsHeldWhileHashing` watched the wrong pool) and declared two mutations review-only with the measurement rather than dropping them. That is the behaviour this process is for.
+
+---
+
+BLOCKING FINDINGS OPEN AT 59a19c5: NEW-1 (claim-status and claim-owner share one hard-ceiling bucket, so an anonymous GET flood answers the operator's valid token 429; `internal/httpapi/setup_limits.go:70-77`)

@@ -603,3 +603,276 @@ The single Makefile edit moves `TestM0ContractIsTheFourProbes` to `TestPublicCon
 ---
 
 **BLOCKING FINDINGS OPEN AT 32b616d:** FINDING 1 (database-unreachable returns 500 where the contract promises 503), FINDING 2 (boot's live-token check outside the advisory lock — concurrent boots both mint), FINDING 3 (unbounded `already_claimed` audit rows on every claimed instance), FINDING 4 (argon2id inside the claim transaction), FINDING 5 (clock test cannot go red; conflict test mislabelled; MUT-17 cited but absent), FINDING 6 (the frozen down file does not state that re-applying 0005 fails 23503).
+
+---
+
+## Chair note on the backend seat's re-review at `59a19c5` (2026-09-21, tick 114)
+
+All six of the seat's blockers (F1–F6) and its follow-ups F-2, F-3, F-5, F-6 are CLOSED; it would change nothing else in migration 0005 before it freezes and traced every interleaving of the restructured claim to the declared 409/403. **One NEW blocker, introduced by the round itself:** NEW-1 — the hard ceiling added to `GET /setup/claim-status` makes it able to answer 429, but `api/openapi.yaml` declares only 200 and 503 for that operation, and the status-coverage test written this round inspects the POST only. The contract is this PR's to freeze, so it blocks. Taken in the same round because the branch is open: NEW-2 (the 409-vs-403 re-read launders a database error into "token not accepted" and charges the failure budget → 503), NEW-3 (`t.Skipf` in the DB-down test → `t.Fatalf`; core PR #9 will make any skip red by name), FU-1 (`Boot` maps a benign `ErrHasUsers` race to Degraded → Claimed), FU-3 (score MUT-6 and MUT-1b by calling the generated `ClaimOwner` query directly). FU-2 (the "implicitly claimed" invariant as `AND NOT EXISTS (SELECT 1 FROM users)` in the redeem CTE) is query-only and cheap — taken now too, since M1-B's registration route is the first thing that could race it. Consolidated with the security seat's re-review and the verifier's verdict as fix round 2 of 2. The seat's re-review follows verbatim.
+
+---
+
+# Re-review at 59a19c5 — `vizra-core` PR #8 (M1-A owner claim, VZ-INSTALL-003)
+
+**Reviewer:** `vizra-core` backend seat · **Date:** 2026-09-21
+**Tree:** `/Users/yosefgamble/github/vizra/.claude/worktrees/core-m1-owner-claim`, `git rev-parse HEAD` = `59a19c5cc7eeef4154c5e39b6d13ab84f60b5290`, `git status --porcelain` empty, `59a19c5` on top of `32b616d`, no force-push.
+
+**UNVERIFIED:** no PostgreSQL 18 reachable to me this round (no credentials for the verifier's container; I will not start one). I did not run `sqlc generate`, `sqlc diff`, `make ci` or the suite. Test *execution*, `sqlc-verify` and the PG 18 transcripts are the verifier's. Everything below is read from the bytes at this SHA.
+
+---
+
+## Status table
+
+| # | Status | Reason (file:line) |
+|---|---|---|
+| **F1** DB-unreachable → 503 not 500 | **CLOSED** | `ErrUnavailable` + the `unavailable()` wrapper (`internal/ownerclaim/ownerclaim.go:96-118`), applied to BeginTx, the lock, both read-phase queries, the mint, the redeem's non-PgError branch and both Commits; mapper branch `internal/httpapi/setup.go:390-396`; `TestOwnerClaimAnswers503WhenTheDatabaseIsDown` (`owner_claim_test.go:1789`, mechanism stated: a pool pointed at `127.0.0.1:1`); `TestNoClaimErrorMapsToAnUnhandledFiveHundred` extended to the sentinel classes (`setup_test.go:185-205`); MUT-28 (`demonstrate.sh:257`). The `*pgconn.PgError` carve-out at `ownerclaim.go:110-113` is correct — a server that answered is not an outage |
+| **F2** boot liveness outside the lock | **CLOSED** | Liveness read is now inside `Mint` after `pg_advisory_xact_lock` (`ownerclaim.go:249-255`); `Boot` no longer decides (`announce.go:75-77,87-95`) and announces the live generation on `ErrLiveTokenExists`; `TestConcurrentBootsMintExactlyOneToken` (`owner_claim_test.go:1671`) is deterministic via a third connection holding lock id 1, and asserts minted=1, printed=1, generation=1, one `minted` audit row; MUT-14b (`demonstrate.sh:247`) |
+| **F3** unbounded `already_claimed` rows | **CLOSED** | The audit call is gone and replaced by `s.claimed.set(true, …)` (`setup.go:374-380`); a cached-true 409 short-circuits before the pool (`setup.go:241-256`); `TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail` (`owner_claim_test.go:1584`); MUT-11c, MUT-11d (`demonstrate.sh:231,235`) |
+| **F4** argon2id inside the transaction | **CLOSED** | Read phase on the pool with no transaction, then `BeginTx(ReadCommitted)` → authoritative `AnyUserExists` → `ClaimOwner` → audit → commit (`ownerclaim.go:368-500`); `TestNoConnectionIsHeldWhileHashing` observes `e.srvPool.Stat().AcquiredConns()` (`owner_claim_test.go:1640-1668`), the fix the builder describes; MUT-29 (`demonstrate.sh:239`) |
+| **F5** tests that cannot go red / mislabelled / phantom MUT-17 | **CLOSED** | Clock test now asserts `minted_at = expires_at - ttl` on **both** the INSERT and the ON CONFLICT path (`owner_claim_test.go:1438-1471`) with MUT-30; `TestUsersOneOwnerFiresThroughTheHandler` forces a real 23505 through the handler with an **uncommitted** concurrent owner insert (`:1905-1962`) and pins the message, not just the status; the old test is renamed honestly to `TestAClaimAgainstAnOutOfBandOwnerIs409NotFiveHundred` (`:1401`); MUT-17 exists (`demonstrate.sh:227`); every review-only entry now carries a MEASUREMENT and a reason (`demonstrate.sh:296-356`) |
+| **F6** frozen down-file sentence | **CLOSED** | `migrations/0005_users_credentials_owner_claim.down.sql:8-24` — names the 23503, names the up file's validating `ADD CONSTRAINT`, scopes the file to a never-claimed development database, routes a claimed instance to restore, and states why `NOT VALID` was rejected. Accurate on all four counts |
+| **R-A** claim-status cached + ceilinged | **PARTIAL** | Both taken (`setup.go:194-203`), `TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed` (`:1839`), `TestClaimStatusIsBoundedByTheHardCeiling` (`:1872`), MUT-33/MUT-34. **But the ceiling makes the GET able to return 429 and the contract declares only 200/503** → NEW-1 |
+| **F-1** M1-B: `claimExemptRoutes` must never gain a user-creating route | open as a **follow-up (M1-B)** | Unchanged; the control is `TestClaimExemptRoutesAreExactlyTheProbesAndSetup` (`setup_test.go:53`) |
+| **F-2** mint guard in SQL | **CLOSED, taken now** | `store/queries/owner_claim.sql:49-51` `SELECT … WHERE NOT EXISTS (SELECT 1 FROM users) ON CONFLICT …`; `ownerclaim.go:279-285` maps `pgx.ErrNoRows` → `ErrHasUsers`; `TestMintIsRefusedByTheDatabaseOnAClaimedInstance` calls the generated query **directly** (`owner_claim_test.go:1748`); MUT-32 |
+| **F-3** dead supersede call / missing `superseded` row | **CLOSED** | The dead `SupersedeLiveOwnerClaimToken` call is gone; `prior.Live` now emits `ActionOwnerClaimSuperseded` with the generation it kills (`ownerclaim.go:257-275`); `TestASupersedingRemintRecordsTheGenerationItKilled` (`:1768`) |
+| **F-4** M2 erasure/retention ledger ID | **follow-up (M2)** | Chair's queue; the 0005 header carries the debt |
+| **F-5** ASCII-only username as a decision | **CLOSED** | `0005…up.sql:77-85` — states the homograph reason, names `display_name` as the Unicode carrier, cites VZ-I18N-001, and says the widening is an annotated-destructive CHECK swap |
+| **F-6** generated-fold escape | **CLOSED** | `0005…up.sql:22-27` — `ALTER TABLE users ALTER COLUMN email_fold DROP EXPRESSION` (PG 13+). I re-checked `scripts/migrate-lint.sh`'s pattern: `DROP EXPRESSION` is not in the `DROP (TABLE\|COLUMN\|CONSTRAINT\|INDEX\|TYPE\|SCHEMA\|VIEW\|SEQUENCE)` alternation and the `ALTER COLUMN … TYPE` clause does not match either. The sentence is true |
+| **B-5** boot minting | **CLOSED** | via F2 |
+| **B-6** bound the anonymous writer | **CLOSED** | via F3 |
+| **B-R4** complete error map | **CLOSED** | via F1 + MUT-17 + `TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs` (`setup_test.go:213-246`). Deadline → **503 `unavailable`**, both via the explicit `ctxDeadline`/`ctxCanceled` branch (`setup.go:404-407`) and via `unavailable()` wrapping a deadline-failed query — same answer either way, and 503 is declared |
+| **B-R12** one explicit transaction | **CLOSED** | via F4; the transaction now contains exactly gate → ClaimOwner → audit → commit |
+| **B-R8** PG 18 acceptance evidence | **PARTIAL / UNVERIFIED by me** | No PG 18 reachable this round; transcripts regenerated (`01-integration-pg18.txt` +352/−…, `02-mutations.txt` +661), verifier owns reproduction. No `uuidv7()` anywhere; ids stay `uuid.NewV7()` |
+
+---
+
+## The things only the restructure could show
+
+**The read-phase / transaction split is correct.** Traced every interleaving of two claimants that both pass the read phase:
+
+- Winner commits before the loser's in-transaction `qtx.AnyUserExists` — under READ COMMITTED that statement takes a fresh snapshot, sees the row, returns `ErrAlreadyClaimed` → **409**.
+- Both pass the gate — the loser's redeem CTE blocks on the winner's row lock on the singleton token row, then re-evaluates `consumed_at IS NULL` against the **committed** version: zero rows in `consumed` → zero in `owner` → zero in `cred` → zero from the final `SELECT … FROM owner, cred` → `pgx.ErrNoRows` → re-read → **409**.
+- With `consumed_at IS NULL` removed (MUT-1b), the loser instead blocks on `users_one_owner` and raises 23505 → **409** with the same message — which is why that mutation is green, and the transcript says so with a measurement (`demonstrate.sh:341-356`). `TestUsersOneOwnerFiresThroughTheHandler` proves the index path independently.
+- Nothing read in the read phase is trusted: the gate re-runs in the transaction, the CTE re-matches the row's own digest against the committed row, `users_one_owner` is the final arbiter. A stale read can only route a request into a transaction that then refuses.
+
+**One ordering does produce something other than 409/403** — see NEW-2: if the database dies between the redeem and the 409-vs-403 re-read, the loser gets 403 rather than 503.
+
+**The wasted derivation is correctly bounded.** N claimants holding the valid token perform N derivations, N−1 wasted. The bound is `credential.DefaultConcurrency()` = `min(GOMAXPROCS,4)` simultaneous (`internal/credential/credential.go:87-92`), ≤76 MiB transient, and a waiter fails on the request context with `ErrBusy` → 503, never an unbounded queue (`credential.go:115-120`). Only a holder of the valid token reaches the hasher at all — now proven twice, by `TestNoPasswordHashingOccursWithoutAValidToken` and by the new `TestACorrectButDeadTokenCostsNoDerivation` (`owner_claim_test.go:1124`). That second one is a genuine improvement nobody asked for: before the liveness pre-check, a *correct but dead* token cost 26 ms while a wrong one cost nothing, which was itself a small oracle. The pre-check removes it.
+
+**The mint statement traces correctly, and I verified both arms.** `WHERE NOT EXISTS (SELECT 1 FROM users)` gates the **source** rows, so when users exist the INSERT has nothing to insert, the `ON CONFLICT` arm is never reached, `RETURNING` yields zero rows, sqlc `:one` scans into `pgx.ErrNoRows`, and `ownerclaim.go:279-285` converts it to `ErrHasUsers` — the CLI's existing refusal text, unchanged. Residual worth stating precisely: the `NOT EXISTS` is evaluated in the mint statement's own READ COMMITTED snapshot, so a claim that commits *during* that statement is not seen. The window shrinks from a full round trip to one statement, and the mint holds the advisory lock while the claim does not — a reduction, not an elimination. It is not exploitable (a token minted after a claim is refused by `AnyUserExists` before it is ever read) and the next boot supersedes it. The comment at `store/queries/owner_claim.sql:36-45` claims exactly this much and no more, which is the right strength.
+
+**Keeping the inner predicates as unobservable defence-in-depth is right.** MUT-6 (`expires_at > now()` in the redeem CTE): the Go pre-check reads `live`, which is itself computed **in SQL with the database clock** (`owner_claim.sql:30`), so expiry has not moved into Go — only its observability has. The CTE predicate remains the only thing that makes expiry atomic with consumption across the ~26 ms hash. Keep it. MUT-1c (`superseded_at IS NULL`): correctly kept and correctly labelled — the predicate guards a path that does not exist yet.
+
+**Is any invariant now defended only in Go where it belongs in SQL?** One, and it is the same one as before the round: **"an instance with users is implicitly claimed"** is a Go decision over a SQL read (`ownerclaim.go:403-410`). Every other claim invariant is a constraint — one live owner (`users_one_owner`), one redemption (`consumed_at IS NULL` + the row lock), never mint on a claimed instance (now the statement), one token row (the singleton PK), argon2id-only secrets (now with its own negative test, `TestTheCredentialsCheckRefusesEveryNonArgon2idSecret`, `:1971`). See the M1-B follow-up for the cheapest way to close it; it is a query change, not a schema change, so it does not freeze here.
+
+**sqlc:** the generated diff is exactly the new statement text plus doc comments propagated from the `.sql` source, with the `Code generated by sqlc / DO NOT EDIT / sqlc v1.31.1` header intact and `Querier` regenerated in step. Consistent with a regenerate, not a hand edit. **UNVERIFIED** — `sqlc diff` is the verifier's `sqlc-verify` lane.
+
+---
+
+## Migration 0005 — last look at the bytes
+
+`git diff 32b616d..59a19c5 -- migrations/` is comments plus the manifest, exactly as stated. I read the frozen sentences and they are accurate and complete: the folding rule and its `DROP EXPRESSION` escape, the password raw-bytes rule, the erasure/retention debt with the `CREATE OR REPLACE FUNCTION` escape, the ASCII-username decision, the `credentials` scope note, the down file's 23503 consequence and its `NOT VALID` rationale.
+
+**I would change nothing else before it freezes.** The extension paths hold: M1-B adds `sessions` as a new table and `ALTER COLUMN email DROP NOT NULL` additively against an already-partial `users_email_fold_key`; M1-C's role change and owner transfer are plain `UPDATE`s against `users_one_owner … WHERE role='owner' AND tombstoned_at IS NULL` (I measured a single-statement swap succeeding against a partial unique index of this shape on PG 18.6 in the plan round); M2 adds `api_keys` and `oauth_identities` as their own tables and widens `credentials_kind` in **one annotated, reversible** migration — which is the whole reason that column is `text + CHECK` and `user_role` is an enum.
+
+---
+
+## OPEN / NEW findings
+
+```
+FINDING NEW-1: claim-status can answer 429, and the contract declares only 200 and 503
+Severity:    BLOCKER (contract drift, introduced by this round)
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     internal/httpapi/setup.go:194-199 (the ceiling added for R-A),
+             api/openapi.yaml — getSetupClaimStatus declares "200" and "503" only
+             (unchanged this round: `git diff --name-only 32b616d..59a19c5 -- api/` is empty),
+             internal/httpapi/setup_test.go:215 (the coverage test reads only
+             `spec.Paths.Find("/api/v1/setup/claim-owner").Post`)
+  requirements: VZ-INSTALL-003; B-R4; the chair's F1 ruling
+
+Observed:
+  R-A's fix put the hard ceiling on the GET:
+      if !s.allowClaimRequest(c) {
+          return newCodedError(http.StatusTooManyRequests, "rate_limited", ...)
+      }
+  The spec's getSetupClaimStatus lists two responses. `TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs`
+  — written this round precisely to stop this class of drift — inspects the POST
+  operation only, so it cannot see the GET. `openapi-verify` checks
+  route<->operation and never status codes.
+
+Failure:
+  The same defect F1 was about, one operation to the left, created by the fix to
+  R-A and guarded by nothing. vizra-user generates its client from this file; a
+  consumer that switches exhaustively on the declared statuses meets an
+  undeclared 429 and falls to its default branch. `api/openapi.yaml` is the
+  product contract, and this PR is the one that creates the /api/v1 surface.
+
+Perspective: developer (vizra-user), operator
+
+Recommendation:
+  1. Add the response to the spec, mirroring the POST's wording:
+
+       "429":
+         description: The hard request ceiling for the setup routes was reached.
+         content:
+           application/json:
+             schema:
+               $ref: "#/components/schemas/Error"
+
+  2. Make the coverage test a table over BOTH setup operations rather than one
+     hardcoded `.Post`, so the next route added to the group is covered by
+     construction:
+
+       for _, tc := range []struct{ path, method string; produced map[string]string }{
+           {"/api/v1/setup/claim-owner",  "POST", map[string]string{...}},
+           {"/api/v1/setup/claim-status", "GET",  map[string]string{
+               "200": "handleClaimStatus success",
+               "429": "hard ceiling",
+               "503": "instanceClaimed lookup failure"}},
+       } { ... }
+
+Acceptance criteria:
+  - Every status either setup operation can return is declared, and every
+    declared status is produced.
+  - Adding a status to either handler without the spec turns a named test red.
+
+Tests:
+  `TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs`, extended.
+  Mutation MUT-41: delete the "429" response from getSetupClaimStatus → red.
+
+Cross-repo implications:
+  user: the generated client gains the 429 case on claim-status.
+
+Challenge:
+  "429 is a generic transport status, clients handle it anyway." Then the POST
+  need not declare it either — and it does, in this same file, for this same
+  limiter. Either the contract enumerates statuses or it does not; half is the
+  only option that is actually wrong.
+```
+
+```
+FINDING NEW-2: the 409-vs-403 re-read launders a database error into "token not accepted"
+Severity:    SHOULD  (not merge-blocking)
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     internal/httpapi/setup.go:398-408 (the pgx.ErrNoRows branch),
+             internal/ownerclaim/ownerclaim.go:102-108 (ErrUnavailable's own doc:
+             "It must never be returned for a bad token: a database error
+             laundered into 'token not accepted' is worse than either answer alone")
+  requirements: ADR-003 ("a database outage returns 503, never 401"); B-R4
+
+Observed:
+  The loser path is
+      if pool, perr := s.poolFor(c); perr == nil {
+          if owner, oerr := ownerclaim.LiveOwnerExists(...); oerr == nil && owner { ... 409 }
+      }
+      return s.refuseToken(c)
+  Both `perr != nil` and `oerr != nil` fall through to a 403 with the uniform
+  "that claim token was not accepted" — and `refuseToken` additionally charges
+  the caller's failure budget for a failure that was the server's.
+
+Failure:
+  A database that dies between the redeem and the re-read answers 403 on a
+  request whose token was correct, and spends the operator's failure budget doing
+  it. Narrow — the re-read is one cheap query on a pool that worked milliseconds
+  earlier — and safe, but it is the exact rule this round's own sentinel exists
+  to enforce, contradicted three lines below where it is enforced.
+
+Perspective: operator
+
+Recommendation:
+  Distinguish the two fall-throughs. Three lines, the same sentinel:
+
+    case errors.Is(err, pgx.ErrNoRows):
+        pool, perr := s.poolFor(c)
+        if perr != nil {
+            return newCodedError(http.StatusServiceUnavailable, "unavailable",
+                "the instance state could not be read")
+        }
+        owner, oerr := ownerclaim.LiveOwnerExists(c.Request().Context(), sqlcgen.New(pool))
+        if oerr != nil {
+            return newCodedError(http.StatusServiceUnavailable, "unavailable",
+                "the instance state could not be read")
+        }
+        if owner {
+            s.claimed.set(true, s.deps.Now())
+            return newCodedError(http.StatusConflict, "conflict", claimedMessage)
+        }
+        return s.refuseToken(c)
+
+Acceptance criteria:
+  - A lookup failure on the 409-vs-403 re-read answers 503, never 403, and
+    consumes no failure budget.
+
+Tests:
+  `TestClaimErrorMapping` gains a case driving the ErrNoRows branch with an
+  unreachable pool. Mutation MUT-42: restore the `oerr == nil &&` fall-through → red.
+
+Cross-repo implications: none.
+
+Challenge:
+  "The window is microseconds." Agreed — which is why this is SHOULD and not a
+  blocker. It is three lines in a file that is not frozen, and the chair can take
+  it here or in M1-B; I would take it here while the branch is open.
+```
+
+```
+FINDING NEW-3: a required integration test can skip itself
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     internal/integration/owner_claim_test.go:1796-1798 (t.Skipf),
+             internal/db/db.go:39 (pgxpool.NewWithConfig), internal/integration/integration.go:46-55
+             ("mustEnv fails rather than skips. A skipped required lane is not a pass.")
+  requirements: AGENTS.md — a skipped required test is not PASS
+
+Observed:
+  TestOwnerClaimAnswers503WhenTheDatabaseIsDown guards `db.Open` with
+  `t.Skipf("the pool refused to open against a closed port, ...")`. `db.Open` uses
+  `pgxpool.NewWithConfig`, which is LAZY — it does not dial — so the skip is
+  unreachable today and the test really runs. But it is a skip in the one test
+  that discharges F1, in a repository whose own harness fatals rather than skips
+  for exactly this reason, and it would become live the day anyone adds an eager
+  ping to db.Open.
+
+Recommendation: `t.Fatalf` instead of `t.Skipf`. One word.
+
+Tests: none needed.
+Cross-repo implications: none.
+Challenge: "It can never fire." Then failing is free.
+```
+
+---
+
+## Follow-ups
+
+**FU-1 (M1-B, from NEW-2's neighbourhood)** — `Boot` maps `ErrHasUsers` to `Degraded` (`announce.go:96-98` falls through to `if err != nil { BootOutcome{Degraded: true} }`). If a user appears between `Boot`'s `AnyUserExists` and the mint statement, boot reports degraded readiness and logs an error for a benign race whose correct outcome is "claimed". Add an `errors.Is(err, ErrHasUsers)` branch returning `BootOutcome{Claimed: true}`.
+
+**FU-2 (M1-B)** — the "implicitly claimed" invariant is the one claim invariant with no database constraint. The cheapest place to make it one, consistent with what this round did for the mint, is the redeem CTE's guarded UPDATE:
+
+```sql
+     WHERE id
+       AND token_sha256  = sqlc.arg('token_sha256')::bytea
+       AND consumed_at   IS NULL
+       AND superseded_at IS NULL
+       AND expires_at    > now()
+       AND NOT EXISTS (SELECT 1 FROM users)   -- pre-statement snapshot; the sibling
+                                              -- CTE's INSERT is not visible to it
+```
+
+Keep the Go gate for the *answer* (409 vs 403); this is the *guarantee*. Query-only, no schema change, so it does not freeze here — but M1-B's registration route is the first thing that could ever race it.
+
+**FU-3 (M1-A if cheap, else M1-B)** — convert MUT-6 and MUT-1b from review-only to scored, using the technique this round already established in `TestMintIsRefusedByTheDatabaseOnAClaimedInstance`: call `sqlcgen.New(pool).ClaimOwner(...)` **directly**, bypassing the Go pre-check, against (a) a row with `expires_at` in the past and (b) a row already consumed, asserting `pgx.ErrNoRows` both times. ~20 lines, fully deterministic, and it turns the two honest "MEASURED: nothing reddens" entries into two red-on-mutation cases. The review-only notes are correct as written; this just makes two of them unnecessary.
+
+**FU-4 (M2)** — unchanged: audit retention and user erasure, per the 0005 header's recorded debt and the chair's new ledger ID.
+
+---
+
+**BLOCKING FINDINGS OPEN AT 59a19c5:** NEW-1 (`getSetupClaimStatus` can return 429 but `api/openapi.yaml` declares only 200 and 503, and `TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs` covers only the POST).
