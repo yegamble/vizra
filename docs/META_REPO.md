@@ -116,26 +116,32 @@ No service in this tree takes an `env_file:`, which is what keeps them apart;
 
 ### Two constraints this topology places on other repositories
 
-**1. Merge order with `vizra-core`'s HMAC-key rename.** The chair has ruled
-`SEARCH_HMAC_KEY` canonical on both sides. `vizra-core` still reads
-`VIZRA_SEARCH_HMAC_KEY`, and its PR #6 retires that name and **refuses it in
-production on presence with any non-empty value**. The two repositories are
-therefore one merge apart from a dead instance, in both directions:
+**1. The HMAC-key rename — DONE, and here is the order it required.**
+`SEARCH_HMAC_KEY` is the canonical contract name. `vizra-core` used to read
+`VIZRA_SEARCH_HMAC_KEY`; since **4a80a1e** it reads the contract name and
+**refuses the old one in production on presence with any non-empty value**. The
+two repositories were one merge apart from a dead instance, in both directions:
 
 | State | What compose must deliver |
 |---|---|
-| core `main` before PR #6 | `VIZRA_SEARCH_HMAC_KEY` only |
-| core `main` after PR #6 | `SEARCH_HMAC_KEY` only |
+| core `main` before 4a80a1e | `VIZRA_SEARCH_HMAC_KEY` only |
+| core `main` at/after 4a80a1e | `SEARCH_HMAC_KEY` only |
 | either, ever | **never both** — the retired name is refused on presence, so a "belt and braces" map is a guaranteed boot refusal |
 
-So core PR #6 merges **first**; this repository then flips
-`docker-compose.yml`, lists the old name in `env/registry/core.json`
-`retired_keys`, bumps that file's `source_commit` to the core `main` commit that
-declares the key, and deletes alias entry 1 from `env/registry/aliases.json`
-(floor 2 → 1) — all in one commit, because every intermediate state is a boot
-refusal. `scripts/check-config-coverage.py`'s `retired-key-delivered` rule is
-what makes getting this wrong a red lane rather than a 3am incident in which the
-refusal names a variable that appears nowhere in the operator's env file.
+So core's rename merged **first**, and this repository then flipped
+`docker-compose.yml`, listed the old name in `env/registry/core.json`
+`retired_keys`, re-snapshotted that file at the core `main` commit declaring the
+key, and deleted the alias (floor 2 → 1) — in one commit, because every
+intermediate state is a boot refusal.
+
+What keeps it from coming back is `scripts/check-config-coverage.py`'s
+`retired-key-delivered` rule, demonstrated by reintroducing the old spelling
+into the compose file and watching it go red by name. Without it, the failure
+mode is a 3am one: the refusal names a variable that appears nowhere in the
+operator's env file, because compose injects it.
+
+This is the pattern for the next rename, not a one-off: snapshot the component
+at a `main` commit, list what it retired, and let the checker own the ordering.
 
 **2. `vizra healthcheck` must exist before the boot lane lands.** `api` and
 `worker` declare a healthcheck that runs `vizra version` — the same self-probe

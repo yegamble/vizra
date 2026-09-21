@@ -387,7 +387,17 @@ def check_drift(registries):
             # scan alone reported PORT and HOSTNAME as removed keys.
             for m in re.finditer(r'(?m)^\s*ENV\s+([A-Z][A-Z0-9_]{2,})=', text):
                 found.add(m.group(1))
-        known = {k["name"] for k in reg["keys"]} | set(reg.get("escape_hatches") or [])
+        # A RETIRED name legitimately still appears in the component's source —
+        # that is where the refusal is implemented — and the snapshot accounts
+        # for it under `retired_keys`. Without this it is reported as an
+        # undeclared key, which would push an author toward deleting the
+        # retired-key declaration to silence the drift check: the one edit that
+        # would let the old spelling come back unnoticed.
+        known = (
+            {k["name"] for k in reg["keys"]}
+            | set(reg.get("escape_hatches") or [])
+            | set(reg.get("retired_keys") or [])
+        )
         ignore = set(reg.get("drift_ignore") or [])
         new = sorted(found - known - ignore)
         gone = sorted(k for k in known if k not in found)

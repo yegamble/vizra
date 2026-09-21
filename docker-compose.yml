@@ -92,16 +92,15 @@ x-core-env: &core-env
   # core's vocabulary: off | managed | external. Not search's vocabulary.
   VIZRA_SEARCH_MODE: ${VIZRA_SEARCH_MODE:-off}
   VIZRA_SEARCH_URL: ${VIZRA_SEARCH_URL:-http://search:8081}
-  # THE ONE DOCUMENTED ALIAS ON THIS SIDE. The contract
+  # ONE NAME, BOTH SERVICES. The canonical contract
   # (api/search-internal.openapi.yaml, vendored identically in both component
-  # repositories) names the shared secret `SEARCH_HMAC_KEY`, and vizra-search
-  # reads exactly that. vizra-core still reads `VIZRA_SEARCH_HMAC_KEY`; its
-  # rename is queued in another slice. Both services are fed from the SINGLE
-  # operator value `SEARCH_HMAC_KEY` so the boundary cannot 401 because an
-  # operator set one spelling and not the other.
-  # Declared in env/registry/aliases.json; the coverage checker tolerates it and
-  # nothing else.
-  VIZRA_SEARCH_HMAC_KEY: ${SEARCH_HMAC_KEY:?SEARCH_HMAC_KEY must be set - generate with `openssl rand -hex 32`; core and search must hold the same value in the same instant}
+  # repositories) names the shared secret `SEARCH_HMAC_KEY`, and since
+  # vizra-core 4a80a1e both core and vizra-search read exactly that. This was an
+  # alias until that commit — core read `VIZRA_SEARCH_HMAC_KEY` — and core now
+  # REFUSES the old spelling in production on presence, so sending both would be
+  # a guaranteed boot refusal. `retired_keys` in env/registry/core.json is what
+  # makes reintroducing it a red lane instead of a dead instance.
+  SEARCH_HMAC_KEY: ${SEARCH_HMAC_KEY:?SEARCH_HMAC_KEY must be set - generate with `openssl rand -hex 32`; core and search must hold the same value in the same instant}
   VIZRA_SEARCH_TIMEOUT: ${VIZRA_SEARCH_TIMEOUT:-2s}
   VIZRA_CORS_ALLOWED_ORIGINS: ${VIZRA_CORS_ALLOWED_ORIGINS:-}
   VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN: ${VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN:-}

@@ -434,7 +434,11 @@ the operator's env file, because compose injects it.
 
 Every **alias** carries an explicit `authorised` decision with its authority and
 its removal condition; an alias without one is a violation, and each is printed
-on every green run. An alias is a standing compromise — a place an operator can
+on every green run. One alias remains (`VIZRA_PUBLIC_ORIGIN`, which `vizra-user`
+reads as `PUBLIC_ORIGIN`); the `SEARCH_HMAC_KEY` alias was **deleted** when
+`vizra-core` 4a80a1e adopted the contract's spelling, and the floor moved 2 → 1
+in the same edit — a resolved alias left in the table is a compromise that reads
+as current. An alias is a standing compromise — a place an operator can
 believe they configured something they did not — so it has to be looked at
 rather than filed once.
 

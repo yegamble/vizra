@@ -439,17 +439,20 @@ PY
 # ===========================================================================
 
 case_header "13 (F1) — compose delivers a key vizra-core has RETIRED"
-echo "    (core refuses a retired name in production ON PRESENCE, so delivering"
-echo "     both spellings is a guaranteed boot refusal, not belt-and-braces)"
-mutate env/registry/core.json <<'PY' && {
-import sys, json
+echo "    (vizra-core 4a80a1e adopted the contract spelling SEARCH_HMAC_KEY and"
+echo "     REFUSES VIZRA_SEARCH_HMAC_KEY in production on presence. This mutation"
+echo "     reintroduces the old spelling into the compose file, against the REAL"
+echo "     retired list in env/registry/core.json - not a planted one.)"
+mutate docker-compose.yml <<'PY' && {
+import sys
 p = sys.argv[1]
-d = json.load(open(p))
-d["retired_keys"] = ["VIZRA_SEARCH_HMAC_KEY"]
-json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+s = open(p).read()
+old = "  SEARCH_HMAC_KEY: ${SEARCH_HMAC_KEY:?"
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, "  VIZRA_SEARCH_HMAC_KEY: ${SEARCH_HMAC_KEY:?", 1))
 PY
-  expect "a retired key is still delivered" 1 "rule=retired-key-delivered"
-  revert env/registry/core.json
+  expect "the retired spelling is back in the compose file" 1 "rule=retired-key-delivered"
+  revert docker-compose.yml
   expect "restored" 0
 }
 

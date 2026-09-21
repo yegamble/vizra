@@ -1,12 +1,12 @@
 {
   "component": "vizra-core",
-  "source_commit": "c043df72f06cc7b5d7237a12d2be4dac25fa788e",
+  "source_commit": "4a80a1e3f36b8001c2954d0568bea29268e739fe",
   "source_files": [
     "internal/config/keys.go",
     "internal/config/config.go",
     ".env.example"
   ],
-  "read_2026_09_21_by": "VZ-ISSUE-002",
+  "read_2026_09_21_by": "VZ-ISSUE-002 review round 1 (re-snapshotted from keys.go at core main)",
   "services": [
     "api",
     "worker",
@@ -25,7 +25,8 @@
       "name": "VIZRA_PUBLIC_ORIGIN",
       "required": "production",
       "secret": false,
-      "delivered_by": "template"
+      "delivered_by": "template",
+      "default": "http://localhost:8080"
     },
     {
       "name": "VIZRA_LISTEN_ADDR",
@@ -62,6 +63,7 @@
       "required": "production",
       "secret": true,
       "delivered_by": "compose-or-template",
+      "default": "redis://127.0.0.1:6379/0",
       "reason": "fixed to the bundled service in the MANAGED shape; supplied verbatim in the EXTERNAL shape (docker-compose.external-redis.yml)."
     },
     {
@@ -101,15 +103,14 @@
       "name": "VIZRA_SEARCH_URL",
       "required": "conditional",
       "secret": false,
-      "delivered_by": "template",
-      "default": "http://search:8081"
+      "delivered_by": "template"
     },
     {
-      "name": "VIZRA_SEARCH_HMAC_KEY",
+      "name": "SEARCH_HMAC_KEY",
       "required": "conditional",
       "secret": true,
-      "delivered_by": "alias",
-      "reason": "fed from the operator key SEARCH_HMAC_KEY; see env/registry/aliases.json."
+      "delivered_by": "template",
+      "reason": "core's OWN spelling since 4a80a1e \u2014 the canonical contract's name, read identically by vizra-core and vizra-search. No alias: one operator key, one spelling, both services."
     },
     {
       "name": "VIZRA_SEARCH_TIMEOUT",
@@ -183,12 +184,11 @@
   "drift_ignore": [
     "CHANGE",
     "ME",
-    "SEARCH_HMAC_KEY",
     "VIZRA_TEST_CACHE_FLAVOUR",
     "VIZRA_TEST_CACHE_URL",
     "VIZRA_TEST_DATABASE_URL"
   ],
-  "drift_ignore_note": "The drift extractor is a deliberately coarse literal scan: it over-reports rather than under-reports, and every entry here is a token it found that is NOT a key the component reads. SEARCH_HMAC_KEY appears in vizra-core's vendored copy of api/search-internal.openapi.yaml, which names the contract's spelling; vizra-core itself still reads VIZRA_SEARCH_HMAC_KEY. When core renames, this entry and the alias in aliases.json go together.",
+  "drift_ignore_note": "The drift extractor is a deliberately coarse literal scan: it over-reports rather than under-reports, and every entry here is a token it found that is NOT a key the component reads. SEARCH_HMAC_KEY was ignored here until core 4a80a1e, when core adopted the contract's spelling and began reading it - the entry is removed rather than left as harmless, because an ignore list that still names a live key hides the next rename.",
   "binaries": [
     "vizra-api",
     "vizra-worker",
@@ -200,8 +200,10 @@
     "vizra migrate"
   ],
   "commands_note": "The operator CLI's subcommands AS SHIPPED, read from vizra-core/cmd/vizra/main.go at source_commit. scripts/check-template-claims.py refuses a template or compose comment that tells an operator to run anything else, unless the reference is marked future by naming its slice - a sentence promising `vizra setup --rotate` is what that check exists to catch.",
-  "retired_keys": [],
-  "retired_keys_note": "EMPTY UNTIL vizra-core PR #6 MERGES. That PR moves VIZRA_SEARCH_HMAC_KEY to RetiredKeys and refuses it in production on presence with any non-empty value. The moment it is on core main, this list gains VIZRA_SEARCH_HMAC_KEY, source_commit is bumped to that merge commit, docker-compose.yml delivers SEARCH_HMAC_KEY only, and alias entry 1 in aliases.json is deleted - all in one commit, because delivering both names is a boot refusal and delivering the new name against today's core main is also a boot refusal. scripts/check-config-coverage.py fails if any compose environment map delivers a name listed here.",
+  "retired_keys": [
+    "VIZRA_SEARCH_HMAC_KEY"
+  ],
+  "retired_keys_note": "Names vizra-core USED TO read and now REFUSES in production on presence (internal/config/keys.go RetiredKeys at source_commit). Not a compatibility alias: the value has no effect, which is exactly why it must be refused rather than ignored \u2014 an operator who carried the old name forward has a file that LOOKS configured while the process booted with no key at all. scripts/check-config-coverage.py fails if any compose environment map delivers one.",
   "future_commands": {
     "vizra setup": "VZ-ISSUE-004",
     "vizra backup": "VZ-ISSUE-004",
