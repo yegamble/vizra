@@ -65,7 +65,15 @@ RULES = frozenset({
     "alias-unwired",
     "registry-drift",
     "retired-key-delivered",
+    "unclassified-secret-key",
 })
+
+# Secondary net only. The registry's explicit `"secret": true` is the primary
+# signal; these suffixes catch a key whose author forgot the flag. Deliberately
+# NOT `_URL`: DATABASE_URL and VIZRA_CACHE_URL are registry-flagged already,
+# while VIZRA_SEARCH_URL is a plain address and matching it would train people
+# to add exceptions.
+SECRET_NAME_SUFFIXES = ("_PASSWORD", "_SECRET", "_TOKEN", "_KEY")
 
 violations = []
 
@@ -224,6 +232,56 @@ def main(argv):
                         f"refuse to boot, naming a variable the operator's env "
                         f"file does not contain",
                     )
+
+    # --- 1c. A secret must be CLASSIFIED, not merely flagged. ---------------
+    #
+    # scripts/compose-render.py derives its redaction set from these same flags,
+    # so a newly flagged key is protected on the bytes immediately. This rule is
+    # the other half: it makes the author say so in the manifest, because the
+    # manifest is what a reader consults to learn what the artifact protects,
+    # and a set that is only ever implicit cannot be reviewed.
+    #
+    # The failure it prevents was reproduced by the verifier: a key added the
+    # FULLY correct way — `"secret": true` in the registry, an entry in the
+    # template, delivered by compose — was written raw into all thirteen models,
+    # 47 occurrences, stamped `secret_values_redacted: true`, with all four lane
+    # checkers green. Nothing connected the registry's own flag to the
+    # redaction set.
+    try:
+        with open(os.path.join(REPO_ROOT, "scripts", "compose-shapes.json"),
+                  "r", encoding="utf-8") as fh:
+            shapes_manifest = json.load(fh)
+    except (OSError, ValueError) as err:
+        unevaluable(f"cannot read scripts/compose-shapes.json: {err}")
+    declared_redact = set(shapes_manifest.get("redact_keys") or [])
+    allowed_lookalikes = set(shapes_manifest.get("not_secret_despite_name") or [])
+
+    flagged = set()
+    for comp, reg in registries.items():
+        for k in reg["keys"]:
+            if k.get("secret"):
+                flagged.add(k["name"])
+    for key in sorted(flagged - declared_redact):
+        violation(
+            "unclassified-secret-key", key,
+            f"is marked \"secret\": true in a component registry but is not in "
+            f"`redact_keys` in scripts/compose-shapes.json. The renderer derives "
+            f"its redaction set from the same flag so the value is not written, "
+            f"but the manifest is what a reader consults to learn what the "
+            f"artifact protects - classify it there too",
+        )
+    for key in sorted(set(templates["production"]) | set(templates["development"])):
+        if key in declared_redact or key in flagged or key in allowed_lookalikes:
+            continue
+        if key.endswith(SECRET_NAME_SUFFIXES):
+            violation(
+                "unclassified-secret-key", key,
+                f"is named like a secret ({[x for x in SECRET_NAME_SUFFIXES if key.endswith(x)][0]}) "
+                f"but is neither flagged secret in a registry nor listed in "
+                f"`redact_keys`. If it really is not a secret, add it to "
+                f"`not_secret_despite_name` in scripts/compose-shapes.json with "
+                f"the reason - one declared exception beats a matcher nobody trusts",
+            )
 
     # --- 2. api and worker run the SAME binary: identical key sets or one half
     #        is configured differently than its operator believes. -----------

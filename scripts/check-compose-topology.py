@@ -126,7 +126,16 @@ RULES = frozenset({
     "probe-gates-readiness",
     "stale-known-false-probe",
     "profile-not-enumerated",
+    "known-false-undisclosed",
+    "postgres-shm-floor",
+    "gated-probe-unrecognised",
 })
+
+# Docker's default /dev/shm. PostgreSQL allocates dynamic shared memory there
+# (dynamic_shared_memory_type=posix), so parallel plans fail against this
+# default months after install while `shared_buffers` — anonymous mmap since
+# 9.3 — keeps the cluster starting fine.
+DOCKER_DEFAULT_SHM_BYTES = 64 * 1024 * 1024
 
 # vizra-core refuses every one of these by name when VIZRA_MODE=production, and
 # VIZRA_DEV_AUTOLOGIN_USER is refused on PRESENCE with a non-empty value. They
@@ -623,7 +632,8 @@ def check_security(shape, model, repo_root):
             )
 
 
-def check_probes(shape, model, known_false, seen_known_false, repo_root):
+def check_probes(shape, model, known_false, seen_known_false, repo_root,
+                 gated_probes):
     """F3. A gate on a probe that cannot go red is worse than no gate.
 
     Two things happen here, and the second is the point:
@@ -633,6 +643,12 @@ def check_probes(shape, model, known_false, seen_known_false, repo_root):
        service healthy while it is wedged, the dependant would start anyway, and
        `vizra deploy`'s probe step and VZ-ISSUE-004's boot lane would both read
        the same green.
+
+    SCOPE, stated because the rule is easy to over-read: it refuses a gate onto
+    a probe someone has DECLARED false. It CANNOT tell a real probe from a fake
+    one nobody declared — swapping postgres's `pg_isready` for `["CMD","true"]`
+    would leave three `service_healthy` edges gating on nothing and this rule
+    silent. `gated-probe-unrecognised`, below, is the converse that covers it.
 
     2. Every known-false probe present in the model is NAMED on every run, and
        `check_lifecycle`'s "must have a healthcheck" rule is deliberately NOT
@@ -661,6 +677,36 @@ def check_probes(shape, model, known_false, seen_known_false, repo_root):
                 continue
             if spec.get("condition") != "service_healthy":
                 continue
+            # THE CONVERSE. probe-gates-readiness below catches a gate onto a
+            # probe someone DECLARED false. It cannot tell a real probe from a
+            # fake one nobody declared — so a gated service must additionally
+            # be listed in `gated_probes` and still invoke the command that
+            # makes its probe mean something.
+            if dep in services and dep not in known_false:
+                rule = gated_probes.get(dep)
+                dep_test = (services[dep].get("healthcheck") or {}).get("test") or []
+                if isinstance(dep_test, str):
+                    dep_test = [dep_test]
+                joined = " ".join(str(x) for x in dep_test)
+                if rule is None:
+                    violation(
+                        sid, "gated-probe-unrecognised", dep,
+                        f"is gated on by {name} with condition service_healthy "
+                        f"but is not listed in `gated_probes` in "
+                        f"scripts/compose-shapes.json, so nothing asserts its "
+                        f"probe means anything. Its rendered test is "
+                        f"{dep_test!r}",
+                        locate_in_sources(shape["files"], dep, "healthcheck", repo_root),
+                    )
+                elif rule["must_invoke"] not in joined:
+                    violation(
+                        sid, "gated-probe-unrecognised", dep,
+                        f"is gated on by {name} with condition service_healthy, "
+                        f"but its probe {dep_test!r} does not invoke "
+                        f"{rule['must_invoke']!r} - {rule['why']}. A gate onto a "
+                        f"probe that cannot fail is a gate onto nothing",
+                        locate_in_sources(shape["files"], dep, "healthcheck", repo_root),
+                    )
             if dep in known_false and dep in services:
                 violation(
                     sid, "probe-gates-readiness", name,
@@ -670,6 +716,37 @@ def check_probes(shape, model, known_false, seen_known_false, repo_root):
                     f"- so this edge reports satisfied while {dep} is broken",
                     locate_in_sources(shape["files"], name, "depends_on", repo_root),
                 )
+
+
+def check_shm(shape, model, repo_root):
+    """PostgreSQL needs more than Docker's 64 MiB /dev/shm.
+
+    Cheap enough to be a rule rather than a comment: Compose renders `shm_size`
+    as a byte count, so this is a comparison. The failure it guards against is
+    the most Docker-specific PostgreSQL failure there is, and its signature is
+    the worst possible one — plan-dependent, so it comes and goes with the
+    statistics, and reports "No space left on device" on a host with gigabytes
+    of disk free.
+    """
+    svc = (model.get("services") or {}).get("postgres")
+    if svc is None:
+        return
+    raw = svc.get("shm_size")
+    try:
+        size = int(raw)
+    except (TypeError, ValueError):
+        size = None
+    if size is None or size <= DOCKER_DEFAULT_SHM_BYTES:
+        violation(
+            shape["id"], "postgres-shm-floor", "postgres",
+            f"shm_size={raw!r}, which is Docker's 64 MiB default or less. "
+            f"PostgreSQL allocates dynamic shared memory in /dev/shm, so "
+            f"parallel scans and hash joins fail with `could not resize shared "
+            f"memory segment ... No space left on device` once a table grows "
+            f"past the parallel threshold - long after install, on a host with "
+            f"plenty of disk",
+            locate_in_sources(shape["files"], "postgres", "shm_size", repo_root),
+        )
 
 
 def check_membership(shape, model):
@@ -734,6 +811,7 @@ def main(argv):
     known_false = {
         e["service"]: e for e in (manifest.get("known_false_probes") or [])
     }
+    gated_probes = manifest.get("gated_probes") or {}
     release_services = set(manifest.get("release_image_services") or [])
     if not release_services:
         sys.stderr.write(
@@ -780,12 +858,39 @@ def main(argv):
         check_production(shape, model, repo_root, release_services)
         check_security(shape, model, repo_root)
         check_membership(shape, model)
-        check_probes(shape, model, known_false, seen_known_false, repo_root)
+        check_probes(shape, model, known_false, seen_known_false, repo_root,
+                     gated_probes)
+        check_shm(shape, model, repo_root)
         checked += 1
 
     # A declaration that matches nothing is a declaration nobody can act on, and
     # it is exactly how a list like this rots into permanent cover. If a probe
     # was fixed, the entry must go in the same commit.
+    # F3's human half. The known-false list is printed on every run for CI; this
+    # is the check that the OPERATOR-facing disclosure exists while it does.
+    # It fails in both directions by construction: emptying the list without
+    # deleting the paragraphs leaves a file claiming a limit that no longer
+    # applies, and deleting a paragraph while the list stands leaves the person
+    # running `docker compose ps` at 3am with no warning at all.
+    disclosure = manifest.get("known_false_disclosure") or {}
+    if known_false and disclosure:
+        marker = disclosure.get("marker", "")
+        for rel in disclosure.get("files", []):
+            try:
+                with open(os.path.join(repo_root, rel), "r", encoding="utf-8") as fh:
+                    text = fh.read()
+            except OSError:
+                text = ""
+            if marker not in text:
+                violation(
+                    "(manifest)", "known-false-undisclosed", rel,
+                    f"must carry the disclosure {marker!r} while "
+                    f"known_false_probes is non-empty "
+                    f"({sorted(known_false)}), and does not. `docker compose ps` "
+                    f"reports those services healthy whatever their state, and "
+                    f"the operator reading that column has no other warning",
+                )
+
     # V3's closing rule: run once, over the union of every file any shape loads.
     all_files = sorted({f for sh in shapes for f in sh["files"]})
     enumerated = {p for sh in shapes for p in (sh.get("profiles") or [])}
@@ -821,7 +926,26 @@ def main(argv):
         print(
             "  No depends_on service_healthy edge may point at one (rule "
             "probe-gates-readiness), and this list must be empty before "
-            "VZ-ISSUE-004's boot lane lands.\n"
+            "VZ-ISSUE-004's boot lane lands."
+        )
+        disc = manifest.get("known_false_disclosure") or {}
+        if disc:
+            print(
+                "  The operator-facing half of this admission — `docker compose "
+                "ps` reports these\n  services healthy whatever their state — is "
+                "carried by:"
+            )
+            for rel in disc.get("files", []):
+                print(f"    {rel}")
+            print(
+                "  Those files and this list are deleted together (rule "
+                "known-false-undisclosed)."
+            )
+        print(
+            "  SCOPE: probe-gates-readiness only refuses a gate onto a probe\n"
+            "  DECLARED false above. It cannot tell a real probe from a fake one\n"
+            "  nobody declared; gated-probe-unrecognised is what covers that, by\n"
+            "  requiring every service_healthy target to invoke a declared command.\n"
         )
 
     if violations:

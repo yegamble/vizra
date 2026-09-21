@@ -659,6 +659,130 @@ PY
   revert docker-compose.prod.yml
   expect "restored" 0
 }
+# ===========================================================================
+# Round 2: the three statements that were untrue as written, and the
+# /dev/shm default nobody had noticed.
+# ===========================================================================
+
+case_header "22 (F2) — a shell script described in the PRESENT tense"
+echo "    (the exact line that survived round 1: backup.sh does not exist, and an"
+echo "     operator who believes it does defers setting up provider snapshots)"
+mutate env/production.env.example <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = "# latency and never data. Nothing backs the cache up today; backup.sh\n# (VZ-ISSUE-004) will refuse to, and say why."
+new = "# latency and never data. `backup.sh` refuses to back the cache up, and says so."
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, new, 1))
+PY
+  expect "a present-tense claim about a script that does not exist" 1 "rule=unmarked-future-script"
+  revert env/production.env.example
+  expect "restored" 0
+}
+
+case_header "23 (F3) — a known-false probe with no operator-facing disclosure"
+echo "    (the machine half is printed on every run; this is the half for the"
+echo "     person running docker compose ps at 3am)"
+mutate README.md <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = "IGNORE THE `healthy` COLUMN"
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, "IGNORE THE health column", 1))
+PY
+  expect "the disclosure went missing while the list stands" 1 "rule=known-false-undisclosed"
+  revert README.md
+  expect "restored" 0
+}
+
+case_header "24 (NEW-1) — postgres left on Docker's 64 MiB /dev/shm"
+echo "    (starts a cluster fine; fails parallel plans months later with"
+echo "     'No space left on device' on a host with gigabytes free)"
+mutate docker-compose.yml <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = "    shm_size: ${VIZRA_POSTGRES_SHM_SIZE:-256m}\n"
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, "", 1))
+PY
+  expect "postgres on the 64 MiB default" 1 "rule=postgres-shm-floor service=postgres"
+  revert docker-compose.yml
+  expect "restored" 0
+}
+# ===========================================================================
+# Verifier re-verification findings at 3261ad3.
+# ===========================================================================
+
+case_header "25 (R-1) — a NEW secret key, added the fully correct way"
+echo "    (the verifier's own mutation: declared \"secret\": true in the registry,"
+echo "     documented in the template, delivered by compose. Before the fix it was"
+echo "     written raw into all 13 models - 47 occurrences - under a"
+echo "     secret_values_redacted: true stamp, with all four checkers green.)"
+mutate env/registry/core.json <<'PY' && {
+import sys, json
+p = sys.argv[1]
+d = json.load(open(p))
+d["keys"].append({"name": "VIZRA_SMTP_PASSWORD", "required": "optional",
+                  "secret": True, "delivered_by": "template"})
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+PY
+  expect "a secret-flagged key that nobody classified" 1 "rule=unclassified-secret-key"
+  revert env/registry/core.json
+  expect "restored" 0
+}
+
+case_header "25b (R-1) — and its value must never reach a written model"
+echo "    (the same key, delivered end to end, rendered with a recognisable value)"
+cp env/registry/core.json /tmp/vizra-r1-reg.bak
+cp docker-compose.yml /tmp/vizra-r1-dc.bak
+python3 - <<'PY'
+import json
+s = open("docker-compose.yml").read()
+a = "  VIZRA_SHUTDOWN_GRACE: ${VIZRA_SHUTDOWN_GRACE:-20s}"
+open("docker-compose.yml", "w").write(
+    s.replace(a, a + "\n  VIZRA_SMTP_PASSWORD: ${VIZRA_SMTP_PASSWORD:-}", 1))
+d = json.load(open("env/registry/core.json"))
+d["keys"].append({"name": "VIZRA_SMTP_PASSWORD", "required": "optional",
+                  "secret": True, "delivered_by": "template"})
+json.dump(d, open("env/registry/core.json", "w"), indent=2)
+open("env/registry/core.json", "a").write("\n")
+PY
+SMTPMARK="zz$(printf REALSMTP)SECRETzz"
+rm -rf /tmp/vizra-r1-models
+env VIZRA_SMTP_PASSWORD="$SMTPMARK" ./scripts/compose-render.py --all --out /tmp/vizra-r1-models >/dev/null 2>&1; rc=$?
+n="$(grep -rc "$SMTPMARK" /tmp/vizra-r1-models 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')"
+if [ "$rc" = "0" ] && [ "$n" = "0" ]; then
+  echo "    ok  (rendered exit 0; the value occurs $n times across the written models)"
+  echo "      | the redaction set is DERIVED from the registry's own secret flag,"
+  echo "      | so a key nobody added to redact_keys is still protected on the bytes"
+  PASSED=$((PASSED + 1))
+else
+  echo "    FAIL: exit $rc, value present $n time(s)"
+  FAILED=$((FAILED + 1))
+fi
+rm -rf /tmp/vizra-r1-models
+cp /tmp/vizra-r1-reg.bak env/registry/core.json; cp /tmp/vizra-r1-dc.bak docker-compose.yml
+rm -f /tmp/vizra-r1-reg.bak /tmp/vizra-r1-dc.bak
+expect "restored" 0
+
+case_header "26 (R-3) — a REAL probe swapped for one that cannot fail"
+echo "    (probe-gates-readiness only refuses a gate onto a probe someone"
+echo "     DECLARED false; this is the converse it cannot see)"
+mutate docker-compose.yml <<'PY' && {
+import sys, re
+p = sys.argv[1]
+s = open(p).read()
+m = re.search(r'      test: \["CMD-SHELL", "pg_isready[^\n]*\n', s)
+assert m, "anchor not found"
+open(p, "w").write(s[:m.start()] + '      test: ["CMD", "true"]\n' + s[m.end():])
+PY
+  expect "postgres gates three edges on a probe that cannot fail" 1 "rule=gated-probe-unrecognised service=postgres"
+  revert docker-compose.yml
+  expect "restored" 0
+}
 # ---------------------------------------------------------------------------
 echo
 echo "=============================================================="

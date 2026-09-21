@@ -138,6 +138,18 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Docker gives every container a 64 MiB /dev/shm. PostgreSQL's
+    # `dynamic_shared_memory_type` defaults to `posix`, which allocates dynamic
+    # shared-memory segments there — so parallel sequential scans and parallel
+    # hash joins draw on it. `shared_buffers` does NOT (anonymous mmap since
+    # 9.3), which is exactly why the cluster starts fine and this is missed:
+    # nothing fails until a table grows past min_parallel_table_scan_size and
+    # the planner goes parallel, months after install, with
+    #     ERROR: could not resize shared memory segment "/PostgreSQL.NNNNNNN"
+    #     to NNNNNN bytes: No space left on device
+    # on a host with gigabytes free. Plan-dependent, so it comes and goes with
+    # the statistics — the worst possible diagnostic signature.
+    shm_size: ${VIZRA_POSTGRES_SHM_SIZE:-256m}
     healthcheck:
       # -U matters: without it pg_isready probes the `root` role and reports
       # "accepting connections" from a server that would reject the app's login.

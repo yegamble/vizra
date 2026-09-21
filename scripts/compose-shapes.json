@@ -754,5 +754,24 @@
       "real_probe_exists": "none reachable from inside the image today.",
       "emptied_by": "vizra-core `vizra healthcheck` subcommand (queue 2h)"
     }
-  ]
+  ],
+  "known_false_disclosure_note": "Where the OPERATOR-facing half of the known-false admission lives. The chair ruled the admission must be standing rather than filed once; printing it on every CI run covers the machine audience, and these files cover the human one - the person running `docker compose ps` at 3am, who is the audience that is not CI. check-compose-topology.py fails (rule known-false-undisclosed) when known_false_probes is non-empty and any file below lacks the marker, so emptying the list without deleting the paragraphs, or deleting a paragraph while the list stands, is a red lane either way.",
+  "known_false_disclosure": {
+    "marker": "IGNORE THE `healthy` COLUMN",
+    "files": [
+      "env/production.env.example",
+      "README.md"
+    ]
+  },
+  "gated_probes_note": "The CONVERSE of probe-gates-readiness. That rule guarantees no readiness gate points at a probe someone has DECLARED false; it cannot tell a real probe from a fake one nobody declared. Swapping postgres's pg_isready for [\"CMD\",\"true\"] left three service_healthy edges gating on nothing with the lane green. So: any service that is the TARGET of a service_healthy edge must be listed here and its rendered probe must invoke the named command. Matched on the command token rather than the whole test, because postgres's probe interpolates POSTGRES_USER and POSTGRES_DB and an exact match would break for an operator who changes them - the property worth asserting is 'it still asks PostgreSQL', not the exact argv.",
+  "gated_probes": {
+    "postgres": {
+      "must_invoke": "pg_isready",
+      "why": "the only probe that proves the server will accept the app's login; -U matters, since without it pg_isready reports a server that would reject it"
+    },
+    "redis": {
+      "must_invoke": "valkey-cli",
+      "why": "speaks RESP to the running server rather than checking that a process exists"
+    }
+  }
 }

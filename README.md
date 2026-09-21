@@ -85,3 +85,27 @@ Evidence sources and limitations: docs/SOURCE_REGISTER.md.
 
 ## The main lesson
 Make 'done' an observable result enforced by tests and review, not an adjective the agent chooses. A required missing/skipped/unexecuted test blocks the claim it was supposed to establish. A good prompt reduces ambiguity; it cannot replace a real test environment or manufacture provider credentials, infrastructure, human review, or a working application.
+
+## Running an instance: diagnosing this release
+
+**IGNORE THE `healthy` COLUMN.** `docker compose ps` reports api and worker
+healthy whenever the binary can execute — their probe is `vizra version`, which
+never opens a socket and never touches PostgreSQL. `docker compose up -d --wait`
+returns success against a wedged api for the same reason. frontend's probe is
+liveness-only too: it says the process renders, not that vizra-core is reachable.
+
+Ask the API itself instead. The production overlay publishes it on loopback for
+exactly this:
+
+```
+curl -fsS http://127.0.0.1:8080/healthz   # liveness
+curl -fsS http://127.0.0.1:8080/readyz    # 503 = PostgreSQL unreachable;
+                                          # 200 "degraded" names the component
+curl -fsS http://127.0.0.1:3000/health    # frontend process only
+```
+
+Real probes land with `vizra healthcheck` (vizra-core, queue 2h). **This section
+is deleted in the same PR that empties `known_false_probes` in
+`scripts/compose-shapes.json`** — if that list is empty and this is still here,
+one of the two is wrong. `scripts/check-compose-topology.py` fails when the list
+is non-empty and this disclosure is missing from either file that must carry it.

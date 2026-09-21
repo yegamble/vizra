@@ -279,8 +279,8 @@ check-runs API.
 ./scripts/compose-render.py --all --out build/compose-models
 ```
 
-Renders the twelve shapes in `scripts/compose-shapes.json` — the topologies
-`docs/META_REPO.md` §2 says Vizra supports — to one JSON model each, plus
+Renders every shape in `scripts/compose-shapes.json` — the topologies
+`docs/META_REPO.md` §2 says Vizra supports; `--list` prints them — to one JSON model each, plus
 `shapes.json` carrying the manifest and the interpolation variables Compose
 reported. Before rendering anything it refuses a Compose below **2.24.4**
 (Q-017), failing closed on an unparseable version, and it validates any external
@@ -311,7 +311,7 @@ the object being serialised — not on a copy.
 This corrects an earlier version of this paragraph that described a control
 which did not work. The renderer computed a redacted copy, validated that copy,
 and then serialised the original — so `find_leaks` could never fire on the bytes
-that were written, and ten of twelve models in the CI artifact for
+that were written, and ten of the twelve models in the CI artifact for
 `69e197e` carried their placeholder values under a stamp saying otherwise. The
 values were the obviously fake `ci-render-only-*`, so nothing real leaked; the
 defect was in the control. Demonstrations 18a and 18b are what keep it working.
@@ -324,7 +324,7 @@ The models are uploaded as the `meta-validate-compose-models` artifact.
 ./scripts/check-compose-topology.py build/compose-models
 ```
 
-Nineteen rules, every one read from `docker compose config --format json` parsed
+Every rule below is read from `docker compose config --format json` parsed
 as JSON — never from the YAML sources, because what is reachable on a host is
 decided by the merged model and a source file can look closed while an overlay
 opens it. The only YAML parsing is the diagnostic that names *which file* to
@@ -339,13 +339,17 @@ edit after a rule has already failed.
 | `missing-log-cap` | a service inheriting the daemon's unbounded json-file default |
 | `missing-healthcheck` | a long-running service that cannot gate a `depends_on` |
 | `production-build` / `missing-build` | a `build:` in a production shape; a developer shape that stopped building from the checkouts |
-| `unpinned-image` | in a production shape: no image, no tag, or `:latest` |
+| `unpinned-image` | in a production shape: no image, no tag, or `:latest`; and no `@sha256:` on a third-party image |
 | `docker-socket` / `privileged` / `host-network` / `no-new-privileges` | VZ-OPS-008 |
 | `missing-service` / `unexpected-service` | a shape that lost a service it needs, or rendered one it forbids |
 | `dev-mode-in-production` / `dev-hatch-in-production` | the developer override leaking into a production chain |
 | `missing-mem-limit` | a long-running production service with no cgroup cap, so a burst is contained by the OOM killer's badness score instead — which picks PostgreSQL |
-| `probe-gates-readiness` | a `depends_on: service_healthy` edge onto a probe declared known-false: a gate that cannot go red is worse than no gate |
+| `probe-gates-readiness` | a `depends_on: service_healthy` edge onto a probe **declared** known-false: a gate that cannot go red is worse than no gate. **Scope:** it cannot tell a real probe from a fake one nobody declared |
+| `gated-probe-unrecognised` | the converse — a `service_healthy` target that is not in `gated_probes`, or whose probe no longer invokes the declared command. Without it, swapping `pg_isready` for `["CMD","true"]` left three gates pointing at nothing with the lane green |
+| `unclassified-secret-key` | a registry key flagged `"secret": true` that is not in `redact_keys`, or a template key *named* like a secret that is neither. The renderer derives its redaction set from the same flag, so the value is never written — this makes the author classify it where a reader will look |
 | `stale-known-false-probe` | a known-false declaration matching no rendered service, so the list cannot rot into permanent cover |
+| `postgres-shm-floor` | postgres left on Docker's 64 MiB `/dev/shm`, which starts a cluster fine and fails parallel plans months later |
+| `known-false-undisclosed` | a known-false probe declared while the operator-facing disclosure is missing from a file that must carry it — it fails in both directions, so the list and the paragraphs are deleted together |
 | `profile-not-enumerated` | a `profiles:` name no shape renders. Everything else here reads a rendered model, so an unrendered profile is an **unasserted** one — this is the rule that makes "in any shape" mean "in any configuration" |
 
 `missing-healthcheck` treats four states explicitly — absent, disabled,
@@ -384,14 +388,14 @@ Every long-running service in a production shape declares
 | `api` | 768m | no pixel decode ever happens in the API process (ADR-002, Q-034), so this is request handling, pools and Go runtime overhead |
 | `worker` | 1500m | the largest cap and the one doing the real containment: the only process that runs libvips, peaking on a 12 MP JPEG derivative set. Sized for the shipped `VIZRA_WORKER_CONCURRENCY=2` |
 | `frontend` | 512m | Next.js standalone server |
-| `caddy` | 96m | a reverse proxy |
+| `caddy` | 160m | the one container whose death is **total site downtime**, and it was the tightest cap in the stack at 96m. Caddy idles at 25-40 MiB but reaches 80-150 MiB with HTTP/2, TLS session state and a few hundred concurrent connections; saving 64 MiB on a 4 GB host is not worth an OOM of the edge |
 | `migrate` | 256m | a one-shot; exempt from the rule, capped anyway |
 | `search` | 256m | a static Go binary on `scratch` owning no index at M0; rises with VZ-SEARCH-001 |
 | `clickhouse` | 1g | **not sized for the floor host** — enabling `analytics` on 4 GB is not a supported shape |
 | `ipfs` | 768m | likewise optional |
 
-**The default-shape caps sum to 4028 MiB on a 4096 MiB host, and that is
-deliberate.** They are caps on *peak*, not reservations: nothing is set aside,
+**The default-shape caps sum to 4092 MiB on a 4096 MiB host, and that is
+deliberate** (plus `migrate` 256m transiently during a deploy). They are caps on *peak*, not reservations: nothing is set aside,
 and these services do not peak together. The job they do is containment. Without
 a cgroup limit anywhere, a burst of concurrent libvips decodes exhausts RAM and
 the kernel OOM killer chooses by badness score — which on a Docker host is
@@ -401,8 +405,40 @@ restart, for reasons unrelated to the upload, with `restart: unless-stopped`
 cycling it. **A limit that OOM-kills the worker is recoverable; one that
 OOM-kills PostgreSQL is not.**
 
-On the 2 vCPU / 4 GB floor host run `VIZRA_WORKER_CONCURRENCY=1` (the template
-says so at the key). The shipped default is 2; use 4 from 8 GB up.
+These numbers are sized for the **shipped** `VIZRA_WORKER_CONCURRENCY=2`. On the
+2 vCPU / 4 GB floor host run 1 — the caps still hold, with more headroom — and
+use 4 from 8 GB up, raising `VIZRA_WORKER_MEM_LIMIT` with it. No two files may
+state a different sizing assumption for the same default; an earlier version of
+this note and the template disagreed, which is the very defect the caps were
+added for.
+
+**What happens when a cap IS reached**, which matters more than why it was
+chosen:
+
+- **worker** — the intended victim. Killed inside its own cgroup; the job lease
+  is swept and the job retried (ADR-004). Recoverable by design.
+- **postgres** — the cgroup OOM killer kills a backend, and the postmaster
+  treats that as a crash: it terminates every backend and runs **crash
+  recovery**. That is the outcome the caps exist to avoid, now merely much less
+  likely rather than impossible. So **raise this cap alongside any tuning
+  change** — `max_connections`, `work_mem`, `shared_buffers`. An operator who
+  raises those without raising the cap walks straight into it.
+- **caddy** — total downtime, which is why it is no longer the tightest cap.
+
+**The caps assume a host with no swap.** `mem_limit` without `memswap_limit`
+leaves swap unbounded, so on a host that HAS swap the worker thrashes before it
+is killed and a 2 vCPU box becomes unresponsive — worse than the clean kill.
+Most VPS images ship swapless, which is why this is a sentence rather than a
+mechanism; if you add swap, add `memswap_limit` with it.
+
+**`/dev/shm` is charged to the postgres cap** under cgroup v2, so
+`VIZRA_POSTGRES_SHM_SIZE` (256m) shares the 768m limit. That is fine — dynamic
+shared memory is transient and bounded by the parallel-worker settings — but it
+is the kind of thing that should be stated rather than discovered. The setting
+exists because Docker's 64 MiB default is enough to start a cluster and not
+enough to run a parallel query, so it fails months after install with
+`could not resize shared memory segment … No space left on device` on a host
+with gigabytes free. `postgres-shm-floor` asserts it from the rendered model.
 
 Precedent: Vidra's `docker-compose.prod.yml` sets `cpus`/`mem_limit` on api,
 worker and ipfs. It was read for **shape** — the `${…:-default}` indirection so
@@ -455,8 +491,12 @@ checkout is absent. See `env/registry/README.md`.
 ./scripts/check-template-claims.py
 ```
 
-Scans `env/*.env.example` and `docker-compose*.yml` comments. A backticked
-`vizra <sub>` must be a shipped command or a declared future one; a declared
+Run it to see the current counts of shipped commands, declared future commands
+and scripts. Scans `env/*.env.example` and `docker-compose*.yml` comments. A backticked
+`vizra <sub>` must be a shipped command or a declared future one; a **shell
+script** (`backup.sh`, `restore.sh`, `install.sh`, `bootstrap.sh`, `deploy.sh`,
+`rollback.sh`) must exist in the tree or be declared in `env/registry/meta.json`
+`future_scripts`; a declared
 future command named anywhere must carry its declared marker **within 2 lines**,
 so a promise carries its own qualifier rather than borrowing a neighbour's.
 
@@ -489,7 +529,9 @@ prints a sha256 either side of its mutation and **refuses to score a case whose
 mutation did not apply** — otherwise a mutation that silently failed would run
 the checker against the unmodified tree, pass, and be recorded as a guard that
 caught something. It restores every file it touches and fails if the tree is not
-byte-identical afterwards. **61 assertions across 34 cases.**
+byte-identical afterwards; the run prints its own totals, and the committed
+transcript under `docs/evidence/compose-topology/` records them for the code
+commit it names.
 
 ## Red/green demonstrations
 

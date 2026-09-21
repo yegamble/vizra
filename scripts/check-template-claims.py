@@ -19,6 +19,11 @@ So the rule is not "documentation should be accurate". It is: **an operator-
 facing file may only name a command that exists, or one explicitly marked as not
 yet existing.** Two passes, because the two failures are different:
 
+  A'. SCRIPTS get the same two passes, against `env/registry/meta.json`:
+     a script that exists in the tree may be named freely; one declared in
+     `future_scripts` needs its marker within `MARKER_WINDOW`; anything else is
+     refused outright.
+
   A. UNKNOWN COMMAND — a backtick-quoted `vizra <sub>` / `vizra-search <sub>`
      that is in neither the shipped set nor the declared future set. Backticks
      are how this repository writes commands; prose mentions ("vizra has three
@@ -60,11 +65,22 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRY_DIR = os.path.join(REPO_ROOT, "env", "registry")
 COMPONENTS = ("core", "user", "search")
 
-RULES = frozenset({"unknown-command", "unmarked-future-command"})
+RULES = frozenset({"unknown-command", "unmarked-future-command",
+                   "unknown-script", "unmarked-future-script"})
 
 # `vizra setup --rotate` → ("vizra", "setup"). A trailing flag is ignored: the
 # claim being made is about the subcommand.
 BACKTICKED = re.compile(r"`(vizra|vizra-search)\s+([a-z][a-z0-9-]*)")
+
+# Shell scripts, backticked or bare. The checker used to match only
+# `vizra <sub>`, so every claim about a SHELL SCRIPT was outside its scope — and
+# `backup.sh refuses to back the cache up, and says so` survived round 1 in two
+# operator-facing files for a script that does not exist. An operator cannot
+# tell a Go subcommand from a shell script and does not care: the failure this
+# checker prevents is about belief, not provenance.
+SCRIPTNAME = re.compile(
+    r"(?<![\w./-])((?:backup|restore|install|bootstrap|deploy|rollback)\.sh)"
+)
 
 violations = []
 
@@ -114,6 +130,33 @@ def main(argv):
                 registries[comp] = json.load(fh)
         except (OSError, ValueError) as err:
             unevaluable(f"cannot read {path}: {err}")
+
+    meta_path = os.path.join(REGISTRY_DIR, "meta.json")
+    try:
+        with open(meta_path, "r", encoding="utf-8") as fh:
+            meta = json.load(fh)
+    except (OSError, ValueError) as err:
+        unevaluable(f"cannot read {meta_path}: {err}")
+    if "future_scripts" not in meta:
+        unevaluable(
+            f"{meta_path} declares no `future_scripts`, so every script "
+            f"reference would be refused or - worse, if the default were "
+            f"permissive - none would."
+        )
+    # A script that actually exists may be named freely; the declaration is only
+    # about the ones that do not. Checked on disk rather than trusted from the
+    # registry, so a script landing makes its references legal automatically.
+    existing_scripts = {
+        n for n in meta.get("scripts", [])
+        if os.path.exists(os.path.join(REPO_ROOT, n))
+    }
+    for cand in list(meta["future_scripts"]):
+        for probe in (cand, os.path.join("scripts", cand), os.path.join("deploy", cand)):
+            if os.path.exists(os.path.join(REPO_ROOT, probe)):
+                existing_scripts.add(cand)
+    future_scripts = {
+        k: v for k, v in meta["future_scripts"].items() if k not in existing_scripts
+    }
 
     shipped = set()
     future = {}
@@ -172,6 +215,31 @@ def main(argv):
                     f"name a command that does not exist",
                 )
 
+            # --- pass A': a script must exist, or be declared and marked
+            for m in SCRIPTNAME.finditer(line):
+                name = m.group(1)
+                refs += 1
+                if name in existing_scripts:
+                    continue
+                if name not in future_scripts:
+                    violation(
+                        "unknown-script", rel, i + 1,
+                        f"names the script {name!r}, which does not exist in "
+                        f"this repository and is not declared in "
+                        f"env/registry/meta.json `future_scripts`",
+                    )
+                    continue
+                if future_scripts[name] not in ctx:
+                    violation(
+                        "unmarked-future-script", rel, i + 1,
+                        f"names {name!r} with no {future_scripts[name]!r} within "
+                        f"{MARKER_WINDOW} line(s). No such script exists, so the "
+                        f"sentence reads as a description of current behaviour - "
+                        f"and an operator who believes a backup tool exists "
+                        f"defers setting up provider snapshots until they have "
+                        f"checked what it does",
+                    )
+
             # --- pass B: a declared future command must carry its marker
             for cmd, marker in sorted(future.items()):
                 if cmd not in line:
@@ -197,7 +265,8 @@ def main(argv):
     print(
         f"template claims: {scanned} operator-facing file(s), {refs} command "
         f"reference(s); {len(shipped)} shipped command(s), {len(future)} "
-        f"declared future command(s); 0 violations"
+        f"declared future command(s), {len(existing_scripts)} script(s) present "
+        f"and {len(future_scripts)} declared future; 0 violations"
     )
     return 0
 

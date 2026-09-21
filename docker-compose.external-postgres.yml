@@ -47,10 +47,12 @@
 # has never existed. scripts/check-doc-links.py now scans compose comments for
 # env/ and deploy/ paths, so a pointer to a file nobody wrote cannot recur.)
 #
-# BACKUP OWNERSHIP MOVES TO YOU. `backup.sh` refuses to back up a database it
-# does not manage (docs/META_REPO.md §6) and the runbook must name the provider
-# snapshot/PITR path. That is VZ-TOPOLOGY-002's recovery case and it is NOT
-# satisfied by this file.
+# BACKUP OWNERSHIP MOVES TO YOU, and nothing in Vizra takes it back. No tool
+# here dumps a database it does not manage, and none will — backup.sh, which
+# will refuse such a database out loud, arrives with VZ-ISSUE-004
+# (docs/META_REPO.md §6), and the runbook that must name the provider
+# snapshot/PITR path arrives with it. Set your provider's schedule up now.
+# That is VZ-TOPOLOGY-002's recovery case and it is NOT satisfied by this file.
 
 services:
 

@@ -26,19 +26,42 @@ use to see what a chain actually resolves to. It does four things a bare
    redacted model and the real model are identical for every purpose those
    checkers have.
 
-   Two sets, deliberately different, because one guards the other:
+   **Where the secret names come from.** Both sets are DERIVED, primarily from
+   the component registries: every key any `env/registry/*.json` marks
+   `"secret": true`. That derivation is the durable half. Hand-maintaining one
+   list meant a key could be added the fully correct way — declared to the
+   component as secret, documented in the template, delivered by compose — and
+   still be written raw into all thirteen models under a
+   `secret_values_redacted: true` stamp with every lane checker green. A control
+   that protects only the secrets someone remembered to enumerate protects
+   nothing about the next one.
 
-   * `redact_keys` drives the REDACTION. Values of those keys are replaced by
-     key, and their exact strings are additionally substituted wherever they
-     appear inside another value — `DATABASE_URL` is assembled from
-     `POSTGRES_PASSWORD` in docker-compose.yml, so a by-key replacement alone
-     would leave the password in the DSN.
-   * Every value this renderer INJECTED — `redact_keys`, `ci_overrides` and
-     `external_dsn_overrides` together — drives the LEAK CHECK, which runs on
-     the object that is about to be serialised. The wider set is the point:
-     deleting a key from `redact_keys` then stops redacting it and does NOT
-     stop checking for it, so the renderer FAILS instead of quietly writing a
-     file that is less redacted than its own stamp claims.
+   On top of that derivation, two explicit manifest lists are unioned, and they
+   are separate from each other on purpose because one guards the other:
+
+   * `redact_keys` feeds the REDACTION. Values are replaced by key, and their
+     exact strings are substituted wherever they appear inside another value —
+     `DATABASE_URL` is assembled from `POSTGRES_PASSWORD` in
+     docker-compose.yml, so a by-key replacement alone would leave the password
+     inside the DSN. The list also carries secrets that are not component keys
+     at all (`POSTGRES_PASSWORD` belongs to the bundled datastore).
+   * `secret_keys` feeds the LEAK CHECK, which runs on the object about to be
+     serialised. Because the two manifest lists are independent, deleting a name
+     from `redact_keys` stops redacting it and does NOT stop looking for it, so
+     the renderer FAILS instead of writing a file that is less redacted than its
+     own stamp claims.
+
+   The effective sets are recorded in each model's `x-vizra-shape` as
+   `redacted_keys` and `leak_checked_keys`, so a reader of the artifact can see
+   what was actually protected rather than trusting the boolean.
+
+   **A caller can only inject two of these.** `ci_overrides` is applied with
+   `env.update()` AFTER the process environment is copied, so it overwrites
+   `VIZRA_SESSION_SECRET`, `VIZRA_MFA_KEY_KEK`, `SEARCH_HMAC_KEY`,
+   `POSTGRES_PASSWORD` and `CLICKHOUSE_PASSWORD` unconditionally. Only
+   `DATABASE_URL` and `VIZRA_CACHE_URL` — which are not in `ci_overrides` —
+   take a caller's value. That is a deliberate property: rendering cannot be
+   made to embed an operator's real session secret by exporting it. Keep it.
 
    This was a real defect, found in review and worth naming: the previous code
    computed a redacted copy, ran the leak check against that copy, and then
@@ -75,6 +98,8 @@ import tempfile
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(REPO_ROOT, "scripts", "compose-shapes.json")
+REGISTRY_DIR = os.path.join(REPO_ROOT, "env", "registry")
+REGISTRY_COMPONENTS = ("core", "user", "search")
 
 # Q-017. Kept as a tuple so the comparison is numeric, never lexical:
 # "2.9" > "2.24" as strings.
@@ -216,6 +241,49 @@ def validate_dsn(var, value):
 # 3. Manifest and floor
 # --------------------------------------------------------------------------
 
+def registry_secret_names():
+    """Every key any component registry marks `"secret": true`.
+
+    This is the PRIMARY signal, and it is derived rather than hand-maintained
+    for a reason worth stating: the previous design read one hand-written list,
+    so a key could be added the fully correct way — declared to the component
+    with `"secret": true`, documented in the template, delivered by compose —
+    and still be written raw into every model under a
+    `secret_values_redacted: true` stamp, with all four lane checkers green.
+    A control that only protects the secrets someone remembered to enumerate
+    protects nothing about the next one.
+
+    The manifest's explicit lists are unioned on top, because some secrets are
+    not registry keys at all: POSTGRES_PASSWORD belongs to the bundled
+    datastore, and DATABASE_URL is ASSEMBLED from it, so the composite has to be
+    named even though the component never sees the part.
+    """
+    names = set()
+    for comp in REGISTRY_COMPONENTS:
+        path = os.path.join(REGISTRY_DIR, f"{comp}.json")
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                reg = json.load(fh)
+        except (OSError, ValueError) as err:
+            fail(
+                f"UNEVALUABLE: cannot read {path}: {err}\n"
+                "  The secret set is derived from the registries, so an "
+                "unreadable one would silently narrow it.",
+                2,
+            )
+        for k in reg.get("keys") or []:
+            if k.get("secret"):
+                names.add(k["name"])
+    if not names:
+        fail(
+            "UNEVALUABLE: no component registry marks a single key secret. "
+            "Either every registry is wrong or the derivation is broken; both "
+            "would leave the leak check looking for nothing.",
+            2,
+        )
+    return names
+
+
 def load_manifest():
     try:
         with open(MANIFEST, "r", encoding="utf-8") as fh:
@@ -300,7 +368,7 @@ def bundle_tree(man):
     return tmp
 
 
-def render(shape, man, out_dir):
+def render(shape, man, out_dir, registry_secrets):
     sid = shape["id"]
     cwd = REPO_ROOT
     tmp = None
@@ -394,8 +462,9 @@ def render(shape, man, out_dir):
         shutil.rmtree(tmp, ignore_errors=True)
 
     # --- redaction ----------------------------------------------------------
-    # Values that get REDACTED: the declared set, by key and by substring.
-    redact_keys = set(man.get("redact_keys", []))
+    # Values that get REDACTED: every registry key flagged secret, PLUS the
+    # manifest's explicit list for the composite and non-component ones.
+    redact_keys = set(man.get("redact_keys", [])) | registry_secrets
     redact_values = {
         env[k] for k in redact_keys if env.get(k) and len(env[k]) >= MIN_SECRET_LEN
     }
@@ -410,7 +479,7 @@ def render(shape, man, out_dir):
     # `VIZRA_PUBLIC_ORIGIN` are injected too and belong in a rendered model.
     # Treating every injected value as a secret made the renderer refuse to
     # write anything at all.
-    secret_keys = set(man.get("secret_keys") or [])
+    secret_keys = set(man.get("secret_keys") or []) | registry_secrets
     if not secret_keys:
         fail(
             "UNEVALUABLE: scripts/compose-shapes.json declares no `secret_keys`, "
@@ -434,6 +503,8 @@ def render(shape, man, out_dir):
         "env_file": env_file,
         "interpolation_variables": variables,
         "secret_values_redacted": True,
+        "redacted_keys": sorted(redact_keys),
+        "leak_checked_keys": sorted(secret_keys),
     }
 
     # THE LEAK CHECK RUNS ON THE OBJECT THAT IS ABOUT TO BE SERIALISED, not on a
@@ -527,12 +598,13 @@ def main():
     if not selected:
         fail(f"no such shape: {args.shape!r}. Try --list.", 2)
 
+    registry_secrets = registry_secret_names()
     out_dir = os.path.join(REPO_ROOT, args.out)
     os.makedirs(out_dir, exist_ok=True)
 
     all_vars = set()
     for shape in selected:
-        path, variables = render(shape, man, out_dir)
+        path, variables = render(shape, man, out_dir, registry_secrets)
         all_vars.update(variables)
         print(f"  rendered {shape['id']:26} -> {os.path.relpath(path, REPO_ROOT)}")
 
@@ -548,6 +620,8 @@ def main():
                 # false, and so the uploaded artifact records the admission.
                 "known_false_probes": man.get("known_false_probes") or [],
                 "release_image_services": man.get("release_image_services") or [],
+                "known_false_disclosure": man.get("known_false_disclosure") or {},
+                "gated_probes": man.get("gated_probes") or {},
             },
             fh, indent=2,
         )

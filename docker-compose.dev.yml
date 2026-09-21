@@ -6,8 +6,11 @@
 #   docker compose -f docker-compose.yml -f docker-compose.override.yml \
 #                  -f docker-compose.dev.yml --profile core --profile frontend up
 #
-# It requires ./vizra-core, ./vizra-user and ./vizra-search to exist —
-# `bootstrap.sh` clones them (VZ-ISSUE-003). This is the ONLY file in the tree
+# It requires ./vizra-core, ./vizra-user and ./vizra-search to exist. Clone them
+# yourself for now: `bootstrap.sh`, which will do it, arrives with VZ-ISSUE-004
+# — the slice that owns the installer and the bundle. (This comment previously
+# cited VZ-ISSUE-003, which is the CI fan-in and owns no script.)
+# This is the ONLY file in the tree
 # that names a build context, which is what makes the bundle shape work: the
 # production chain never loads it, so a production host needs no source, no
 # compiler and no Docker build (asserted by the `bundle-no-checkouts` shape in

@@ -80,9 +80,10 @@ Rules carried over from Vidra and asserted in CI, not assumed:
 ### 2a. What VZ-ISSUE-002 actually built, and where it deviates
 
 The eight compose files above exist, plus `env/production.env.example`,
-`env/development.env.example`, `env/registry/*.json` and three checkers wired
-into the required `validate` lane. Twelve shapes are rendered on every run and
-asserted from `docker compose config --format json` parsed as JSON — never from
+`env/development.env.example`, `env/registry/*.json` and four checkers wired
+into the required `validate` lane. Every shape in `scripts/compose-shapes.json`
+(`./scripts/compose-render.py --list`) is rendered on every run and asserted
+from `docker compose config --format json` parsed as JSON — never from
 the YAML — and the models are uploaded as a CI artifact. See
 `docs/quality/COMMANDS.md` §§4–7 for the commands and, more importantly, for
 what a green result does **not** prove.
@@ -154,11 +155,25 @@ Rather than leave that as a comment, both probes are declared **known-false** in
 
 - **refuses** any `depends_on: {condition: service_healthy}` edge pointing at
   one (rule `probe-gates-readiness`) — which is why `frontend → api` is
-  `service_started`, `required: false`;
+  `service_started`, `required: false`. That rule's scope is narrow and worth
+  stating: it only refuses a gate onto a probe someone has **declared** false,
+  and cannot tell a real probe from a fake one nobody declared. The converse is
+  `gated-probe-unrecognised` — every `service_healthy` target must be listed in
+  `gated_probes` and still invoke the command that makes its probe mean
+  something, so swapping `pg_isready` for `["CMD","true"]` is red;
 - **names every entry on every run**, pass or fail, so the admission is standing
   rather than filed once;
 - **refuses a declaration that matches nothing** (rule
   `stale-known-false-probe`), so the list cannot rot into permanent cover.
+
+The admission also has a **human half**, because the audience that is not CI is
+the person typing `docker compose ps` at 3am and reading `healthy` next to a
+wedged api. `env/production.env.example` (beside the loopback ports that make it
+actionable) and `README.md` both carry a *DIAGNOSING THIS RELEASE: IGNORE THE
+`healthy` COLUMN* paragraph giving the `curl` commands that do tell the truth.
+Rule `known-false-undisclosed` fails when the list is non-empty and either file
+lacks it — and it fails in both directions, so **the list and the paragraphs are
+deleted in the same PR**.
 
 **That list must be empty before VZ-ISSUE-004's boot lane lands.** The boot lane
 and `vizra deploy` are both written against `--wait` / `ps --status healthy`, and

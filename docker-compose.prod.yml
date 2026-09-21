@@ -175,7 +175,11 @@ services:
       - "4001:4001/udp"
 
   caddy:
-    mem_limit: ${VIZRA_CADDY_MEM_LIMIT:-96m}
+    # The one container whose death is TOTAL SITE DOWNTIME, and it was the
+    # tightest cap in the stack at 96m. Caddy idles at 25-40 MiB but reaches
+    # 80-150 MiB with HTTP/2, TLS session state and a few hundred concurrent
+    # connections. Saving 64 MiB on a 4 GB host is not worth an OOM of the edge.
+    mem_limit: ${VIZRA_CADDY_MEM_LIMIT:-160m}
     ports:
       - "80:80"
       - "443:443"
