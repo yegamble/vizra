@@ -24,9 +24,16 @@ repository's own `AGENTS.md` for its lanes.
 No Docker, no database, no browser and no network access is required. The link
 checker deliberately performs **no** network I/O.
 
-CI pins the interpreter to **Python 3.12.14** (`actions/setup-python`) and
-PyYAML to **6.0.3**. The transcripts below were produced locally on macOS with
-the system **Python 3.9.6** and PyYAML 6.0.3.
+CI pins the interpreter to **Python 3.12.14** (`actions/setup-python`, pinned by
+commit SHA). PyYAML is **not** pinned in practice: the `ubuntu-24.04` runner
+image ships it, and the `pyyaml==6.0.3` line in `ci-required.yml` is only a
+fallback for an image that does not. The first CI run used the runner's
+preinstalled **PyYAML 6.0.1**; the pinned install did not execute. Recorded
+here because "pinned" and "what actually ran" are different facts.
+
+The local transcripts below were produced on macOS with the system
+**Python 3.9.6** and PyYAML 6.0.3. The CI transcripts in
+`docs/evidence/meta-validate/ci-run-*.txt` are the Linux runs.
 
 ## The `validate` lane
 
