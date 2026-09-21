@@ -641,3 +641,292 @@ consecutive green runs per leg. The fix is four lines and I have run it green ag
 deterministic reproduction. Findings 2-4 are non-blocking.
 
 PASS is not a merge and not VERIFIED; this is a FAIL and the chair records neither.
+
+---
+---
+
+# Re-verification at `bfd2d5f`
+
+| | |
+|---|---|
+| **Head SHA verified** | `bfd2d5f3f550c249f33f0834b97558646a8b67e5` |
+| Previous verdict | FAIL at `1a6d8bd` (FINDING 1) |
+| Commits added | `2f0688c` fix(test): wait on the log buffer, not on a claim-time counter · `bfd2d5f` docs(evidence): round-1 transcripts |
+| `1a6d8bd` an ancestor of `bfd2d5f`? | **Yes** (`git merge-base --is-ancestor` → true) — nothing was rewritten |
+| Head moved during re-verification? | **No** — re-checked at start and end |
+| Checkout | **fresh clone**, new scratch tree, new containers (`vzv2-pg` :55633, `vzv2-valkey` :56680, `vzv2-redis` :56681), same pinned CI digests |
+| **Verdict** | **PASS** |
+
+| Finding | State |
+|---|---|
+| **FINDING 1** — new flake in the PR's own test | **CLOSED** |
+| **FINDING 2** — AGENTS.md overclaim on `safeError` | **CLOSED** |
+| **FINDING 3** — GitGuardian red, no triage | **CLOSED**, with a correction the owner needs (below) |
+| **FINDING 4** — third affected test unrecorded | **CLOSED** |
+
+## Frozen paths
+
+`git diff --stat 415a6d1 bfd2d5f` is **empty** for all of `migrations/`, `api/`, `go.mod`
+and `go.sum`. `migrations/manifest.sha256` unchanged; `./scripts/migration-manifest.sh
+check` → `ok append-only manifest matches (8 migrations)`; `append-only` green in CI.
+
+Delta `1a6d8bd..bfd2d5f`: `.gitguardian.yaml` +22, `AGENTS.md` 1/1, `internal/jobs/worker.go`
+8/8, `internal/integration/golden_test.go` +37/−10, **new** `internal/jobs/logsites_test.go`
++99, plus evidence transcripts. No product logic outside `worker.go` changed.
+
+## FINDING 1 — CLOSED
+
+The fix is exactly the one I proposed: the wait now requires all three log lines in the
+buffer, and keeps the database conditions as necessary-but-not-sufficient.
+
+**My own red/green, using my round-1 diagnostic** (`time.Sleep(3*time.Second)` in the
+`leaky-retry` handler only, never committed):
+
+| Configuration | Result |
+|---|---|
+| **New** wait (log buffer) + 3 s diagnostic sleep | **GREEN 3 / 3** |
+| **Old** proxy wait (`c.Attempts >= 1`) restored + same sleep | **RED 3 / 3** — `golden_test.go:1662: the worker never logged "jobs: retrying"` |
+
+That is a controlled mutation in both directions: the old condition is deterministically
+red under the diagnostic and the new one is deterministically green.
+
+**Volume, all at `bfd2d5f`, `go test -race -count=1 … -tags=integration ./...`:**
+
+| Leg | Mode | Runs | Failed |
+|---|---|---|---|
+| PostgreSQL 18 + Valkey | source order | 20 | **0** |
+| PostgreSQL 18 + Valkey | `-shuffle=on` | 20 | **0** |
+| PostgreSQL 18 + Valkey | explicit seeds ×10 | 10 | **0** |
+| PostgreSQL 18 + Redis 7.2 | source order | 20 | **0** |
+| PostgreSQL 18 + Redis 7.2 | `-shuffle=on` | 20 | **0** |
+| PostgreSQL 18 + Redis 7.2 | explicit seeds ×10 | 10 | **0** |
+| **Total full suite** | | **100** | **0** |
+| `TestAWorkerWithAPlainHandlerLogsNoCredentials` standalone | `-race` | **60** | **0** |
+
+At `1a6d8bd` the same standalone loop failed 1 of 40 and the suite 2 of 120. Here: 0 of 60
+and 0 of 100.
+
+Recorded seeds (explicit `-shuffle=<seed>`, both legs, all exit 0):
+`11111111, 22222222, 33333333, 44444444, 55555555, 66666666, 77777777, 88888888,
+99999999, 12345678`.
+
+**Honest limitation:** my 40 `-shuffle=on` runs carry no seeds, because `go test` prints
+`-test.shuffle <seed>` only for a *failing* package — the repo's own Makefile comment says
+so. That is why I added the 20 explicitly-seeded runs. The builder's transcripts use
+explicit per-run seeds throughout, which is the better practice and is reproducible.
+
+### Audit of every other wait in `internal/integration` — done independently
+
+The builder claims an audit of the 8 waits it added or touched. I was asked to spot-check
+three; I checked **all seven** others plus the helper, by reading each wait and the
+assertions that follow it. The rule applied: *the wait must be on the observable the
+assertion reads, or on a value the database writes in the same statement as the state
+waited for.*
+
+| line | Test | Waits on | Assertions after | Verdict |
+|---|---|---|---|---|
+| 596 | `TestWorkerRunsAndCompletesAJob` | both jobs `succeeded` | none — the wait *is* the assertion | safe |
+| 627 | `TestRetryLadderAndTerminalFailure` | `state='dead'` | — | safe (`RecordDeadLetter` writes state + `last_error` in one statement) |
+| 632 | `TestRetryLadderAndTerminalFailure` | `state='failed'` | `Attempts`, `LastError` | safe (`FailJob` writes state + `last_error` + `finished_at` in one statement; `attempts` was set earlier at claim) |
+| 1254 | `TestRetryLadderActuallyWalksTheLadder` | `state='queued' && Attempts==1` | `RunAfter` in the future, `LastError` | safe — and notably **not** the round-1 mistake: `queued && attempts==1` is uniquely the post-`RetryJob` state (enqueue is `queued/0`, claim is `leased/1`), and `RetryJob` writes state + `run_after` + `last_error` in one statement |
+| 1278 | `TestRetryLadderActuallyWalksTheLadder` | `state='dead'` | `calls >= 3` | safe — `calls++` is at handler *entry* (`golden_test.go:1243-1245`), so it precedes the state change |
+| 1320 | `TestAJobWhoseWorkerDiedIsReclaimedAndCompleted` | `state='succeeded'` | none | safe |
+| 1498 | `TestAMultibyteErrorIsStoredInLastError` | terminal state | `LastError` | safe (same statement) |
+| helper | `startWorker` | the `stopped` channel | that the goroutine returned | the observable itself; fails the test after 30 s |
+
+**No other wait in `internal/integration` waits on `attempts`, a row count, or a state
+that becomes true before the asserted observable.** My table and the builder's
+`ROUND1-wait-on-the-observable.md` agree line for line; I reached it independently.
+
+The three `time.Sleep` calls in the file (lines 814, 1190, 1276) all **pre-date this PR
+entirely** — they are present verbatim at base `415a6d1` — so none is a masking change
+introduced here.
+
+## FINDING 2 — CLOSED
+
+All eight previously-raw sites now pass `safeError(...)`: `worker.go:192, 293, 308, 324,
+338, 365, 384, 388`, joining 316, 329 and 342. The AGENTS.md row no longer claims a bare
+"every error log site"; it now names the behaviour test and the coverage test separately,
+and the coverage claim ("**all 11**") is mechanically enforced rather than asserted.
+
+`internal/jobs/logsites_test.go` parses `worker.go`'s AST and requires every `"error"`
+attribute value to be a `safeError(...)` call, with a hard count guard. My mutations:
+
+| Mutation | Result |
+|---|---|
+| unwrap one site (`jobs: heartbeat failed`) | **RED** — `logsites_test.go:68: worker.go:365:49: the "error" value is err.Error(...), not safeError(...)` — names file:line:col |
+| add a **twelfth raw** error log site | **RED** — names `worker.go:385:54`, **and** `checked 12 … expected 11` |
+| add a twelfth site that **is** `safeError`-wrapped | **RED** — `checked 12 … expected 11` (the drift guard bites even when the new site is correct) |
+
+The test cannot pass vacuously: the count guard fires if the attribute key is renamed or
+the calls restructured.
+
+**Diagnostic value is intact.** I checked that redacting database causes destroys nothing.
+`obs.Redact` is a complete **no-op** on every realistic driver error shape:
+
+```
+UNCHANGED  ERROR: null value in column "run_after" of relation "jobs" violates not-null constraint (SQLSTATE 23502)
+UNCHANGED  ERROR: new row for relation "jobs" violates check constraint "jobs_attempts_bounded" (SQLSTATE 23514)
+UNCHANGED  ERROR: duplicate key value violates unique constraint "jobs_idem" (SQLSTATE 23505) Detail: Key (kind, idempotency_key)=(noop, abc) already exists.
+UNCHANGED  ERROR: canceling statement due to user request (SQLSTATE 57014)
+UNCHANGED  ERROR: could not serialize access due to concurrent update (SQLSTATE 40001)
+UNCHANGED  timeout: context deadline exceeded
+```
+
+Live pgx errors against a real server likewise pass through untouched, SQLSTATE, relation
+name and dial diagnostics preserved:
+
+```
+RAW/REDACTED identical: ERROR: relation "no_such_table_here" does not exist (SQLSTATE 42P01)
+RAW/REDACTED identical: failed to connect to `user=vizra database=x`: 127.0.0.1:1 … connection refused
+```
+
+And the hypothetical the new test exists to guard against **is** caught:
+
+```
+RAW:      failed to connect to postgres://vizra:hunter2@db:5432/vizra: connection refused
+REDACTED: failed to connect to postgres://[redacted]@db:5432/vizra: connection refused
+```
+
+So the belt-and-braces has zero diagnostic cost and real defence-in-depth value. My
+round-1 argument — that the eight sites were safe *because pgx happens to redact today* —
+is exactly the kind of third-party-behaviour dependency the new test removes. The stronger
+fix is the right one.
+
+*Residual, not a finding:* the AST test keys on the literal attribute name `"error"`. A
+future site logging a cause under a different key (`"cause"`, `"detail"`) would not be
+checked. The count guard limits the blast radius and nothing today does this.
+
+## FINDING 3 — CLOSED, and the builder's correction **holds**
+
+`.gitguardian.yaml` gains two per-path entries with written reasons and no glob:
+`internal/integration/golden_test.go` (naming the flagged literal and why deleting it
+would delete VZ-OPS-005's coverage) and `docs/evidence/pr2/` (scoped to this one slice's
+directory, explicitly so a future slice cannot hide a real secret under a standing
+exclusion). The triage table is in the PR body.
+
+**The builder further claims `.gitguardian.yaml` is decorative for this red check. I
+verified it, and it is true.** This matters for what the owner must do:
+
+| Evidence | Result |
+|---|---|
+| `grep -rn "ggshield\|gitguardian\|GitGuardian" .github/` | **one hit only**: `.github/CODEOWNERS:38:/.gitguardian.yaml @yegamble`. No workflow runs ggshield. |
+| `grep -rn "ggshield" .` (excluding the config itself) | **none** |
+| `.pre-commit-config.yaml` | **does not exist** |
+| Failing check's app | `app_slug: gitguardian`, `app_name: GitGuardian` — the **GitHub App**, scanning server-side, not a workflow |
+| Reported count at `1a6d8bd` | `1 secret uncovered!` — "scan of 2 commits" |
+| Reported count at `bfd2d5f` | `1 secret uncovered!` — "scan of 4 commits" |
+| Flagged occurrence at both SHAs | **identical** — incident `37481217`, occurrence `298761579`, commit `4f02e18`, `internal/integration/golden_test.go` line R1572 |
+
+Adding the exclusion changed the App's verdict by **nothing at all**. `.gitguardian.yaml`
+configures the ggshield CLI, which nothing in this repository runs. **Consequence for the
+owner:** GitGuardian will stay red on this PR no matter what is committed. Clearing it
+requires an action in the GitGuardian dashboard (resolve incident `37481217` as a false
+positive, or add a server-side ignore), or removing the literals — which would remove the
+redaction coverage. GitGuardian is **not** a required check and does not gate the merge.
+
+The committed `.gitguardian.yaml` entries are still worth having — they document the
+triage next to the values and cover ggshield if anyone runs it locally — but they are not
+the remedy, and the PR body now says so rather than implying the red is fixed.
+
+## FINDING 4 — CLOSED
+
+`TestAJobWhoseWorkerDiedIsReclaimedAndCompleted` is recorded as the third affected test in
+the PR body (line 45), in the meta execution plan (line 270), and in the wait-audit table
+of `docs/evidence/pr2/ROUND1-wait-on-the-observable.md`.
+
+## Regression canaries — all still die
+
+| Canary | Result |
+|---|---|
+| **M1** — resolve a zero `RunAfter` with the host clock again | **RED** — `run_after … is not created_at …: they differ by 1961 µs` |
+| **M3** — the three handler-error sites back to raw | **RED** — leaked the Vizra API key; **and** `TestEveryErrorLogSiteInTheWorkerIsRedacted` named 2 sites |
+| **M6** (mine) — `COALESCE(now(), …)`, explicit delay discarded | **RED** — `an explicit RunAfter was not stored verbatim: stored …00:06:41Z, asked for …02:06:41Z` |
+
+Restored after each: green.
+
+## No masking, no test weakened
+
+Masking patterns **added** in `1a6d8bd..bfd2d5f` across `*.go`, `Makefile`, `.github/`:
+`time.Sleep` **none**, `t.Skip` **none**, `t.Parallel` **none**, `-p 1`/serialisation
+**none**, `Eventually` **none**, retries **none**, timeouts/deadlines changed **none**
+(the only `deadline` hit is a comment).
+
+`git diff --numstat 1a6d8bd bfd2d5f -- '*_test.go'` → `37 10 golden_test.go`,
+`99 0 logsites_test.go`. **All ten removed lines** are the old wait condition and the old
+inline `[]string{…}` literal; both are replaced by strictly stronger versions — the wait
+gained the three log-line checks, and the literal was hoisted to `lines` and is still
+iterated by the post-wait `Fatalf` loop, which is retained deliberately so a timeout names
+*which* branch never logged. No assertion lost, no test renamed, deleted or skipped.
+
+## Lanes and CI at `bfd2d5f`
+
+| Check | Command / source | Result |
+|---|---|---|
+| Full suite | `go test -count=1 -tags=integration -v ./...` | exit 0 — **920 pass, 0 fail, 0 skip** (claim matched exactly) |
+| AST coverage test | in the above | `logsites_test.go:88: 11 error log sites in worker.go, all going through safeError` |
+| Whole gate | `make ci` | **exit 0** — `make ci: all lanes passed` |
+| sqlc drift | `make sqlc-verify` | exit 0 |
+| manifest | `./scripts/migration-manifest.sh check` | exit 0, 8 migrations |
+
+GitHub, this SHA — every required lane executed and green, nothing skipped or cancelled:
+
+| Check | Conclusion | completed |
+|---|---|---|
+| `append-only` | success | 23:55:37Z |
+| `build-test` | success | 23:59:46Z |
+| `cache-matrix` | success | 23:57:13Z |
+| `cache-matrix-leg (valkey, …)` | success | 23:56:50Z |
+| `cache-matrix-leg (redis, …)` | success | 23:57:08Z |
+| `govulncheck` | success | 23:56:05Z |
+| `docker-build` | success | 23:58:52Z |
+| **`ci-required`** | **success** | **2026-09-21T00:00:08Z** |
+| `GitGuardian Security Checks` | failure | 23:55:38Z — **not a required check**, see FINDING 3 |
+
+`ci-required` completed **last**, after `build-test` — the fan-in genuinely waited. The
+manifest `.github/required-checks.txt` still matches `FLOOR_LANES` exactly (5 lanes). All
+three `-shuffle=on` steps ran and succeeded on this SHA:
+
+```
+JOB build-test [success]                       Integration tests, shuffled order (PostgreSQL 18 + Valkey) -> success
+JOB cache-matrix-leg (valkey, …) [success]     Integration tests against valkey, shuffled order -> success
+JOB cache-matrix-leg (redis, …)  [success]     Integration tests against redis, shuffled order -> success
+```
+
+## Builder's round-1 evidence, checked
+
+| Claim | Verdict |
+|---|---|
+| `ROUND1-wait-on-the-observable.md`: RED 3/3 old wait, GREEN 3/3 new wait under the 3 s diagnostic | **Reproduced exactly** |
+| Audit of all 8 waits, only the V-2 test was a proxy | **Confirmed independently**, all seven others plus the helper |
+| Four `AFTER-*-30runs*.txt`, 120 runs, 0 failures, explicit per-run seeds | **Consistent with my 100 runs, 0 failures.** Their headers say `source SHA: 2f0688c … tree clean: 2 modified` / `4 modified` — the modified files are the transcripts being written; I did not rely on them, which is the point of independent measurement |
+| `FINAL-LANES.txt` / 920 pass, 0 fail, 0 skip | **Confirmed exactly** |
+| `.gitguardian.yaml` is decorative for the App's red | **Confirmed** — identical incident and occurrence before and after |
+
+## Cleanup
+
+Removed by exact name: containers `vzv2-pg`, `vzv2-valkey`, `vzv2-redis`; the
+re-verification clone and its worktrees under the scratch directory. No image was built or
+deleted. `vizra-pr2-*` and `vidra-*` containers untouched.
+
+---
+
+## Re-verification verdict: **PASS**
+
+- **FINDING 1 — CLOSED.** The proxy wait is replaced by a wait on the log buffer. Red 3/3
+  with the old condition and green 3/3 with the new one under my deterministic diagnostic;
+  0 failures in 100 full suite runs across both cache legs (ordered, `-shuffle=on`, and
+  explicitly seeded) and 0 in 60 standalone runs, against 2/120 and 1/40 before.
+- **FINDING 2 — CLOSED.** All 11 error log sites go through `safeError`, enforced by an
+  AST test with a count guard that I broke three different ways. AGENTS.md is now exactly
+  true. Redaction costs no database diagnostic.
+- **FINDING 3 — CLOSED**, with a correction the owner needs: `.gitguardian.yaml` does not
+  and cannot change the GitHub App's verdict. GitGuardian will remain red until the
+  incident is resolved in the dashboard. It is not a required check.
+- **FINDING 4 — CLOSED.**
+- V-1, V-2 and the `attempts` note remain CLOSED; all round-1 canaries still die.
+- No migration, API contract, `go.mod` or `go.sum` change. No masking. No test weakened.
+- `ci-required` green on `bfd2d5f`, all five required lanes executed, fan-in completing
+  last.
+
+PASS is not a merge and not VERIFIED — the chair records those.
