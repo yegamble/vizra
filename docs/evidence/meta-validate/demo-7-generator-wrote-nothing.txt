@@ -1,0 +1,82 @@
+
+########## DEMO 7 — a generator that exits 0 without writing (verifier FINDING 1) ##########
+
+BASE SHA: 4b2269043831548b91f00201b494fc53c7673769
+
+Before this fix, check-generated-ledger.sh asserted `git diff --exit-code`
+but never that the declared files were WRITTEN. A gutted build.py therefore
+printed 'reproduces byte-for-byte' while nothing had been regenerated.
+The declared files are now REMOVED before regenerating, so a generator that
+writes nothing leaves a deletion the existence check names.
+
+########## RED 7a — the verifier's exact no-op generator ##########
+
+  sha256(docs/evidence/ledger-generator/build.py) = fe2c7566e8e468db
+  sha256(docs/evidence/ledger-generator/build.py) = fac4bbb3027ab23f
+$ ./scripts/check-generated-ledger.sh
+regenerating with: Python 3.9.6
+OK 191 requirements; core=141
+GENERATOR WROTE NOTHING: 'docs/quality/features.json' is declared as generated but does not exist after running the generator.
+  It was removed before regeneration, so the generator did not write it.
+  A generator that exits 0 without writing its output is not a reproduction.
+
+Restore the removed file(s) with: git checkout -- docs/quality/features.json
+EXIT=1
+
+########## RED 7b — a generator that writes an EMPTY file ##########
+
+$ ./scripts/check-generated-ledger.sh
+regenerating with: Python 3.9.6
+OK 191 requirements; core=141
+GENERATOR WROTE AN EMPTY FILE: 'docs/quality/features.json' exists but is zero bytes.
+
+Restore the removed file(s) with: git checkout -- docs/quality/features.json
+EXIT=1
+
+########## RED 7c — a generator that writes only SOME of the declared files ##########
+
+The declared list is widened to a second file the generator does not write,
+which is what a partial write looks like from the check's point of view.
+declared list is now features.json + ui-controls.json
+$ ./scripts/check-generated-ledger.sh
+regenerating with: Python 3.9.6
+OK 191 requirements; core=141; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 14, 'upload': 13, 'media': 13, 'storage': 15, 'import': 4, 'activitypub': 4, 'atproto': 2, 'ipfs': 2, 'organization': 24, 'community': 19, 'search': 12, 'admin': 26, 'design': 4}; questions=['Q-016', 'Q-021', 'Q-022', 'Q-028', 'Q-032', 'Q-036']; decided=['Q-001', 'Q-002', 'Q-003', 'Q-004', 'Q-005', 'Q-006', 'Q-007', 'Q-008', 'Q-009', 'Q-010', 'Q-011', 'Q-012', 'Q-013', 'Q-014', 'Q-015', 'Q-017', 'Q-018', 'Q-023', 'Q-024', 'Q-027', 'Q-028', 'Q-029', 'Q-030', 'Q-031', 'Q-033', 'Q-034', 'Q-035', 'Q-037', 'Q-038', 'Q-039', 'Q-040', 'Q-041', 'Q-042', 'Q-043']
+GENERATOR WROTE NOTHING: 'docs/quality/ui-controls.json' is declared as generated but does not exist after running the generator.
+  It was removed before regeneration, so the generator did not write it.
+  A generator that exits 0 without writing its output is not a reproduction.
+
+Restore the removed file(s) with: git checkout -- docs/quality/features.json docs/quality/ui-controls.json
+EXIT=1
+
+########## RED 7d — the PRE-FIX generator under the C/POSIX locale regression check ##########
+
+The verifier reproduced the locale bug on macOS with
+  LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0
+(PEP 538 C-locale coercion is what normally masks it). That invocation is
+now a step of the check itself, so the fix cannot silently regress.
+restored the pre-fix build.py (bare open(sys.argv[1],"w"), no encoding=)
+$ ./scripts/check-generated-ledger.sh
+regenerating with: Python 3.9.6
+OK 191 requirements; core=141; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 14, 'upload': 13, 'media': 13, 'storage': 15, 'import': 4, 'activitypub': 4, 'atproto': 2, 'ipfs': 2, 'organization': 24, 'community': 19, 'search': 12, 'admin': 26, 'design': 4}; questions=['Q-016', 'Q-021', 'Q-022', 'Q-028', 'Q-032', 'Q-036']; decided=['Q-001', 'Q-002', 'Q-003', 'Q-004', 'Q-005', 'Q-006', 'Q-007', 'Q-008', 'Q-009', 'Q-010', 'Q-011', 'Q-012', 'Q-013', 'Q-014', 'Q-015', 'Q-017', 'Q-018', 'Q-023', 'Q-024', 'Q-027', 'Q-028', 'Q-029', 'Q-030', 'Q-031', 'Q-033', 'Q-034', 'Q-035', 'Q-037', 'Q-038', 'Q-039', 'Q-040', 'Q-041', 'Q-042', 'Q-043']
+locale regression: re-running under LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0
+Traceback (most recent call last):
+  File "/Users/yosefgamble/github/vizra/.claude/worktrees/meta-validate/docs/evidence/ledger-generator/build.py", line 57, in <module>
+    json.dump(out, open(sys.argv[1],"w"), indent=2, ensure_ascii=False)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/__init__.py", line 180, in dump
+    fp.write(chunk)
+UnicodeEncodeError: 'ascii' codec can't encode character '\u2014' in position 428: ordinal not in range(128)
+LOCALE REGRESSION: the generator failed under a C/POSIX locale.
+  This is the pre-fix failure returning: an output opened without an explicit
+  encoding= is written in the ambient locale's encoding, which is ASCII here,
+  and the ledger's non-ASCII characters cannot be encoded.
+  Restore the removed file(s) with: git checkout -- docs/quality/features.json
+EXIT=1
+
+########## GREEN ##########
+
+$ ./scripts/check-generated-ledger.sh
+regenerating with: Python 3.9.6
+OK 191 requirements; core=141; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 14, 'upload': 13, 'media': 13, 'storage': 15, 'import': 4, 'activitypub': 4, 'atproto': 2, 'ipfs': 2, 'organization': 24, 'community': 19, 'search': 12, 'admin': 26, 'design': 4}; questions=['Q-016', 'Q-021', 'Q-022', 'Q-028', 'Q-032', 'Q-036']; decided=['Q-001', 'Q-002', 'Q-003', 'Q-004', 'Q-005', 'Q-006', 'Q-007', 'Q-008', 'Q-009', 'Q-010', 'Q-011', 'Q-012', 'Q-013', 'Q-014', 'Q-015', 'Q-017', 'Q-018', 'Q-023', 'Q-024', 'Q-027', 'Q-028', 'Q-029', 'Q-030', 'Q-031', 'Q-033', 'Q-034', 'Q-035', 'Q-037', 'Q-038', 'Q-039', 'Q-040', 'Q-041', 'Q-042', 'Q-043']
+locale regression: re-running under LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0
+generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+EXIT=0

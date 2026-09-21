@@ -1,0 +1,109 @@
+
+########## DEMO 9 — shell override and conditional step on the REAL validate lane (FINDING 3) ##########
+
+BASE SHA: 4b2269043831548b91f00201b494fc53c7673769
+
+continue-on-error was refused in five spellings, but two strictly simpler
+ways to neuter the same lane were unchecked. Both are applied to the real
+workflow here, not only to fixtures.
+
+########## RED 9a — workflow-level defaults.run.shell that swallows non-zero exits ##########
+
+  sha256(.github/workflows/validate.yml) = 260bbf6426904460
+inserted workflow-level defaults.run.shell
+  sha256(.github/workflows/validate.yml) = fa4c1084f221b097
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+VIOLATION .github/workflows/validate.yml reason=defaults-shell-override where=workflow shell='bash -c "eval \\"$@\\" || true" --'
+  `defaults.run.shell` replaces the shell every `run:` step executes in. A shell
+  that swallows non-zero exits turns every check in this lane into a no-op that
+  still reports success — the Actions analogue of `SHELL := /usr/bin/true`.
+a required lane is undefined, shell-overridden, or has a conditional step
+EXIT=1
+
+########## RED 9b — job-level defaults.run.shell ##########
+
+inserted job-level defaults.run.shell
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+VIOLATION .github/workflows/validate.yml reason=defaults-shell-override where=jobs.validate shell='bash -c "eval \\"$@\\" || true" --'
+  `defaults.run.shell` replaces the shell every `run:` step executes in. A shell
+  that swallows non-zero exits turns every check in this lane into a no-op that
+  still reports success — the Actions analogue of `SHELL := /usr/bin/true`.
+a required lane is undefined, shell-overridden, or has a conditional step
+EXIT=1
+
+########## RED 9c — step-level 'if: false' on the ledger check ##########
+
+inserted if: false on the ledger step
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+VIOLATION .github/workflows/validate.yml reason=constant-false-if lane=validate where=jobs.validate.steps[3] if='False'
+  Step 'the generated ledger matches its sources' carries an `if:` on a REQUIRED lane.
+  It is a constant false, so this step never runs at all while the lane
+  still reports success. A skipped JOB is refused by the fan-in; a skipped
+  STEP leaves the job green, which is why it is refused here.
+a required lane is undefined, shell-overridden, or has a conditional step
+EXIT=1
+
+########## RED 9d — a step-level 'if:' expression nothing can evaluate ##########
+
+inserted a non-constant if: on the ledger step
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+VIOLATION .github/workflows/validate.yml reason=conditional-step-on-required-lane lane=validate where=jobs.validate.steps[3] if="${{ github.event.repository.owner.login == 'nobody' }}"
+  Step 'the generated ledger matches its sources' carries an `if:` on a REQUIRED lane.
+  Nothing here can evaluate that expression, and a step that MIGHT not run
+  is not a gate. A required lane's steps run unconditionally.
+a required lane is undefined, shell-overridden, or has a conditional step
+EXIT=1
+
+########## RED 9e — the required lane's job renamed, so the manifest names no job ##########
+
+renamed the validate job
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+VIOLATION reason=no-such-job lane=validate
+  Required check 'validate' has no job of that name in any of 2 workflow file(s). The fan-in would wait for a check nobody defined.
+a required lane is undefined, shell-overridden, or has a conditional step
+EXIT=1
+
+########## GREEN ##########
+
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+lane integrity: 1 required lane(s) defined by a real job across 2 workflow file(s); no shell override, no conditional step
+the workflow checker rejects every continue-on-error spelling in scripts/testdata/ (6 fixtures exercised, floor 6)
+the pin checker rejects every unpinned-action and untriggered-lane spelling in scripts/testdata/ (7 fixtures exercised, floor 7)
+the lane checker rejects every shell-override, conditional-step and missing-job case in scripts/testdata/ (7 fixtures exercised, floor 7)
+EXIT=0
