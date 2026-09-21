@@ -122,6 +122,10 @@ RULES = frozenset({
     "missing-build",
     "dev-mode-in-production",
     "dev-hatch-in-production",
+    "missing-mem-limit",
+    "probe-gates-readiness",
+    "stale-known-false-probe",
+    "profile-not-enumerated",
 })
 
 # vizra-core refuses every one of these by name when VIZRA_MODE=production, and
@@ -135,7 +139,46 @@ DEV_HATCH_PREFIX = "VIZRA_DEV_"
 CORE_SERVICES = frozenset({"api", "worker", "migrate"})
 
 
+# The FOUR states a healthcheck can be in. Written once, as a single function,
+# because the previous shape — one conditional in check_lifecycle and another in
+# check_probes — let a spelling fall between them. `test: ["NONE"]` is Docker's
+# documented way to DISABLE a healthcheck (it is what `disable: true` compiles
+# to), and it passed the "must have a healthcheck" rule because a one-element
+# list is not falsy. The neighbouring spelling `disable: true` was caught, so the
+# rule knew about the concept and missed one of its two spellings.
+PROBE_ABSENT = "absent"          # no healthcheck at all
+PROBE_DISABLED = "disabled"      # disable: true, or test NONE in any spelling
+PROBE_KNOWN_FALSE = "known-false"  # declared in compose-shapes.json: cannot go red
+PROBE_REAL = "real"              # actually probes the service
+
+
+def probe_state(svc, name, known_false):
+    hc = svc.get("healthcheck") or {}
+    if not hc:
+        return PROBE_ABSENT, hc
+    if hc.get("disable") is True:
+        return PROBE_DISABLED, hc
+    test = hc.get("test")
+    if isinstance(test, str):
+        # Compose accepts the bare string form; normalise before comparing so
+        # `test: NONE` and `test: ["NONE"]` cannot diverge.
+        test = [test]
+    if not test:
+        return PROBE_ABSENT, hc
+    if test[:1] == ["NONE"]:
+        return PROBE_DISABLED, hc
+    entry = known_false.get(name)
+    if entry and list(test) == list(entry["test"]):
+        return PROBE_KNOWN_FALSE, hc
+    return PROBE_REAL, hc
+
+
 violations = []
+
+# Services whose healthcheck matched a known-false declaration in some rendered
+# shape. Module level because two rules populate and read it, and because the
+# "declared but matching nothing" check has to run once, after every shape.
+KNOWN_FALSE_SEEN = set()
 
 
 def violation(shape, rule, service, detail, path=None):
@@ -183,6 +226,84 @@ def locate_in_sources(files, service, key, repo_root):
     return None
 
 
+def profiles_declared_in_sources(files, repo_root):
+    """Every `profiles:` name that appears in any compose file in the chain.
+
+    Uses the same tolerant loader as the diagnostic locator. This is NOT an
+    assertion on a rendered model, and it cannot be: the hole it closes is
+    precisely that an unenumerated profile is NEVER rendered, so no amount of
+    reading rendered models can see it.
+    """
+    if yaml is None:
+        return None
+    found = set()
+    for rel in sorted(set(files)):
+        path = os.path.join(repo_root, rel)
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                class Tolerant(yaml.SafeLoader):
+                    pass
+
+                Tolerant.add_multi_constructor("", lambda l, sfx, n: None)
+                doc = yaml.load(fh, Loader=Tolerant)
+        except (OSError, yaml.YAMLError):
+            continue
+        if not isinstance(doc, dict):
+            continue
+        for svc in (doc.get("services") or {}).values():
+            if not isinstance(svc, dict):
+                continue
+            profs = svc.get("profiles")
+            # `profiles: !override [...]` loads as None under the tolerant
+            # loader (the tag constructor discards the value), which is exactly
+            # right here: an overlay that PARKS a service on a disabled profile
+            # must not add that name to the set of profiles an operator can
+            # select. Only plain lists count.
+            if isinstance(profs, list):
+                found.update(str(x) for x in profs)
+    return found
+
+
+def check_profile_coverage(all_files, enumerated, repo_root):
+    """A service on a profile no shape enumerates is never rendered, so never
+    asserted.
+
+    Every rule in this file reads a rendered model, and a shape renders only the
+    profiles it names. The union across every shape is therefore the exact
+    boundary of this checker's coverage — complete inside it, EMPTY outside it.
+    A later slice adding a `backup`, `debug` or `admin` profile with an open
+    datastore port would leave the lane green at "0 violations" while an
+    operator who enables that profile gets 0.0.0.0:5432.
+
+    So the set is closed rather than enumerated: every profile name that appears
+    in the compose files must be covered by at least one shape. Adding a profile
+    AND a shape that enumerates it is green — the rule pushes authors toward
+    declaring the shape, not away from adding profiles.
+    """
+    declared = profiles_declared_in_sources(all_files, repo_root)
+    if declared is None:
+        violation(
+            "(manifest)", "profile-not-enumerated", "(all)",
+            "PyYAML is unavailable, so the profiles declared in the compose "
+            "files could not be read and this rule checked NOTHING. It fails "
+            "closed: an unchecked closing rule is the one that lets an "
+            "unrendered profile through",
+        )
+        return
+    # `external-disabled` is the parking profile the external overlays use to
+    # delete a bundled datastore. Nothing may ever select it — that is its
+    # entire purpose — so a shape enumerating it would be a bug, not coverage.
+    parking = {"external-disabled"}
+    for name in sorted(declared - enumerated - parking):
+        violation(
+            "(manifest)", "profile-not-enumerated", "(profile)",
+            f"profile {name!r} appears in a compose file but no shape in "
+            f"scripts/compose-shapes.json enumerates it, so no shape renders it "
+            f"and NO RULE HERE HAS EVER SEEN IT. Add a shape that selects "
+            f"{name!r} (enumerated today: {sorted(enumerated)})",
+        )
+
+
 # --------------------------------------------------------------------------
 # Rules
 # --------------------------------------------------------------------------
@@ -222,11 +343,26 @@ def check_ports(shape, model, repo_root):
     # a `reason` in the manifest. Today exactly two services hold it — caddy
     # (80/443, the edge) and ipfs (4001, the swarm port a node must be dialled
     # on). Everything else that publishes at all publishes on 127.0.0.1.
+    # Keyed on "<published>/<protocol>", not on the port number alone. The
+    # manifest reads as a protocol-aware allowlist and used to not be one: with
+    # a number-only key, api publishing 8080/udp was allowed by an entry that
+    # meant "this service may answer on TCP 8080". Bounded in impact — api and
+    # frontend are loopback-only and any non-loopback bind is still caught by
+    # public-bind — but an allowlist should mean what it reads as.
+    #
+    # A bare integer in the manifest still means tcp, so the common case stays
+    # short; ipfs, the one service with a legitimate UDP port, names both.
     allow = {}
     for item in shape.get("published_allow") or []:
-        allow[item["service"]] = {
-            str(p): bool(item.get("public", False)) for p in item["ports"]
-        }
+        entries = {}
+        for p in item["ports"]:
+            if isinstance(p, dict):
+                entries[f"{p['port']}/{p.get('protocol', 'tcp')}"] = bool(
+                    item.get("public", False)
+                )
+            else:
+                entries[f"{p}/tcp"] = bool(item.get("public", False))
+        allow[item["service"]] = entries
 
     for name, svc in sorted((model.get("services") or {}).items()):
         entries = port_entries(svc)
@@ -245,18 +381,20 @@ def check_ports(shape, model, repo_root):
             continue
 
         permitted = allow.get(name) or {}
-        for host_ip, published, target, _ in entries:
-            if published not in permitted:
+        for host_ip, published, target, proto in entries:
+            key = f"{published}/{proto}"
+            if key not in permitted:
                 violation(
                     sid, "port-not-allowed", name,
-                    f"publishes {host_ip}:{published}->{target}, which this "
-                    f"shape does not allow",
+                    f"publishes {host_ip}:{published}->{target}/{proto}, which "
+                    f"this shape does not allow (allowed: "
+                    f"{sorted(permitted) or 'nothing'})",
                     where,
                 )
                 continue
             # Allowed to publish this port — but facing the network is a second,
             # separate permission that must be written out per port.
-            if not permitted[published] and host_ip not in LOOPBACK_HOST_IPS:
+            if not permitted[key] and host_ip not in LOOPBACK_HOST_IPS:
                 violation(
                     sid, "public-bind", name,
                     f"binds {host_ip}:{published}, but this shape allows that "
@@ -284,7 +422,7 @@ def check_edge(shape, model, repo_root):
         )
 
 
-def check_lifecycle(shape, model, repo_root):
+def check_lifecycle(shape, model, repo_root, known_false):
     """restart policy, log cap, healthcheck — per docs/META_REPO.md §2 rule 4."""
     sid = shape["id"]
     for name, svc in sorted((model.get("services") or {}).items()):
@@ -322,23 +460,46 @@ def check_lifecycle(shape, model, repo_root):
             )
 
         if not one_shot:
-            hc = svc.get("healthcheck") or {}
-            if not hc or hc.get("disable") is True or not hc.get("test"):
+            state, hc = probe_state(svc, name, known_false)
+            if state in (PROBE_ABSENT, PROBE_DISABLED):
                 violation(
                     sid, "missing-healthcheck", name,
-                    f"healthcheck={hc!r}; a long-running service with no "
-                    f"healthcheck cannot gate a depends_on and cannot be "
-                    f"diagnosed by doctor",
+                    f"healthcheck is {state} ({hc!r}); a long-running service "
+                    f"without one cannot gate a depends_on and cannot be "
+                    f"diagnosed by doctor. NOTE: test ['NONE'] and the string "
+                    f"'NONE' are Docker's spellings of disabled, not of a probe",
                     locate_in_sources(shape["files"], name, "healthcheck", repo_root),
                 )
+            elif state == PROBE_KNOWN_FALSE:
+                # PRESENT, but a placeholder. This rule's whole reason for
+                # existing is "cannot gate a depends_on" — so a probe that
+                # cannot go red satisfies its letter and defeats its purpose.
+                # It is allowed through ONLY because it is declared, and it is
+                # NAMED on every run by the standing report in main().
+                KNOWN_FALSE_SEEN.add(name)
 
 
-def image_is_pinned(image):
+def image_is_pinned(image, release_image):
     """A production image names an immutable artefact.
 
-    Accepted: `repo@sha256:<64 hex>` (a digest), or `repo:<tag>` where the tag
-    is neither empty nor `latest`. Refused: no image at all, a bare repository
-    with no tag (which Docker resolves to `latest`), and `latest` spelled out.
+    TWO RULES, because there are two kinds of image and ADR-001 asks different
+    things of them:
+
+    * A **Vizra release image** (`release_image=True`) comes from the release
+      record — `ghcr.io/…/vizra-core:${VIZRA_CORE_TAG}` — and a release tag is
+      legitimately what `releases/<tag>.json` names. A non-empty, non-`latest`
+      tag is enough. Recording the resolved digest at deploy time is
+      VZ-UPGRADE-002's job, not this rule's.
+
+    * **Anything else** is third-party, and ADR-001 says PostgreSQL 18 is
+      "managed and digest-pinned" and Valkey 9.1.x "digest-pinned". So a digest
+      is REQUIRED. The tree honoured that by hand; nothing enforced it, and
+      `postgres:18` would have passed silently — a moving target that makes two
+      operators on the same release record run different PostgreSQL builds and
+      stops a rollback rolling the datastore back.
+
+    The default for an unrecognised service is the strict branch, so a service
+    added later must either be declared a release image or carry a digest.
     """
     if not image or not isinstance(image, str):
         return False, "no image"
@@ -347,6 +508,13 @@ def image_is_pinned(image):
         if len(digest) == 64 and all(c in "0123456789abcdef" for c in digest):
             return True, ""
         return False, f"malformed digest {image!r}"
+    if not release_image:
+        return False, (
+            f"{image!r} is a third-party image with no @sha256 digest. ADR-001 "
+            f"pins these by digest; a bare tag is a moving target, so two "
+            f"operators deploying the same release record get different builds "
+            f"and a rollback does not roll the datastore image back"
+        )
     # Split off the tag, being careful that a registry host may carry a :port.
     last = image.rsplit("/", 1)[-1]
     if ":" not in last:
@@ -359,7 +527,7 @@ def image_is_pinned(image):
     return True, ""
 
 
-def check_production(shape, model, repo_root):
+def check_production(shape, model, repo_root, release_services):
     """Rules that apply only where an operator's data lives."""
     if shape.get("kind") != "production":
         return
@@ -375,13 +543,28 @@ def check_production(shape, model, repo_root):
                 locate_in_sources(shape["files"], name, "build", repo_root),
             )
 
-        ok, why = image_is_pinned(svc.get("image"))
+        ok, why = image_is_pinned(svc.get("image"), name in release_services)
         if not ok:
             violation(
                 sid, "unpinned-image", name,
                 f"{why}; production images come from the release record "
                 f"(VIZRA_*_TAG) or a digest",
                 locate_in_sources(shape["files"], name, "image", repo_root),
+            )
+
+        # F4. Same shape as missing-log-cap, and for a related reason: a
+        # service with no cgroup limit cannot be contained, so the kernel picks
+        # the victim by badness score - which on a Docker host is routinely
+        # PostgreSQL, the largest resident process. A limit that OOM-kills the
+        # worker is recoverable; one that OOM-kills PostgreSQL is crash
+        # recovery. One-shots are exempt: they exit.
+        if name not in ONE_SHOT_SERVICES and not svc.get("mem_limit"):
+            violation(
+                sid, "missing-mem-limit", name,
+                "declares no mem_limit in a production shape; without one a "
+                "burst has no containment and the OOM killer chooses by badness "
+                "score, not by what is safe to lose",
+                locate_in_sources(shape["files"], name, "mem_limit", repo_root),
             )
 
         if "no-new-privileges:true" not in (svc.get("security_opt") or []):
@@ -438,6 +621,55 @@ def check_security(shape, model, repo_root):
                 sid, "host-network", name,
                 "uses network_mode: host, which bypasses every port rule above",
             )
+
+
+def check_probes(shape, model, known_false, seen_known_false, repo_root):
+    """F3. A gate on a probe that cannot go red is worse than no gate.
+
+    Two things happen here, and the second is the point:
+
+    1. Any `depends_on: {condition: service_healthy}` edge pointing at a service
+       whose probe is declared known-false FAILS. Docker would report that
+       service healthy while it is wedged, the dependant would start anyway, and
+       `vizra deploy`'s probe step and VZ-ISSUE-004's boot lane would both read
+       the same green.
+
+    2. Every known-false probe present in the model is NAMED on every run, and
+       `check_lifecycle`'s "must have a healthcheck" rule is deliberately NOT
+       allowed to be quietly satisfied by one. That rule exists to make a
+       `depends_on` gateable; a placeholder satisfies its letter and defeats its
+       purpose, so the placeholder has to be announced every single time rather
+       than declared once and forgotten.
+    """
+    sid = shape["id"]
+    services = model.get("services") or {}
+
+    for name, svc in sorted(services.items()):
+        entry = known_false.get(name)
+        if not entry:
+            continue
+        if list(svc.get("healthcheck", {}).get("test") or []) != list(entry["test"]):
+            # The declaration no longer matches what the service actually runs.
+            # Either the probe was fixed (delete the entry) or it changed and
+            # nobody revisited the declaration. Both need a human.
+            continue
+        seen_known_false.add(name)
+
+    for name, svc in sorted(services.items()):
+        for dep, spec in sorted((svc.get("depends_on") or {}).items()):
+            if not isinstance(spec, dict):
+                continue
+            if spec.get("condition") != "service_healthy":
+                continue
+            if dep in known_false and dep in services:
+                violation(
+                    sid, "probe-gates-readiness", name,
+                    f"gates on {dep} with condition service_healthy, but {dep}'s "
+                    f"probe is declared known-false in "
+                    f"scripts/compose-shapes.json ({known_false[dep]['why_false']}) "
+                    f"- so this edge reports satisfied while {dep} is broken",
+                    locate_in_sources(shape["files"], name, "depends_on", repo_root),
+                )
 
 
 def check_membership(shape, model):
@@ -499,6 +731,20 @@ def main(argv):
         )
         return 2
 
+    known_false = {
+        e["service"]: e for e in (manifest.get("known_false_probes") or [])
+    }
+    release_services = set(manifest.get("release_image_services") or [])
+    if not release_services:
+        sys.stderr.write(
+            "UNEVALUABLE: scripts/compose-shapes.json declares no "
+            "`release_image_services`. Every image would then be required to "
+            "carry a digest, including the Vizra images that legitimately come "
+            "from a release tag - a rule nobody could satisfy is not a rule.\n"
+        )
+        return 2
+    seen_known_false = KNOWN_FALSE_SEEN
+
     shapes = manifest.get("shapes") or []
     if not shapes:
         sys.stderr.write(
@@ -530,11 +776,53 @@ def main(argv):
 
         check_ports(shape, model, repo_root)
         check_edge(shape, model, repo_root)
-        check_lifecycle(shape, model, repo_root)
-        check_production(shape, model, repo_root)
+        check_lifecycle(shape, model, repo_root, known_false)
+        check_production(shape, model, repo_root, release_services)
         check_security(shape, model, repo_root)
         check_membership(shape, model)
+        check_probes(shape, model, known_false, seen_known_false, repo_root)
         checked += 1
+
+    # A declaration that matches nothing is a declaration nobody can act on, and
+    # it is exactly how a list like this rots into permanent cover. If a probe
+    # was fixed, the entry must go in the same commit.
+    # V3's closing rule: run once, over the union of every file any shape loads.
+    all_files = sorted({f for sh in shapes for f in sh["files"]})
+    enumerated = {p for sh in shapes for p in (sh.get("profiles") or [])}
+    check_profile_coverage(all_files, enumerated, repo_root)
+
+    for name in sorted(set(known_false) - seen_known_false):
+        violation(
+            "(manifest)", "stale-known-false-probe", name,
+            f"is declared known-false in scripts/compose-shapes.json but no "
+            f"rendered shape has a {name} service running that exact probe. "
+            f"Either the probe was fixed - delete the entry - or it changed and "
+            f"the declaration was not revisited",
+        )
+
+    # PRINTED ON EVERY RUN, pass or fail, before the verdict. A probe that
+    # cannot go red is a standing admission, not a one-time note in a commit
+    # message nobody re-reads. VZ-ISSUE-004's boot lane and `vizra deploy` are
+    # both written against `--wait` / `ps --status healthy`; this list is what
+    # stops them inheriting a false green silently, and it must be EMPTY before
+    # that lane lands.
+    if known_false:
+        print(
+            f"\nKNOWN-FALSE PROBES: {len(known_false)} service(s) carry a "
+            f"healthcheck that CANNOT GO RED while the service is broken."
+        )
+        for name in sorted(known_false):
+            e = known_false[name]
+            state = "present in the rendered model" if name in seen_known_false \
+                else "DECLARED BUT NOT MATCHED - see stale-known-false-probe"
+            print(f"  - {name}: {' '.join(e['test'])}  [{state}]")
+            print(f"      why it is false: {e['why_false']}")
+            print(f"      emptied by:      {e['emptied_by']}")
+        print(
+            "  No depends_on service_healthy edge may point at one (rule "
+            "probe-gates-readiness), and this list must be empty before "
+            "VZ-ISSUE-004's boot lane lands.\n"
+        )
 
     if violations:
         for line in violations:
@@ -546,7 +834,8 @@ def main(argv):
 
     print(
         f"compose topology: {checked} shape(s) asserted from their rendered "
-        f"models; {len(RULES)} rules, 0 violations"
+        f"models; {len(RULES)} rules, 0 violations; "
+        f"{len(known_false)} known-false probe(s) named above"
     )
     return 0
 

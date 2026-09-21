@@ -1,5 +1,5 @@
 {
-  "note": "ONE operator key feeding two differently-spelled service keys. Each entry is a naming conflict between component repositories, not a convenience. The floor below is a decision: adding an alias must be a visible edit, because every alias is a place where an operator can believe they configured something they did not.",
+  "note": "ONE operator key feeding two differently-spelled service keys. Each entry is a naming conflict between component repositories, not a convenience, and each carries an explicit `authorised` decision: an alias is a place where an operator can believe they configured something they did not, so 'somebody wrote a paragraph about it' is not the same as 'somebody decided it'. scripts/check-config-coverage.py refuses an alias with no `authorised` field, and PRINTS every alias with its state on each green run. The floor makes adding one a visible edit.",
   "floor": 2,
   "aliases": [
     {
@@ -14,8 +14,9 @@
           "key": "SEARCH_HMAC_KEY"
         }
       ],
-      "authorised_by": "war-room chair ruling, VZ-ISSUE-002 brief: SEARCH_HMAC_KEY is the contract's name on BOTH sides; vizra-core's rename is queued in another slice.",
-      "removed_when": "vizra-core renames VIZRA_SEARCH_HMAC_KEY to SEARCH_HMAC_KEY."
+      "authorised_by": "chair ruling, VZ-ISSUE-002 brief: SEARCH_HMAC_KEY is the contract's name on BOTH sides; vizra-core's rename is queued as core PR #6.",
+      "removed_when": "vizra-core `main` retires VIZRA_SEARCH_HMAC_KEY. At that point this entry is DELETED, the floor drops to 1, env/registry/core.json lists the old name in `retired_keys`, and docker-compose.yml delivers SEARCH_HMAC_KEY only - one commit, because delivering both names is a boot refusal and delivering only the new one against today's core main is also a boot refusal.",
+      "authorised": true
     },
     {
       "operator_key": "VIZRA_PUBLIC_ORIGIN",
@@ -29,8 +30,9 @@
           "key": "PUBLIC_ORIGIN"
         }
       ],
-      "authorised_by": "NOT YET RULED ON. Found while implementing VZ-ISSUE-002 and REPORTED: it is the same shape as the HMAC conflict - two repositories spell one value differently - and it needs the same ruling. Implemented as an alias because the alternative is two operator keys that must be kept byte-identical by hand, which is a worse failure mode.",
-      "removed_when": "the chair rules on one spelling and the losing repository renames."
+      "authorised_by": "chair ruling 2026-09-21, WARROOM-BOARD queue 2h",
+      "removed_when": "vizra-user main reads VIZRA_PUBLIC_ORIGIN",
+      "authorised": true
     }
   ]
 }

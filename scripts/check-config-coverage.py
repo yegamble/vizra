@@ -64,6 +64,7 @@ RULES = frozenset({
     "alias-floor",
     "alias-unwired",
     "registry-drift",
+    "retired-key-delivered",
 })
 
 violations = []
@@ -188,6 +189,42 @@ def main(argv):
                         f"reads it",
                     )
 
+    # --- 1b. A RETIRED key must never be delivered. --------------------------
+    #
+    # This is not the same rule as service-key-unknown, and the difference is
+    # the whole point. An unknown key is merely useless: it reaches the
+    # container and nothing reads it. A RETIRED key is actively fatal —
+    # vizra-core refuses a retired name in production ON PRESENCE with any
+    # non-empty value, so a "belt and braces" map that sets both the old and the
+    # new spelling is a guaranteed boot refusal.
+    #
+    # The 3am scenario this exists to prevent: core's rename merges, the
+    # operator pulls the new image, and `vizra migrate`, `vizra-api` and
+    # `vizra-worker` all refuse to start naming a variable that appears NOWHERE
+    # in their env file, because compose injects it. They grep production.env,
+    # find the key the template told them to set, and have no path forward
+    # without reading docker-compose.yml.
+    for comp, reg in registries.items():
+        retired = set(reg.get("retired_keys") or [])
+        if not retired:
+            continue
+        for sid, model in sorted(models.items()):
+            for svc_name in reg["services"]:
+                svc = (model.get("services") or {}).get(svc_name)
+                if svc is None:
+                    continue
+                for key in sorted(retired & set((svc.get("environment") or {}).keys())):
+                    violation(
+                        "retired-key-delivered",
+                        f"{sid}/{svc_name}/{key}",
+                        f"vizra-{comp} has RETIRED {key} (env/registry/{comp}.json "
+                        f"at {reg['source_commit'][:12]}) and refuses it in "
+                        f"production on presence, but the rendered model still "
+                        f"delivers it - every container running that image would "
+                        f"refuse to boot, naming a variable the operator's env "
+                        f"file does not contain",
+                    )
+
     # --- 2. api and worker run the SAME binary: identical key sets or one half
     #        is configured differently than its operator believes. -----------
     for sid, model in models.items():
@@ -254,6 +291,24 @@ def main(argv):
         )
     for al in declared_aliases:
         op_key = al["operator_key"]
+        # An alias must be a DECISION. Without this, the table records that
+        # somebody wrote a paragraph about a naming conflict, which is not the
+        # same as somebody having ruled on it - and the second alias sat in
+        # exactly that state ("NOT YET RULED ON") while reading as declared.
+        if "authorised" not in al:
+            violation(
+                "alias-floor", op_key,
+                "is declared as an alias with no `authorised` field. Every "
+                "alias is a place an operator can believe they configured "
+                "something they did not, so it needs an explicit decision and "
+                "the authority for it, not a description",
+            )
+        elif not al["authorised"]:
+            violation(
+                "alias-floor", op_key,
+                f"is declared with authorised=false, so it is not authorised "
+                f"and must not be wired: {al.get('authorised_by', '(no reason given)')}",
+            )
         if op_key not in all_template_keys:
             violation(
                 "alias-unwired",
@@ -279,12 +334,26 @@ def main(argv):
         sys.stderr.write(f"\n{len(violations)} violation(s).\n")
         return 1
 
+    # Printed on every GREEN run, like the known-false probe list: an alias is a
+    # standing compromise and should have to be looked at, not filed once.
+    if declared_aliases:
+        print(f"ALIASES: {len(declared_aliases)} operator key(s) feeding two service spellings")
+        for al in declared_aliases:
+            spellings = ", ".join(
+                f"{sk['component']}:{sk['key']}" for sk in al["service_keys"]
+            )
+            print(f"  - {al['operator_key']} -> {spellings}")
+            print(f"      authorised: {al.get('authorised')}  by {al.get('authorised_by')}")
+            print(f"      removed when: {al.get('removed_when')}")
+
     total_keys = sum(len(r["keys"]) for r in registries.values())
     print(
         f"config coverage: {total_keys} component keys across "
         f"{len(registries)} components, {len(all_template_keys)} template keys, "
         f"{len(consumed)} interpolated variables, {len(models)} shapes; "
-        f"{len(declared_aliases)} declared alias(es); 0 violations"
+        f"{len(declared_aliases)} declared alias(es); "
+        f"{sum(len(r.get('retired_keys') or []) for r in registries.values())} "
+        f"retired key(s) refused; 0 violations"
     )
     return 0
 

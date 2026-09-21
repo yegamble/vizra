@@ -37,10 +37,15 @@
 # POSTGRES_PASSWORD IS STILL REQUIRED, AND THAT IS NOT A BUG IN THIS FILE.
 # Compose interpolates each file AS IT LOADS IT — before profiles are evaluated
 # and before this overlay merges — so `${POSTGRES_PASSWORD:?…}` in
-# docker-compose.yml fires whatever happens afterwards. `env/external-postgres.
-# env.example` therefore ships POSTGRES_PASSWORD with a placeholder that says so
-# in its own value. It is never used: the bundled service does not exist and
-# every DSN below comes from DATABASE_URL.
+# docker-compose.yml fires whatever happens afterwards. Put any non-empty
+# placeholder there; it is never used, because the bundled service does not
+# exist and every DSN below comes from DATABASE_URL.
+#
+# THE FULL CHECKLIST IS IN env/production.env.example, under "EXTERNAL
+# PostgreSQL: WHAT YOU MUST SET" — four items, reachable without reading a
+# compose file. (This header used to point at a per-overlay example file that
+# has never existed. scripts/check-doc-links.py now scans compose comments for
+# env/ and deploy/ paths, so a pointer to a file nobody wrote cannot recur.)
 #
 # BACKUP OWNERSHIP MOVES TO YOU. `backup.sh` refuses to back up a database it
 # does not manage (docs/META_REPO.md §6) and the runbook must name the provider

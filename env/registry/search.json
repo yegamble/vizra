@@ -73,5 +73,16 @@
     "UNEVALUABLE",
     "VIOLATION"
   ],
-  "drift_ignore_note": "Tokens the coarse literal scan found in AGENTS.md prose and in build tooling, none of which vizra-search reads as configuration. SEARCH_MODE is vizra-core's key, discussed in vizra-search's AGENTS.md; vizra-search reads VIZRA_SEARCH_MODE."
+  "drift_ignore_note": "Tokens the coarse literal scan found in AGENTS.md prose and in build tooling, none of which vizra-search reads as configuration. SEARCH_MODE is vizra-core's key, discussed in vizra-search's AGENTS.md; vizra-search reads VIZRA_SEARCH_MODE.",
+  "binaries": [
+    "vizra-search"
+  ],
+  "commands": [
+    "vizra-search version",
+    "vizra-search healthcheck"
+  ],
+  "commands_note": "argv subcommands read from vizra-search/cmd/vizra-search/main.go at source_commit; no argument runs the server.",
+  "retired_keys": [],
+  "future_commands": {},
+  "source_commit_rule": "Names a commit on this component's `main`. Confirmed at re-stamp time with `git -C <checkout> merge-base --is-ancestor <sha> origin/main`."
 }

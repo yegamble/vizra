@@ -114,11 +114,76 @@ and `vizra-search` (`production|development`), with incompatible vocabularies.
 No service in this tree takes an `env_file:`, which is what keeps them apart;
 `vizra-search`'s value is set literally by the compose files.
 
-`api` and `worker` declare a healthcheck that runs `vizra version` — the same
-self-probe the image ships. It proves the binary runs; it does **not** prove
-`/readyz` answers, because the runtime image carries no curl or wget and
-`vizra-core` has no `healthcheck` subcommand (`vizra-search` has exactly that).
-That subcommand is requested from the core owner; this slice does not make it.
+### Two constraints this topology places on other repositories
+
+**1. Merge order with `vizra-core`'s HMAC-key rename.** The chair has ruled
+`SEARCH_HMAC_KEY` canonical on both sides. `vizra-core` still reads
+`VIZRA_SEARCH_HMAC_KEY`, and its PR #6 retires that name and **refuses it in
+production on presence with any non-empty value**. The two repositories are
+therefore one merge apart from a dead instance, in both directions:
+
+| State | What compose must deliver |
+|---|---|
+| core `main` before PR #6 | `VIZRA_SEARCH_HMAC_KEY` only |
+| core `main` after PR #6 | `SEARCH_HMAC_KEY` only |
+| either, ever | **never both** — the retired name is refused on presence, so a "belt and braces" map is a guaranteed boot refusal |
+
+So core PR #6 merges **first**; this repository then flips
+`docker-compose.yml`, lists the old name in `env/registry/core.json`
+`retired_keys`, bumps that file's `source_commit` to the core `main` commit that
+declares the key, and deletes alias entry 1 from `env/registry/aliases.json`
+(floor 2 → 1) — all in one commit, because every intermediate state is a boot
+refusal. `scripts/check-config-coverage.py`'s `retired-key-delivered` rule is
+what makes getting this wrong a red lane rather than a 3am incident in which the
+refusal names a variable that appears nowhere in the operator's env file.
+
+**2. `vizra healthcheck` must exist before the boot lane lands.** `api` and
+`worker` declare a healthcheck that runs `vizra version` — the same self-probe
+the image ships. It proves the binary runs; it does **not** prove `/readyz`
+answers, because the runtime image carries no curl or wget and `vizra-core` has
+no `healthcheck` subcommand (`vizra-search` ships exactly that).
+
+Rather than leave that as a comment, both probes are declared **known-false** in
+`scripts/compose-shapes.json`. `scripts/check-compose-topology.py` then:
+
+- **refuses** any `depends_on: {condition: service_healthy}` edge pointing at
+  one (rule `probe-gates-readiness`) — which is why `frontend → api` is
+  `service_started`, `required: false`;
+- **names every entry on every run**, pass or fail, so the admission is standing
+  rather than filed once;
+- **refuses a declaration that matches nothing** (rule
+  `stale-known-false-probe`), so the list cannot rot into permanent cover.
+
+**That list must be empty before VZ-ISSUE-004's boot lane lands.** The boot lane
+and `vizra deploy` are both written against `--wait` / `ps --status healthy`, and
+a green that cannot go red is how a false gate becomes permanent. What empties
+it is a `vizra healthcheck` subcommand in `vizra-core` mirroring
+`vizra-search`'s — requested from the core owner and on its queue; **not** made
+here. A `/dev/tcp` shell bridge was considered and rejected by the chair: it
+would bake a bash dependency into a runtime image a queued core slice rebuilds
+from a clean base.
+
+### What the checkers close that a reader might assume
+
+- **Every profile is rendered.** A service on a profile no shape enumerates is
+  never rendered and therefore never asserted — a `backup` or `debug` profile
+  with an open datastore port would have left the lane green. Rule
+  `profile-not-enumerated` closes the set: every `profiles:` name in the compose
+  files must be covered by at least one shape.
+- **Third-party images need a digest, Vizra images need a release tag.**
+  ADR-001 pins PostgreSQL and Valkey by digest; the rule now requires
+  `@sha256:` for every image that is not a declared release image, so
+  `postgres:18` cannot quietly replace a digest.
+- **A disabled healthcheck is disabled in every spelling.** `disable: true`,
+  `test: ["NONE"]` and `test: NONE` are one state, not two caught and one
+  missed.
+- **The port allowlist is protocol-aware**, so an entry that reads "may answer
+  on 8080" does not also permit 8080/udp.
+- **Rendered models are redacted before they are written**, and the leak check
+  runs on the object being serialised. `redact_keys` drives the redaction and
+  `secret_keys` drives the check; because they are independent lists, deleting a
+  key from the first makes the renderer fail rather than write a file that is
+  less redacted than its own stamp claims.
 
 ## 3. Installer and wizard (`install.sh` → `vizra setup`)
 

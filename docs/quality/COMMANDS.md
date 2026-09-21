@@ -79,7 +79,7 @@ The local transcripts below were produced on macOS with the system
 ## The `validate` lane
 
 `.github/workflows/validate.yml` runs these, in this order. Run them from the
-repository root. Checks 1-3 are documentary; 4-7 are the compose topology added
+repository root. Checks 1-3 are documentary; 4-8 are the compose topology added
 by VZ-ISSUE-002.
 
 ### 1. The generated ledger matches its sources
@@ -293,10 +293,30 @@ directory, and no `docker-compose.override.yml` or `docker-compose.dev.yml`. It
 is built by copying in rather than by trusting that the component directories
 happen to be absent today.
 
-Declared secret values are redacted from every model before it is written, and
-the renderer re-scans the redacted model for each value it substituted and
-refuses to write a file that still contains one. The models are uploaded as the
-`meta-validate-compose-models` artifact.
+**Redaction, and the two lists that make it provable.** Declared secret values
+are redacted from every model *before it is written*, and the leak check runs on
+the object being serialised — not on a copy.
+
+- `redact_keys` drives the redaction: those values are replaced by key, and
+  their exact strings are substituted wherever they appear inside another value.
+  The substring pass is not belt-and-braces: `DATABASE_URL` is assembled from
+  `POSTGRES_PASSWORD` in `docker-compose.yml`, so a by-key replacement alone
+  would leave the password inside the DSN.
+- `secret_keys` drives the leak check. It is a separate list, identical in
+  content today, and the independence is the mechanism: deleting a key from
+  `redact_keys` stops redacting its value and does **not** stop looking for it,
+  so the renderer **fails and writes nothing** rather than producing a file that
+  is less redacted than its own `secret_values_redacted: true` stamp claims.
+
+This corrects an earlier version of this paragraph that described a control
+which did not work. The renderer computed a redacted copy, validated that copy,
+and then serialised the original — so `find_leaks` could never fire on the bytes
+that were written, and ten of twelve models in the CI artifact for
+`69e197e` carried their placeholder values under a stamp saying otherwise. The
+values were the obviously fake `ci-render-only-*`, so nothing real leaked; the
+defect was in the control. Demonstrations 18a and 18b are what keep it working.
+
+The models are uploaded as the `meta-validate-compose-models` artifact.
 
 ### 5. The rendered topology is closed, capped and pinned
 
@@ -323,12 +343,73 @@ edit after a rule has already failed.
 | `docker-socket` / `privileged` / `host-network` / `no-new-privileges` | VZ-OPS-008 |
 | `missing-service` / `unexpected-service` | a shape that lost a service it needs, or rendered one it forbids |
 | `dev-mode-in-production` / `dev-hatch-in-production` | the developer override leaking into a production chain |
+| `missing-mem-limit` | a long-running production service with no cgroup cap, so a burst is contained by the OOM killer's badness score instead — which picks PostgreSQL |
+| `probe-gates-readiness` | a `depends_on: service_healthy` edge onto a probe declared known-false: a gate that cannot go red is worse than no gate |
+| `stale-known-false-probe` | a known-false declaration matching no rendered service, so the list cannot rot into permanent cover |
+| `profile-not-enumerated` | a `profiles:` name no shape renders. Everything else here reads a rendered model, so an unrendered profile is an **unasserted** one — this is the rule that makes "in any shape" mean "in any configuration" |
+
+`missing-healthcheck` treats four states explicitly — absent, disabled,
+known-false, real — in one function rather than two overlapping conditionals.
+`test: ["NONE"]` and `test: NONE` are Docker's spellings of *disabled*; the
+neighbouring `disable: true` was already caught, and a rule that catches one
+spelling and not the other is one an author can pass by accident.
+
+`unpinned-image` splits by origin: a **release image** (`migrate`, `api`,
+`worker`, `frontend`, `search`) may carry a non-empty, non-`latest` tag, because
+that is what `releases/<tag>.json` names. Everything else is third-party and
+must carry an `@sha256:` digest — ADR-001 pins PostgreSQL 18 and Valkey 9.1.x by
+digest, and a bare `postgres:18` is a moving target that makes two operators on
+the same release record run different builds. A service absent from
+`release_image_services` gets the strict branch, so the safe default is a digest.
+
+The port allowlist is keyed on `<published>/<protocol>`. A bare integer in the
+manifest means `tcp`; `ipfs` names 4001 on both. Before that it was keyed on the
+number alone, so an entry reading "may answer on 8080" also permitted 8080/udp.
 
 **What this does NOT prove.** It proves what the *model* declares. It has never
 started a container, so it does not prove a service is healthy, that a probe
 answers, that a port is genuinely closed on a running host, or that the IPFS
 swarm port is firewalled. Those belong to the `boot` lane (VZ-ISSUE-004), which
 does not exist.
+
+### 5a. Capacity note — what the memory caps are, and what they are not
+
+Every long-running service in a production shape declares
+`mem_limit: ${VIZRA_*_MEM_LIMIT:-default}`, asserted by `missing-mem-limit`.
+
+| Service | Default cap | Why |
+|---|---:|---|
+| `postgres` | 768m | the service we most want the OOM killer *not* to choose. PostgreSQL 18's `shared_buffers` defaults to 128 MB and no tuning knobs are set (VZ-OPS-007 adds them when it has measured a budget); the cap sits well above realistic use so it contains a pathology without clipping normal work |
+| `redis` | 384m | `VALKEY_MAXMEMORY` defaults to 256mb; the rest is fragmentation and copy-on-write headroom. Raise both together or the cap fights the eviction policy |
+| `api` | 768m | no pixel decode ever happens in the API process (ADR-002, Q-034), so this is request handling, pools and Go runtime overhead |
+| `worker` | 1500m | the largest cap and the one doing the real containment: the only process that runs libvips, peaking on a 12 MP JPEG derivative set. Sized for the shipped `VIZRA_WORKER_CONCURRENCY=2` |
+| `frontend` | 512m | Next.js standalone server |
+| `caddy` | 96m | a reverse proxy |
+| `migrate` | 256m | a one-shot; exempt from the rule, capped anyway |
+| `search` | 256m | a static Go binary on `scratch` owning no index at M0; rises with VZ-SEARCH-001 |
+| `clickhouse` | 1g | **not sized for the floor host** — enabling `analytics` on 4 GB is not a supported shape |
+| `ipfs` | 768m | likewise optional |
+
+**The default-shape caps sum to 4028 MiB on a 4096 MiB host, and that is
+deliberate.** They are caps on *peak*, not reservations: nothing is set aside,
+and these services do not peak together. The job they do is containment. Without
+a cgroup limit anywhere, a burst of concurrent libvips decodes exhausts RAM and
+the kernel OOM killer chooses by badness score — which on a Docker host is
+routinely PostgreSQL, the largest resident process. The operator's symptom is
+then not "uploads are slow" but PostgreSQL killed mid-write and crash recovery on
+restart, for reasons unrelated to the upload, with `restart: unless-stopped`
+cycling it. **A limit that OOM-kills the worker is recoverable; one that
+OOM-kills PostgreSQL is not.**
+
+On the 2 vCPU / 4 GB floor host run `VIZRA_WORKER_CONCURRENCY=1` (the template
+says so at the key). The shipped default is 2; use 4 from 8 GB up.
+
+Precedent: Vidra's `docker-compose.prod.yml` sets `cpus`/`mem_limit` on api,
+worker and ipfs. It was read for **shape** — the `${…:-default}` indirection so
+a larger host raises a cap without editing a tracked file — and not for values,
+which are sized there for a much larger machine. These numbers are VZ-OPS-007's
+starting budget, not a measurement; nothing here has been benchmarked, and the
+first boot-lane run on the reference host is what calibrates them.
 
 ### 6. Configuration-key coverage, in both directions
 
@@ -345,6 +426,18 @@ template key nothing consumes, on api and worker carrying different key sets
 (they run the same binary), on a development escape hatch in the production
 template, and on an undeclared alias.
 
+It also refuses a **retired** key (`retired-key-delivered`). That is a different
+failure from an unknown one: an unknown key is merely useless, while `vizra-core`
+refuses a retired name in production *on presence*, so a compose map that still
+sends it is a guaranteed boot refusal — naming a variable that appears nowhere in
+the operator's env file, because compose injects it.
+
+Every **alias** carries an explicit `authorised` decision with its authority and
+its removal condition; an alias without one is a violation, and each is printed
+on every green run. An alias is a standing compromise — a place an operator can
+believe they configured something they did not — so it has to be looked at
+rather than filed once.
+
 **What a green result does NOT prove.** It proves the topology is consistent
 with the snapshots. It does **not** prove the snapshots are current: this
 repository's CI has no token to check out a private sibling repository, so
@@ -352,7 +445,36 @@ repository's CI has no token to check out a private sibling repository, so
 source — **cannot run in CI at all** and reports BLOCKED, exit 2, when a
 checkout is absent. See `env/registry/README.md`.
 
-### 7. Every compose guard still fails against a controlled mutation
+### 7. No operator-facing file names a command that does not exist
+
+```
+./scripts/check-template-claims.py
+```
+
+Scans `env/*.env.example` and `docker-compose*.yml` comments. A backticked
+`vizra <sub>` must be a shipped command or a declared future one; a declared
+future command named anywhere must carry its declared marker **within 2 lines**,
+so a promise carries its own qualifier rather than borrowing a neighbour's.
+
+The sentence this exists to refuse shipped in the production template:
+
+> `# ROTATING THIS RE-SEALS STORED MFA SECRETS. `vizra setup --rotate` requires`
+> `# --yes-i-know for exactly this key.`
+
+`vizra setup` does not exist. An operator who believed it, edited
+`VIZRA_MFA_KEY_KEK` and restarted would not have re-sealed anything: every TOTP
+secret stays sealed under the old key, becomes permanently undecryptable, and
+every MFA-enrolled member is locked out. The marker window is 2 lines because
+the block was tried first and failed its own red demonstration — a correct
+sentence further down the same comment *laundered* the false one.
+
+`scripts/check-doc-links.py` additionally scans compose comments for `env/…` and
+`deploy/…` paths, after a header pointed at a file that had never existed.
+`env/production.env`, `env/development.env` and `deploy/Caddyfile.local` are
+allow-listed **by name, with reasons** — they are generated or operator-owned and
+gitignored by design — rather than by relaxing the matcher.
+
+### 8. Every compose guard still fails against a controlled mutation
 
 ```
 bash docs/evidence/compose-topology/demo.sh
@@ -363,7 +485,7 @@ prints a sha256 either side of its mutation and **refuses to score a case whose
 mutation did not apply** — otherwise a mutation that silently failed would run
 the checker against the unmodified tree, pass, and be recorded as a guard that
 caught something. It restores every file it touches and fails if the tree is not
-byte-identical afterwards. 32 assertions.
+byte-identical afterwards. **61 assertions across 34 cases.**
 
 ## Red/green demonstrations
 

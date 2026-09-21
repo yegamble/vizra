@@ -81,7 +81,9 @@ expect() {
   local label="$1" want_rc="$2" want_rule="${3:-}" out rc
   out="$( { ./scripts/compose-render.py --all --out "$MODELS" \
               && ./scripts/check-compose-topology.py "$MODELS" \
-              && ./scripts/check-config-coverage.py "$MODELS"; } 2>&1 )"
+              && ./scripts/check-config-coverage.py "$MODELS" \
+              && ./scripts/check-template-claims.py \
+              && ./scripts/check-doc-links.py; } 2>&1 )"
   rc=$?
   if [ "$rc" != "$want_rc" ]; then
     echo "    FAIL: expected exit $want_rc, got $rc"
@@ -238,6 +240,37 @@ PY
   expect "restored" 0
 }
 
+case_header "6d (V2) — a healthcheck DISABLED with disable: true"
+mutate docker-compose.yml <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = '      test: ["CMD", "valkey-cli", "ping"]\n'
+new = '      disable: true\n' + old
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, new, 1))
+PY
+  expect "disable: true is a disabled probe" 1 "rule=missing-healthcheck service=redis"
+  revert docker-compose.yml
+  expect "restored" 0
+}
+
+case_header "6e (V2) — a healthcheck DISABLED with Docker's test: [NONE]"
+echo "    (a one-element list is not falsy, so this spelling used to PASS the rule"
+echo "     that its neighbour disable: true already failed)"
+mutate docker-compose.yml <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = '      test: ["CMD", "valkey-cli", "ping"]'
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, '      test: ["NONE"]', 1))
+PY
+  expect "test: [NONE] is Docker's spelling of disabled" 1 "rule=missing-healthcheck service=redis"
+  revert docker-compose.yml
+  expect "restored" 0
+}
+
 # ---------------------------------------------------------------------------
 case_header "7 — build: on the migration one-shot in a PRODUCTION shape"
 mutate docker-compose.prod.yml <<'PY' && {
@@ -288,6 +321,22 @@ open(p, "w").write(s)
 PY
   expect "frontend has no tag, which Docker resolves to :latest" 1 "rule=unpinned-image service=frontend"
   revert docker-compose.prod.yml
+  expect "restored" 0
+}
+
+case_header "8c (V4) — a THIRD-PARTY image demoted from its digest to a bare tag"
+echo "    (ADR-001 pins PostgreSQL and Valkey by digest; a bare tag is a moving"
+echo "     target, so a rollback does not roll the datastore image back)"
+mutate docker-compose.yml <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = "image: postgres:18@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae"
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, "image: postgres:18", 1))
+PY
+  expect "postgres lost its digest pin" 1 "rule=unpinned-image service=postgres"
+  revert docker-compose.yml
   expect "restored" 0
 }
 
@@ -384,6 +433,221 @@ PY
   expect "restored" 0
 }
 
+# ===========================================================================
+# Round 1 of the infrastructure-seat review (2026-09-21). One case per blocking
+# finding, plus the two follow-ups that grew a mechanism.
+# ===========================================================================
+
+case_header "13 (F1) — compose delivers a key vizra-core has RETIRED"
+echo "    (core refuses a retired name in production ON PRESENCE, so delivering"
+echo "     both spellings is a guaranteed boot refusal, not belt-and-braces)"
+mutate env/registry/core.json <<'PY' && {
+import sys, json
+p = sys.argv[1]
+d = json.load(open(p))
+d["retired_keys"] = ["VIZRA_SEARCH_HMAC_KEY"]
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+PY
+  expect "a retired key is still delivered" 1 "rule=retired-key-delivered"
+  revert env/registry/core.json
+  expect "restored" 0
+}
+
+case_header "14 (F2) — the MFA-rotation sentence that shipped, back where it shipped"
+mutate env/production.env.example <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = "# openssl rand -base64 32\n#\n# ***  DO NOT CHANGE"
+new = ("# openssl rand -base64 32\n"
+       "# ROTATING THIS RE-SEALS STORED MFA SECRETS. `vizra setup --rotate` requires\n"
+       "# --yes-i-know for exactly this key.\n"
+       "#\n# ***  DO NOT CHANGE")
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, new, 1))
+PY
+  expect "the template promises a command that does not exist" 1 "rule=unmarked-future-command"
+  revert env/production.env.example
+  expect "restored" 0
+}
+
+case_header "15 (F3) — a service_healthy gate onto a probe that cannot go red"
+mutate docker-compose.yml <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+# Change ONLY the condition. Removing `required: false` as well would make the
+# prod-frontend-only shape fail to render, the run would abort before the
+# topology checker executed, and the case would "fail" for a reason that has
+# nothing to do with the rule it is demonstrating.
+old = "        condition: service_started\n"
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, "        condition: service_healthy\n", 1))
+PY
+  expect "frontend gates on api's known-false probe" 1 "rule=probe-gates-readiness service=frontend"
+  revert docker-compose.yml
+  expect "restored" 0
+}
+
+case_header "15b (F3) — a known-false declaration that matches nothing any more"
+echo "    (the list must not be able to rot into permanent cover)"
+mutate scripts/compose-shapes.json <<'PY' && {
+import sys, json
+p = sys.argv[1]
+d = json.load(open(p))
+for e in d["known_false_probes"]:
+    if e["service"] == "worker":
+        e["test"] = ["CMD", "/usr/local/bin/vizra", "healthcheck"]
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+PY
+  expect "a stale known-false declaration" 1 "rule=stale-known-false-probe"
+  revert scripts/compose-shapes.json
+  expect "restored" 0
+}
+
+case_header "16 (F4) — a long-running production service with NO memory cap"
+mutate docker-compose.prod.yml <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = "    mem_limit: ${VIZRA_WORKER_MEM_LIMIT:-1500m}\n"
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, "", 1))
+PY
+  expect "the worker has no containment" 1 "rule=missing-mem-limit service=worker"
+  revert docker-compose.prod.yml
+  expect "restored" 0
+}
+
+case_header "17 (F9) — a compose comment pointing at a file that does not exist"
+mutate docker-compose.external-postgres.yml <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = "a per-overlay example file that"
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, "env/external-postgres.env.example, a file that", 1))
+PY
+  expect "the external-PostgreSQL pointer is dangling" 1 "env/external-postgres.env.example"
+  revert docker-compose.external-postgres.yml
+  expect "restored" 0
+}
+
+# ===========================================================================
+# Verifier findings on 69e197e, same fix round.
+# ===========================================================================
+
+case_header "18a (V1) — a declared secret must not survive into a WRITTEN model"
+echo "    (no file is mutated: the values arrive through the environment, like"
+echo "     cases 10a/10b. The renderer used to validate a redacted COPY and then"
+echo "     serialise the ORIGINAL, stamped secret_values_redacted: true.)"
+rm -rf /tmp/vizra-redaction-demo
+out="$(env \
+  POSTGRES_PASSWORD='zzMARKERzzPOSTGRESzz' \
+  VIZRA_SESSION_SECRET='zzMARKERzzSESSIONzz' \
+  VIZRA_MFA_KEY_KEK='zzMARKERzzKEKzz' \
+  SEARCH_HMAC_KEY='zzMARKERzzHMACzz' \
+  CLICKHOUSE_PASSWORD='zzMARKERzzCLICKHOUSEzz' \
+  DATABASE_URL='postgres://db.ci.invalid:5432/v?sslmode=require&x=zzMARKERzzDSNzz' \
+  VIZRA_CACHE_URL='rediss://cache.ci.invalid:6379/0' \
+  ./scripts/compose-render.py --all --out /tmp/vizra-redaction-demo 2>&1)"; rc=$?
+hits="$(grep -ro 'zzMARKERzz' /tmp/vizra-redaction-demo 2>/dev/null | wc -l | tr -d ' ')"
+if [ "$rc" = "0" ] && [ "$hits" = "0" ]; then
+  echo "    ok  (every shape rendered, exit 0; the marker occurs $hits times in the written models)"
+  echo "      | the composite DATABASE_URL that docker-compose.yml assembles from"
+  echo "      | POSTGRES_PASSWORD is covered too - a by-key replacement alone would not"
+  PASSED=$((PASSED + 1))
+else
+  echo "    FAIL: exit $rc, and the marker occurs $hits time(s) in the written models"
+  grep -rl 'zzMARKERzz' /tmp/vizra-redaction-demo 2>/dev/null | sed 's/^/      | /' | head -5
+  FAILED=$((FAILED + 1))
+fi
+rm -rf /tmp/vizra-redaction-demo
+
+case_header "18b (V1) — a key removed from redact_keys must FAIL, not write"
+echo "    (redact_keys drives the redaction, secret_keys drives the leak check;"
+echo "     because they are independent lists, removing one stops redacting and"
+echo "     does NOT stop looking)"
+mutate scripts/compose-shapes.json <<'PY' && {
+import sys, json
+p = sys.argv[1]
+d = json.load(open(p))
+d["redact_keys"] = [k for k in d["redact_keys"] if k != "POSTGRES_PASSWORD"]
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+PY
+  rm -rf /tmp/vizra-redaction-demo2
+  out="$(./scripts/compose-render.py --all --out /tmp/vizra-redaction-demo2 2>&1)"; rc=$?
+  written="$(ls /tmp/vizra-redaction-demo2 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "$rc" = "1" ] && [ "$written" = "0" ] && printf '%s\n' "$out" | grep -q 'survived into the model'; then
+    echo "    ok  (exit 1, $written model(s) written - it refused rather than write a less-redacted file)"
+    printf '%s\n' "$out" | grep -m2 'survived into the model' | sed 's/^/      | /'
+    PASSED=$((PASSED + 1))
+  else
+    echo "    FAIL: expected exit 1 with nothing written, got exit $rc and $written file(s)"
+    printf '%s\n' "$out" | sed 's/^/      | /' | head -6
+    FAILED=$((FAILED + 1))
+  fi
+  rm -rf /tmp/vizra-redaction-demo2
+  revert scripts/compose-shapes.json
+  expect "restored" 0
+}
+
+case_header "19 (V3) — a service on a profile NO shape enumerates"
+echo "    (the verifier's own pgadmin-tunnel block: it publishes 0.0.0.0:5432 and"
+echo "     the lane stayed green, because an unrendered profile is an unasserted one)"
+mutate docker-compose.prod.yml <<'PY' && {
+import sys
+p = sys.argv[1]
+block = "\n  pgadmin-tunnel:\n    image: alpine:3.22\n    profiles: [\"backup\"]\n"
+block += "    restart: unless-stopped\n    ports:\n      - \"0.0.0.0:5432:5432\"\n"
+open(p, "a").write(block)
+PY
+  expect "an unenumerated profile hides a published datastore port" 1 "rule=profile-not-enumerated"
+  revert docker-compose.prod.yml
+  expect "restored" 0
+}
+
+case_header "20a (V6) — an alias added WITHOUT moving the floor"
+mutate env/registry/aliases.json <<'PY' && {
+import sys, json
+p = sys.argv[1]
+d = json.load(open(p))
+d["aliases"].append({"operator_key": "VIZRA_SITE_HANDLE",
+    "service_keys": [{"component": "vizra-core", "key": "VIZRA_SITE_HANDLE"}],
+    "authorised": True, "authorised_by": "nobody", "removed_when": "never"})
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+PY
+  expect "the alias floor was not moved in the same edit" 1 "rule=alias-floor"
+  revert env/registry/aliases.json
+  expect "restored" 0
+}
+
+case_header "20b (V6) — an alias whose service key is NOT in the snapshot"
+mutate env/registry/aliases.json <<'PY' && {
+import sys, json
+p = sys.argv[1]
+d = json.load(open(p))
+d["aliases"][0]["service_keys"][0]["key"] = "VIZRA_SEARCH_HMAC_KEY_RENAMED_UPSTREAM"
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+PY
+  expect "the alias target no longer exists upstream" 1 "rule=alias-unwired"
+  revert env/registry/aliases.json
+  expect "restored" 0
+}
+
+case_header "21 (V8) — a port allowed on TCP, published on UDP"
+mutate docker-compose.prod.yml <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = '- !override "127.0.0.1:${VIZRA_HTTP_PORT:-8080}:8080"'
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, old[:-1] + '/udp"', 1))
+PY
+  expect "the allowlist is protocol-aware" 1 "rule=port-not-allowed service=api"
+  revert docker-compose.prod.yml
+  expect "restored" 0
+}
 # ---------------------------------------------------------------------------
 echo
 echo "=============================================================="

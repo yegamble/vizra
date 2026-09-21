@@ -188,5 +188,33 @@
     "VIZRA_TEST_CACHE_URL",
     "VIZRA_TEST_DATABASE_URL"
   ],
-  "drift_ignore_note": "The drift extractor is a deliberately coarse literal scan: it over-reports rather than under-reports, and every entry here is a token it found that is NOT a key the component reads. SEARCH_HMAC_KEY appears in vizra-core's vendored copy of api/search-internal.openapi.yaml, which names the contract's spelling; vizra-core itself still reads VIZRA_SEARCH_HMAC_KEY. When core renames, this entry and the alias in aliases.json go together."
+  "drift_ignore_note": "The drift extractor is a deliberately coarse literal scan: it over-reports rather than under-reports, and every entry here is a token it found that is NOT a key the component reads. SEARCH_HMAC_KEY appears in vizra-core's vendored copy of api/search-internal.openapi.yaml, which names the contract's spelling; vizra-core itself still reads VIZRA_SEARCH_HMAC_KEY. When core renames, this entry and the alias in aliases.json go together.",
+  "binaries": [
+    "vizra-api",
+    "vizra-worker",
+    "vizra"
+  ],
+  "commands": [
+    "vizra version",
+    "vizra doctor",
+    "vizra migrate"
+  ],
+  "commands_note": "The operator CLI's subcommands AS SHIPPED, read from vizra-core/cmd/vizra/main.go at source_commit. scripts/check-template-claims.py refuses a template or compose comment that tells an operator to run anything else, unless the reference is marked future by naming its slice - a sentence promising `vizra setup --rotate` is what that check exists to catch.",
+  "retired_keys": [],
+  "retired_keys_note": "EMPTY UNTIL vizra-core PR #6 MERGES. That PR moves VIZRA_SEARCH_HMAC_KEY to RetiredKeys and refuses it in production on presence with any non-empty value. The moment it is on core main, this list gains VIZRA_SEARCH_HMAC_KEY, source_commit is bumped to that merge commit, docker-compose.yml delivers SEARCH_HMAC_KEY only, and alias entry 1 in aliases.json is deleted - all in one commit, because delivering both names is a boot refusal and delivering the new name against today's core main is also a boot refusal. scripts/check-config-coverage.py fails if any compose environment map delivers a name listed here.",
+  "future_commands": {
+    "vizra setup": "VZ-ISSUE-004",
+    "vizra backup": "VZ-ISSUE-004",
+    "vizra restore": "VZ-ISSUE-004",
+    "vizra deploy": "VZ-ISSUE-004",
+    "vizra rollback": "VZ-ISSUE-004",
+    "vizra update": "VZ-ISSUE-004",
+    "vizra release": "VZ-ISSUE-004",
+    "vizra status": "VZ-ISSUE-004",
+    "vizra logs": "VZ-ISSUE-004",
+    "vizra restart": "VZ-ISSUE-004",
+    "vizra healthcheck": "queue 2h"
+  },
+  "future_commands_note": "Commands docs/META_REPO.md \u00a75 names as targets, mapped to the MARKER that must appear in the comment block of any operator-facing file that names them. scripts/check-template-claims.py enforces it, so 'marked as future' is mechanical rather than a judgement about tone: either the sentence names the slice that will deliver the command, or it does not get to promise it.",
+  "source_commit_rule": "Names a commit on this component's `main`. Confirmed at re-stamp time with `git -C <checkout> merge-base --is-ancestor <sha> origin/main`."
 }

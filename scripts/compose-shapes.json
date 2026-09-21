@@ -6,6 +6,7 @@
     "prod-default",
     "prod-external-tls",
     "prod-worker-split",
+    "prod-frontend-only",
     "prod-all-optional",
     "prod-external-postgres",
     "prod-external-redis",
@@ -42,6 +43,25 @@
     "CLICKHOUSE_PASSWORD",
     "DATABASE_URL",
     "VIZRA_CACHE_URL"
+  ],
+  "secret_keys_note": "The authoritative answer to 'which injected values must NEVER appear in a written model'. Identical to redact_keys today, and deliberately a SEPARATE list rather than the same one used twice: redact_keys drives the redaction, secret_keys drives the leak check that runs on the object about to be serialised. Because the two are independent, deleting a key from redact_keys stops redacting its value and does NOT stop checking for it - so the renderer FAILS instead of writing a file that is less redacted than its own `secret_values_redacted: true` stamp claims. A key here that is not in redact_keys is therefore a guaranteed render failure, by construction. Tags and origins are NOT secrets and are absent from both lists: they belong in a rendered model.",
+  "secret_keys": [
+    "VIZRA_SESSION_SECRET",
+    "VIZRA_MFA_KEY_KEK",
+    "VIZRA_SEARCH_HMAC_KEY",
+    "SEARCH_HMAC_KEY",
+    "POSTGRES_PASSWORD",
+    "CLICKHOUSE_PASSWORD",
+    "DATABASE_URL",
+    "VIZRA_CACHE_URL"
+  ],
+  "release_image_services_note": "Services whose image comes from the RELEASE RECORD (ghcr.io/<owner>/vizra-*:${VIZRA_*_TAG}). For these a non-empty, non-latest tag is enough: a release tag is what releases/<tag>.json names, and recording the resolved digest at deploy time is VZ-UPGRADE-002's job. EVERY OTHER image is third-party and must carry an @sha256 digest (ADR-001: PostgreSQL 18 'managed and digest-pinned', Valkey 9.1.x 'digest-pinned'). A service missing from this list gets the strict branch, so the safe default is the one that requires a digest.",
+  "release_image_services": [
+    "migrate",
+    "api",
+    "worker",
+    "frontend",
+    "search"
   ],
   "shapes": [
     {
@@ -264,6 +284,41 @@
       "published_allow": []
     },
     {
+      "id": "prod-frontend-only",
+      "title": "a frontend-only host: --profile frontend alone must render (VZ-TOPOLOGY-008, finding 8b)",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml"
+      ],
+      "profiles": [
+        "frontend"
+      ],
+      "checkouts": "any",
+      "requires_services": [
+        "frontend"
+      ],
+      "forbids_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "caddy",
+        "search",
+        "clickhouse",
+        "ipfs"
+      ],
+      "published_allow": [
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ]
+    },
+    {
       "id": "prod-all-optional",
       "title": "every optional profile enabled at once - the authority for port closure",
       "kind": "production",
@@ -319,7 +374,14 @@
         {
           "service": "ipfs",
           "ports": [
-            4001
+            {
+              "port": 4001,
+              "protocol": "tcp"
+            },
+            {
+              "port": 4001,
+              "protocol": "udp"
+            }
           ],
           "public": true,
           "reason": "the libp2p swarm port. An IPFS node that cannot be dialled cannot participate; the Kubo HTTP API (5001) and gateway are never published. docs/META_REPO.md 2 additionally requires this port to be gated in the cloud firewall, which compose cannot assert."
@@ -653,12 +715,44 @@
         {
           "service": "ipfs",
           "ports": [
-            4001
+            {
+              "port": 4001,
+              "protocol": "tcp"
+            },
+            {
+              "port": 4001,
+              "protocol": "udp"
+            }
           ],
           "public": true,
           "reason": "the libp2p swarm port. An IPFS node that cannot be dialled cannot participate; the Kubo HTTP API (5001) and gateway are never published. docs/META_REPO.md 2 additionally requires this port to be gated in the cloud firewall, which compose cannot assert."
         }
       ]
+    }
+  ],
+  "known_false_probes_note": "Probes that CANNOT GO RED while the service is broken. Declaring one here is not permission - it is a standing, printed admission. scripts/check-compose-topology.py names every entry on EVERY run, refuses any depends_on service_healthy edge onto one (rule probe-gates-readiness), and refuses an entry that matches no rendered service (rule stale-known-false-probe) so the list cannot rot. THIS LIST MUST BE EMPTY BEFORE VZ-ISSUE-004's BOOT LANE LANDS: that lane and `vizra deploy` are both written against `--wait` / `ps --status healthy`, and a green that cannot go red is how a false gate becomes permanent. What empties it: a `vizra healthcheck` subcommand in vizra-core, mirroring the one vizra-search already ships (queue 2h). The /dev/tcp shell bridge was considered and REJECTED by the chair - it would bake a bash dependency into a runtime image a queued core slice rebuilds from a clean base.",
+  "known_false_probes": [
+    {
+      "service": "api",
+      "test": [
+        "CMD",
+        "/usr/local/bin/vizra",
+        "version"
+      ],
+      "why_false": "a CLI that prints build info and exits 0 without opening a socket or touching PostgreSQL. An api wedged with PostgreSQL unreachable, or listening but deadlocked, still reports healthy.",
+      "real_probe_exists": "vizra-core serves /healthz (liveness) and /readyz (503 only on PostgreSQL, otherwise 200 `degraded` with the component named). The image carries no curl and no wget, so compose cannot reach them.",
+      "emptied_by": "vizra-core `vizra healthcheck` subcommand (queue 2h), mirroring vizra-search's"
+    },
+    {
+      "service": "worker",
+      "test": [
+        "CMD",
+        "/usr/local/bin/vizra",
+        "version"
+      ],
+      "why_false": "same binary, same reason; the worker additionally has no HTTP listener on the API port at all. Its metrics listener on VIZRA_METRICS_ADDR is the thing a real probe would reach.",
+      "real_probe_exists": "none reachable from inside the image today.",
+      "emptied_by": "vizra-core `vizra healthcheck` subcommand (queue 2h)"
     }
   ]
 }

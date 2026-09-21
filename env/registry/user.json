@@ -1,6 +1,6 @@
 {
   "component": "vizra-user",
-  "source_commit": "77305009a7ae5b20411134ce5497f88d824e68ce",
+  "source_commit": "90896beb9669a3b305269a298d507fd7a9e27aa4",
   "source_files": [
     "lib/config.ts",
     "Dockerfile"
@@ -54,5 +54,13 @@
     "NEXT_TELEMETRY_DISABLED",
     "NODE_ENV"
   ],
-  "drift_ignore_note": "Baked into the image by vizra-user's Dockerfile and never varied per deployment: NODE_ENV=production is what makes it a production build at all, and NEXT_TELEMETRY_DISABLED=1 is a build-time opt-out. Neither is service configuration, so neither belongs in an operator template."
+  "drift_ignore_note": "Baked into the image by vizra-user's Dockerfile and never varied per deployment: NODE_ENV=production is what makes it a production build at all, and NEXT_TELEMETRY_DISABLED=1 is a build-time opt-out. Neither is service configuration, so neither belongs in an operator template.",
+  "binaries": [
+    "node server.js"
+  ],
+  "commands": [],
+  "commands_note": "vizra-user ships no operator CLI; its image CMD is `node server.js`.",
+  "retired_keys": [],
+  "future_commands": {},
+  "source_commit_rule": "Names a commit on vizra-user's `main`, NOT on a branch. The previous value 77305009 was the tip of an unmerged PR branch: a snapshot stamped with a commit that may never merge cannot be re-derived by anyone, and the drift check would compare against a tree that does not exist for them. Verified at re-stamp time by reading lib/config.ts and Dockerfile out of `git show origin/main:` - the three keys and the two image ENV declarations are unchanged. The same rule applies to every registry here."
 }

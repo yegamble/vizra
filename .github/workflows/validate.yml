@@ -212,9 +212,18 @@ jobs:
         run: ./scripts/check-compose-topology.py build/compose-models
 
       # Both directions: a key a component reads with nothing delivering it,
-      # and a template key nothing consumes.
+      # and a template key nothing consumes. Also refuses a key a component has
+      # RETIRED: core rejects a retired name in production ON PRESENCE, so a
+      # compose map that still sends it is a guaranteed boot refusal naming a
+      # variable that appears nowhere in the operator's env file.
       - name: configuration-key coverage in both directions
         run: ./scripts/check-config-coverage.py build/compose-models
+
+      # An operator-facing file may not name a command that does not exist.
+      # The sentence this exists to refuse shipped in env/production.env.example
+      # and invited an operator to permanently destroy every stored MFA secret.
+      - name: no template claims a command that does not exist
+        run: ./scripts/check-template-claims.py
 
       # The guards are exercised against controlled mutations on every run, not
       # only in a one-off demonstration. This is the same rule
