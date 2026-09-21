@@ -226,5 +226,54 @@ to `worker-guard.ts`; the half went green and the suite failed by name. The
 still passed. Both were fixed by the demonstration failing, which is what the
 demonstrations are for.
 
+## Round 8 — docs and comments only (chair HOLD on false guarantees, PASS at `07f2c6e`)
+
+Head `f0ee8f1`. No code, test, lint-rule, workflow, fixture or manifest change.
+
+**FINDING 7.** `withoutComments` measured directly, call removed in each case:
+nothing → RED; line comment starting a line → RED; block comment / JSDoc → RED;
+**trailing `//` comment → GREEN**; **string literal → GREEN**;
+**call-and-discard → GREEN**. Corrected in AGENTS.md § Residuals (with the table
+and the note that for the late edge this grep is the ONLY compensating control),
+in `scripts/ci/check-e2e-lane.mjs`'s header (which had asserted "this can only
+make the patterns match LESS, i.e. fail closed" — false), and in the evidence
+README. Count corrected: **eleven** checks, ten call + one presence, not eight.
+
+**FINDING 6.** `globalSetup`/`globalTeardown` named in § Residuals with the
+verifier's measurement (exit 0, `3 passed`, no guard message, module provably
+ran), the reasoning that it needs a `playwright.config.ts` edit so it is
+config-level and review-only, and the contrast that a setup PROJECT is covered.
+
+**FINDING 8.** PR body rewritten via `gh pr edit` to the verified state
+(355 tests / 0 skips, 18 e2e, 123 halves, what rounds 6–8 changed, the late
+edge's stated cost, both new residuals, artifact privacy untouched). A
+correcting comment posted; round-7 comment left in history.
+
+Both fixes are QUEUED as controls for the next slice, and neither is implemented.
+
+### Conflict flagged rather than worked around
+
+`e2e/harness/worker-guard.ts:70-71` carries the same overstatement ("greps for
+the assertion by call, so deleting it is not silent"). Its bytes are pinned by
+`docs/evidence/VZ-FOUND-008/mutation-digests.txt` (sha256
+`4fc5c024…06e9e8`, recorded BEFORE and RESTORED by D13q). Editing it would make
+a committed evidence ledger stale in a docs-only round, so it was left alone and
+AGENTS.md names the sentence, says it overstates, and says the correction lands
+with the control. **Chair's call whether to regenerate the ledger instead.**
+
+### Diff and verification
+
+`git diff 07f2c6e..f0ee8f1 --stat`: `AGENTS.md` +65/-10,
+`docs/evidence/VZ-FOUND-008/README.md` +12/-1,
+`scripts/ci/check-e2e-lane.mjs` +26/-3 — 3 files, +100/-17. The one non-markdown
+file is comment-only: both revisions stripped of every block and line comment
+are **identical over 425 lines** of executable content. All five digest-pinned
+files still match their recorded sha256.
+
+`npm run ci` 0 (15 files / 355 tests / 0 skipped); `check-e2e-lane.sh`,
+`require-checks_test.sh` (102 cases / 109 assertions), `check-required-floor.sh`,
+`check-image-pins.sh`, `check:contract` all 0. CI on `f0ee8f1`: all 8 check-runs
+pass; `OK: every required check on f0ee8f15… concluded success.`
+
 ## Blockers and handoff
 None. Nothing was BLOCKED; every command above ran.
