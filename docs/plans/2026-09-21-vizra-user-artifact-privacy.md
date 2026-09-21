@@ -880,17 +880,87 @@ gate from `node_modules/playwright/lib/index.js:657-671, 697-717`; its code fram
 `lib/errorContext.js`; its copy into the report from `lib/runner/index.js:1349`; the
 base64 report embed from `lib/runner/index.js:3704-3712`.
 
-### Phase 2 — PR A
-
-Baseline before any change, on `fix/m0-artifact-privacy-a` at `6bf0a0e`:
+### Phase 2 — PR A, on `fix/m0-artifact-privacy-a` off `origin/main` (`6bf0a0e`)
 
 | Command | Exit | Counts |
 |---|---|---|
-| `npm run ci` | **0** | 15 files / **355 tests** / 0 skipped (8.3 s) |
+| `npm run ci` (baseline, before any change) | **0** | 15 files / **355 tests** / 0 skipped, 8.3 s |
+| `npm run ci` (after the lane-guard work) | **0** | 16 files / **394 tests** / 0 skipped |
+| `npm run ci` (after the redaction work) | **0** | 16 files / **409 tests** / 0 skipped |
+| `bash scripts/ci/require-checks_test.sh` (baseline) | 0 | 102 cases / 109 assertions |
+| `bash scripts/ci/require-checks_test.sh` (now) | **0** | **141 cases / 148 assertions / 0 failed** |
+| `bash scripts/ci/check-e2e-lane.sh` | **0** | — |
+| `npx vitest run scripts/ci/ts-source-facts.test.mjs` | **0** | 39 tests |
+| `npx vitest run e2e/harness/redact.test.ts` | **0** | 24 tests |
+| `shellcheck scripts/e2e/sweep-artifacts.sh scripts/ci/redact-artifacts.sh` | **0** | clean |
 
-Per-commit `npm run ci` results, the demonstration transcripts and the final lane
-results are appended below as they are produced. Nothing here is a narrative: each
-row is a command, an exit code and a count.
+**Facts verified at source, per the rulings:**
+
+* `actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02`'s
+  `include-hidden-files` default is **`'false'`** — read from that commit's own
+  `action.yml` through the GitHub contents API, not from documentation.
+* `yegamble/vizra`, `vizra-core`, `vizra-user`, `vizra-search` are **all
+  `PRIVATE`** (`gh repo view --json visibility`). So the contract sentence says
+  "readable by collaborators", not "world-readable".
+
+**Red demonstrations driven through the real guard** (each also a permanent case
+in `require-checks_test.sh`, whose helper REFUSES a mutation that did not change
+the file — "a demonstration that does not mutate proves nothing"):
+
+| Mutation of `e2e/harness/test.ts` | Old string check | Now |
+|---|---|---|
+| clean tree (inverse control) | green | **green** |
+| `formatOrphans` call removed | red | **red** |
+| + trailing comment `// formatOrphans(a, b)` | **GREEN — defeated** | **red** |
+| + string literal `"formatOrphans("` | **GREEN — defeated** | **red** |
+| `void formatOrphans(a, b);` | **GREEN — defeated** | **red** |
+| shadowed callee `const formatOrphans = () => "x"` | not reachable then | **red** |
+
+The same six for `guardBrowser` in `worker-guard.ts`; `STAMP_ANNOTATION`
+surviving only on its import line; four `globalSetup`/`globalTeardown` cases with
+two inverse controls; six FINDING 8 upload-scope mutations; two retention; four
+env; four `package.json`.
+
+**F13, driven through the shipped `redact-artifacts.sh`** — the verifier's own
+three-line reduction, verbatim:
+
+```
+"url":"http://host/m.jpg?X-Amz-Sig=SENTINELVALUE&e=60"       -> ?<redacted>
+"path":"/m.jpg?X-Amz-Sig=SENTINELVALUE&e=60"                 -> ?<redacted>
+"subtitle":"host:3219/m.jpg?X-Amz-Sig=SENTINELVALUE&e=60"    -> ?<redacted>
+"subtitle":"127.0.0.1:3000/media/p.jpg?X-Amz-Signature=…"    -> ?<redacted>
+prose: see step 3/4? and a 1:23/foo timestamp                -> UNCHANGED
+sentinel survivals: 0
+```
+
+The first version of my authority pattern required a DOTTED host and left the
+verifier's own `host:3219` line unredacted; the committed pattern accepts any
+label with an explicit `:port`. The price is deliberate over-redaction of a
+`1:23/foo?x=y`-shaped string.
+
+**FINDING 3, and the sweep's blind spot** — measured against the probe tree
+AFTER the shipped redactor reported success:
+
+```
+old raw grep for the typed-password marker under playwright-report/ :  1 member
+new sweep (decode-then-recurse)                                     :  5 members
+  including .decoded-0.bin.unzipped/903210ec32f953d9c779.json
+  — the member a raw grep cannot see
+```
+
+**Two process failures of my own, recorded rather than smoothed over:**
+
+1. I twice edited files **while `npm run e2e:demos` was executing**. Bash reads a
+   script incrementally, so the second run died at `exit 127`
+   (`line 680: spec: command not found`) and the first recorded ten bogus
+   failures against a `check-e2e-lane.mjs` that was mid-edit. Neither run's
+   output means anything; both were discarded and the suite re-run on a quiescent
+   tree. No committed transcript comes from either.
+2. The `Write` tool's JSON interpreted the `\uXXXX` escapes in a regex character
+   class I wrote, so `e2e/harness/redact.ts` briefly contained **literal NUL and
+   other C0 bytes** in its source. Caught by dumping the bytes with `od -c`, not
+   by any test — `tsc`, `eslint` and `vitest` were all green on it. Replaced with
+   source-level escapes; the file is now ASCII apart from the prose em-dashes.
 
 ### Status
 
