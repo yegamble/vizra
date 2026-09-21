@@ -1,0 +1,41 @@
+# Owner review for the files that decide whether CI can fail, for the generated
+# ledger and its generator, and for the contract itself.
+#
+# AGENTS.md ("Tests, workflows, manifests, baseline changes, and
+# security-critical code require independent review") and ADR-002 § "Branch
+# protection and rulesets" (item 7) require owner review on workflows, gate
+# scripts and the required-check manifest. A manifest edited in the same PR as
+# the thing it guards defeats the gate, which is exactly what this file exists
+# to prevent.
+#
+# NOTHING ENFORCES THIS FILE TODAY. CODEOWNERS is advisory until a ruleset
+# requires owner review on these paths. Applying that ruleset is an owner action
+# after this PR lands (ADR-002 item 9: "application happens after PR1 lands,
+# because ci-required must exist before it can be required"), and GitHub
+# rulesets return 403 on this repository's current plan. So this file records
+# the intended ownership; it does not currently block anything.
+
+# Everything in this repository, as the baseline.
+*                            @yegamble
+
+# CI definition, the required-check manifest and the fan-in gate.
+/.github/                    @yegamble
+
+# The gate scripts: they decide what red means.
+/scripts/                    @yegamble
+
+# The shared engineering contract.
+/AGENTS.md                   @yegamble
+
+# Accepted architecture decisions.
+/docs/adr/                   @yegamble
+
+# The generated ledger and the release profiles read from it.
+/docs/quality/               @yegamble
+
+# The ledger's SOURCE. docs/quality/features.json is generated from here, so
+# review on the JSON alone would miss the change that produces it.
+/docs/evidence/ledger-generator/   @yegamble
+
+# Agent configuration: war-room roles, skills and permissions.
+/.claude/                    @yegamble

@@ -1,0 +1,80 @@
+# The `validate` lane for the vizra META repo (docs/META_REPO.md §7).
+#
+# This repository carries no product code: it is the contract, the product spec,
+# the ADRs, the ledgers, the plans and the evidence. What can go wrong here is
+# therefore documentary, and three failures are worth a gate:
+#
+#   (a) the GENERATED ledger no longer matches its sources — either it was
+#       hand-edited (AGENTS.md forbids it) or a generator source changed without
+#       regenerating. Both look identical in review and both are caught by
+#       regenerating and diffing.
+#   (b) a quality JSON does not parse, or the milestone plan and issue files
+#       schedule work by a `VZ-…` id that names no requirement.
+#   (c) a relative markdown link points at a file that does not exist.
+#
+# META_REPO.md §7 names two further target lanes for this repo, `bundle` and
+# `boot`. Neither is built here: there is no compose file, no installer, no
+# bundle and no image to boot yet, so there is nothing for them to run against.
+# They are deliberately absent from .github/required-checks.txt rather than
+# present and empty — see that file.
+#
+# The trigger deliberately carries NO base-branch filter. This lane's own pull
+# request is STACKED on `chore/m0-meta-baseline`, not on `main`, and a
+# `branches: [main]` filter would skip the lane on exactly that PR while
+# `ci-required` waited for a check nobody scheduled.
+# scripts/check-action-pins.py enforces that statically.
+
+name: validate
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The generated-ledger check runs `git diff` against HEAD, so it needs
+          # the commit it is diffing. fetch-depth 1 is enough — nothing here
+          # reads history.
+          fetch-depth: 1
+
+      # A pinned interpreter, not "whatever the runner image ships". The ledger
+      # generator's output must be reproducible, and the Python version is part
+      # of that: dict ordering, json.dump formatting and float repr are all
+      # interpreter behaviour. 3.12.14 is the current stable 3.12 in
+      # actions/python-versions.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12.14'
+
+      - name: record the environment
+        run: |
+          set -euo pipefail
+          python3 --version
+          python3 -c 'import locale,sys; print("filesystem encoding:", sys.getfilesystemencoding()); print("preferred encoding:", locale.getpreferredencoding(False))'
+          git --version
+          echo "source SHA: ${{ github.event.pull_request.head.sha || github.sha }}"
+
+      # (a) The generated ledger reproduces byte-for-byte from its sources.
+      - name: the generated ledger matches its sources
+        run: ./scripts/check-generated-ledger.sh
+
+      # (b) Every quality JSON parses, and every VZ-… id resolves.
+      - name: quality JSON parses and every requirement id resolves
+        run: ./scripts/check-quality-json.py
+
+      # (c) Relative markdown links resolve. No network I/O: external URLs are
+      # recorded and never fetched.
+      - name: relative documentation links resolve
+        run: ./scripts/check-doc-links.py
