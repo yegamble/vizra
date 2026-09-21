@@ -627,3 +627,420 @@ Both fixes are prose plus one assertion; no design change, no re-verification of
 needed beyond re-running `make ci` and the named test.
 
 FINAL VERDICT: FAIL — SHA 852b38291c3ec8109f27ebd924ef48eec3b11a9d
+
+---
+---
+
+# Re-verification at `6a02ab2` — 2026-09-21
+
+- **SHA verified:** `6a02ab2975a6f5c4da49b5af62b9822ead2e885e`
+- **Relationship to the failed head:** `git merge-base --is-ancestor 852b3829… HEAD` → **true**.
+  One commit (`6a02ab2 fix(config): ignore what we do not own; test the no-echo property`) on
+  top of `852b382`. **No force-push**, no history rewrite.
+- **Base:** `origin/main` still `3619fed873fc194130f02cc85577de10414ade39` (unmoved).
+- Fresh `mktemp -d` clone, new scratch directory; the round-1 directory was already deleted.
+- Environment as in round 1 (darwin/arm64, go1.26.2, Docker 29.8.0; **no amd64 build attempted**).
+
+## 0. The policy this round verifies
+
+Chair ruling, prompted by round-1 FINDING 2, **reverses the original brief**: vizra-search no
+longer validates core's topology vocabulary at all. `VIZRA_SEARCH_MODE` carrying an **old
+runtime value** (`development`/`production` after TrimSpace+ToLower) → refused by name in every
+mode. **Every other value** — core's topology values, unknown values, whitespace-only, empty →
+**ignored silently**. I verified against the *new* policy, not the old brief.
+
+## 1. My 84-combination matrix, re-run against the new binary
+
+Same harness, same method: `env -i`, two key probes per combination, **mode proven from
+behaviour** (acceptance of the published dev key), marker garbage value, 168 outputs captured.
+
+**Distribution:** 36 REFUSED · 40 production · 8 development *(round 1: 48 / 30 / 6)*.
+
+**Exactly twelve rows changed classification, all in the predicted direction** — garbage or
+whitespace-only in `VIZRA_SEARCH_MODE` moving from "refused" to "boots in `VIZRA_MODE`'s mode":
+
+| # | VIZRA_MODE | VIZRA_SEARCH_MODE | round 1 | round 2 |
+|---|---|---|---|---|
+| 11, 12 | `<unset>` | marker / `'   '` | REFUSED | **production** |
+| 23, 24 | `<empty>` | marker / `'   '` | REFUSED | **production** |
+| 35, 36 | `production` | marker / `'   '` | REFUSED | **production** |
+| 47, 48 | `development` | marker / `'   '` | REFUSED | **development** |
+| 59, 60 | `Production` | marker / `'   '` | REFUSED | **production** |
+| 71, 72 | `' production '` | marker / `'   '` | REFUSED | **production** |
+
+**No other row moved.** In particular rows 83/84 (garbage `VIZRA_MODE` + garbage/whitespace
+topology) still refuse, because `VIZRA_MODE` is this service's own variable and is still validated.
+
+### The safety property holds
+
+- **The eight rows observed in `development` are 37, 38, 43, 44, 45, 46, 47, 48 — every one has
+  an explicit `VIZRA_MODE=development`.** The two new ones (47, 48) gained development *from
+  `VIZRA_MODE`*, not from the retired name. **Nothing reaches development without asking.**
+- The named danger and all its case/whitespace variants still refuse: rows 3, 4, 5, 6 and every
+  combination of them with any `VIZRA_MODE` (24 rows in total).
+- **No echo.** `grep -rlE 'DEVELOPMENT|Managed|Production|zzmarker7391garbage'` over all 168
+  captured outputs returned **no file**.
+
+### Near-misses of the old vocabulary (`VIZRA_MODE` unset, dev-key probe for mode)
+
+| value sent | result | echoes value |
+|---|---|---|
+| `production ` (trailing space) | **REFUSED** | no |
+| ` production` (leading space) | **REFUSED** | no |
+| `development\t` (trailing tab) | **REFUSED** | no |
+| `\ndevelopment\n` (newline-wrapped) | **REFUSED** | no |
+| `DeVeLoPmEnT` (odd case) | **REFUSED** | no |
+| `developmnt` (typo) | boots **production** | no |
+| `dev` | boots **production** | no |
+| `prod` | boots **production** | no |
+| `produc tion` (inner space) | boots **production** | no |
+| `development # x` (trailing comment) | boots **production** | no |
+| `"development"` (double-quoted) | boots **production** | no |
+| `'development'` (single-quoted) | boots **production** | no |
+| `ｄevelopment` (unicode fullwidth d) | boots **production** | no |
+| `dеvelopment` (Cyrillic е look-alike) | boots **production** | no |
+| `staging` | boots **production** | no |
+| `off` (core topology) | boots **production** | no |
+
+Refused = exactly the set `TrimSpace`+`ToLower` normalises onto `development`/`production`
+(leading/trailing spaces, tabs and newlines are all trimmed by `strings.TrimSpace`). Everything
+else boots production. **Nothing in this table boots development.**
+
+My harness first flagged three of these as "ECHOED"; on inspection all three were **artifacts of
+my own substring grep** hitting the legitimately printed `development | production` vocabulary
+(and `production` in the startup log). I diffed the actual outputs: the refusal text for
+` production`, `\ndevelopment\n` and `DeVeLoPmEnT` is **byte-identical** to the canonical message.
+**Zero real echoes.**
+
+**Is the accepted cost stated truthfully?** Yes, and unusually plainly. `AGENTS.md:302-310`:
+
+> **The accepted cost, stated plainly:** a typo such as `VIZRA_SEARCH_MODE=developmnt` with no
+> `VIZRA_MODE` boots **production** — the strict mode — and the operator finds out because the
+> development affordances they wanted (the published dev key, the relaxed ceilings) are refused.
+> That is the fail-safe direction. Production is the **default**, and the only dangerous outcome
+> — running development without asking for it — requires an explicit `VIZRA_MODE=development` and
+> can never come from this variable.
+
+It names the exact typo I tested, the exact outcome I measured, and the named test and two matrix
+rows that hold the line. This is a doc at — not above — the strength of its control.
+
+## 2. Mutations
+
+Baseline digest measured by me: `84f2c1fe25e5c49dd46d6428bb530f92c6c1c64d1891b45572938c19e226fc73`
+— **identical to the builder's claim**. Green matrix: **21 passed, 0 failed** (20 boot cases +
+the focused suite), matching the claim.
+
+### The builder's five, reproduced with my own digests
+
+| Mutation | digest after (mine) | passed/failed | claim | match |
+|---|---|---|---|---|
+| `fallback-to-the-old-name` | `e8e21d83c585a211…` | **17 / 4** | 17/4 | ✅ |
+| `drop-the-refusal` | `193880b62ef01a97…` | **15 / 6** | 15/6 | ✅ |
+| `default-to-development` | `d6fe88c50c894408…` | **14 / 7** | 14/7 | ✅ |
+| `unknown-value-as-development` | `4ff73168120e93c3…` | **15 / 6** | 15/6 | ✅ |
+| `echo-the-value` | `b8c9d1fdafc1db91…` | **19 / 2** | 19/2 | ✅ |
+
+All five restored to `84f2c1fe…`; `git status --porcelain` empty after each.
+
+### My own four
+
+| # | My mutation | Result | Named test(s) red |
+|---|---|---|---|
+| V1 | ignore the old name entirely when `VIZRA_MODE` is set | **RED** — unit + matrix 18/3 | `TestTheOldNameIsConsultedOnlyByTheRefusal`, `TestTheOldRuntimeModeNameIsRefusedInDevelopmentToo` |
+| V2 | refuse only in production | **RED** — unit + matrix 19/2 | `TestTheOldRuntimeModeNameIsRefusedInDevelopmentToo` |
+| V3 | log the ignored value via `os.Getenv` in `Config.String()` | **STAYED GREEN** — see note | none |
+| V4 | echo the raw value in the retired-name refusal (my round-1 **M4**) | **RED at unit AND matrix level** — 19/2 | `TestNoRefusalEchoesTheSuppliedValue/the_retired_runtime-mode_name` |
+
+**V4 closes round-1 FINDING 1.** The property that had no control now has one that bites at both
+levels.
+
+**V3 note — not a finding against this PR.** My mutation reached *around* the `Lookup` seam with a
+direct `os.Getenv`. The unit tests inject a map, so the marker never appears and the test cannot
+see it; no lane catches a stray `os.Getenv` either (`grep` for any guard: none exists). But
+`internal/config/env.go:6` — "osLookupEnv is the only place this package touches the process
+environment" — is a **pre-existing, unenforced discipline that predates this slice** and is
+untouched by it. Out of scope; recorded for the chair as a standing, separate observation.
+
+### M6 — core adds a topology value: now a non-event
+
+Repository untouched, six values probed against the real binary:
+
+| value | result |
+|---|---|
+| `readonly`, `hybrid`, `replica` (hypothetical new core values) | **BOOTED** (production) |
+| `off`, `managed`, `external` (core's current values) | **BOOTED** (production) |
+
+Unit tests green throughout. The day core extends its vocabulary, **nothing here breaks** — which
+is precisely what round-1 FINDING 2 asked for. `SearchTopologyValues`,
+`TestTheTopologyVocabularyIsPinnedToCore` and every pinning sentence are deleted from `config.go`,
+`config_test.go`, `AGENTS.md` and the PR body. **Round-1 FINDING 2 is closed.**
+
+## 3. Does the no-echo test really cover every refusal path?
+
+I enumerated the loader's refusal sites from the source (`grep -c 'v\.addf('` → **17**) and then
+measured, with `go test -run TestNoRefusalEchoesTheSuppliedValue -coverprofile`, which of those
+lines the test actually executes:
+
+| | sites |
+|---|---|
+| **Executed** (6) | 287 unknown `VIZRA_MODE`; 344 retired name; 361 listen address; 374 not-a-duration; 391 not-an-integer; 501 key too short |
+| **Not executed** (11) | 378 & 395 "must be greater than zero"; 412 & 416 production ceilings; 459 key must be set; 474, 478, 484, 490, 496 key placeholder/published refusals; 505 distinct-bytes |
+
+**The test drives 6 of 17 paths, not "every refusal in the loader".** See FINDING 4.
+
+The important mitigating fact, which I checked by reading all 17 format strings: **not one `addf`
+call anywhere in the loader interpolates a supplied value.** Every argument is an `Env*` constant,
+a `Mode*` constant or a numeric limit — the `key` argument in `duration()`/`bytes()` is the
+*variable name*, not its content (`raw` is never passed). So the *property* genuinely holds on all
+17 paths; only the *claim about the test's reach* is wrong. The 11 unreached paths are unreachable
+**by a marker** by construction: the ceilings need a valid-but-too-large value, the placeholder
+branches need a placeholder-shaped key, "greater than zero" needs a parseable non-positive value.
+
+**Is the `development`/`production` exemption narrow enough?** Yes, at both levels:
+
+- Unit: the retired-name subtest supplies `"  DeVeLoPmEnT\t"` and asserts the message contains
+  **neither** the raw string **nor** the bare `"DeVeLoPmEnT"` shape.
+- Matrix: `scripts/boot-matrix.sh:333-337` greps **every refusal row** for each supplied value,
+  skipping only `development` and `production` **exactly as spelled** — and case
+  `old-name-old-vocabulary-odd-case` deliberately supplies `  DeVeLoPmEnT  ` so that spelling is
+  checked. An echoed odd-case shape **is** caught.
+
+Booting rows are also checked: values ≥6 characters must not appear in the process log
+(boot-matrix.sh:284-288), with the length guard honestly commented as avoiding collision with
+ordinary log text.
+
+## 4. The `docker-build` step on this SHA
+
+Run `35580813539`, job `docker-build` (`106273021073`). The step now captures the container output
+to `retired-name.log` and requires:
+
+```
+if [ "$code" -eq 0 ];   then … exit 1; fi     # booted
+if [ "$code" -eq 124 ]; then … exit 1; fi     # still running after 30s
+if ! grep -q 'VIZRA_SEARCH_MODE' retired-name.log; then … exit 1; fi
+if ! grep -q 'VIZRA_MODE ('      retired-name.log; then … exit 1; fi
+```
+
+- Ran the **built amd64 image** (`vizra-search:ci`) on ubuntu-24.04 — ✅
+- **No `|| true`**; `|| code=$?` with both failure branches intact — ✅
+- The 124 branch is unchanged — ✅
+- **Asserts both variable names in the captured text** — ✅ (round-1 FINDING 3 closed)
+- The key is `openssl rand -hex 32`, so the refusal cannot be the key's — ✅
+
+**What it guarantees, exactly:** the image exited non-zero within 30 s having printed text
+containing both `VIZRA_SEARCH_MODE` and the literal `VIZRA_MODE (`. It does **not** pin the whole
+message. Answering the question directly: **yes, in principle a different non-zero exit whose
+output happened to contain both tokens would satisfy it.** In practice `VIZRA_MODE (` is produced
+by exactly one message in this binary — the retired-name refusal (`mode()`'s own refusal prints
+`VIZRA_MODE must be "production" or "development"`, with no parenthesis) — so the conjunction is
+currently unique to the control under test. That is a materially honest control; pinning a longer
+phrase would make it stronger still, but this is no longer a false positive.
+
+## 5. Regression sweep of everything confirmed at `852b382`
+
+| Check | Result at `6a02ab2` |
+|---|---|
+| Any reader of the old name **as a mode** | **None.** Only the constant, its refusal, tests, the harness, the CI assertion and prose |
+| `LookupEnv` seam | intact — `internal/config/env.go:6` is the only `os.LookupEnv`; **no `os.Getenv` anywhere** in `internal/` or `cmd/` |
+| Dockerfile `ENV` | `VIZRA_SEARCH_ADDR=:8081` + **`VIZRA_MODE=production`** — production, never development |
+| Guards & manifest | `scripts/ci-required-guard.sh`, `scripts/check-workflows.py`, `.github/required-checks.txt` **not in the diff across either commit** |
+| Makefile `ci:` | target line unchanged vs `3619fed` |
+| `api/` and vendored files | **not in the diff at all** |
+| `t.Skip` / `testing.Short()` in the tree | **0** |
+| Skips counted by me from `go test -json` | **384 pass, 0 skip, 0 fail** |
+
+### Test deletions in the fix commit — each one ruled
+
+Round 1 had zero deleted test lines; this commit deletes some. **Five test functions removed, five
+added**, and every removal is a direct consequence of the chair's reversal, with a named successor:
+
+| Removed | Why it had to go | Successor |
+|---|---|---|
+| `TestTheTopologyVocabularyIsPinnedToCore` | **ruled deleted** (round-1 FINDING 2) | — (deliberately none) |
+| `TestATopologyValueInTheOldNameIsIgnored` | iterated `config.SearchTopologyValues`, which no longer exists | `TestEveryValueButTheOldVocabularyIsIgnored` |
+| `TestANonVocabularyValueInTheOldNameIsRefused` | asserted the **reversed** policy (refuse `staging`/`dev`/`prod`/`1`/whitespace) | `TestAnUnknownRetiredNameValueBootsProduction` |
+| `TestAnEmptyOldNameIsToleratedAsATombstone` | "empty" is now one case of "ignored", not a special rule | `TestEveryValueButTheOldVocabularyIsIgnored` (covers `""`) |
+| `TestBootAcceptsCoreTopologyAlongsideTheRuntimeMode` | named core's vocabulary, which this repo no longer knows | `TestBootIgnoresEveryOtherValueOfTheRetiredName` |
+
+**No assertion was weakened to turn CI green.** The successors are strictly broader — e.g.
+`TestEveryValueButTheOldVocabularyIsIgnored` covers `off, managed, external, staging, dev, prod,
+developmnt, 1, "   ", ""` in both `VIZRA_MODE` states, and
+`TestNoValueInTheOldNameCanEverProduceDevelopment` supplies the **published dev key** so that a
+wrongly-selected development mode would be *visible* (it asserts the refusal is specifically the
+`development placeholder` one, i.e. the mode really was production). That claim of the builder's
+is accurate.
+
+## 6. Lanes from the clean clone
+
+| Command | Exit | Result I measured |
+|---|---|---|
+| `make ci` | **0** | **contract-drift 356 tests / 4 packages / 0 deselected**; `test -race` 6 packages ok; **test-noskip 384 pass events, 0 skips** |
+| `go test -count=1 -json ./...` (my count) | **0** | pass **384**, skip **0**, fail **0** |
+| `govulncheck ./...` | **0** | No vulnerabilities found |
+| `./scripts/ci-required-guard.sh` | **0** | — |
+| `python3 scripts/check-workflows.py` | **0** | — |
+| `shellcheck scripts/boot-matrix.sh` | **0** | — |
+| `./scripts/boot-matrix.sh` | **0** | **21 passed, 0 failed** |
+
+Every number in the PR body's table reproduced exactly (356/0, 384/0, 21, and the five mutation counts).
+
+## 7. CI on `6a02ab2`
+
+**12 check runs, all `completed` / `success`**: `ci-required`, `build`, `contract-drift`,
+`docker-build`, `echo-containment`, `fmt`, `govulncheck`, `test`, `test-noskip`, `tidy-check`,
+`vet`, `GitGuardian Security Checks`. None skipped, cancelled or timed out.
+
+All ten `.github/required-checks.txt` lanes are present in that list and green; the manifest is
+unedited. **Which tree was tested:** both workflow runs report `headSha = 6a02ab2…` on the
+`pull_request` event, so the checked-out tree is the PR merge of `6a02ab2` into `main`; `main` is
+still `3619fed` (unmoved since the PR branched), and GitHub reports the PR MERGEABLE, so **the
+merge tree is the head tree**. My clean clone at `6a02ab2` therefore tested the same content CI did.
+
+## Round-1 findings — status
+
+| | Finding | Status |
+|---|---|---|
+| 1 | no-echo property untested | **CLOSED** — my V4 is red at unit *and* matrix level |
+| 2 | `TestTheTopologyVocabularyIsPinnedToCore` pinned nothing, comment claimed it did | **CLOSED** — test, constant and every pinning sentence deleted; M6 is a non-event |
+| 3 | `docker-build` counted any non-zero exit as "refused" | **CLOSED** — output captured, both variable names asserted |
+
+## New findings
+
+```
+FINDING 4: the no-echo test is documented as driving "every refusal path in the loader"; it drives 6 of 17
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-search
+  files:     internal/config/config.go:333 ; AGENTS.md:315
+             internal/config/config_test.go (TestNoRefusalEchoesTheSuppliedValue)
+  requirements: acceptance bullet 5 (docs at the strength of the control)
+
+Observed:
+  config.go:333 — "TestNoRefusalEchoesTheSuppliedValue drives this and every
+  other refusal in the loader with a runtime-assembled marker".
+  AGENTS.md:315 — "TestNoRefusalEchoesTheSuppliedValue drives every refusal path
+  in the loader with a marker assembled at run time".
+  The loader has 17 `v.addf` sites. Running the test under
+  -coverprofile shows 6 executed (287, 344, 361, 374, 391, 501) and 11 not
+  (378, 395, 412, 416, 459, 474, 478, 484, 490, 496, 505).
+  I read all 17 format strings: NONE interpolates a supplied value, so the
+  PROPERTY holds everywhere; only the claim about the test's reach is wrong.
+  The companion clause of AGENTS.md:315 — "every refusal row of the boot matrix
+  greps the process output for the value it supplied" — is TRUE
+  (boot-matrix.sh:333-337, applied to every refusal row).
+
+Failure:
+  A reader budgets no further work because the sentence says the test already
+  covers everything. If someone later adds the offending value to, say, the
+  clock-skew ceiling message (line 412), TestNoRefusalEchoesTheSuppliedValue
+  will not catch it — a marker cannot reach that branch, which needs a valid
+  but too-large duration.
+
+Perspective:
+  developer
+
+Recommendation:
+  Replace "every refusal path in the loader" with what is true in both places —
+  "every refusal a marker-shaped value can reach (the mode, the retired name,
+  the listen address, the three durations, the byte ceiling and the key), plus
+  Config.String() and Config.LogValue()" — and note that the remaining paths
+  take no value argument at all.
+
+Acceptance criteria:
+  - No sentence claims the test drives every refusal in the loader.
+  - The sentence names either the covered paths or the reason the rest cannot
+    echo (they interpolate only constants).
+
+Tests:
+  None required; the wording is the defect. If broader coverage is ever wanted,
+  the smallest honest version is a table-driven case per addf site supplying a
+  value of the shape that branch requires.
+
+Cross-repo implications:
+  core: none | user: none | search: two sentences | meta: none
+
+Challenge:
+  Every refusal in the loader does in fact fail to echo, so the sentence is true
+  about the SYSTEM even though it is false about the TEST, and no defect can
+  reach a user today. Counter: it is stated as "That sentence is a test, not a
+  habit" — an explicit claim of mechanism, which is the thing that is wrong.
+```
+
+```
+FINDING 5: one stale enumeration of core's vocabulary survives in a test comment
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-search
+  files:     internal/config/config_test.go:155-156
+  requirements: acceptance bullet 5
+
+Observed:
+  config_test.go:155-156 still reads "VIZRA_SEARCH_MODE is core's search
+  TOPOLOGY variable (off | managed | external) and means that, and only that,
+  product-wide." `git diff 852b382..6a02ab2` does not touch this line.
+  Everywhere else is clean: AGENTS.md:249/262/282, README.md:51 and config.go
+  all describe the variable without enumerating core's values.
+  The accompanying claim that "every `off | managed | external` enumeration was
+  removed from this repo's docs and messages" is therefore very nearly, but not
+  quite, accurate.
+
+Failure:
+  The whole point of the reversal is that this repository holds no copy of
+  core's vocabulary, because a copy goes stale silently. This copy is inert —
+  it is a comment, it drives nothing, and no control depends on it — but it is
+  the same liability in miniature: if core extends its vocabulary the comment
+  becomes wrong and nothing notices.
+
+Perspective:
+  developer
+
+Recommendation:
+  Delete the parenthetical, leaving "VIZRA_SEARCH_MODE is core's search TOPOLOGY
+  variable and means that, and only that, product-wide."
+
+Acceptance criteria:
+  - `grep -rn "off | managed | external"` over the repository, excluding
+    docs/evidence/**, returns nothing.
+
+Tests:
+  None.
+
+Cross-repo implications:
+  core: none | user: none | search: one line | meta: none
+
+Challenge:
+  It is a comment in a test file, not a doc or a message, so the builder's claim
+  was arguably never about it. Accepted — hence NIT, not a hold.
+```
+
+## Cross-repo note for the chair — unchanged and still owed
+
+Meta PR #4 (`feat/m0-compose-topology`) still sets `VIZRA_SEARCH_MODE: production` on the **search**
+service. Under the NEW policy that is still a **boot refusal** (my matrix row 4 — `production` is
+old runtime vocabulary and is the one refused class). **Meta must deliver `VIZRA_MODE: production`**
+to the search service. Core's `VIZRA_SEARCH_MODE: ${VIZRA_SEARCH_MODE:-off}` on api/worker stays.
+The compose comment above that line ("SEARCH'S OWN vocabulary — `production|development`") is now
+doubly wrong and must be rewritten.
+
+## Verdict
+
+The reversal is implemented cleanly and all three round-1 findings are closed. My own 84-combination
+matrix, 16 near-miss probes, five reproduced builder mutations, four fresh adversarial mutations,
+a coverage measurement of the no-echo test and the full lane set all agree with the PR's claims;
+every number in the PR body reproduced exactly. Nothing can reach development without an explicit
+`VIZRA_MODE=development`; the named danger and all its normalised spellings still refuse; no
+refusal echoes a supplied value; the accepted cost of ignoring unknown values is documented
+truthfully and precisely.
+
+The two remaining findings are NITs: one sentence (in two places) overstates how many refusal
+paths a test walks, for a property that in fact holds on all of them, and one stale parenthetical
+survives in a test comment. Neither is a false promise of safety, neither has an operator-facing
+consequence, and neither is of the kind that failed round 1 — where a comment promised a
+cross-repo alarm that could never fire and guarded an accepted risk that could bite an operator
+on upgrade. I record them for the chair, which may still choose to hold for the one-line fixes.
+
+FINAL VERDICT: PASS — SHA 6a02ab2975a6f5c4da49b5af62b9822ead2e885e
