@@ -141,13 +141,49 @@ All five `uses:` pins re-confirmed against the live repositories with
 `actions/upload-artifact`'s own `action.yml` at the pinned SHA
 `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`.
 
+### CI on `e710c3c` — every required lane green, on this SHA
+
+| lane | conclusion | duration |
+|---|---|---|
+| `ci-required` | **success** | 11m26s |
+| `build-test` | success | **11m03s** |
+| `cache-matrix` (+ both legs) | success | 3s (legs 5m06s / 5m03s) |
+| `docker-build` | success | 3m36s |
+| `fixtures` | success | 2m14s |
+| `append-only` | success | 5s |
+| `govulncheck` | success | 39s |
+| GitGuardian Security Checks | success | 1s |
+| `image-scan` | **failure — by design, NOT required** | 3m31s |
+
+Fan-in: `ci-required-guard: passed (6 required check(s))` then `SUCCESS` observed
+for each of the six, `all 6 required check(s) succeeded`.
+
+**CI now corroborates the counts** (the PR#7 note closed):
+
+```
+unit          1047 executed, 194 top-level, 1047 passed, 0 failed, 0 SKIPPED   floor 900
+integration   1092 executed, 225 top-level, 1092 passed, 0 failed, 0 SKIPPED   floor 940
+              internal/integration: 45 test(s), floor 40
+integration (shuffled)  identical: 1092 / 0 skipped / 45
+```
+
+Identical to the local numbers. The `build-test-events-<sha>` artifact carries
+the raw `go test -json` streams so a verifier can re-derive them.
+
+**Timing, before → after.** `build-test` **11m03s** against the verifiers'
+baseline of 10m59s (PR#6) and 11m08s (PR#7), of an **unchanged 20-minute
+timeout**. The restructure is runtime-neutral as intended: the direct integration
+steps (117s + 115s) replaced the recipe invocations that stood there, and the
+unit step (112s) replaced the bare `go test` step. No timeout was raised.
+
+**`image-scan` red is the pre-existing upstream CVE red, not this slice.** It
+exited **1 (findings)**, not 3 (no valid scan), with `--fail-on HIGH,CRITICAL`
+and **48 HIGH / 175 TOTAL** — the same numbers PR#7's verifier confirmed. The
+verdict's own gate chain ran (`ok the scanner exited 0`), so the new `--fail-on`
+refusal did not break the valid path. The lane is deliberately not required.
+
 ### What did NOT run
 
-- **CI timing before/after**: this branch's first CI run is the one on PR #9.
-  Baseline from the PR#6/#7 verifiers: `build-test` 10m59s and 11m08s of a
-  20-minute timeout. **No timeout was raised.** The restructure replaces steps
-  rather than adding them, so it is intended to be runtime-neutral; the real
-  number comes from the run on this head.
 - **`docker-build` / `image-scan` were not run locally** — arm64 host, CI builds
   linux/amd64. `assert-runtime-image.sh` was exercised against stub daemons,
   never a real image.
