@@ -188,6 +188,41 @@ pinned"; the `off | managed | external` enumeration in `AGENTS.md`'s table, the
 "anything else, whitespace-only included → boot refusal"; and the original
 decision 2 in the PR body.
 
+### Fix round 2 (verifier PASS at `6a02ab2`; chair held the merge on two sentences)
+
+Head `cb02cdf19ddfdc57f06adcce8963f85cac0cdaf0`. Both findings were claims
+stronger than their controls; no behaviour changed.
+
+- **F4 — "drives every refusal path in the loader" drove 6 of 17.** The property
+  held (the verifier read all 17 format strings; none interpolates a supplied
+  value) but the claim about reach did not. `refusalSites()` is now a table of
+  all 17 `v.addf` sites / 14 distinct messages, each row carrying a rendered
+  fragment (so a probe cannot silently provoke a different refusal), its probes,
+  and a written reason where the site cannot take an arbitrary marker (11 of 17:
+  ceilings need a parseable over-limit value, placeholder branches need a
+  placeholder-shaped key, "greater than zero" needs a parseable non-positive
+  value, the retired name needs the vocabulary).
+  `TestEveryRefusalSiteInTheLoaderHasANoEchoRow` parses `config.go` with go/ast,
+  folds concatenated literals and fails unless the table accounts for every call
+  by format and count. New mutation `add-an-unrowed-refusal` adds a refusal that
+  fires only for a sentinel no case supplies — 20 passed, **1 failed**, that
+  test by name, with every boot row unchanged.
+- **F5 — one stale `(off | managed | external)` survived** at
+  `config_test.go:155-156`; removed, and one more found in a `ci.yml` comment
+  and removed. Re-grepped outside `docs/evidence/**`: none remain.
+- **Absolutes audit.** "the only process that reads it" (untestable from this
+  repo) → "owned and read by `vizra-core`"; the site counts are now dated
+  ("17 as of 2026-09-21") because the guard, not the prose, keeps them honest.
+
+Lanes: `make ci` 0 (**test-noskip 391 pass events, 0 skips**), `govulncheck` 0,
+`ci-required-guard.sh` 0, `check-workflows.py` 0, `shellcheck` 0, boot matrix
+21/21, six mutations red, all restoring config.go to
+`b88139cec44a9a441e5b75a0c3fc2c99ba10a8ba80cbcae77295baa7b31fcb3c`.
+
+Noted by the verifier, NOT in this PR (chair queued it with the search CI-guard
+slice): `env.go`'s `Lookup` seam is an unenforced discipline — a direct
+`os.Getenv` elsewhere would bypass it.
+
 ## Blockers and handoff
 
 No blocker in this repository. One **cross-repo dependency** the chair must
