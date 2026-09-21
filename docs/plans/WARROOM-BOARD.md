@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-21, tick 103 — search PR #4 fix round 1 landed at `6a02ab2` (12/12 check-runs success, chair's call): the vocabulary pin is deleted, only OLD runtime values are refused, a no-echo assertion at unit + matrix level, the image step asserts the refusal text → same verifier re-verifying. In flight: that verifier; core #8 verifier + two seats; meta #4 closing builder; core B1; user privacy PR A. History: "Tick log" at the end of this file.
+Last tick: 2026-09-21, tick 104 — security seat's CODE review of core PR #8 at `32b616d`: a faithful implementation (S-1…S-4, S-6, S-7, S-9, S-11…S-14 CLOSED) with **one blocker** — N-1: on a CLAIMED instance every anonymous POST to the claim endpoint writes a permanent `refused` audit row (only the 600/15 min ceiling bounds it) into the table this migration makes undeletable — plus three required (claim-status bypasses the monotonic cache and the ceiling; `Origin` compared as raw strings against a value config accepts with a trailing slash; a correct-but-DEAD token still costs an argon2 derivation, so "zero derivations on every non-201 path" is false). PR held; one consolidated fix round once the backend seat and the verifier report. In flight: core #8 verifier + backend seat; search #4 re-verification; meta #4 closing builder; core B1; user privacy PR A. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -141,6 +141,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 104 (2026-09-21) — security seat's code review of core PR #8 filed: one blocker (already-claimed 409 audits every anonymous request into an undeletable table), three required; held for a consolidated round.
 - Tick 103 (2026-09-21) — search PR #4 fix round 1 at `6a02ab2` (pin deleted, no-echo asserted, image step checks the text); same verifier re-verifying.
 - Tick 102 (2026-09-21) — core PR #8 (M1-A owner claim) ready at `32b616d`; verifier + security and backend seats dispatched on the code.
 - Tick 101 (2026-09-21) — search PR #4 verifier FAIL at `852b382` on docs-vs-control only; chair reversed its own brief (search ignores non-runtime values instead of validating core's vocabulary); fix round 1.
