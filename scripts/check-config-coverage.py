@@ -32,11 +32,18 @@ Exit codes, matching the house convention:
     1  VIOLATION   one `VIOLATION …` line per hit
     2  UNEVALUABLE  an input was missing or unusable; nothing was checked
 
-`--drift` reports BLOCKED and exits 2 when a component checkout is absent. That
-is deliberate and it is why drift is a separate flag: this repository's CI has
-no token to check out a private sibling repository, so a green `validate` proves
+`--drift` compares each snapshot against the component's live source on TWO
+fields — the key NAMES, and the `"secret": true` FLAG where the component
+declares it in a machine-readable form (see SECRET_SOURCE below for which
+components do and which are reported UNCHECKED). Those are exactly the two
+fields any checker in this repository consumes.
+
+It reports BLOCKED and exits 2 when a component checkout is absent. That is
+deliberate and it is why drift is a separate flag: this repository's CI has no
+token to check out a private sibling repository, so a green `validate` proves
 the topology is consistent with the snapshots, NOT that the snapshots are
-current. A missing dependency is BLOCKED, never a pass.
+current, and the secret-flag comparison is a LOCAL control that CI never runs.
+A missing dependency is BLOCKED, never a pass.
 """
 
 import glob
@@ -74,6 +81,68 @@ RULES = frozenset({
 # while VIZRA_SEARCH_URL is a plain address and matching it would train people
 # to add exceptions.
 SECRET_NAME_SUFFIXES = ("_PASSWORD", "_SECRET", "_TOKEN", "_KEY")
+
+# --- What `--drift` compares, and why the `secret` flag is on the list --------
+#
+# Exactly TWO fields of a `keys[]` entry are consumed by any checker in this
+# repository, and both are therefore drift-checked:
+#
+#   name    -> `service-key-missing` / `service-key-unknown` / `alias-unwired`
+#   secret  -> `unclassified-secret-key` here, and compose-render.py's
+#              `registry_secret_names()`, which is what actually keeps the value
+#              out of the uploaded CI artifact
+#
+# `required`, `default`, `delivered_by` and `reason` are documentation for a
+# human reader; nothing reads them, so nothing validates them and this file does
+# not pretend to.
+#
+# The flag used to be unchecked, which is the defect one level down from the one
+# the derivation fixed: deleting `"secret": true` from a snapshot narrowed the
+# redaction set silently while `--drift` still reported "every snapshot matches
+# its component source" (verifier S-5). So the flag is now compared against the
+# component's own source, where the component states it in a machine-readable
+# form — and where it does not, that is REPORTED on every run rather than
+# passing quietly.
+SECRET_SOURCE = {
+    # `internal/config/keys.go` declares one struct literal per key with both
+    # fields inside the same braces:
+    #     {Name: "VIZRA_SESSION_SECRET", Secret: true, RequiredInProduction: ...}
+    # `Secret` always precedes `Doc`, so truncating at the first `}` cannot hide
+    # a flag even if a Doc string ever contains one.
+    "core": {"file": "internal/config/keys.go", "form": "go-key-struct"},
+    # No machine-readable secret marker. vizra-search redacts its shared secret
+    # in `String()` and validates it, but never DECLARES a per-key flag;
+    # vizra-user's lib/config.ts carries no `secret` token at all and its
+    # snapshot flags no key secret. Rather than invent a bespoke matcher for one
+    # key in one file, these are declared UNCHECKED and said so out loud on
+    # every drift run.
+    "search": None,
+    "user": None,
+}
+
+# One Go struct literal from a `[]Key` registry. `[^}]*` stops at the literal's
+# closing brace; see the note on ordering above for why that is safe here.
+GO_KEY_STRUCT = re.compile(r'\{\s*Name:\s*"([A-Z][A-Z0-9_]*)"([^}]*)\}')
+
+
+def source_secret_flags(root, spec):
+    """{key name: is it flagged secret in the component's own source}.
+
+    Returns None when the declared file cannot be read, which the caller treats
+    as BLOCKED rather than as agreement.
+    """
+    path = os.path.join(root, spec["file"])
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return None
+    if spec["form"] != "go-key-struct":  # pragma: no cover - one form today
+        return None
+    return {
+        m.group(1): "Secret: true" in m.group(2)
+        for m in GO_KEY_STRUCT.finditer(text)
+    }
 
 violations = []
 
@@ -419,8 +488,21 @@ def main(argv):
 # --------------------------------------------------------------------------
 
 def check_drift(registries):
-    """Snapshot vs. the live component source. BLOCKED when absent."""
+    """Snapshot vs. the live component source. BLOCKED when absent.
+
+    Two comparisons, over the two fields any checker consumes (see SECRET_SOURCE
+    above): the set of key NAMES, by a coarse quoted-literal net, and the
+    `secret` FLAG, where the component declares it in a form that can be read.
+
+    This cannot run in this repository's CI at all — there is no token for a
+    private sibling repository — so the flag comparison is a LOCAL control. What
+    CI still enforces on every run is `unclassified-secret-key`, which fails
+    when a flagged key is not also classified in the manifest.
+    """
     blocked = []
+    secret_checked = {}
+    secret_unlocatable = {}
+    secret_unchecked = {}
     for comp, reg in registries.items():
         root = os.path.join(REPO_ROOT, f"vizra-{comp}")
         if not os.path.isdir(root):
@@ -475,6 +557,44 @@ def check_drift(registries):
                 f"{reg['source_files']}; the component may have removed it",
             )
 
+        # --- the `secret` FLAG, not just the name ---------------------------
+        spec = SECRET_SOURCE.get(comp)
+        if spec is None:
+            secret_unchecked[comp] = sorted(
+                k["name"] for k in reg["keys"] if k.get("secret")
+            )
+            continue
+        flags = source_secret_flags(root, spec)
+        if flags is None:
+            blocked.append(f"vizra-{comp}/{spec['file']} (the secret flags)")
+            continue
+        checked, unlocatable = [], []
+        for k in reg["keys"]:
+            name = k["name"]
+            if name not in flags:
+                # Declared in a source file this spec does not parse. Its
+                # DISAPPEARANCE is still caught by the name pass above; its flag
+                # is not compared, and that is counted and printed rather than
+                # rounded up into "matches".
+                unlocatable.append(name)
+                continue
+            checked.append(name)
+            if bool(k.get("secret")) != flags[name]:
+                snap = "secret" if k.get("secret") else "not secret"
+                src = "Secret: true" if flags[name] else "no Secret field"
+                violation(
+                    "registry-drift", f"vizra-{comp}/{name}",
+                    f"the snapshot's secret FLAG disagrees with the component: "
+                    f"env/registry/{comp}.json says {snap}, "
+                    f"vizra-{comp}/{spec['file']} says {src}. That flag is not "
+                    f"documentation - scripts/compose-render.py derives its "
+                    f"redaction set from it, so a snapshot that drops it "
+                    f"narrows what is kept out of the uploaded CI artifact "
+                    f"while every lane stays green",
+                )
+        secret_checked[comp] = (checked, spec["file"])
+        secret_unlocatable[comp] = unlocatable
+
     if blocked:
         sys.stderr.write(
             "BLOCKED: the drift check needs the component checkouts and these "
@@ -496,6 +616,32 @@ def check_drift(registries):
         sys.stderr.write(f"\n{len(violations)} drift violation(s).\n")
         return 1
     print("config registry drift: every snapshot matches its component source")
+    # Printed on every green run, like the alias table: the point of the S-5 fix
+    # is that the reader can see HOW MUCH of the flag surface was compared, not
+    # just that nothing disagreed.
+    for comp, (checked, src) in sorted(secret_checked.items()):
+        line = (
+            f"  secret flags: {len(checked)} key(s) in env/registry/{comp}.json "
+            f"compared against vizra-{comp}/{src}"
+        )
+        missed = secret_unlocatable.get(comp) or []
+        if missed:
+            line += (
+                f"; {len(missed)} NOT compared - not declared in that file: "
+                f"{missed}"
+            )
+        print(line)
+    for comp, flagged in sorted(secret_unchecked.items()):
+        print(
+            f"  secret flags UNCHECKED for vizra-{comp}: its source declares no "
+            f"machine-readable secret marker, so the snapshot's flags there are "
+            f"a human judgement nothing validates "
+            f"({len(flagged)} key(s) flagged secret: {flagged or 'none'})"
+        )
+    print(
+        "  This whole check needs the component checkouts and CANNOT run in this "
+        "repository's CI."
+    )
     return 0
 
 

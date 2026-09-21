@@ -159,8 +159,19 @@ Rather than leave that as a comment, both probes are declared **known-false** in
   stating: it only refuses a gate onto a probe someone has **declared** false,
   and cannot tell a real probe from a fake one nobody declared. The converse is
   `gated-probe-unrecognised` — every `service_healthy` target must be listed in
-  `gated_probes` and still invoke the command that makes its probe mean
-  something, so swapping `pg_isready` for `["CMD","true"]` is red;
+  `gated_probes`, and its **rendered** probe must run the declared command *as
+  its own command*: `["CMD", argv…]` where `basename(argv[0])` is that command,
+  or `["CMD-SHELL", s]` where `s` is one plain invocation carrying no `;`, `|`,
+  `&`, `#`, backtick, `$(`, `<`, `>` or newline and starting with that command.
+  Any other form — a bare string, `["NONE"]`, no healthcheck — is refused.
+  So `["CMD","true"]`, `pg_isready || true`, `true # pg_isready`,
+  `sh -c 'exit 0; pg_isready'` and `echo pg_isready` are all red. **What it
+  still cannot show**, and nothing here should be read as claiming: that the
+  command can exit non-zero (`pg_isready --version` passes), or that a binary
+  with the right name is the real one rather than a wrapper on `PATH`. Both need
+  a running container, which is VZ-ISSUE-004's boot lane. What it buys is that
+  killing a gate now costs a change to the image rather than one line of YAML
+  that still mentions the right word;
 - **names every entry on every run**, pass or fail, so the admission is standing
   rather than filed once;
 - **refuses a declaration that matches nothing** (rule
@@ -171,9 +182,14 @@ the person typing `docker compose ps` at 3am and reading `healthy` next to a
 wedged api. `env/production.env.example` (beside the loopback ports that make it
 actionable) and `README.md` both carry a *DIAGNOSING THIS RELEASE: IGNORE THE
 `healthy` COLUMN* paragraph giving the `curl` commands that do tell the truth.
-Rule `known-false-undisclosed` fails when the list is non-empty and either file
-lacks it — and it fails in both directions, so **the list and the paragraphs are
-deleted in the same PR**.
+Two rules hold the two halves together, so **the list and the paragraphs are
+deleted in the same PR**: `known-false-undisclosed` fails when the list is
+non-empty and either file lacks the marker, and `known-false-stale-disclosure`
+fails when the list is empty and either file still carries it. Both are
+demonstrated red by rule id in `docs/evidence/compose-topology/demo.sh`. The
+second direction did not exist until the closing round — three documents
+asserted it while the rule body sat inside `if known_false and disclosure:`,
+which made it unreachable.
 
 **That list must be empty before VZ-ISSUE-004's boot lane lands.** The boot lane
 and `vizra deploy` are both written against `--wait` / `ps --status healthy`, and

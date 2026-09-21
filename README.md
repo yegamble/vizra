@@ -97,15 +97,23 @@ liveness-only too: it says the process renders, not that vizra-core is reachable
 Ask the API itself instead. The production overlay publishes it on loopback for
 exactly this:
 
+The ports are the defaults of `VIZRA_HTTP_PORT` and `VIZRA_FRONTEND_PORT`; if
+you changed either in your env file, use yours.
+
 ```
-curl -fsS http://127.0.0.1:8080/healthz   # liveness
-curl -fsS http://127.0.0.1:8080/readyz    # 503 = PostgreSQL unreachable;
-                                          # 200 "degraded" names the component
-curl -fsS http://127.0.0.1:3000/health    # frontend process only
+curl -fsS http://127.0.0.1:8080/healthz              # :8080 = VIZRA_HTTP_PORT; liveness
+curl -sS http://127.0.0.1:8080/readyz; echo          # NO -f: /readyz answers 200 "degraded"
+                                                     # for cache down, search misconfigured or
+                                                     # a queue backlog, and -f would exit 0 on
+                                                     # it. Read the JSON: it names the component.
+                                                     # 503 means PostgreSQL is unreachable.
+curl -fsS http://127.0.0.1:3000/health               # :3000 = VIZRA_FRONTEND_PORT; process only
 ```
 
 Real probes land with `vizra healthcheck` (vizra-core, queue 2h). **This section
 is deleted in the same PR that empties `known_false_probes` in
-`scripts/compose-shapes.json`** — if that list is empty and this is still here,
-one of the two is wrong. `scripts/check-compose-topology.py` fails when the list
-is non-empty and this disclosure is missing from either file that must carry it.
+`scripts/compose-shapes.json`**, and that is enforced rather than remembered:
+`scripts/check-compose-topology.py` fails with `known-false-undisclosed` when
+the list is non-empty and this disclosure is missing from either file that must
+carry it, and with `known-false-stale-disclosure` when the list is empty and
+either file still carries it.

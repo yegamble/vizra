@@ -127,6 +127,7 @@ RULES = frozenset({
     "stale-known-false-probe",
     "profile-not-enumerated",
     "known-false-undisclosed",
+    "known-false-stale-disclosure",
     "postgres-shm-floor",
     "gated-probe-unrecognised",
 })
@@ -180,6 +181,98 @@ def probe_state(svc, name, known_false):
     if entry and list(test) == list(entry["test"]):
         return PROBE_KNOWN_FALSE, hc
     return PROBE_REAL, hc
+
+
+# Shell syntax that can move a CMD-SHELL probe's exit status away from the
+# command it names. `||` and `&&` are subsumed by `|` and `&`; `$(` is listed
+# separately from `$` because `$` alone is legitimate in a rendered probe.
+#
+# This is a REFUSAL LIST, not a parser. A gated probe is a one-line command; it
+# has no business carrying a pipeline, a comment, a redirection, a substitution
+# or a second statement, and refusing all of them outright is decidable from the
+# rendered string in a way that "does this shell line exit non-zero when the
+# server is down" is not.
+SHELL_CONTROL = (";", "|", "&", "#", "`", "$(", "<", ">", "\n")
+
+
+def probe_invokes(test, must_invoke):
+    """Does this RENDERED probe run `must_invoke` as its own command?
+
+    Structural, from the rendered model - `${POSTGRES_USER}` is already
+    substituted by the time this sees it, which is why the real postgres probe
+    survives. Returns (True, "") or (False, why).
+
+    Three forms, and everything else is refused:
+
+      ["CMD", argv...]   basename(argv[0]) must BE the declared command.
+                         `["CMD","echo","pg_isready"]` runs echo; mentioning the
+                         name in an argument is not invoking it.
+      ["CMD-SHELL", s]   s must carry NO shell control or substitution syntax
+                         and its first word must be the declared command. That
+                         refuses `pg_isready || true`, `true # pg_isready` and
+                         `exit 0; pg_isready` without pretending to parse shell.
+      anything else      a bare string that survived rendering, `["NONE"]`, an
+                         absent test. Fail closed.
+
+    WHAT THIS STILL CANNOT SHOW, stated here because the documents that describe
+    this rule must not claim it does:
+
+      * that the command can exit NON-ZERO. `pg_isready --version` passes this
+        check and succeeds whatever PostgreSQL is doing. Deciding that from a
+        rendered model is not possible - it needs a running container, which is
+        VZ-ISSUE-004's boot lane.
+      * that a binary named like the declared command IS the declared command. A
+        wrapper called `pg_isready` earlier on PATH passes.
+
+    What it does buy: killing a gate now requires changing the image, not
+    editing one line of YAML that still mentions the right word.
+    """
+    if not isinstance(test, list) or not test:
+        return False, f"its rendered healthcheck test is {test!r}, which is not a command list"
+    head = str(test[0])
+    if head == "CMD":
+        argv = [str(x) for x in test[1:]]
+        if not argv:
+            return False, "its rendered probe is [\"CMD\"] with no command at all"
+        actual = os.path.basename(argv[0])
+        if actual != must_invoke:
+            return False, (
+                f"its rendered probe runs {argv[0]!r} (basename {actual!r}), not "
+                f"{must_invoke!r}; naming the command in an ARGUMENT is not "
+                f"invoking it"
+            )
+        return True, ""
+    if head == "CMD-SHELL":
+        if len(test) != 2 or not isinstance(test[1], str):
+            return False, (
+                f"its rendered probe is CMD-SHELL with {len(test) - 1} argument(s) "
+                f"({test!r}); CMD-SHELL takes exactly one shell string"
+            )
+        s = test[1]
+        found = [c for c in SHELL_CONTROL if c in s]
+        if found:
+            return False, (
+                f"its rendered CMD-SHELL probe contains shell control syntax "
+                f"{found!r}, so the exit status the gate reads need not be "
+                f"{must_invoke!r}'s. A gated probe must be one plain command: "
+                f"`{must_invoke} || true`, `true # {must_invoke}` and "
+                f"`exit 0; {must_invoke}` all always succeed"
+            )
+        words = s.split()
+        if not words:
+            return False, "its rendered CMD-SHELL probe is an empty string"
+        actual = os.path.basename(words[0])
+        if actual != must_invoke:
+            return False, (
+                f"its rendered CMD-SHELL probe starts with {words[0]!r} "
+                f"(basename {actual!r}), not {must_invoke!r}"
+            )
+        return True, ""
+    return False, (
+        f"its rendered healthcheck test is {test!r}; only [\"CMD\", ...] and "
+        f"[\"CMD-SHELL\", \"...\"] can be checked, and an unrecognised form is "
+        f"refused rather than assumed to probe anything"
+    )
 
 
 violations = []
@@ -680,14 +773,14 @@ def check_probes(shape, model, known_false, seen_known_false, repo_root,
             # THE CONVERSE. probe-gates-readiness below catches a gate onto a
             # probe someone DECLARED false. It cannot tell a real probe from a
             # fake one nobody declared — so a gated service must additionally
-            # be listed in `gated_probes` and still invoke the command that
-            # makes its probe mean something.
+            # be listed in `gated_probes` and its RENDERED probe must actually
+            # run the declared command (probe_invokes, above, which states what
+            # that does and does not establish).
             if dep in services and dep not in known_false:
                 rule = gated_probes.get(dep)
                 dep_test = (services[dep].get("healthcheck") or {}).get("test") or []
                 if isinstance(dep_test, str):
                     dep_test = [dep_test]
-                joined = " ".join(str(x) for x in dep_test)
                 if rule is None:
                     violation(
                         sid, "gated-probe-unrecognised", dep,
@@ -698,15 +791,35 @@ def check_probes(shape, model, known_false, seen_known_false, repo_root,
                         f"{dep_test!r}",
                         locate_in_sources(shape["files"], dep, "healthcheck", repo_root),
                     )
-                elif rule["must_invoke"] not in joined:
-                    violation(
-                        sid, "gated-probe-unrecognised", dep,
-                        f"is gated on by {name} with condition service_healthy, "
-                        f"but its probe {dep_test!r} does not invoke "
-                        f"{rule['must_invoke']!r} - {rule['why']}. A gate onto a "
-                        f"probe that cannot fail is a gate onto nothing",
-                        locate_in_sources(shape["files"], dep, "healthcheck", repo_root),
-                    )
+                else:
+                    # The FOUR-STATE function stays the single place absent /
+                    # disabled / known-false / real is decided. Only a REAL probe
+                    # reaches the structural check; `["NONE"]` and a missing
+                    # healthcheck are refused here for the same reason
+                    # missing-healthcheck refuses them, and both rules fire so a
+                    # reader sees the gate as well as the probe.
+                    state, _hc = probe_state(services[dep], dep, known_false)
+                    if state in (PROBE_ABSENT, PROBE_DISABLED):
+                        violation(
+                            sid, "gated-probe-unrecognised", dep,
+                            f"is gated on by {name} with condition "
+                            f"service_healthy, but its healthcheck is {state} "
+                            f"({dep_test!r}) - so the gate is satisfied by "
+                            f"Docker's own fallback rather than by "
+                            f"{rule['must_invoke']!r}",
+                            locate_in_sources(shape["files"], dep, "healthcheck", repo_root),
+                        )
+                    else:
+                        ok, why = probe_invokes(dep_test, rule["must_invoke"])
+                        if not ok:
+                            violation(
+                                sid, "gated-probe-unrecognised", dep,
+                                f"is gated on by {name} with condition "
+                                f"service_healthy, but {why}. {rule['why']}. A "
+                                f"gate onto a probe that cannot fail is a gate "
+                                f"onto nothing",
+                                locate_in_sources(shape["files"], dep, "healthcheck", repo_root),
+                            )
             if dep in known_false and dep in services:
                 violation(
                     sid, "probe-gates-readiness", name,
@@ -867,13 +980,27 @@ def main(argv):
     # it is exactly how a list like this rots into permanent cover. If a probe
     # was fixed, the entry must go in the same commit.
     # F3's human half. The known-false list is printed on every run for CI; this
-    # is the check that the OPERATOR-facing disclosure exists while it does.
-    # It fails in both directions by construction: emptying the list without
-    # deleting the paragraphs leaves a file claiming a limit that no longer
-    # applies, and deleting a paragraph while the list stands leaves the person
-    # running `docker compose ps` at 3am with no warning at all.
+    # is the check that the OPERATOR-facing disclosure exists while it does, and
+    # that it is GONE once the list is.
+    #
+    # Two rule ids, because they are two different failures and a reviewer has to
+    # be able to tell which one fired:
+    #
+    #   known-false-undisclosed        the list stands and a file that must carry
+    #                                  the paragraph does not. The person running
+    #                                  `docker compose ps` at 3am gets no warning.
+    #   known-false-stale-disclosure   the list is empty and a paragraph survives.
+    #                                  Every probe is real now, and the file still
+    #                                  tells the operator to distrust a column
+    #                                  that works.
+    #
+    # The block runs UNCONDITIONALLY and branches on the list. It used to sit
+    # inside `if known_false and disclosure:`, which made the second direction
+    # unreachable while three documents and the PR body said it was enforced —
+    # exactly the class of defect this round exists to close (verifier S-1,
+    # infrastructure seat NEW-2).
     disclosure = manifest.get("known_false_disclosure") or {}
-    if known_false and disclosure:
+    if disclosure:
         marker = disclosure.get("marker", "")
         for rel in disclosure.get("files", []):
             try:
@@ -881,7 +1008,7 @@ def main(argv):
                     text = fh.read()
             except OSError:
                 text = ""
-            if marker not in text:
+            if known_false and marker not in text:
                 violation(
                     "(manifest)", "known-false-undisclosed", rel,
                     f"must carry the disclosure {marker!r} while "
@@ -889,6 +1016,16 @@ def main(argv):
                     f"({sorted(known_false)}), and does not. `docker compose ps` "
                     f"reports those services healthy whatever their state, and "
                     f"the operator reading that column has no other warning",
+                )
+            elif not known_false and marker in text:
+                violation(
+                    "(manifest)", "known-false-stale-disclosure", rel,
+                    f"still carries the disclosure {marker!r}, but "
+                    f"known_false_probes is EMPTY. Every probe is real now, so "
+                    f"this paragraph tells the operator to ignore a `healthy` "
+                    f"column that has become trustworthy and to keep hand-curling "
+                    f"/readyz past the point that was useful. Delete the section "
+                    f"in the same change that empties the list",
                 )
 
     # V3's closing rule: run once, over the union of every file any shape loads.
@@ -938,14 +1075,22 @@ def main(argv):
             for rel in disc.get("files", []):
                 print(f"    {rel}")
             print(
-                "  Those files and this list are deleted together (rule "
-                "known-false-undisclosed)."
+                "  Those files and this list are deleted together: rule\n"
+                "  known-false-undisclosed fails while the list stands and a "
+                "paragraph is\n  missing, and rule known-false-stale-disclosure "
+                "fails once the list is\n  empty and a paragraph survives."
             )
         print(
             "  SCOPE: probe-gates-readiness only refuses a gate onto a probe\n"
             "  DECLARED false above. It cannot tell a real probe from a fake one\n"
             "  nobody declared; gated-probe-unrecognised is what covers that, by\n"
-            "  requiring every service_healthy target to invoke a declared command.\n"
+            "  requiring every service_healthy target's RENDERED probe to run a\n"
+            "  declared command as its own command - one plain CMD or CMD-SHELL\n"
+            "  invocation, no pipeline, comment, redirection or second statement.\n"
+            "  It still cannot show that the command can exit NON-ZERO\n"
+            "  (`pg_isready --version` would pass) or that a binary with the right\n"
+            "  name is the real one. That needs a running container, which is\n"
+            "  VZ-ISSUE-004's boot lane.\n"
         )
 
     if violations:

@@ -72,15 +72,40 @@ RULES = frozenset({"unknown-command", "unmarked-future-command",
 # claim being made is about the subcommand.
 BACKTICKED = re.compile(r"`(vizra|vizra-search)\s+([a-z][a-z0-9-]*)")
 
-# Shell scripts, backticked or bare. The checker used to match only
-# `vizra <sub>`, so every claim about a SHELL SCRIPT was outside its scope — and
-# `backup.sh refuses to back the cache up, and says so` survived round 1 in two
-# operator-facing files for a script that does not exist. An operator cannot
-# tell a Go subcommand from a shell script and does not care: the failure this
-# checker prevents is about belief, not provenance.
+# ANY `*.sh` token, with or without a path prefix, with or without backticks.
+#
+# The checker used to match only `vizra <sub>`, so every claim about a SHELL
+# SCRIPT was outside its scope — and `backup.sh refuses to back the cache up,
+# and says so` survived round 1 in two operator-facing files for a script that
+# does not exist. An operator cannot tell a Go subcommand from a shell script
+# and does not care: the failure this checker prevents is about belief, not
+# provenance.
+#
+# The FIRST fix was narrower than its own comment, which read "backticked or
+# bare". It listed six names and excluded `.`, `/` and `-` in a lookbehind, so
+# the two spellings an operator-facing document actually uses for a runnable
+# script — `./backup.sh` and `scripts/backup.sh` — both passed unmarked, and a
+# backticked `` `./backup.sh` `` with them. Worse, because the six matchable
+# names were exactly the six declared future, the `unknown-script` branch was
+# UNREACHABLE from any documentation edit: a rule id that cannot fire is a
+# control that does not exist, which AGENTS.md forbids listing as one
+# (verifier S-3).
+#
+# So the matcher is now general and the REGISTRIES decide, which is the right
+# division: an invented `rotate-secrets.sh` reaches `unknown-script`, a declared
+# future one needs its marker, and a script that exists in the tree may be named
+# freely. The lookbehind keeps `.`/`/` out only so a match cannot start in the
+# middle of a longer word; a path prefix is consumed rather than excluded.
 SCRIPTNAME = re.compile(
-    r"(?<![\w./-])((?:backup|restore|install|bootstrap|deploy|rollback)\.sh)"
+    r"(?<![\w.-])(?:\.{0,2}/)?(?:[A-Za-z0-9_.-]+/)*"
+    r"([A-Za-z0-9_][A-Za-z0-9_.-]*\.sh)\b"
 )
+
+# Directories a bare script name is looked for in, in order, when deciding
+# whether it EXISTS. A script that exists may be named freely, and it is checked
+# on disk rather than trusted from the registry so that a script landing makes
+# its references legal in the same commit.
+SCRIPT_DIRS = ("", "scripts", "deploy")
 
 violations = []
 
@@ -121,6 +146,33 @@ def marker_context(lines, i):
     return "\n".join(lines[lo:hi])
 
 
+def script_on_disk(ref, name):
+    """Does the script this reference names exist in THIS repository?
+
+    `ref` is the whole matched token as written (`./backup.sh`,
+    `scripts/backup.sh`, `backup.sh`); `name` is its basename. A path form is
+    resolved literally, and every form is additionally looked for in
+    SCRIPT_DIRS, because a document that writes the bare name means the script
+    wherever it lives.
+
+    A reference that resolves OUTSIDE the repository (`../../thing.sh`) is
+    reported as not existing rather than followed. Fail closed: the caller then
+    refuses it as `unknown-script`, which is the correct answer for a path an
+    operator cannot run from a deployment bundle either.
+    """
+    candidates = [ref.lstrip("./")] if "/" in ref else []
+    candidates += [
+        os.path.join(d, name) if d else name for d in SCRIPT_DIRS
+    ]
+    for rel in candidates:
+        path = os.path.normpath(os.path.join(REPO_ROOT, rel))
+        if not path.startswith(REPO_ROOT + os.sep):
+            continue
+        if os.path.exists(path):
+            return True
+    return False
+
+
 def main(argv):
     registries = {}
     for comp in COMPONENTS:
@@ -146,16 +198,13 @@ def main(argv):
     # A script that actually exists may be named freely; the declaration is only
     # about the ones that do not. Checked on disk rather than trusted from the
     # registry, so a script landing makes its references legal automatically.
-    existing_scripts = {
+    declared_present = {
         n for n in meta.get("scripts", [])
         if os.path.exists(os.path.join(REPO_ROOT, n))
     }
-    for cand in list(meta["future_scripts"]):
-        for probe in (cand, os.path.join("scripts", cand), os.path.join("deploy", cand)):
-            if os.path.exists(os.path.join(REPO_ROOT, probe)):
-                existing_scripts.add(cand)
     future_scripts = {
-        k: v for k, v in meta["future_scripts"].items() if k not in existing_scripts
+        k: v for k, v in meta["future_scripts"].items()
+        if k not in declared_present and not script_on_disk(k, k)
     }
 
     shipped = set()
@@ -189,6 +238,7 @@ def main(argv):
 
     scanned = 0
     refs = 0
+    resolved_on_disk = set()
     for path in targets:
         try:
             with open(path, "r", encoding="utf-8") as fh:
@@ -217,22 +267,26 @@ def main(argv):
 
             # --- pass A': a script must exist, or be declared and marked
             for m in SCRIPTNAME.finditer(line):
-                name = m.group(1)
+                ref, name = m.group(0), m.group(1)
                 refs += 1
-                if name in existing_scripts:
+                if name in declared_present or script_on_disk(ref, name):
+                    resolved_on_disk.add(name)
                     continue
                 if name not in future_scripts:
                     violation(
                         "unknown-script", rel, i + 1,
-                        f"names the script {name!r}, which does not exist in "
-                        f"this repository and is not declared in "
-                        f"env/registry/meta.json `future_scripts`",
+                        f"names the script {ref!r}, which does not exist in "
+                        f"this repository (looked for it as written and in "
+                        f"{'/, '.join(d or '.' for d in SCRIPT_DIRS)}/) and is "
+                        f"not declared in env/registry/meta.json "
+                        f"`future_scripts`. An operator-facing file may not "
+                        f"name a script that does not exist",
                     )
                     continue
                 if future_scripts[name] not in ctx:
                     violation(
                         "unmarked-future-script", rel, i + 1,
-                        f"names {name!r} with no {future_scripts[name]!r} within "
+                        f"names {ref!r} with no {future_scripts[name]!r} within "
                         f"{MARKER_WINDOW} line(s). No such script exists, so the "
                         f"sentence reads as a description of current behaviour - "
                         f"and an operator who believes a backup tool exists "
@@ -264,9 +318,10 @@ def main(argv):
 
     print(
         f"template claims: {scanned} operator-facing file(s), {refs} command "
-        f"reference(s); {len(shipped)} shipped command(s), {len(future)} "
-        f"declared future command(s), {len(existing_scripts)} script(s) present "
-        f"and {len(future_scripts)} declared future; 0 violations"
+        f"and script reference(s); {len(shipped)} shipped command(s), "
+        f"{len(future)} declared future command(s), "
+        f"{len(resolved_on_disk)} script reference(s) resolved to a file in the "
+        f"tree and {len(future_scripts)} script(s) declared future; 0 violations"
     )
     return 0
 

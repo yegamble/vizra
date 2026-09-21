@@ -55,6 +55,32 @@ use to see what a chain actually resolves to. It does four things a bare
    `redacted_keys` and `leak_checked_keys`, so a reader of the artifact can see
    what was actually protected rather than trusting the boolean.
 
+   **WHAT IS NOT PROTECTED, precisely.** Redaction covers exactly two things:
+   a key some `env/registry/*.json` flags `"secret": true`, and a key named in
+   the manifest's explicit `redact_keys` / `secret_keys` (the composite and
+   non-component values — `DATABASE_URL`, `POSTGRES_PASSWORD`,
+   `CLICKHOUSE_PASSWORD`). **A key that is neither is written raw**, and no lane
+   goes red for it.
+
+   That is not hypothetical. The verifier added `VIZRA_S3_ACCESS_ID` the fully
+   correct way — registered in `env/registry/core.json`, declared in the
+   template, delivered by compose — but WITHOUT `"secret": true`, and its value
+   appeared 47 times across the 13 models with render, topology, coverage and
+   template-claims all exit 0. An AWS access key id is a credential and `_ID`
+   matches nothing, so `check-config-coverage.py`'s `unclassified-secret-key`
+   suffix net (`_PASSWORD`, `_SECRET`, `_TOKEN`, `_KEY`) does not catch it
+   either. That net is deliberately NOT widened here: one declared exception
+   beats a matcher nobody trusts, and the primary signal is meant to be the
+   component's own flag.
+
+   So the honest statement, and the one the operator-facing documents must
+   repeat rather than soften: **the component's `secret` flag is the control.**
+   A component that declares a credential without flagging it is a
+   component-side bug that this renderer cannot see, and the flag itself is
+   compared against the component's source only by
+   `check-config-coverage.py --drift`, which needs the component checkouts and
+   cannot run in CI.
+
    **A caller can only inject two of these.** `ci_overrides` is applied with
    `env.update()` AFTER the process environment is copied, so it overwrites
    `VIZRA_SESSION_SECRET`, `VIZRA_MFA_KEY_KEK`, `SEARCH_HMAC_KEY`,

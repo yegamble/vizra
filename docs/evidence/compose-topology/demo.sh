@@ -19,6 +19,24 @@
 #
 # It restores every file it touches, including on failure (trap), and it fails
 # loudly if a restore did not land.
+#
+# WHY HERE-STRINGS AND NOT `printf … | grep`. Every test below reads its
+# captured output with `grep … <<< "$out"`, and no reporting pipeline ends in
+# `head`. Both used to, and under `set -o pipefail` that is a race: `grep -q`
+# exits at its first match and closes the pipe, `printf` then takes EPIPE, and
+# pipefail propagates that non-zero through a pipeline whose grep MATCHED. The
+# `if` takes the else branch and the case reports `FAIL: expected exit 1 …,
+# got 1` — a required lane going red with no product cause, sending whoever
+# reads it hunting a regression that does not exist. The verifier hit it once in
+# a clean run at 9c4b5d3 (72/73) and could not reproduce it in isolation; it
+# fires under load, which a full run provides. A here-string is a file
+# descriptor, not a process, so there is no producer to signal. `head -N` is
+# gone for the same reason: it closes the pipe early on whatever feeds it.
+# Do not "simplify" either back.
+#
+# The fix must not make a condition unconditionally true, and does not: an
+# absent signal still returns 1 from `grep -qF`, so a genuinely broken guard is
+# still reported FAIL. That is demonstrated in the committed transcript.
 
 set -uo pipefail
 
@@ -87,22 +105,23 @@ expect() {
   rc=$?
   if [ "$rc" != "$want_rc" ]; then
     echo "    FAIL: expected exit $want_rc, got $rc"
-    printf '%s\n' "$out" | sed 's/^/      | /' | head -12
+    sed -n '1,12p' <<< "$out" | sed 's/^/      | /'
     FAILED=$((FAILED + 1)); return 1
   fi
-  if [ -n "$want_rule" ] && ! printf '%s\n' "$out" | grep -qF "$want_rule"; then
+  if [ -n "$want_rule" ] && ! grep -qF "$want_rule" <<< "$out"; then
     echo "    FAIL: exit $rc was right but the expected signal was absent:"
     echo "          wanted: $want_rule"
-    printf '%s\n' "$out" | grep -E 'VIOLATION|FAILED|UNEVALUABLE' | sed 's/^/      | /' | head -8
+    grep -E 'VIOLATION|FAILED|UNEVALUABLE' <<< "$out" | sed -n '1,8p' | sed 's/^/      | /'
     FAILED=$((FAILED + 1)); return 1
   fi
   echo "    ok  ($label: exit $rc${want_rule:+, signal \"$want_rule\"})"
-  printf '%s\n' "$out" | grep -E 'VIOLATION|FAILED TO RENDER|UNEVALUABLE|is not a valid DSN|is empty, but' \
-    | sed 's/^/      | /' | head -4
+  grep -E 'VIOLATION|FAILED TO RENDER|UNEVALUABLE|is not a valid DSN|is empty, but' <<< "$out" \
+    | sed -n '1,4p' | sed 's/^/      | /'
   PASSED=$((PASSED + 1)); return 0
 }
 
-case_header() { echo; echo "=============================================================="; echo "CASE $1"; echo "=============================================================="; }
+CASES=0
+case_header() { CASES=$((CASES + 1)); echo; echo "=============================================================="; echo "CASE $1"; echo "=============================================================="; }
 
 echo "vizra compose-topology red/green demonstrations"
 echo "date:  $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
@@ -372,29 +391,29 @@ case_header "10a — an INVALID external DSN"
 echo "    (no file is mutated: the DSN is supplied through the environment,"
 echo "     exactly as an operator's env file supplies it)"
 out="$(DATABASE_URL='hunter2' ./scripts/compose-render.py --shape prod-external-postgres --out "$MODELS" 2>&1)"; rc=$?
-if [ "$rc" = "1" ] && printf '%s\n' "$out" | grep -q 'DATABASE_URL is not a valid DSN'; then
-  if printf '%s\n' "$out" | grep -q 'hunter2'; then
+if [ "$rc" = "1" ] && grep -q 'DATABASE_URL is not a valid DSN' <<< "$out"; then
+  if grep -q 'hunter2' <<< "$out"; then
     echo "    FAIL: the message ECHOED the value. A DSN carries a password."
     FAILED=$((FAILED + 1))
   else
     echo "    ok  (exit 1, names the variable, does not echo the value)"
-    printf '%s\n' "$out" | sed 's/^/      | /'
+    sed 's/^/      | /' <<< "$out"
     PASSED=$((PASSED + 1))
   fi
 else
   echo "    FAIL: expected exit 1 with an actionable message, got $rc"
-  printf '%s\n' "$out" | sed 's/^/      | /'
+  sed 's/^/      | /' <<< "$out"
   FAILED=$((FAILED + 1))
 fi
 
 case_header "10b — a MISSING external DSN"
 out="$(DATABASE_URL='' ./scripts/compose-render.py --shape prod-external-postgres --out "$MODELS" 2>&1)"; rc=$?
-if [ "$rc" = "1" ] && printf '%s\n' "$out" | grep -q 'DATABASE_URL is empty'; then
+if [ "$rc" = "1" ] && grep -q 'DATABASE_URL is empty' <<< "$out"; then
   echo "    ok  (exit 1, names the variable and the overlay that requires it)"
-  printf '%s\n' "$out" | sed 's/^/      | /'
+  sed 's/^/      | /' <<< "$out"
   PASSED=$((PASSED + 1))
 else
-  echo "    FAIL: expected exit 1, got $rc"; printf '%s\n' "$out" | sed 's/^/      | /'
+  echo "    FAIL: expected exit 1, got $rc"; sed 's/^/      | /' <<< "$out"
   FAILED=$((FAILED + 1))
 fi
 
@@ -403,10 +422,10 @@ case_header "11 — a production shape rendered with the component checkouts ABS
 out="$(./scripts/compose-render.py --shape bundle-no-checkouts --out "$MODELS" 2>&1)"; rc=$?
 if [ "$rc" = "0" ]; then
   echo "    ok  (exit 0 - rendered from a tree containing no vizra-core, vizra-user or vizra-search)"
-  printf '%s\n' "$out" | sed 's/^/      | /'
+  sed 's/^/      | /' <<< "$out"
   PASSED=$((PASSED + 1))
 else
-  echo "    FAIL: expected exit 0, got $rc"; printf '%s\n' "$out" | sed 's/^/      | /'
+  echo "    FAIL: expected exit 0, got $rc"; sed 's/^/      | /' <<< "$out"
   FAILED=$((FAILED + 1))
 fi
 
@@ -420,13 +439,13 @@ d["shapes"] = [s for s in d["shapes"] if s["id"] != "prod-external-postgres"]
 json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
 PY
   out="$(./scripts/compose-render.py --all --out "$MODELS" 2>&1)"; rc=$?
-  if [ "$rc" = "1" ] && printf '%s\n' "$out" | grep -q "SHAPE FLOOR VIOLATION"; then
+  if [ "$rc" = "1" ] && grep -q "SHAPE FLOOR VIOLATION" <<< "$out"; then
     echo "    ok  (exit 1 - the floor refuses a smaller matrix)"
-    printf '%s\n' "$out" | sed 's/^/      | /' | head -6
+    sed -n '1,6p' <<< "$out" | sed 's/^/      | /'
     PASSED=$((PASSED + 1))
   else
     echo "    FAIL: expected exit 1 with a floor violation, got $rc"
-    printf '%s\n' "$out" | sed 's/^/      | /' | head -6
+    sed -n '1,6p' <<< "$out" | sed 's/^/      | /'
     FAILED=$((FAILED + 1))
   fi
   revert scripts/compose-shapes.json
@@ -570,7 +589,7 @@ if [ "$rc" = "0" ] && [ "$hits" = "0" ]; then
   PASSED=$((PASSED + 1))
 else
   echo "    FAIL: exit $rc, and the marker occurs $hits time(s) in the written models"
-  grep -rl "$MARKER" /tmp/vizra-redaction-demo 2>/dev/null | sed 's/^/      | /' | head -5
+  grep -rl "$MARKER" /tmp/vizra-redaction-demo 2>/dev/null | sed -n '1,5p' | sed 's/^/      | /'
   FAILED=$((FAILED + 1))
 fi
 rm -rf /tmp/vizra-redaction-demo
@@ -589,13 +608,13 @@ PY
   rm -rf /tmp/vizra-redaction-demo2
   out="$(./scripts/compose-render.py --all --out /tmp/vizra-redaction-demo2 2>&1)"; rc=$?
   written="$(ls /tmp/vizra-redaction-demo2 2>/dev/null | wc -l | tr -d ' ')"
-  if [ "$rc" = "1" ] && [ "$written" = "0" ] && printf '%s\n' "$out" | grep -q 'survived into the model'; then
+  if [ "$rc" = "1" ] && [ "$written" = "0" ] && grep -q 'survived into the model' <<< "$out"; then
     echo "    ok  (exit 1, $written model(s) written - it refused rather than write a less-redacted file)"
-    printf '%s\n' "$out" | grep -m2 'survived into the model' | sed 's/^/      | /'
+    grep -m2 'survived into the model' <<< "$out" | sed 's/^/      | /'
     PASSED=$((PASSED + 1))
   else
     echo "    FAIL: expected exit 1 with nothing written, got exit $rc and $written file(s)"
-    printf '%s\n' "$out" | sed 's/^/      | /' | head -6
+    sed -n '1,6p' <<< "$out" | sed 's/^/      | /'
     FAILED=$((FAILED + 1))
   fi
   rm -rf /tmp/vizra-redaction-demo2
@@ -783,13 +802,134 @@ PY
   revert docker-compose.yml
   expect "restored" 0
 }
+
+# ===========================================================================
+# CLOSING ROUND. Verifier findings S-1…S-7 and infrastructure NEW-2/NEW-3 at
+# 9c4b5d3. Every one of them is the same defect: a checker that matches TEXT,
+# described in this repository's own documents with a guarantee word. These
+# cases are what make the sentences true rather than softer.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# S-2. The four probes the verifier measured GREEN on 9c4b5d3 while always
+# exiting ZERO — so all three service_healthy gates onto PostgreSQL gated on
+# nothing — plus the disabled spelling. The old rule was
+# `must_invoke not in joined`, a substring test over the joined command line,
+# while docs/META_REPO.md and docs/quality/COMMANDS.md both said "invoke".
+# Each is applied to postgres, which api, worker and migrate gate on.
+#
+# What these cases do NOT establish, stated here so the transcript cannot be
+# read as more than it is: `["CMD-SHELL", "pg_isready --version"]` passes the
+# rule and always succeeds. Proving a probe can go RED needs a running
+# container, which is VZ-ISSUE-004's boot lane.
+probe_case() {
+  local id="$1" why="$2" probe="$3"
+  case_header "$id (S-2) — $why"
+  echo "    (rendered probe: $probe)"
+  export PROBE_JSON="$probe"
+  mutate docker-compose.yml <<'PY' && {
+import sys, os, re
+p = sys.argv[1]
+s = open(p).read()
+m = re.search(r'      test: \["CMD-SHELL", "pg_isready[^\n]*\n', s)
+assert m, "anchor not found"
+open(p, "w").write(s[:m.start()] + "      test: " + os.environ["PROBE_JSON"] + "\n" + s[m.end():])
+PY
+    expect "$why" 1 "rule=gated-probe-unrecognised service=postgres"
+    revert docker-compose.yml
+    expect "restored" 0
+  }
+}
+
+probe_case "26a" "a probe that always succeeds behind || true" \
+  '["CMD-SHELL", "pg_isready -U vizra || true"]'
+probe_case "26b" "the declared command demoted to a shell COMMENT" \
+  '["CMD-SHELL", "true # pg_isready"]'
+probe_case "26c" "a second statement after an unconditional exit 0" \
+  '["CMD", "sh", "-c", "exit 0; pg_isready"]'
+probe_case "26d" "the declared command ECHOED rather than run" \
+  '["CMD", "echo", "pg_isready"]'
+probe_case "26e" "the healthcheck DISABLED under a service_healthy gate" \
+  '["NONE"]'
+
+
+case_header "27 (S-1 / NEW-2) — known_false_probes EMPTIED while the paragraphs stand"
+echo "    (the direction three documents and the PR body claimed was enforced and"
+echo "     was not: the rule body sat inside \`if known_false and disclosure:\`, so"
+echo "     an empty list made it unreachable and the lane exited 0)"
+mutate scripts/compose-shapes.json <<'PY' && {
+import sys, json
+p = sys.argv[1]
+d = json.load(open(p))
+assert d["known_false_probes"], "the list is already empty; this case proves nothing"
+d["known_false_probes"] = []
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+PY
+  expect "the disclosure outlived the probes it describes" 1 "rule=known-false-stale-disclosure"
+  revert scripts/compose-shapes.json
+  expect "restored" 0
+}
+
+# ---------------------------------------------------------------------------
+# S-3. The script pass missed exactly the two spellings an operator-facing
+# document uses for a runnable script, and `unknown-script` could not fire at
+# all. Each of these replaces the same correctly-marked sentence in the
+# production template with a present-tense claim, as case 22 does for the bare
+# form.
+script_case() {
+  local id="$1" why="$2" text="$3" want="$4"
+  case_header "$id (S-3) — $why"
+  export SCRIPT_TEXT="$text"
+  mutate env/production.env.example <<'PY' && {
+import sys, os
+p = sys.argv[1]
+s = open(p).read()
+old = ("# latency and never data. Nothing backs the cache up today; backup.sh\n"
+       "# (VZ-ISSUE-004) will refuse to, and say why.")
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, "# latency and never data. " + os.environ["SCRIPT_TEXT"], 1))
+PY
+    expect "$why" 1 "$want"
+    revert env/production.env.example
+    expect "restored" 0
+  }
+}
+
+script_case "28a" "a PATH-form script reference, unmarked" \
+  './backup.sh refuses to back the cache up, and says so.' \
+  "rule=unmarked-future-script"
+script_case "28b" "a scripts/ -prefixed reference, unmarked" \
+  'scripts/backup.sh refuses to back the cache up, and says so.' \
+  "rule=unmarked-future-script"
+script_case "28c" "a BACKTICKED path form, unmarked" \
+  '`./backup.sh` refuses to back the cache up, and says so.' \
+  "rule=unmarked-future-script"
+script_case "28d" "an INVENTED script nobody declared" \
+  'rotate-secrets.sh rotates the cache credentials nightly.' \
+  "rule=unknown-script"
+
+case_header "28e (S-3) — a path form WITH its marker in the window stays GREEN"
+echo "    (the generalised matcher must not make correct documentation illegal:"
+echo "     the marker is one line below, inside MARKER_WINDOW)"
+mutate env/production.env.example <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = "(backup.sh, which will"
+assert old in s, "anchor not found"
+open(p, "w").write(s.replace(old, "(./backup.sh, which will", 1))
+PY
+  expect "./backup.sh with VZ-ISSUE-004 one line below" 0
+  revert env/production.env.example
+  expect "restored" 0
+}
 # ---------------------------------------------------------------------------
 echo
 echo "=============================================================="
-echo "RESULT: $PASSED assertion(s) passed, $FAILED failed"
+echo "RESULT: $PASSED assertion(s) passed, $FAILED failed, across $CASES case(s)"
 echo "final tree digest check:"
 dirty="$(git status --porcelain)"
-printf '%s\n' "$dirty" | sed 's/^/  /'
+sed 's/^/  /' <<< "$dirty"
 if [ -n "$dirty" ]; then
   echo "  !! THE TREE IS NOT CLEAN. Either a restore above did not land, or a"
   echo "     step before this one left a file behind. Both matter: this check is"

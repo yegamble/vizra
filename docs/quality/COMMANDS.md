@@ -283,9 +283,12 @@ Renders every shape in `scripts/compose-shapes.json` — the topologies
 `docs/META_REPO.md` §2 says Vizra supports; `--list` prints them — to one JSON model each, plus
 `shapes.json` carrying the manifest and the interpolation variables Compose
 reported. Before rendering anything it refuses a Compose below **2.24.4**
-(Q-017), failing closed on an unparseable version, and it validates any external
-DSN the chain requires with a message that names the variable and **never echoes
-the value**.
+(Q-017), failing closed on an unparseable version — that path is `require_floor`
+and is **not exercised by any demonstration**, because the harness runs on
+whatever Compose the host has; read it as code that has been reviewed, not as a
+control that has been seen to fire. It also validates any external DSN the chain
+requires with a message that names the variable and **never echoes the value**,
+which cases 10a and 10b do demonstrate, value check included.
 
 `bundle-no-checkouts` is rendered from a temporary tree built by copying in only
 what a deployment bundle ships — no `vizra-core`, `vizra-user` or `vizra-search`
@@ -316,6 +319,28 @@ that were written, and ten of the twelve models in the CI artifact for
 values were the obviously fake `ci-render-only-*`, so nothing real leaked; the
 defect was in the control. Demonstrations 18a and 18b are what keep it working.
 
+**What redaction covers, and what it does not.** Exactly two things are
+redacted: a key some `env/registry/*.json` flags `"secret": true`, and a key
+named in the manifest's explicit `redact_keys` / `secret_keys` (the composite
+and non-component values — `DATABASE_URL`, `POSTGRES_PASSWORD`,
+`CLICKHOUSE_PASSWORD`). **A key that is neither is written raw into the uploaded
+artifact, and no lane goes red for it.**
+
+That is measured, not theoretical. The verifier added `VIZRA_S3_ACCESS_ID` the
+fully correct way — registered in `env/registry/core.json`, declared in the
+template, delivered by compose — but without `"secret": true`, and its value
+appeared 47 times across the 13 models with every lane exit 0. An AWS access key
+id is a credential and `_ID` matches nothing, so `unclassified-secret-key`'s
+suffix net (`_PASSWORD`, `_SECRET`, `_TOKEN`, `_KEY`) does not catch it either.
+That net is deliberately **not** widened: one declared exception beats a matcher
+nobody trusts, and the primary signal is meant to be the component's own flag.
+
+So: **the component's `secret` flag is the control.** A component that declares
+a credential without flagging it is a component-side bug this repository cannot
+see, and the flag itself is compared against the component's source only by
+`check-config-coverage.py --drift`, which needs the component checkouts and
+**cannot run in CI**.
+
 The models are uploaded as the `meta-validate-compose-models` artifact.
 
 ### 5. The rendered topology is closed, capped and pinned
@@ -345,11 +370,12 @@ edit after a rule has already failed.
 | `dev-mode-in-production` / `dev-hatch-in-production` | the developer override leaking into a production chain |
 | `missing-mem-limit` | a long-running production service with no cgroup cap, so a burst is contained by the OOM killer's badness score instead — which picks PostgreSQL |
 | `probe-gates-readiness` | a `depends_on: service_healthy` edge onto a probe **declared** known-false: a gate that cannot go red is worse than no gate. **Scope:** it cannot tell a real probe from a fake one nobody declared |
-| `gated-probe-unrecognised` | the converse — a `service_healthy` target that is not in `gated_probes`, or whose probe no longer invokes the declared command. Without it, swapping `pg_isready` for `["CMD","true"]` left three gates pointing at nothing with the lane green |
+| `gated-probe-unrecognised` | the converse — a `service_healthy` target that is not in `gated_probes`, or whose **rendered** probe does not run the declared command *as its own command*. See the paragraph below for exactly what that means and what it still cannot show |
 | `unclassified-secret-key` | a registry key flagged `"secret": true` that is not in `redact_keys`, or a template key *named* like a secret that is neither. The renderer derives its redaction set from the same flag, so the value is never written — this makes the author classify it where a reader will look |
 | `stale-known-false-probe` | a known-false declaration matching no rendered service, so the list cannot rot into permanent cover |
 | `postgres-shm-floor` | postgres left on Docker's 64 MiB `/dev/shm`, which starts a cluster fine and fails parallel plans months later |
-| `known-false-undisclosed` | a known-false probe declared while the operator-facing disclosure is missing from a file that must carry it — it fails in both directions, so the list and the paragraphs are deleted together |
+| `known-false-undisclosed` | a known-false probe declared while the operator-facing disclosure is missing from a file that must carry it |
+| `known-false-stale-disclosure` | the other direction: `known_false_probes` emptied while a file still carries the disclosure, which would leave the template telling an operator to ignore a `healthy` column that has become trustworthy. The two rules together are why the list and the paragraphs are deleted in the same change — before the closing round only the first existed, and three documents said otherwise |
 | `profile-not-enumerated` | a `profiles:` name no shape renders. Everything else here reads a rendered model, so an unrendered profile is an **unasserted** one — this is the rule that makes "in any shape" mean "in any configuration" |
 
 `missing-healthcheck` treats four states explicitly — absent, disabled,
@@ -369,6 +395,36 @@ the same release record run different builds. A service absent from
 The port allowlist is keyed on `<published>/<protocol>`. A bare integer in the
 manifest means `tcp`; `ipfs` names 4001 on both. Before that it was keyed on the
 number alone, so an entry reading "may answer on 8080" also permitted 8080/udp.
+
+**`gated-probe-unrecognised`: what "run the declared command" means, and what it
+does not.** The check is structural and reads the **rendered** probe, which is
+why the real one survives — `pg_isready -U "${POSTGRES_USER:-vizra}" …` has
+already become `pg_isready -U "vizra" …` by the time the rule sees it.
+
+- `["CMD", argv…]` — `basename(argv[0])` must *be* the declared command.
+  `["CMD","echo","pg_isready"]` runs `echo`; naming the command in an argument
+  is not invoking it.
+- `["CMD-SHELL", s]` — `s` must contain none of `;` `|` `&` `#` `` ` `` `$(`
+  `<` `>` or a newline, and its first word must be the declared command. That is
+  a refusal list, not a shell parser: a gated probe has no business carrying a
+  pipeline, a comment, a redirection, a substitution or a second statement, and
+  refusing all of them is decidable from the string.
+- anything else — a bare string that survived rendering, `["NONE"]`, no
+  healthcheck at all — is refused rather than assumed to probe something.
+
+Red, each demonstrated by rule id: `["CMD","true"]`, `["NONE"]`,
+`pg_isready -U vizra || true`, `true # pg_isready`,
+`sh -c 'exit 0; pg_isready'`, `echo pg_isready`.
+
+**What it still cannot show.** That the command can exit **non-zero** —
+`["CMD-SHELL","pg_isready --version"]` passes this check and succeeds whatever
+PostgreSQL is doing — or that a binary with the right name is the real one
+rather than a wrapper earlier on `PATH`. Neither is decidable from a rendered
+model; both need a running container, which is VZ-ISSUE-004's boot lane. What
+the rule buys is a price change: killing a readiness gate now costs a change to
+the image, not one line of YAML that still mentions the right word. An earlier
+version of this rule was a **substring test** over the joined command line and
+two documents called it an invocation check; all four bypasses above passed it.
 
 **What this does NOT prove.** It proves what the *model* declares. It has never
 started a container, so it does not prove a service is healthy, that a probe
@@ -394,8 +450,15 @@ Every long-running service in a production shape declares
 | `clickhouse` | 1g | **not sized for the floor host** — enabling `analytics` on 4 GB is not a supported shape |
 | `ipfs` | 768m | likewise optional |
 
-**The default-shape caps sum to 4092 MiB on a 4096 MiB host, and that is
-deliberate** (plus `migrate` 256m transiently during a deploy). They are caps on *peak*, not reservations: nothing is set aside,
+**The default-shape caps sum to 4092 MiB on a 4096 MiB host. The
+*oversubscription* is deliberate; landing 4 MiB under physical RAM is a
+coincidence and not the number that matters** — realistic concurrent peak on the
+default shape is roughly **2.3 GB** (postgres ~250, the cache ~320 at its 256m
+`maxmemory` plus fragmentation, api 100–200, frontend 150–250, caddy 30–60,
+worker 800–1200 at concurrency 2 during an AVIF encode), against ~3500 MiB usable
+after Ubuntu 24.04 and dockerd. Sizing a larger host means scaling the *peak*,
+not the sum. (Plus `migrate` 256m transiently during a deploy.)
+They are caps on *peak*, not reservations: nothing is set aside,
 and these services do not peak together. The job they do is containment. Without
 a cgroup limit anywhere, a burst of concurrent libvips decodes exhausts RAM and
 the kernel OOM killer chooses by badness score — which on a Docker host is
@@ -478,12 +541,37 @@ as current. An alias is a standing compromise — a place an operator can
 believe they configured something they did not — so it has to be looked at
 rather than filed once.
 
+**What `--drift` compares.** Exactly the two fields of a `keys[]` entry that any
+checker consumes, because a field nothing reads is a field nothing can be wrong
+about:
+
+- **`name`**, by a coarse quoted-literal scan over the component's declared
+  `source_files`. It over-reports rather than under-reports.
+- **`secret`**, against the component's own source where the component states it
+  in a machine-readable form. `vizra-core`'s `internal/config/keys.go` writes
+  `{Name: "…", Secret: true, …}`, so all 22 of its snapshot keys are compared.
+  `vizra-search` and `vizra-user` carry **no** such marker, so their flags are
+  reported **UNCHECKED on every run** — named, with the count of keys they flag
+  — rather than rounded up into "matches".
+
+The flag is on that list because it is load-bearing: `scripts/compose-render.py`
+derives its redaction set from it, so a snapshot that quietly drops a
+`"secret": true` narrows what is kept out of the uploaded artifact. Until the
+closing round nothing compared it, and deleting the flag from
+`VIZRA_SESSION_SECRET` still reported *every snapshot matches its component
+source*.
+
+`required`, `default`, `delivered_by` and `reason` are documentation for a human
+reader. Nothing reads them, so nothing validates them and this check does not
+pretend to.
+
 **What a green result does NOT prove.** It proves the topology is consistent
 with the snapshots. It does **not** prove the snapshots are current: this
 repository's CI has no token to check out a private sibling repository, so
-`--drift` — the check that compares a snapshot against the component's live
-source — **cannot run in CI at all** and reports BLOCKED, exit 2, when a
-checkout is absent. See `env/registry/README.md`.
+`--drift` — **including the secret-flag comparison above** — **cannot run in CI
+at all** and reports BLOCKED, exit 2, when a checkout is absent. Drift is a
+local control; the only secret-classification rule CI enforces on every run is
+`unclassified-secret-key`. See `env/registry/README.md`.
 
 ### 7. No operator-facing file names a command that does not exist
 
@@ -493,12 +581,22 @@ checkout is absent. See `env/registry/README.md`.
 
 Run it to see the current counts of shipped commands, declared future commands
 and scripts. Scans `env/*.env.example` and `docker-compose*.yml` comments. A backticked
-`vizra <sub>` must be a shipped command or a declared future one; a **shell
-script** (`backup.sh`, `restore.sh`, `install.sh`, `bootstrap.sh`, `deploy.sh`,
-`rollback.sh`) must exist in the tree or be declared in `env/registry/meta.json`
-`future_scripts`; a declared
+`vizra <sub>` must be a shipped command or a declared future one; a declared
 future command named anywhere must carry its declared marker **within 2 lines**,
 so a promise carries its own qualifier rather than borrowing a neighbour's.
+
+**Any `*.sh` token** is a script reference, with or without backticks and with
+or without a path prefix — `backup.sh`, `./backup.sh`, `scripts/backup.sh`,
+`` `./backup.sh` ``. It must exist in the tree (looked for as written and under
+`./`, `scripts/` and `deploy/`), or be declared in `env/registry/meta.json`
+`future_scripts` **with its marker in the window**; anything else is
+`unknown-script`. The first version of this pass listed six names and excluded
+`.` and `/` in a lookbehind, so the two spellings an operator-facing document
+actually uses for a runnable script both passed unmarked — and because the six
+matchable names were exactly the six declared future, `unknown-script` could not
+be tripped by any documentation edit at all. A rule id that cannot fire is a
+control that does not exist. It fires now: an invented `rotate-secrets.sh`
+is red.
 
 The sentence this exists to refuse shipped in the production template:
 
@@ -529,9 +627,34 @@ prints a sha256 either side of its mutation and **refuses to score a case whose
 mutation did not apply** — otherwise a mutation that silently failed would run
 the checker against the unmodified tree, pass, and be recorded as a guard that
 caught something. It restores every file it touches and fails if the tree is not
-byte-identical afterwards; the run prints its own totals, and the committed
-transcript under `docs/evidence/compose-topology/` records them for the code
-commit it names.
+byte-identical afterwards; the run prints its own totals — assertions **and
+case count**, both counted by the harness — and the committed transcript under
+`docs/evidence/compose-topology/` records them for the code commit it names.
+Read the counts off the `RESULT:` line rather than counting `case_header`, which
+was off by one in three successive PR bodies because it counts the function
+definition too.
+
+**Not every rule id has a red demonstration, and the tables above do not say so
+on their own.** Sixteen of the 42 declared rule ids across the three checkers
+have never been seen to fire; they are asserted by code review only, and a
+reader deciding what this lane proves needs that distinction. The full list,
+with the claim each one backs, is
+`docs/evidence/compose-topology/CLAIMS.md` — regenerate it with
+`python3 docs/evidence/compose-topology/claims.py` when a rule or a document
+moves, and it recomputes the mapping from `demo.sh` rather than trusting a hand
+count.
+
+No condition in the harness reads its captured output through a pipe. Every one
+uses a here-string, and no reporting pipeline ends in `head`: under
+`set -o pipefail`, `printf … | grep -q` is a race — `grep -q` exits on its first
+match, `printf` takes EPIPE, and pipefail propagates that through a pipeline
+whose grep matched, so a correct guard is reported `FAIL: expected exit 1 …,
+got 1`. It is fail-closed (the `ok` branch requires the pipeline to succeed), but
+a required lane that can go red with no product cause is a defect in the lane.
+`scripts/ci-required-guard.sh` (lines 80, 249, 348, 423, 440) and
+`scripts/ci-required-select.sh` (line 56) still carry that shape; they are
+outside this slice's diff and are recorded here as a follow-up rather than
+edited alongside the thing they guard.
 
 ## Red/green demonstrations
 
