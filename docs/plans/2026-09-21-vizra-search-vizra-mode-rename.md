@@ -101,10 +101,11 @@ local run carries no acceptance claim (ADR-009 / Q-027).
 
 ## Progress and evidence
 
-READY_FOR_REVIEW. PR https://github.com/yegamble/vizra-search/pull/4, head
-`852b38291c3ec8109f27ebd924ef48eec3b11a9d` (three commits: the rename +
-demonstration, a bounded `docker-build` refusal step, an `AGENTS.md` scope-note
-line). Base `3619fed`. Host
+READY_FOR_REVIEW, fix round 1 of 2 applied. PR
+https://github.com/yegamble/vizra-search/pull/4, head
+`6a02ab2975a6f5c4da49b5af62b9822ead2e885e`. Round 1 verdict was FAIL at
+`852b38291c3ec8109f27ebd924ef48eec3b11a9d` on acceptance bullet 5 only — see
+"Fix round 1" below. Base `3619fed`. Host
 darwin/arm64, go1.27.1, Docker 29.8.0, gh 2.98.0 — all present at preflight;
 nothing was BLOCKED.
 
@@ -146,6 +147,46 @@ restoring the pre-mutation digest
   verified only by `ci-required` on the PR head.
 - `make vendor-contract` / `vendor-contract-selftest` — out of scope; nothing
   vendored changed.
+
+### Fix round 1 (verifier FAIL at `852b382`, acceptance bullet 5 only)
+
+Verdict evidence: `docs/evidence/warroom/2026-09-21-vizra-search-pr4-vizra-mode-rename-VERIFY.md`.
+Everything behavioural reproduced; all three findings were documentation
+standing stronger than its controls. New head `6a02ab2`, commits on top of
+`852b382` (no amend, no force-push).
+
+- **FINDING 2 / chair's ruling (reverses the brief's recommendation).**
+  `SearchTopologyValues`, `TestTheTopologyVocabularyIsPinnedToCore` and every
+  sentence about pinning or a vocabulary shared with core are deleted.
+  `VIZRA_SEARCH_MODE` is now refused ONLY for the old runtime vocabulary; every
+  other value — core's, unknown, whitespace-only, empty — is ignored in
+  silence. The accepted cost (a typo boots PRODUCTION, the strict mode) is
+  stated in AGENTS.md and held by
+  `TestNoValueInTheOldNameCanEverProduceDevelopment`,
+  `TestAnUnknownRetiredNameValueBootsProduction`, two matrix rows and the new
+  mutation `unknown-value-as-development`.
+- **FINDING 1.** `TestNoRefusalEchoesTheSuppliedValue` drives every refusal path
+  in the loader with a runtime-assembled marker (and checks `Config.String()` /
+  `LogValue()` for an ignored value); every matrix refusal row greps the process
+  output for the value it supplied, with the two vocabulary words exempt exactly
+  as spelled — hence the `  DeVeLoPmEnT  ` row. New mutation `echo-the-value`
+  turns both red, by name.
+- **FINDING 3 (NIT).** The `docker-build` retired-name step now requires the
+  container output to name both variables; the exit-0 and exit-124 branches are
+  unchanged.
+
+Matrix grew 13 → 20 boot cases. Lanes re-run: `make ci` 0 (contract-drift 356
+tests / 4 pkgs / 0 deselected; test-noskip **384 pass events, 0 skips**),
+`govulncheck` 0, `ci-required-guard.sh` 0, `check-workflows.py` 0, `shellcheck`
+0, boot matrix 21/21, five mutations red for their declared reasons, restore
+digest `84f2c1fe25e5c49dd46d6428bb530f92c6c1c64d1891b45572938c19e226fc73`.
+
+Sentences removed (all were stronger than their controls): "core adding a
+topology value must update it here in the same release … is where the list is
+pinned"; the `off | managed | external` enumeration in `AGENTS.md`'s table, the
+`README.md` line, the `EnvSearchTopology` doc comment and both refusal messages;
+"anything else, whitespace-only included → boot refusal"; and the original
+decision 2 in the PR body.
 
 ## Blockers and handoff
 
