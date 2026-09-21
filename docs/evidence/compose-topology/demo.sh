@@ -389,9 +389,13 @@ echo
 echo "=============================================================="
 echo "RESULT: $PASSED assertion(s) passed, $FAILED failed"
 echo "final tree digest check:"
-git status --porcelain | sed 's/^/  /'
-if [ -n "$(git status --porcelain)" ]; then
-  echo "  !! the tree is not clean; a restore did not land"
+dirty="$(git status --porcelain)"
+printf '%s\n' "$dirty" | sed 's/^/  /'
+if [ -n "$dirty" ]; then
+  echo "  !! THE TREE IS NOT CLEAN. Either a restore above did not land, or a"
+  echo "     step before this one left a file behind. Both matter: this check is"
+  echo "     what proves the mutations were reverted, and it cannot tell the two"
+  echo "     apart, so anything untracked has to be accounted for."
   exit 1
 fi
 echo "  tree is clean - every mutation was reverted"
