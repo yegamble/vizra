@@ -2727,3 +2727,65 @@ PASS is not a merge and not VERIFIED — the chair records those. My recommendat
 is that VZ-FOUND-008 may be recorded VERIFIED on this evidence, with findings 12,
 13 and 14 carried as dependency-ready follow-ups, and with the two inaccurate
 AGENTS.md paragraphs corrected in whichever PR lands first.
+
+---
+
+# Confirmation at 3b566c3
+
+**Verdict: PASS. Docs-only confirmed mechanically. Merge condition CLOSED.**
+
+`c669e40` is an ancestor. Diff is exactly 4 files — `AGENTS.md`,
+`docs/evidence/VZ-FOUND-008/README.md`, `e2e/harness/browser-errors.ts`,
+`scripts/ci/harness-canary.mjs`. No `.json`, `.yml` or `.sh`.
+
+**1. Nothing executable changed.** Both code files were parsed with the
+repository's own TypeScript and re-printed from the AST with
+`removeComments: true` (comments are trivia, so the emitted text is executable
+content only, formatting-normalised), then compared:
+
+```
+browser-errors.ts   IDENTICAL executable content   (218 lines printed, both sides)
+harness-canary.mjs  IDENTICAL executable content   ( 92 lines printed, both sides)
+```
+
+Independently: every added **and** removed line in those two files is a comment
+or blank. Full re-verification is not required.
+
+**2. The corrected sentences are exactly true against what I measured.**
+
+| Claim now made | Against my measurement |
+|---|---|
+| residual is "a CONTEXT OR BROWSER THE HARNESS WAS NEVER HANDED", own-property wrapping named as the mechanism | exact |
+| the three import-free routes, each "unguarded", each passing the complete gate with `20 passed, floor OK (10/9 10/9), stamp OK (20 verified)`, out-of-process 0 | exact, including the numbers |
+| prototype `newPage` **is** guarded, because it calls `this.newContext` | exact |
+| "**Nothing catches these today**" — not the rule, stamp, floor, canary or parser; review only | exact |
+| the previous paragraph ("importing a Playwright package… the rule catches it") is labelled **false** | correct |
+| redaction covers "query strings and fragments on URLs that carry a scheme or start at `/`, and `Location`" — **not** scheme-less `host:port/path?query` | exact; the three-line reduction is reproduced verbatim |
+| D9 "does not exercise this path, and does not claim to" — sub-resource, never a step subtitle | exact |
+| the fix is queued under the existing no-authenticated-spec rule, "Not done here" | correct |
+| canary covers three of four kinds; neutering `requestfailed` leaves it green | exact |
+| flush window: `0 ms` caught, **50 ms and 150 ms missed**, called inherent | exact |
+| `request`-fixture 4xx out of scope, and the guard header re-scoped to "HTTP >= 400 response **observed by a browser context**" | exact, and a genuine tightening |
+
+No sentence overstates. The one absolute that remains on the page (line 379) is
+the old claim quoted in order to be called false — correct. One mild
+**understatement**: line 612 still says the guard covers "D13, eight shapes";
+I measured **eleven** red shapes (the eight plus a page created in `beforeAll`,
+an iframe inside a popup, and a context closed before the test ends). Harmless,
+worth a number bump whenever that file is next touched.
+
+**3. CI on 3b566c3**: `ci-required`, `contract`, `deps-scan`, `docker-build`,
+`e2e`, `frontend`, `guard`, `image-scan` all **success**; `ci-required`
+enumerated `e2e`, waited three polls, and logged `OK: every required check on
+3b566c3b057a9a9a6748393000b4a3461ded2d49 concluded success.` GitGuardian remains
+the two historical findings from `951f18b`.
+
+**Acceptance bullet.** VZ-FOUND-008 — "the Playwright harness runs in CI against
+the production build image on desktop and mobile projects, and a console or
+network error fails the lane (demonstrated)" — **is met by my own evidence**:
+reproduced at c669e40 from a clean clone (18 passed at 1440 px and 390 px
+against the built image, floor 9/9 9/9, 18 stamps, 88/88 demonstration halves)
+and unchanged here, since nothing executable moved.
+
+Findings 12, 13 and 14 remain OPEN as documented, queued follow-ups — now
+stated accurately in the contract rather than contradicted by it.
