@@ -663,3 +663,382 @@ and restored; `git status --porcelain` is empty at the end of this verification.
 The FINDING 1 reproduction is the spec quoted in that finding: drop it in
 `e2e/specs/`, start the production server, and run
 `npx playwright test --project=desktop-chromium-1440 <file>` — it passes.
+
+---
+
+# Re-verification at `07f2c6e` — 2026-09-21
+
+| | |
+|---|---|
+| Head SHA verified | `07f2c6e0d9e083760c316b6b7032b5b0cf2e73ae` (confirmed by `gh api` at start) |
+| Previous verdict | FAIL at `7730500` (FINDING 1: `beforeAll` navigation escaped the test-scoped guard) |
+| Clone | fresh `mktemp -d` directory, never the builder's checkout; `git status --porcelain` empty |
+| Environment | macOS arm64 native, Node v22.14.0, npm 10.9.2, Playwright 1.63.0, Docker 29.8.0, 28 GiB free |
+
+## R0. Baseline counts at this SHA
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm ci` | 0 | clean |
+| `npm run ci` | 0 | **15 files / 355 tests / 0 skipped**; build OK |
+| `npx playwright test` | 0 | **18 passed**, floor `9/9 9/9`, **18 stamps** |
+| `bash scripts/ci/require-checks_test.sh` | 0 | 102 cases / 109 assertions / 0 failed |
+| `bash scripts/ci/check-e2e-lane.sh` | 0 | — |
+
+## R1. My FINDING 1 reproduction, verbatim — now RED
+
+The spec is byte-for-byte the one quoted in FINDING 1 (`browser.newPage()` in
+`test.beforeAll`, `makeBroken`, read-only body). `tsc` exit 0, `eslint` exit 0 —
+still lint-green and type-green, as an honest spec would be.
+
+`npx playwright test` → **1 failed**, and the message names the cause:
+
+```
+3 BEFORE THE TEST BODY — a hook (beforeAll/beforeEach) or a page shared with an
+earlier test produced these, and the page was already in this state when the test started:
+  [response]  http 404: GET …/__vizra_verifier__/definitely-missing.bin
+  [console]   console.error: Failed to load resource: … 404 (Not Found) …
+  [pageerror] pageerror: VZ-VERIFIER-UNCAUGHT-EXCEPTION
+```
+
+**FINDING 1 is closed, and the failure names the phase.**
+
+## R2. Attacking the NEW boundary (worker scope)
+
+Every probe below is a spec in `e2e/specs/` importing only the harness `test`,
+on the same broken-page body (404 sub-resource + uncaught throw). `tsc` exit 0
+throughout.
+
+| # | Probe | Lint (shipped) | Runtime | Verdict |
+|---|---|---|---|---|
+| A | `browser.newContext()` + navigate in `beforeAll` | 0 errors | **1 failed**, `BEFORE THE TEST BODY` | **caught, named** |
+| B | `afterAll` navigates a broken page; every test passes | 0 errors | exit **1**, `1 passed` + *"1 error was not a part of any test"* | **caught** (late edge) |
+| C | dirty `beforeAll`, only test `test.skip(…)` at declaration | 0 errors | exit 0, `1 skipped` | **vacuous** — Playwright does not run `beforeAll` when every test is declaration-skipped; no page was ever opened |
+| C2 | dirty `beforeAll`, test skips **at runtime** (`test.skip(true, …)` in the body) | 0 errors | **1 failed**, `BEFORE THE TEST BODY` | **caught, named** |
+| C3 | dirty `beforeAll`, one declaration-skipped test + one real test | 0 errors | **1 failed** 1 skipped, `BEFORE THE TEST BODY` | **charged to the real test** |
+| D | spec-defined **auto worker fixture** launching its own browser | 2 errors | **1 failed**, ``vizra harness: `chromium.launch` `` | **refused** — Playwright resolves `vizraWorkerGuard` before a spec's own auto worker fixture, so the launch happens while armed |
+| E | `test.describe.configure({ mode: "parallel" })` + dirty `beforeAll` | 0 errors | **2 failed**, `BEFORE THE TEST BODY` | **caught in every parallel slice** |
+| F | test 1 dirties a shared page and passes its own assertions; test 2 innocent | 0 errors | **1 failed** (test 1) 1 passed | **charged to the test that dirtied it** |
+| G | one-shot fault: attempt 1 dirty, retry clean (`--retries=1`) | 0 errors | exit **1**, `1 flaky` | **`failOnFlakyTests: true` means a flaky pass cannot hide a real error** |
+| I | a **setup project** (`dependencies: ["vzsetup"]`) opening a broken page | n/a | exit **1**, the setup project's own test fails with `[response] http 404` | **caught** — a setup project's tests are guarded like any other |
+| H | **`globalSetup`** launching its own browser and opening a broken page | n/a (outside the lint glob) | exit **0**, `3 passed`, **no guard message** | **SILENT** — see FINDING 6 |
+
+The `globalSetup` probe was proved to have actually executed (it wrote a marker
+file: `globalSetup ran; images=1`), so the green lane is a real miss, not a
+probe that never ran. Reaching it requires editing `playwright.config.ts` — a
+CODEOWNERS path — so it is *not* reachable from a spec.
+
+## R3. The late edge: can the lane launder the exit code?
+
+`npm run e2e` is exactly `playwright test` (no flags). Mutating
+`.github/workflows/e2e.yml`:
+
+| Mutation | `check-e2e-lane.sh` |
+|---|---|
+| `run: npm run e2e \|\| true` | **exit 1** — *"`npm run e2e` and nothing else — a superstring such as `npm run e2e \|\| t…`"* |
+| `continue-on-error: true` on that step | **exit 1** |
+| `if: false` on that step | **exit 1** — *"it must run unconditionally on every pull request"* |
+
+No reporter can change Playwright's exit code, and the workflow passes no CLI
+flags. **The workflow cannot launder a non-zero exit.** But see FINDING 7: the
+*guard on the guard* can be defeated, which is where the late edge is actually
+soft.
+
+## R4. "Stamped ⟹ guarded" — five attacks on the brand
+
+| Attack | Lint | Runtime |
+|---|---|---|
+| `test.extend({ vizraWorkerGuard: <no-op look-alike> })` | **1 error** | **1 failed**, *"the worker-scoped guard `vizraWorkerGuard` was replaced"*; `harness stamp: OK (0 …)` — **no stamp issued** |
+| `test.extend({ vizraWorkerGuard: async ({vizraWorkerGuard: real}) => provide({...real}) })` (spread copy) | **1 error** | **1 failed**, same refusal — a copy is not in the `WeakSet` |
+| second module instance via a **symlinked directory** (`e2e/harness2 -> harness`) | **2 errors** | **1 failed** on the broken page — the symlink realpaths to the same module, so the brand and the guard still apply |
+| **re-export shim** inside `e2e/harness/` (the lint-exempt directory) | **2 errors** | **1 failed** on the broken page — same module instance |
+| copying the stamp annotation | (covered at `7730500`) | no bypass: the stamp is per-test and signed |
+
+The brand check runs **before** the stamp is written, so a replaced worker
+fixture costs the stamp, which both floor checks refuse. **No bypass found.**
+
+## R5. F3 — the eleven lane checks, three mutation flavours
+
+For each symbol: remove the CALL (rename the call site, keep the import and an
+alias so the identifier survives), then re-add the name in two shapes.
+
+| Symbol (file) | call removed | + trailing `// sym(...)` | + string `"sym("` |
+|---|---|---|---|
+| `validatePolicy`, `unallowedRecords`, `claimSigner`, `createWorkerHarness`, `isGenuineWorkerHarness`, `unguardedContexts`, `formatOrphans` (`e2e/harness/test.ts`) | **RED, named** | **green** | **green** |
+| `guardBrowser`, `armCreationGuard`, `patchBrowserPrototype` (`e2e/harness/worker-guard.ts`) | **RED, named** | **green** | **green** |
+| `STAMP_ANNOTATION` (presence, not a call) | green | green | green |
+
+**The original FINDING 3 is fixed for the plain case — all ten call checks are
+RED and named.** But `withoutComments` strips a line comment only when `//` is
+the first non-whitespace on its line, and does not touch strings, so a trailing
+comment or a string literal re-satisfies every one of them. Its own header says
+this "can only make the patterns match LESS, i.e. fail closed" — measured, it
+fails **open** in both shapes. See FINDING 7.
+
+## R6. Regression sweep at this SHA
+
+| Item | Result |
+|---|---|
+| F12 route 1 `Object.getPrototypeOf(browser).newContext.call(browser)` | lint-green (by design), **RED at runtime** with 3 records |
+| F12 route 2 `browser.browserType().launch()` | lint 2 errors; **RED**, ``chromium.launch`` |
+| F12 route 3 `chromium.launchPersistentContext(dir)` | lint 1 error; **RED**, ``chromium.launchPersistentContext`` |
+| (all three under my mutant config with `bannedMethods: []` — **0 lint errors**) | the runtime layer alone is doing the work |
+| **my FINDING 2** `browser.newBrowserCDPSession()` | lint **1 error**; **RED**, ``vizra harness: `browser.newBrowserCDPSession` `` — **CLOSED** |
+| F14: neuter `console` / `weberror` / `requestfailed` / `response` | canary **exit 1** each, naming `console-error` / `uncaught-exception` / `aborted-request` / `failed-request`; restored → exit 0 |
+| `SETTLE_MS` | still `250` |
+| settle table (my own six-delay probe) | 0/50/150/250 **caught**; 400 not charged to its own test; 600 as below |
+| shipped `late-fault.demo.ts` | `RED:` half **fails**, `LIMIT:` half **passes** — both as documented |
+
+**On the 600 ms row.** In my six-delay probe `WINDOW 600` went red and
+`WINDOW 400` green — which looks like the table is wrong until you read the
+prose beside it. It is not: `WINDOW 400`'s fault fired during `WINDOW 600`'s
+window and was charged there (`BEFORE THE TEST BODY`), and `WINDOW 600`'s own
+fault never fired because the browser had closed. AGENTS.md states exactly that:
+*"not charged to THAT test; if a later test in the same worker is still running
+it is charged to that one, and if the worker has finished it fails the run — but
+if the browser has already closed, nothing observes it at all."* **Accurate.**
+
+### Hygiene
+
+- Every test / spec / demo / rule file is `+N/−0` except
+  `eslint-rules/no-unguarded-playwright-import.test.mjs` at `+129/−1`; the one
+  deleted line is `const HARNESS_FIXTURES = ["vizraHarnessGuard", "vizraHarnessStamp", "browserErrorPolicy"];`,
+  replaced by a longer list that adds `vizraWorkerGuard`. Assertions go **59 → 73**, 71 tests pass. **Nothing weakened.**
+- `git diff --diff-filter=D`: **no file deleted** anywhere in the PR.
+- No `.skip` / `.only` / `.fixme` anywhere in the tree.
+- **Hard rule:** no spec or demo authenticates, fills a credential, or touches a
+  signed URL. The only `token` hits are the demos' `FIXTURE_TOKEN` marker string
+  and prose; there is no `.fill(`, no `storageState`, no cookie write, no
+  `X-Amz`/`sig=`. The repo's own tripwire
+  (`e2e/harness/no-credentials-in-specs.test.ts`) passes, 10/10.
+
+## R7. CI on `07f2c6e`
+
+All **8** check-runs `completed` / `success`; none skipped, cancelled or timed out.
+`ci-required` finished `07:03:10`, **after** `e2e` at `07:03:05` — it waited.
+
+Manifest `frontend, contract, ?guard, ?docker-build, e2e` vs what ran:
+`frontend` ✓ `contract` ✓ `guard` ✓ `e2e` ✓; `?docker-build` is `?`-optional,
+path-filtered, and no Dockerfile path is touched — and the `e2e` lane builds the
+image itself (`docker build --tag vizra-user:e2e .` in the log). **No
+listed-but-unexecuted required lane.**
+
+The `e2e` job log carries `18 passed`,
+`coverage floor: OK (desktop-chromium-1440=9/9 mobile-chromium-390=9/9)`,
+`harness stamp: OK (18 succeeding result(s)…`,
+`OK: the harness canary failed all 4 fault-injection fixtures`, and **zero**
+`not a part of any test` orphans.
+
+## R8. Demonstrations, determinism, transcripts
+
+| Check | Result |
+|---|---|
+| `npm run e2e:demos` | exit **0** — `halves passed: 123, halves blocked: 0, halves failed: 0` |
+| 10 × `npx playwright test --workers=2` under **full 8-core CPU contention** | **10/10 exit 0**, `18 passed`, floor OK, 18 stamps, **0 orphans** every run (10.5–43.4 s) |
+| transcript reproducibility after my run, from a *different checkout path* | **6** of 123 differ, not 4 |
+
+The two beyond the builder's declared four are benign and explained:
+`environment.txt` records `branch`/`head sha` by design (mine is a detached HEAD
+at `07f2c6e`; the committed copy was written at `7730500`), and
+`server-production.log` records a per-build Next.js build id. My round-1
+FINDING 5 (95 files of churn) is substantially fixed.
+
+## Status of my earlier findings at `07f2c6e`
+
+| # | Round-1 finding | Now |
+|---|---|---|
+| 1 | `beforeAll` navigation escapes the guard | **CLOSED as a control** — verbatim spec RED, phase named; 10 further boundary probes all caught, named or correctly refused |
+| 2 | `browser.newBrowserCDPSession()` silent | **CLOSED** — refused at runtime, added to the lint ban |
+| 3 | four `includes()` lane checks | **fixed for the plain case** — all ten call checks RED and named; residual in FINDING 7 |
+| 4 | `stamp.ts` overstated the key file's unreadability | **CLOSED** — reworded to exactly what I measured, including "which was false as written" |
+| 5 | demo transcripts not reproducible | **substantially fixed** — 95 → 6 |
+
+## Findings at `07f2c6e`
+
+```
+FINDING 6: a `globalSetup` that opens a broken page is observed by nothing,
+           and no document names the gap
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     e2e/harness/worker-guard.ts (listening begins at worker setup)
+             playwright.config.ts (no `globalSetup` key today)
+             scripts/ci/check-e2e-lane.mjs (does not refuse one)
+             AGENTS.md § Residuals (no mention: `grep -ic globalsetup` = 0)
+  requirements: VZ-FOUND-008
+
+Observed:
+  Adding `globalSetup: "./e2e/harness/vz-globalsetup.ts"` to playwright.config.ts,
+  where that module launches its own Chromium and opens a page that 404s a
+  sub-resource and throws: `npx playwright test` exits **0**, `3 passed`, with no
+  guard message. The globalSetup provably ran — it wrote a marker file reading
+  `globalSetup ran; images=1`. `bash scripts/ci/check-e2e-lane.sh` also exits 0.
+  A setup PROJECT (`dependencies: [...]`) is by contrast fully covered: its tests
+  are guarded like any other and mine failed with `[response] http 404`.
+
+Failure:
+  `globalSetup` runs in the Playwright main process before any worker exists, so
+  the worker-scoped listening cannot cover it and the creation guard is unarmed.
+  Nothing refuses it and nothing names it as open.
+
+Perspective: developer
+
+Recommendation:
+  Smallest fix: one Residuals bullet. Cheap hardening if wanted: have
+  `check-e2e-lane.mjs` refuse a `globalSetup`/`globalTeardown` key in
+  playwright.config.ts, since the repository has no use for one.
+
+Acceptance criteria:
+  Either a `globalSetup` key fails `check-e2e-lane.sh` by name, or AGENTS.md
+  names globalSetup/globalTeardown as outside the guard.
+
+Tests: `scripts/ci/require-checks_test.sh` gains one case.
+Cross-repo implications: core: none | user: as above | search: none | meta: none
+
+Challenge:
+  This is NOT reachable from a spec — it needs an edit to playwright.config.ts,
+  a CODEOWNERS path, which puts it in the same accepted-by-design class as
+  "a file under e2e/harness/** can edit the guard". By the chair's own split it
+  is a disclosure gap, not a hole.
+```
+
+```
+FINDING 7: the lane's harness checks are still satisfied by a trailing comment
+           or a string, and that grep is the late edge's only named guard
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     scripts/ci/check-e2e-lane.mjs:525-529 (`withoutComments`), :440-509 (HARNESS_CALLS)
+             e2e/harness/test.ts (the `formatOrphans` orphan assertion)
+             PR #7 round-7 comment: "greps the assertion by call so deleting it is not silent"
+  requirements: VZ-FOUND-008
+
+Observed:
+  `withoutComments` strips a line comment only when `//` is the first
+  non-whitespace on its line, and never touches strings. Measured over all ten
+  call checks: with the CALL removed, `check-e2e-lane.sh` is RED and names the
+  symbol — but re-adding the name as a TRAILING comment (`const x = 1; // guardBrowser(browser)`)
+  or as a string (`const s = "guardBrowser(";`) returns it to **green, 10/10**.
+  Its own header asserts the opposite: "this can only make the patterns match
+  LESS, i.e. fail closed."
+
+  End to end on the one control the canary cannot cover: delete the orphan
+  assertion in `e2e/harness/test.ts`, leave a trailing comment naming
+  `formatOrphans` —
+      tsc exit 0 | check-e2e-lane.sh exit 0 | harness-canary exit 0
+      the `afterAll`-broken-page spec now PASSES (exit 0), where it failed before.
+  Blast radius is limited: with a later test still to run in the worker the
+  records leak forward and are charged to it (measured — `home.spec.ts` failed
+  with "BEFORE THE TEST BODY"). Only a dirty `afterAll` that is the last thing a
+  worker does goes fully silent.
+
+Failure:
+  The late edge's stated cost is "the out-of-process check does not see this
+  case, so check-e2e-lane greps for the assertion by call". That grep is
+  defeatable by a trailing comment, so the compensating control is weaker than
+  the sentence claims.
+
+Perspective: developer
+
+Recommendation:
+  Strip trailing line comments and string literals before matching (or match on
+  a parsed AST). Then correct the round-7 comment's sentence.
+
+Acceptance criteria:
+  For each of the ten symbols, all three flavours — call removed; call removed +
+  trailing comment; call removed + string — are RED and name the symbol.
+
+Tests: `scripts/ci/require-checks_test.sh` gains the trailing-comment and
+  string flavours for at least `formatOrphans` and `guardBrowser`.
+Cross-repo implications: core: none | user: as above | search: none | meta: none
+
+Challenge:
+  Defeating it requires editing `e2e/harness/test.ts`, a CODEOWNERS path, by
+  someone who also chooses to leave a decoy comment — i.e. deliberate evasion,
+  not an honest builder's mistake. It is a guard on a guard, and my round-1
+  FINDING 3 in the same class was ruled next-slice.
+```
+
+```
+FINDING 8: the PR body still describes round 6 and is wrong for this head
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     PR #7 description
+  requirements: VZ-FOUND-008
+
+Observed:
+  The body's "What passed" table says `14 files / 341 tests` and
+  `104 halves` — at this head it is `15 files / 355 tests` and `123 halves`. Its
+  closing section says the pre-existing checks "`guardBrowser`, `validatePolicy`,
+  `unallowedRecords`, `claimSigner` … are unchanged here"; at this head all four
+  require a call. The body does not mention `worker-guard.ts`, FINDING 1, the
+  brand, the late edge or the CDP refusal. The round-7 COMMENT is accurate and
+  supersedes it, and the body under-claims rather than over-claims.
+  Also minor, in that comment: "all **eight** harness checks" — there are ten
+  call checks plus one presence check; and "4 of 123 transcripts differ" —
+  I measure 6 across checkouts, the two extras benign.
+
+Failure: a chair reading the description alone gets stale counts.
+Perspective: developer
+Recommendation: refresh the body, or point its first line at the round-7 comment.
+Acceptance criteria: the body's counts match the head.
+Tests: none.
+Cross-repo implications: core: none | user: as above | search: none | meta: none
+Challenge: the round-7 comment is already the record of this head.
+```
+
+## Residuals at `07f2c6e`, split as the chair asked
+
+**Accepted by design — reachable only by editing a CODEOWNERS gate file, or by
+deliberately reaching for a private internal.**
+
+| Residual | Evidence |
+|---|---|
+| `e2e/harness/**`, `playwright.config.ts`, `eslint-rules/**`, `.github/**`, `scripts/ci/**` can weaken the guard | CODEOWNERS; the canary makes a neutered listener a named `e2e` failure (verified, all four) |
+| **`globalSetup` / `globalTeardown`** are outside the worker guard | FINDING 6 — needs a `playwright.config.ts` edit; **undisclosed**, should be named |
+| the lane's own call-greps are defeatable by a decoy comment or string | FINDING 7 — needs an `e2e/harness/**` edit |
+| Playwright private internals (`_connection`, `_connect`, `_innerNewContext`) | disclosed; not an idiom written innocently |
+| `browser[name]()` computed access | disclosed; runtime guard catches it, lint cannot |
+| the `request` fixture (`APIRequestContext`) | disclosed |
+| the in-test 250 ms late edge, and a fault after the browser closes | disclosed, measured, and the prose is exactly right |
+| the coverage-floor numbers | CODEOWNERS file that says so |
+
+**Real holes reachable from an honest-looking, lint-green, type-green spec under
+`e2e/specs/`: none found.** Every spec-reachable shape I attacked — `beforeAll`
+`newPage`, `beforeAll` `newContext`, `beforeEach`, runtime skip, skip-then-real,
+shared page between tests, `describe.configure({mode:"parallel"})`, a
+spec-defined auto worker fixture, a setup project, retries with a one-shot
+fault, `afterAll`, the three F12 routes, the CDP session, and five attacks on
+the brand — was caught and named, or correctly refused.
+
+## Verdict
+
+**PASS.**
+
+- My FINDING 1 reproduction is RED for the declared reason and the failure names
+  the phase. The guarantee genuinely moved from test scope to worker scope, and
+  I could not find a spec-reachable way around the new boundary.
+- F12 and F14 still hold; my FINDING 2 is closed; FINDING 3 is fixed for the
+  plain case; FINDINGS 4 and 5 are addressed.
+- Counts reproduce exactly: 15 files / 355 tests / 0 skips, 18 e2e with floor
+  `9/9 9/9` and 18 stamps, 102 cases / 109 assertions, 123/123 demonstration
+  halves, 10/10 deterministic under full CPU contention with zero orphans.
+- CI on this SHA: 8/8 success, nothing skipped, `ci-required` waited for `e2e`,
+  the manifest matches what ran, and the `e2e` log carries the floor, 18 stamps
+  and the four-fixture canary.
+- No test, assertion, demonstration or baseline weakened; nothing deleted; no
+  skips; no spec authenticates, fills a credential or touches a signed URL
+  (the repo's own tripwire passes 10/10).
+- FINDINGS 6, 7 and 8 are all non-blocking: none is reachable from a spec, and
+  the remedies are a Residuals bullet, a stricter grep, and a refreshed PR body.
+
+PASS is not a merge and not VERIFIED — the chair records those.
+
+FINAL VERDICT: PASS — SHA 07f2c6e0d9e083760c316b6b7032b5b0cf2e73ae
