@@ -2001,3 +2001,817 @@ container started, no image pulled or built. The only file written outside my
 scratch directory is this one.
 
 FINAL VERDICT: PASS — SHA 3261ad3edd63684855ff9d2346895a70522b5a8b
+
+---
+
+# Re-verification at 9c4b5d3 (2026-09-21)
+
+Same verifier. Two fresh clones under my own `mktemp -d` inside the shared
+scratch root — one for the demonstration run, one for mutations, because in this
+round I first made the mistake of mutating the tree a background demo run was
+using and had to discard that result. Started no container. Wrote only this file.
+
+| | |
+|---|---|
+| Head SHA verified | `9c4b5d3285e1368634bc2042a83a91bfcb7e564b` |
+| Head moved? | No — `gh pr view 4` read `9c4b5d3e` at the start and the CI/artifact queries all name it. |
+| Previous head | `3261ad3e` (my PASS). Two commits on top, **plain push**, nothing rewritten. |
+| Environment | macOS arm64, Python 3.9.6, PyYAML 6.0.3, Docker Engine 29.8.0, Compose **v5.5.1** (CI: Engine 28.0.4, Compose v2.38.2) |
+
+```
+7e95989 fix(compose): review round 2 — untrue statements, /dev/shm, and a derived secret set
+9c4b5d3 docs(evidence): transcripts for 7e959893…
+```
+
+## Verdict summary
+
+Every acceptance bullet is still MET from my own renderer, CI is green, the
+scope is clean, and the artifact carries no secret. **R-1 is genuinely fixed in
+substance.** The verdict is FAIL on two findings of one kind: a guarantee
+asserted in the PR body and in three documents that the control does not
+deliver. That is the exact condition the chair has held this PR for twice, and
+the coordinator asked me to list any sentence that still is stronger than its
+control. Neither touches the topology; both are a few words and, for one, a
+three-line code change.
+
+## 1. Lanes
+
+| Command | Exit | Result |
+|---|---|---|
+| `check-generated-ledger.sh` | 0 | reproduces byte-for-byte, 191 requirements |
+| `check-quality-json.py` | 0 | 191 ids, 287 references, all resolve |
+| `check-doc-links.py` | 0 | + new: `compose comments: 6 env//deploy/ path(s) across 8 file(s), all resolve` |
+| `ci-required-guard.sh` | 0 | floor `validate`; 6 / 7 / 10 fixtures |
+| `check-template-claims.py` | 0 | `10 files, 16 command references; 5 shipped, 11 future, 0 scripts present and 6 declared future; 0 violations` |
+| `compose-render.py --all` | 0 | **13 shapes** |
+| `check-compose-topology.py` | 0 | **`13 shape(s) … 26 rules, 0 violations; 2 known-false probe(s)`** |
+| `check-config-coverage.py` | 0 | **`34 component keys …, 58 template keys, 58 interpolated variables, 13 shapes; 1 alias; 1 retired key refused; 0 violations`** |
+| `check-config-coverage.py --drift` (absent) | 2 | BLOCKED, as documented |
+| `demo.sh` (clean clone, nothing else touching it) | **1** | **72 of 73 assertions passed, 1 failed** — see **S-4**; CI reported 73/73 |
+
+Counted from source: **26** topology rule ids, **11** coverage rule ids, **4**
+template-claims rule ids — all three claims reproduce. `case_header` is called
+**39** times and 39 cases printed; the "40 cases" figure counts the function
+definition (see S-7).
+
+## 2. Acceptance bullets — re-derived from my own renderer
+
+I re-rendered all 13 shapes with plain `docker compose config --format json` and
+ran my own audit. **0 violations found by me**, covering ports, restart, log cap,
+healthcheck state (including the `["NONE"]` spelling), production build, image
+pinning and `mem_limit`:
+
+```
+bundle-no-checkouts        10 svc | api 127.0.0.1:8080; caddy 0.0.0.0:80,443; frontend 127.0.0.1:3000; ipfs 0.0.0.0:4001 tcp+udp
+dev-build-from-checkouts    7 svc | api 127.0.0.1:8080; frontend 127.0.0.1:3000
+dev-default                 7 svc | api 127.0.0.1:8080; frontend 127.0.0.1:3000
+prod-all-optional          10 svc | + ipfs 0.0.0.0:4001 tcp+udp
+prod-default                7 svc | api/frontend loopback; caddy 80/443
+prod-external-both          5 svc | no postgres, no redis
+prod-external-clickhouse    7 svc | no clickhouse
+prod-external-ipfs          7 svc | no ipfs, no swarm port
+prod-external-postgres      6 svc | no postgres
+prod-external-redis         6 svc | no redis
+prod-external-tls           6 svc | no caddy
+prod-frontend-only          1 svc | frontend 127.0.0.1:3000
+prod-worker-split           1 svc | PUBLISHES NOTHING
+shapes audited: 13 | MY OWN violations: 0
+```
+
+postgres, the cache, search, clickhouse, migrate and worker publish **nothing**
+in any of the 13. The external overlays really delete the container. The
+worker-split shape really renders worker alone and publishes nothing. **All
+three VZ-ISSUE-002 acceptance bullets remain MET.**
+
+## 3. R-1 — fixed in substance
+
+The derivation is real: `registry_secret_names()` unions every
+`"secret": true` key from all three component registries into **both** the
+redaction set and the leak-check set, on top of the two manifest lists.
+
+| Attack | Result |
+|---|---|
+| **my exact round-2 mutation** (`"secret": true` in core.json + template entry + compose delivery) | **47 occurrences → 0**; `api.VIZRA_SMTP_PASSWORD` = `'<redacted>'`; the key appears in the model's `redacted_keys` and `leak_checked_keys` |
+| the same secret ALSO delivered under a second, non-secret key (`VIZRA_MAILER_AUTH: ${VIZRA_SMTP_PASSWORD}`) | **0 occurrences** — the substring pass covers the alias |
+| the secret in `labels:` / `command:` rather than `environment:` | **0 occurrences** |
+| **case 18b must not regress**: delete `POSTGRES_PASSWORD` from `redact_keys` | render **exit 1**, `a value this renderer injected survived into the model at $.services.postgres.environment.POSTGRES_PASSWORD`, **0 files written** |
+| a suffix-matching name with **no** registry flag (`VIZRA_SMTP_PASSWORD`) | value written, but **the lane goes red**: `unclassified-secret-key … is named like a secret (_PASSWORD) but is neither flagged secret in a registry nor listed in redact_keys` |
+| a credential whose name matches **none** of `_PASSWORD/_SECRET/_TOKEN/_KEY` and which no registry flags (`VIZRA_S3_ACCESS_ID`) | **47 occurrences, every lane exit 0** — see **S-6** |
+
+**The CI artifact for this SHA is clean.** Downloaded from run `35576458546`
+(`meta-validate-compose-models`, 37 204 B): **14 files, 0 hits** for any of the
+eight secret values; `prod-default` `api.DATABASE_URL` = `'<redacted>'`; the
+stamp is `true` and each model now records `redacted_keys: 8` and
+`leak_checked_keys: 8`, so a reader can see what was protected instead of
+trusting the boolean.
+
+`ci_overrides` is still applied with `env.update()` after the process
+environment, and the docstring now states that property and says "Keep it" —
+which matches the code and matches my round-2 correction.
+
+## 4. R-3 — implemented, and weaker than its own description
+
+`gated-probe-unrecognised` exists and the declared case works. Its
+implementation is `rule["must_invoke"] not in joined`, where `joined` is the
+rendered `healthcheck.test` list joined with spaces — a **substring test over
+the command line**, not a check that the command runs or that its status gates.
+
+| Probe substituted on `postgres` (three `service_healthy` edges point at it) | Lane |
+|---|---|
+| `["CMD", "true"]` | **red** — `gated-probe-unrecognised`, the declared case |
+| `["NONE"]` | **red** — twice (`missing-healthcheck` + `gated-probe-unrecognised`) |
+| `["CMD-SHELL", "pg_isready -U vizra \|\| true"]` | **green** |
+| `["CMD-SHELL", "true # pg_isready"]` | **green** |
+| `["CMD", "sh", "-c", "exit 0; pg_isready"]` | **green** |
+| `["CMD", "echo", "pg_isready"]` | **green** |
+
+All four green rows are probes that **always exit 0**, so all three readiness
+gates onto PostgreSQL become gates onto nothing, with `26 rules, 0 violations`.
+
+**What the rule now guarantees, plainly:** every `service_healthy` target must
+be listed in `gated_probes`, and its rendered probe command line must *contain
+the declared command's name somewhere*. **What it does not guarantee:** that the
+command is executed, that its exit status decides the probe, or that the probe
+can go red. It raises the cost of killing a gate from deleting a word to writing
+a line that still mentions `pg_isready` — real, and one line.
+
+**The docs do not say that.** `docs/META_REPO.md:162` — "must be listed in
+`gated_probes` and still **invoke** the command"; `docs/quality/COMMANDS.md:348`
+— "whose probe no longer **invokes** the declared command". "Invoke" is a claim
+about execution; the control tests for a mention. See **S-2**.
+
+## 5. Infrastructure F2 / F3 / F4 / NEW-1
+
+### F4 and NEW-1 — solid
+
+`VIZRA_WORKER_CONCURRENCY=2` with a corrected comment block (1 / 2 / 4 by host
+size); `VIZRA_CADDY_MEM_LIMIT=160m`; COMMANDS.md §5a states the 4092 MiB sum on
+a 4096 MiB host and the three added caveats. `mem_limit` is on every
+long-running production service in all 13 shapes (my own audit).
+
+`postgres-shm-floor` survives every defeat I tried:
+
+| Mutation | Result |
+|---|---|
+| `shm_size: 0` | red (`shm_size=None`) |
+| `shm_size: 64m` (exactly Docker's default) | red |
+| `shm_size: 65m` | green — the boundary is where it says it is |
+| `shm_size: ${PG_SHM:-}` (empty default) | **render refuses** |
+| `shm_size: 256` (bytes, not `m`) | red |
+
+Compose normalises the value to a byte count (`'268435456'` rendered from
+`256m`), so the units-versus-bytes question the coordinator raised is settled by
+Compose before the rule sees it.
+
+### F3 — the disclosure is one-directional
+
+| Mutation | Result |
+|---|---|
+| delete the `IGNORE THE \`healthy\` COLUMN` marker from `env/production.env.example` | **red** — `known-false-undisclosed` |
+| delete it from `README.md` | **red** |
+| **empty `known_false_probes` while both paragraphs remain** | **green, exit 0** |
+| marker present, the `curl` commands stripped out | green (the rule matches the marker string only) |
+
+`scripts/check-compose-topology.py:876` is `if known_false and disclosure:` —
+the whole block is skipped when the list is empty. See **S-1**.
+
+### F2 — the script pass, and where it does not reach
+
+`env/registry/meta.json` is well built: six future scripts, each mapped to
+`VZ-ISSUE-004`, with an explicit empty `scripts` list. The three `backup.sh`
+sentences are genuinely future tense with the marker adjacent — I read all three
+(`env/production.env.example:144,158`, `docker-compose.external-postgres.yml:51`):
+"backup.sh, which **will** refuse such a database out loud, **arrives with**
+VZ-ISSUE-004". That is the fix, done properly.
+
+| Spelling in an operator-facing file, no marker | Caught? |
+|---|---|
+| `backup.sh` (bare) | ✅ `unmarked-future-script` |
+| `bash backup.sh` | ✅ |
+| `bootstrap.sh` inside a compose `:?` message | ✅ |
+| **`./backup.sh`** | ❌ |
+| **`scripts/backup.sh`** | ❌ |
+| **`` `./backup.sh` `` (backticked)** | ❌ |
+| an invented `rotate-secrets.sh` | ❌ |
+
+The regex is `(?<![\w./-])((?:backup|restore|install|bootstrap|deploy|rollback)\.sh)`.
+The negative lookbehind excludes `.`, `/` and `-`, which is exactly the two
+spellings an operator-facing document uses for a runnable script. And because
+`SCRIPTNAME` matches only those six names and all six are in `future_scripts`,
+**`unknown-script` cannot be tripped by any documentation edit at all** — I
+computed the set difference: empty. See **S-3**.
+
+## 6. Truthfulness — sentences still stronger than their control
+
+Accurate, checked against what I measured: META_REPO §2a on known-false scope
+("it only refuses a gate onto a probe someone has **declared** false, and cannot
+tell a real probe from a fake one nobody declared" — correct and well put);
+COMMANDS.md §4 on the derivation and the two manifest lists; the renderer
+docstring, which now matches the code including the `ci_overrides` property;
+COMMANDS.md §5 "What this does NOT prove"; the PR body's GitGuardian section;
+the capacity note. The stale counts I raised as R-4 are gone from COMMANDS.md
+and META_REPO.md — the only remaining figure there is the correct historical
+"ten of the twelve models in the CI artifact for 69e197e".
+
+Still stronger than the control:
+
+| Sentence | Where | Measured |
+|---|---|---|
+| "it fails in **both directions**, so the list and the paragraphs are deleted together" | `COMMANDS.md:352`, `META_REPO.md:175`, `check-compose-topology.py:871`, **PR body** | one-directional; emptying the list with the paragraphs present is exit 0 |
+| "must be listed in `gated_probes` and still **invoke** the command" | `META_REPO.md:162` | substring test; `echo pg_isready` passes |
+| "whose probe no longer **invokes** the declared command" | `COMMANDS.md:348` | same |
+| "Shell scripts, **backticked or bare**" | `check-template-claims.py:74` | a backticked `` `./backup.sh` `` is not matched |
+| "73 assertions across **40** cases" | **PR body** | 39 `case_header` calls, 39 cases printed |
+
+## 7. CI on `9c4b5d3e`
+
+| Check run | Status | Conclusion | In the manifest? |
+|---|---|---|---|
+| `validate` | completed | **success** | **yes** — the only entry |
+| `ci-required` | completed | **success** | the aggregate |
+| `GitGuardian Security Checks` | completed | failure | **no** |
+
+`.github/required-checks.txt` at this SHA has one live line, `validate`, and is
+not in this PR's diff. All **18** `validate` steps succeeded, none skipped. From
+the log: `13 shape(s) … 26 rules, 0 violations`, the coverage line, the
+template-claims line, and `RESULT: 73 assertion(s) passed, 0 failed`.
+
+**GitGuardian names no newer commit.** Its output reads "1 secret were uncovered
+from the scan of **9 commits** in your pull request" — one incident, the PR's
+whole commit range. I swept both new commits' added lines myself for
+credential-shaped assignments and `scheme://user:pass@host`: **no hits in either
+`7e95989` or `9c4b5d3`**. The red is attributable to `a96f188` alone, as stated.
+
+## 8. Scope
+
+| Check | Result |
+|---|---|
+| Component repositories modified | **No** — 0 paths under `vizra-{core,user,search}/` |
+| `docs/quality/features.json` | **byte-identical to `main`** |
+| `docs/evidence/ledger-generator/` | **untouched**; `build.py:20` PLANNED/UNVERIFIED gate present |
+| `.github/required-checks.txt` | **untouched** |
+| New credential-shaped literal in either new commit | **none** |
+
+---
+
+# Findings — round 3
+
+```
+FINDING S-1: known-false-undisclosed is one-directional, and four places say it is not
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/check-compose-topology.py:875-876 (the guard) and :871 (the comment);
+             docs/quality/COMMANDS.md:352; docs/META_REPO.md:175; the PR #4 body
+  requirements: VZ-TOPOLOGY-002, VZ-OPS-008
+
+Observed:
+  The rule body is entered only when the list is non-empty:
+
+      disclosure = manifest.get("known_false_disclosure") or {}
+      if known_false and disclosure:          # :876
+          marker = disclosure.get("marker", "")
+          for rel in disclosure.get("files", []):
+              ...
+
+  Measured, from a clean clone at this SHA:
+
+    - marker deleted from env/production.env.example, list populated -> exit 1,
+      `rule=known-false-undisclosed service=env/production.env.example`
+    - marker deleted from README.md, list populated                  -> exit 1
+    - `known_false_probes` emptied, BOTH paragraphs left in place     -> exit 0
+      (compose topology: 13 shape(s) … 26 rules, 0 violations)
+
+  The documentation says the opposite in four places, including the line
+  immediately above the guard:
+
+    check-compose-topology.py:871  "It fails in both directions by construction:
+                                    emptying the list without …"
+    COMMANDS.md:352                "it fails in both directions, so the list and
+                                    the paragraphs are deleted together"
+    META_REPO.md:175               "and it fails in both directions, so **the
+                                    list and the paragraphs are deleted together**"
+    PR #4 body                     "that paragraph and the list are deleted
+                                    together, enforced in both directions"
+
+Failure:
+  The direction that is unenforced is the one that matters later. The disclosure
+  paragraph tells an operator to IGNORE the `healthy` column in
+  `docker compose ps`. `vizra healthcheck` is queued in vizra-core (queue 2h);
+  when it lands and the known-false list is emptied, nothing makes the author
+  delete the paragraphs — and META_REPO.md tells them a rule already handles it.
+  The instance is then shipping a README and a production template instructing
+  operators to distrust a health column that has become trustworthy, which is
+  how a real outage gets diagnosed slowly. The claimed control is precisely what
+  would have prevented it.
+
+Perspective:
+  operator, instance-admin, developer
+
+Recommendation:
+  Three lines. Run the block unconditionally and branch on the list:
+
+      if disclosure:
+          marker = disclosure.get("marker", "")
+          for rel in disclosure.get("files", []):
+              text = read(rel)
+              if known_false and marker not in text:
+                  violation(... "must carry the disclosure while known_false_probes is non-empty" ...)
+              if not known_false and marker in text:
+                  violation(... "still carries the disclosure, but known_false_probes is empty:"
+                                " the probes were fixed and the paragraph now tells operators"
+                                " to distrust a column that works" ...)
+
+Acceptance criteria:
+  - Emptying `known_false_probes` while either declared file still contains the
+    marker fails the lane, exit 1, naming the file.
+  - Deleting the marker while the list is non-empty still fails (no regression).
+  - Emptying the list AND removing both paragraphs in the same change is green.
+  - The four sentences above become true, or are rewritten to match.
+
+Tests:
+  docs/evidence/compose-topology/demo.sh, beside the existing disclosure case:
+  empty `known_false_probes` in scripts/compose-shapes.json with the paragraphs
+  in place, assert exit 1 with rule=known-false-undisclosed, restore, assert
+  exit 0. The harness already mutates that file in case 12.
+
+Cross-repo implications:
+  core: `vizra healthcheck` (queue 2h) is the change that will empty the list and
+  trip this | user: none | search: none | meta: three lines plus a demo case.
+
+Challenge:
+  "The list is non-empty today, so the unenforced direction cannot fire." True —
+  and it becomes live on the exact change the documentation is written to
+  survive. A guarantee that is false only in the future is still false now, and
+  this one is asserted in the PR body a merge decision is read from.
+```
+
+```
+FINDING S-2: gated-probe-unrecognised tests for a mention, and two documents say "invoke"
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/check-compose-topology.py, check_probes() — `rule["must_invoke"] not in joined`;
+             docs/META_REPO.md:162; docs/quality/COMMANDS.md:348
+  requirements: VZ-TOPOLOGY-002, VZ-OPS-008
+
+Observed:
+  `joined = " ".join(str(x) for x in dep_test)` and the test is
+  `rule["must_invoke"] not in joined` — a substring match over the rendered
+  healthcheck command line.
+
+  Measured on `postgres`, which three services gate on with
+  `condition: service_healthy` (api, worker, migrate). Each probe below always
+  exits 0, so all three gates gate on nothing:
+
+    ["CMD-SHELL", "pg_isready -U vizra || true"]   -> 26 rules, 0 violations
+    ["CMD-SHELL", "true # pg_isready"]             -> 26 rules, 0 violations
+    ["CMD", "sh", "-c", "exit 0; pg_isready"]      -> 26 rules, 0 violations
+    ["CMD", "echo", "pg_isready"]                  -> 26 rules, 0 violations
+
+  The declared case is caught, and so is the disabled case:
+
+    ["CMD", "true"]  -> rule=gated-probe-unrecognised (api, worker, migrate)
+    ["NONE"]         -> rule=missing-healthcheck AND rule=gated-probe-unrecognised
+
+  The documentation claims execution, not mention:
+
+    META_REPO.md:162   "must be listed in `gated_probes` and still INVOKE the
+                        command that makes its probe mean something"
+    COMMANDS.md:348    "or whose probe no longer INVOKES the declared command"
+
+Failure:
+  A maintainer under pressure to empty the known-false list — which META_REPO.md
+  says "must be empty before VZ-ISSUE-004's boot lane lands" — can satisfy every
+  rule here with `pg_isready || true` and believe the checker vetted it, because
+  the checker's own documentation says it checks invocation. The deploy then
+  proceeds past a PostgreSQL that is not accepting connections, which is the
+  failure the whole F3 round exists to prevent.
+
+  This is not a demand that the rule become a classifier. It cannot be one: you
+  cannot decide from a rendered model whether a shell string exits non-zero when
+  the server is down. The finding is that the description promises what the
+  implementation cannot do.
+
+Perspective:
+  operator, developer
+
+Recommendation:
+  Two parts, both small.
+  1. Say what it does: "…and its probe must still NAME the declared command.
+     This is a mention, not an execution check: `pg_isready || true` and
+     `echo pg_isready` both pass. It raises the cost of killing a gate; it
+     cannot prove a probe can go red."
+  2. Refuse the cheap defeats that ARE decidable from the string, as a declared
+     denylist rather than a classifier: a `CMD-SHELL` test containing `|| true`,
+     `; true`, `# ` before the declared command, or whose first token is `echo`
+     or `true`. Name it in the message as a denylist so nobody mistakes it for
+     coverage.
+
+Acceptance criteria:
+  - `["CMD-SHELL","pg_isready || true"]` on a gated service fails the lane.
+  - `["CMD","echo","pg_isready"]` fails the lane.
+  - The real probe `["CMD-SHELL","pg_isready -U \"$POSTGRES_USER\" -d …"]` still
+    passes (the token match must survive interpolation, which is why it exists).
+  - Both documents describe a mention plus a denylist, not an invocation check.
+
+Tests:
+  demo.sh beside case 26: `pg_isready || true` red for
+  rule=gated-probe-unrecognised, restored, green.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: the rule and two sentences.
+
+Challenge:
+  "Any denylist is bypassable too, so only the wording needs fixing." A fair
+  reading, and I would accept wording alone. What I will not accept is the
+  current pair: a rule that catches `["CMD","true"]` and nothing else, described
+  as checking invocation, in the document a reviewer uses to decide what is
+  proven.
+```
+
+```
+FINDING S-3: the script pass misses ./backup.sh and scripts/backup.sh, and unknown-script cannot fire
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/check-template-claims.py:74-83 (SCRIPTNAME and its comment);
+             env/registry/meta.json (`future_scripts`)
+  requirements: VZ-CI-002, VZ-OPS-008
+
+Observed:
+  SCRIPTNAME = re.compile(
+      r"(?<![\w./-])((?:backup|restore|install|bootstrap|deploy|rollback)\.sh)"
+  )
+
+  The negative lookbehind excludes `.`, `/` and `-`. Measured, each inserted
+  into env/production.env.example with no marker within 2 lines:
+
+      backup.sh                 -> exit 1  rule=unmarked-future-script
+      bash backup.sh            -> exit 1
+      bootstrap.sh in a `:?`    -> exit 1
+      ./backup.sh               -> exit 0
+      `./backup.sh` (backticked)-> exit 0
+      scripts/backup.sh         -> exit 0
+      rotate-secrets.sh         -> exit 0
+
+  And `unknown-script` is unreachable from any documentation edit. SCRIPTNAME
+  matches exactly six names; env/registry/meta.json lists all six in
+  `future_scripts` and none in `scripts`. The set difference
+  {matchable} − {future} − {existing} is EMPTY, so no string in any scanned file
+  can reach the `unknown-script` branch. It fires only if someone edits
+  meta.json itself.
+
+  The code comment above the regex says "Shell scripts, backticked or bare" — a
+  backticked path form is neither.
+
+Failure:
+  The two spellings the checker misses are the two an operator-facing document
+  actually uses: you write `./backup.sh` or `scripts/backup.sh` when you mean
+  "run this", and the bare word when you mean "the backup tool". The round-2
+  finding this rule exists to close was a present-tense claim about a script
+  that does not exist; the same claim written `Run ./backup.sh nightly` passes
+  today. `unknown-script` gives the appearance of covering invented scripts and
+  covers none.
+
+Perspective:
+  operator, developer
+
+Recommendation:
+  Allow an optional leading `./` or `scripts/` or `deploy/` instead of excluding
+  it — the lookbehind is there to avoid matching inside a longer word, which
+  `(?<![\w-])` alone achieves once the path prefix is consumed:
+
+      SCRIPTNAME = re.compile(
+          r"(?<![\w-])(?:\./|scripts/|deploy/)?"
+          r"((?:backup|restore|install|bootstrap|deploy|rollback)\.sh)"
+      )
+
+  For `unknown-script`: either match any `[a-z][a-z0-9-]*\.sh` and let the
+  future/existing lists decide — which is what makes the rule reachable — or
+  delete the rule id and stop listing a rule that cannot fire.
+
+Acceptance criteria:
+  - `./backup.sh`, `scripts/backup.sh` and `` `./backup.sh` `` without a marker
+    each fail the lane.
+  - A path-form reference WITH its marker within the window passes.
+  - Either an invented `rotate-secrets.sh` fails with `unknown-script`, or that
+    rule id is removed from RULES.
+  - The code comment describes the forms actually matched.
+
+Tests:
+  demo.sh, beside the existing script case: the `./` form red, restored, green.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: one regex, one comment, one
+  demo case.
+
+Challenge:
+  "No document in the tree writes `./backup.sh` today." Correct — I checked, all
+  three live references are bare and correctly marked. The rule's purpose is the
+  next document, and the next document is where a path form is most likely.
+```
+
+```
+FINDING S-4: the demonstration harness can report a correct guard as FAILED
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     docs/evidence/compose-topology/demo.sh:23 (`set -uo pipefail`) and
+             :375 (and every `printf … | grep -q` in the file)
+  requirements: VZ-CI-002
+
+Observed:
+  In my clean run at this SHA, in a clone nothing else was touching:
+
+      RESULT: 72 assertion(s) passed, 1 failed
+      DEMO2 exit=1
+
+  The failing case, verbatim:
+
+      CASE 10a — an INVALID external DSN
+      docs/evidence/compose-topology/demo.sh: line 375: printf: write error: Broken pipe
+          FAIL: expected exit 1 with an actionable message, got 1
+            | shape prod-external-postgres: DATABASE_URL is not a valid DSN: it does not start with postgres:// …
+            |   (The value is not echoed here; it carries a password.)
+
+  The guard behaved correctly — exit 1, the actionable message, the value not
+  echoed. The harness reported FAIL, and its own message is self-contradictory
+  ("expected exit 1 … got 1"). The mechanism is line 375:
+
+      if [ "$rc" = "1" ] && printf '%s\n' "$out" | grep -q 'DATABASE_URL is not a valid DSN'; then
+
+  `grep -q` exits at the first match and closes the pipe; `printf` then takes
+  EPIPE; `set -o pipefail` (line 23) propagates that non-zero through the
+  pipeline even though grep matched. The `if` takes the else branch.
+
+  It is intermittent: the same pipeline in isolation returned true 20/20 times
+  for me, and CI reported 73/73 on this SHA. It fires under load, which is what
+  a full demo run with concurrent `docker compose` provides.
+
+Failure:
+  `validate` is a required lane and this step is one of its gates, so the lane
+  can go red with no product cause — and the message it prints sends whoever
+  reads it hunting a regression that does not exist. It is fail-closed (the `ok`
+  branch requires the pipeline to succeed, so a genuinely broken guard cannot be
+  reported as passing this way), which is why this is SHOULD and not higher. But
+  "all 40 cases red for their declared reason" is not reproducible on my
+  environment, and CI's green is partly timing.
+
+Perspective:
+  developer
+
+Recommendation:
+  Take the pipe out of the condition. Either capture first:
+
+      printf '%s\n' "$out" > "$tmp"; grep -q '…' "$tmp"
+
+  or use a here-string, which has no pipeline and no SIGPIPE:
+
+      grep -q '…' <<< "$out"
+
+  The same construct appears throughout the file; fix it in the `expect` helper
+  and at every open-coded site (10a, 10b and the redaction cases).
+
+Acceptance criteria:
+  - Ten consecutive local runs of demo.sh report the same assertion count and
+    exit 0.
+  - No `printf: write error: Broken pipe` in any transcript.
+  - A deliberately broken guard is still reported FAIL (the fix must not make
+    the condition unconditionally true).
+
+Tests:
+  Run demo.sh ten times in a loop and diff the RESULT lines. Worth doing once
+  before merge, since the lane is required.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: demo.sh only.
+
+Challenge:
+  "CI is green and you cannot reproduce it in isolation." Both true, and that is
+  the shape of the problem: a required lane whose result depends on scheduling
+  is one I cannot certify as reproducible, and the next person to see it red
+  will be told the DSN guard broke when it did not.
+```
+
+```
+FINDING S-5: --drift compares key names only, never the "secret" flag the redaction now depends on
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/check-config-coverage.py check_drift() (quoted-literal scan
+             over source_files, compared against key NAMES);
+             scripts/compose-render.py registry_secret_names()
+  requirements: VZ-TOPOLOGY-007, VZ-OPS-008
+
+Observed:
+  The R-1 fix makes the redaction set derive from `"secret": true` in the
+  component registries. `--drift` is the only check that compares a registry to
+  its component, and it compares presence of NAMES:
+
+      found = {quoted literals and ENV assignments in source_files}
+      new  = found - known - ignore
+      gone = known - found
+
+  Nothing compares the `secret` flag, or `default`. Measured: I materialised all
+  three components' `source_files` from their `origin/main` with `git show`,
+  confirmed `config registry drift: every snapshot matches its component source`
+  (exit 0), then deleted `"secret": true` from `VIZRA_SESSION_SECRET` in
+  env/registry/core.json. `--drift` still reported
+
+      config registry drift: every snapshot matches its component source   exit 0
+
+  and the coverage lane stayed green.
+
+  No value leaks today, because all five registry-flagged secrets are ALSO in
+  the manifest's `redact_keys`/`secret_keys` — I computed the difference:
+  registry-only = []. The derivation carries nothing alone yet.
+
+Failure:
+  The durable half of the R-1 fix rests on a field that no check validates
+  against its source. A snapshot re-taken carelessly, or hand-edited, can drop a
+  `secret` flag and narrow the redaction set silently while the drift check says
+  the snapshot matches. For the next component secret — one not in the manifest
+  lists — that is the R-1 defect again, arriving through the door R-1's fix
+  walked in.
+
+Perspective:
+  developer, operator
+
+Recommendation:
+  Compare the flag where the component declares it. `vizra-core`'s
+  `internal/config/keys.go` writes `Secret: true` in the same struct literal as
+  `Name:`, so the existing scan can read both; `vizra-search` and `vizra-user`
+  need the same treatment or an explicit "this component declares no secrets"
+  note. Failing that, at minimum fail when a key in `redact_keys` is NOT flagged
+  in its registry — the union hides that today.
+
+Acceptance criteria:
+  - Removing `"secret": true` from any registry key that the component's source
+    marks secret fails `--drift`, exit 1.
+  - The honest snapshots still pass (exit 0).
+  - The BLOCKED path with the checkouts absent still exits 2.
+
+Tests:
+  A drift case in demo.sh cannot run in CI (no checkouts). Record it in
+  docs/evidence/compose-topology/drift-transcript.txt the way the current drift
+  evidence is recorded, red and green.
+
+Cross-repo implications:
+  core: `keys.go` already carries the flag in a parseable form | user: none |
+  search: none | meta: the drift scan.
+
+Challenge:
+  "Drift is a coarse quoted-literal net by design, and flags are not literals."
+  Agreed for names. But the flag is now load-bearing for a security control, and
+  a security control resting on an unvalidated field is the thing I raised in
+  R-1 one level down.
+```
+
+```
+FINDING S-6: a credential the registry does not flag and whose name matches no suffix is still written raw
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/check-config-coverage.py:76 (SECRET_NAME_SUFFIXES);
+             scripts/compose-render.py registry_secret_names()
+  requirements: VZ-OPS-008
+
+Observed:
+  SECRET_NAME_SUFFIXES = ("_PASSWORD", "_SECRET", "_TOKEN", "_KEY").
+
+  Measured: `VIZRA_S3_ACCESS_ID` added the fully correct way but WITHOUT
+  `"secret": true` — registered in env/registry/core.json, declared in
+  env/production.env.example, delivered by compose — renders with the value
+  present 47 times across the 13 models, stamp `secret_values_redacted: true`,
+  and render / topology / coverage / template-claims all exit 0.
+
+  The same key named `VIZRA_SMTP_PASSWORD` IS caught, by the suffix net:
+  `unclassified-secret-key … is named like a secret (_PASSWORD) but is neither
+  flagged secret in a registry nor listed in redact_keys`.
+
+  An AWS access key id is a credential; `_ID` matches nothing. M2's storage
+  slice adds exactly this shape of key.
+
+Failure:
+  Bounded and one step removed from R-1: it needs a component to declare a
+  credential without flagging it secret, which is a component-side bug. But the
+  meta repo is where the value gets written to an uploaded artifact, so it is
+  also where the backstop belongs.
+
+Perspective:
+  developer, operator
+
+Recommendation:
+  Add `_ID` only where it is preceded by a credential word, or better, add the
+  handful of known credential-name shapes (`*_ACCESS_ID`, `*_ACCESS_KEY_ID`,
+  `*_CLIENT_ID` is NOT one) as a declared list with the existing
+  `not_secret_despite_name` escape hatch the checker already offers. One
+  declared exception beats a wider matcher — which is the rule's own stated
+  philosophy.
+
+Acceptance criteria:
+  - `VIZRA_S3_ACCESS_ID` unflagged fails `unclassified-secret-key`.
+  - `VIZRA_SEARCH_URL` and other plain addresses still pass.
+  - `not_secret_despite_name` still silences a declared false positive.
+
+Tests:
+  demo.sh beside the existing unclassified-secret-key case.
+
+Cross-repo implications:
+  core: should flag it at source when M2 adds it | user: none | search: none |
+  meta: one tuple and a demo case.
+
+Challenge:
+  "The primary signal is the component's own flag, and a name matcher will never
+  be complete." Right — which is why this is a NIT and why I am asking for a
+  named list rather than a cleverer regex.
+```
+
+```
+FINDING S-7: the PR body's case count, and its repetition of the "both directions" claim
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     the PR #4 body
+  requirements: VZ-CI-002
+
+Observed:
+  The body is otherwise accurate and much improved — head SHA, 26/11/4 rule
+  counts, the GitGuardian incident stated with its id and the commit it belongs
+  to, the alias ruling, and a "What a green result does NOT prove" section that
+  correctly narrows `probe-gates-readiness`. Two items do not hold:
+
+  - "**73 assertions across 40 cases**". `grep -c '^case_header "'` is 39 and 39
+    cases printed in my run. The extra one is the function definition — the same
+    off-by-one I reported as R-4 last round and made myself before checking.
+  - "that paragraph and the list are deleted together, **enforced in both
+    directions**" — disproved in S-1.
+
+Failure:
+  Documentary, and the second one repeats a claim the merge decision is read
+  from.
+
+Perspective:
+  developer
+
+Recommendation:
+  Fix both when S-1 is fixed; if S-1 is fixed as recommended the second sentence
+  becomes true as written.
+
+Acceptance criteria:
+  - The case count matches `case_header` CALLS.
+  - No claim in the body outlives the control it describes.
+
+Tests:
+  None mechanical.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: PR body.
+
+Challenge:
+  "One number." It is the third round in which a recorded count in this PR is
+  off by the same mistake, in a repository whose COMMANDS.md argues recorded
+  figures must be trustable.
+```
+
+---
+
+# Round-2 findings — disposition
+
+| Round-2 finding | Severity | Status at `9c4b5d3e` | Verified by |
+|---|---|---|---|
+| **R-1** nothing forces a new secret into the redaction set | REQUIRED | **CLOSED in substance** | derivation from `"secret": true`; my exact mutation 47 → 0; alias-name and labels/command paths also 0; case 18b does not regress; CI artifact clean. Residuals filed as **S-5** and **S-6** |
+| **R-2** docstring described a wider leak-check set than the code used | SHOULD | **CLOSED** | docstring now describes the derivation and the two manifest lists, and states the `ci_overrides` property correctly |
+| **R-3** probe rule could not see an undeclared fake probe | SHOULD | **PARTLY CLOSED** | `gated-probe-unrecognised` exists and catches `["CMD","true"]` and `["NONE"]`; four one-line bypasses remain and the docs say "invoke" — **S-2** |
+| **R-4** stale counts in COMMANDS.md / META_REPO.md | NIT | **CLOSED** | no stale shape/rule/case figure remains in either file |
+| **R-5** stale PR body | SHOULD | **CLOSED but for two items** | rewritten and accurate on head, counts, GitGuardian, alias, limits — except **S-7** |
+
+Infrastructure PARTIALs: **F4 and NEW-1 closed** (verified by four mutations
+each); **F2 closed in substance**, with the reach gap at **S-3**; **F3 closed
+one-directionally**, at **S-1**.
+
+## Cleanup
+
+Both clones and all scratch output live under one `mktemp -d` directory inside
+the shared scratch root and are deleted by exact path. Component checkouts were
+read with `git -C … show origin/main:<path>` only — nothing checked out, fetched
+into a working tree or modified; no branch switched in the chair's checkout. No
+container started, no image pulled or built. The only file written outside my
+scratch directory is this one.
+
+FINAL VERDICT: FAIL — SHA 9c4b5d3285e1368634bc2042a83a91bfcb7e564b
