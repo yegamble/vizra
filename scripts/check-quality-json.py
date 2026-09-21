@@ -223,6 +223,7 @@ def referencing_files(problems):
 
 
 def check_ids(ids, problems):
+    problems_before = len(problems)
     paths = referencing_files(problems)
     known_issue_files = {
         os.path.splitext(os.path.basename(p))[0] for p in glob.glob("docs/issues/*.md")
@@ -282,6 +283,18 @@ def check_ids(ids, problems):
             problems.append(f"  {ref}: {why}")
             for path in sorted(where):
                 problems.append(f"      referenced by {path}")
+        return
+
+    # Only claim "every one resolves" when nothing went wrong on the way here.
+    # A reference this run could not READ — a descending or implausible range —
+    # was reported above but never resolved, so printing the success summary
+    # alongside it would be a false statement in the same output.
+    if len(problems) > problems_before:
+        print(
+            f"requirement ids: {written_total} written reference(s), "
+            f"{expanded_total} id(s) expanded and resolved, but at least one reference "
+            f"could not be read — see the failure(s) above"
+        )
         return
 
     print(

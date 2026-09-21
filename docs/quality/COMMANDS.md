@@ -51,11 +51,27 @@ it writes (today: `docs/quality/features.json`). Catches **both** a hand-edited
 generated file and a generator source changed without regenerating — they are
 indistinguishable in review and identical from this check's point of view.
 Refuses to run against a dirty working tree, so a difference is never
-misattributed. Also fails if the generator writes a file that is not in its
-declared list.
+misattributed.
+
+It **deletes the declared files before regenerating**. A diff alone cannot tell
+"rewrote it identically" from "wrote nothing", so a generator gutted to
+`print("OK 191 requirements; core=141")` used to exit 0 here while the check
+printed a reproduction claim that was false. With the files removed first, a
+generator that writes nothing leaves a deletion, and each declared file must
+then **exist, be non-empty and parse as JSON** before the diff runs. Together
+with the existing undeclared-file check, the declared list and the generator's
+real output set are asserted equal in **both** directions.
+
+It then re-runs the generator once under
+`LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0` and requires
+byte-identical output. That is the environment in which the pre-fix generator
+raises `UnicodeEncodeError: 'ascii' codec can't encode character '—'` and
+leaves a truncated `features.json`; PEP 538's C-locale coercion is what
+normally masks it, which is why both variables are needed to see it.
 
 Last run: **exit 0**, `generated ledger reproduces byte-for-byte:
-docs/quality/features.json` (191 requirements, core=141).
+docs/quality/features.json (UTF-8 and C/POSIX locales)` (191 requirements,
+core=141).
 
 To regenerate after editing a generator source — and you must commit both:
 
@@ -77,8 +93,29 @@ Every `*.json` under `docs/quality/` parses, and every `VZ-…` id referenced by
 allowlisted by name — and `VZ-ISSUE-NNN` is still resolved against a real
 `docs/issues/VZ-ISSUE-NNN.md`, so the allowlist is not an escape hatch.
 
-Last run: **exit 0** — 4 JSON files parsed, 191 requirement ids, 139 distinct
-`VZ-…` references across 14 documents, every one resolving.
+**Ranges and slash-lists are expanded and every member resolved.** The
+milestone rows write `VZ-FOUND-001…008`, `VZ-CI-001/002/004` and
+`VZ-MEDIA-002/005…010`; resolving only the leading id would validate one
+requirement out of eight. A separator (`…`, `...`, `–`, `—`, `/`) only counts
+when digits follow it, so a sentence-ending `.` and a path `/` end the run. A
+descending or implausibly long range is a **named failure**, not a silent skip.
+
+Last run: **exit 0** — 4 JSON files parsed, 191 requirement ids in the ledger,
+191 written references expanded to 287 ids (204 distinct) across 14 documents,
+every one resolving.
+
+### Scope of the id check, and what is deliberately excluded
+
+| Path | Checked | Why |
+|---|---|---|
+| `docs/MILESTONES.md` | yes | schedules work; an id here is a commitment |
+| `docs/issues/*.md` | yes | the slice definitions |
+| `docs/plans/*.md` | **no** | plans legitimately PROPOSE ids that do not exist yet. Measured: the 13 slice plans are clean, but `docs/plans/WARROOM-BOARD.md` row 2b names four proposed ids (`VZ-SEC-SSR-001`, `VZ-SEC-HDR-001`, `VZ-SEC-SSR-002`, `VZ-SEC-SUPPLY-001`) whose purpose is to be evaluated and possibly added to the ledger. Gating this directory would make the lane red for proposing a requirement. |
+| `docs/evidence/**` | **no** | a red/green transcript must write down the id it deliberately made dangle (`VZ-NOSUCH-999`, `VZ-ISSUE-404`, `VZ-FOUND-001…999`). Gating it would make every demonstration a lane failure. |
+
+Both exclusions were measured, not assumed. If a plan or the board should be
+gated later, the honest way in is a marker distinguishing "proposed" from
+"referenced", not a wildcard exemption.
 
 ### 3. Relative documentation links resolve
 
@@ -90,8 +127,15 @@ Relative markdown links in `docs/**/*.md` and the root `*.md` resolve to a file
 that exists. External URLs are recorded and **never fetched**. Fenced blocks and
 inline code spans are stripped first.
 
-Last run: **exit 0** — `relative links: none exist yet across 87 markdown
-file(s) (checked nothing); 6 external URL(s) recorded and not fetched`.
+Last run: **exit 0** — `relative links: none exist yet … (checked nothing);
+6 external URL(s) recorded and not fetched`.
+
+The markdown-file count the command prints is **deliberately not quoted here**.
+It changes every time a document is added — this file's own first version
+recorded 87 and was stale within the same commit that added it, because
+COMMANDS.md joined the corpus it was counting. A number that goes stale on its
+own is worse than no number in a file whose purpose is that recorded figures can
+be trusted. Run the command for the current value.
 
 That "checked nothing" is accurate and is printed on purpose: this repository
 currently contains **zero** relative markdown links. Every link-shaped string in
@@ -111,21 +155,33 @@ Everything that can be checked about the gate from the checkout itself:
 the floor (`validate` present and non-optional), bare job names, every required
 check defined by a real job, `continue-on-error` refused wherever it appears
 (parsed, not grepped), every action pinned to a 40-hex commit SHA, every
-required lane triggered on `pull_request` with no base-branch filter, and both
-checkers exercised against their negative fixtures.
+required lane triggered on `pull_request` with no base-branch filter, no
+`defaults.run.shell` override, no step-level `if:` on a required lane, and all
+three checkers exercised against their negative fixtures.
 
-Last run: **exit 0** — 6 continue-on-error fixtures exercised (floor 6) and
-7 pin/trigger fixtures exercised (floor 7).
+Last run: **exit 0** — 6 continue-on-error fixtures (floor 6), 7 pin/trigger
+fixtures (floor 7), 7 lane-integrity fixtures (floor 7).
 
-The two checkers it calls can also be run alone:
+The three checkers it calls can also be run alone:
 
 ```
-./scripts/check-workflows.py                                  # exit 0
+./scripts/check-workflows.py                                            # exit 0
 ./scripts/check-action-pins.py --required .github/required-checks.txt   # exit 0
+./scripts/check-lane-integrity.py --required .github/required-checks.txt # exit 0
 ```
 
-Both answer three ways, so "rejected" and "could not be evaluated" are never
-confused: `0` clean, `1` VIOLATION, `2` UNEVALUABLE.
+All three answer three ways, so "rejected" and "could not be evaluated" are
+never confused: `0` clean, `1` VIOLATION, `2` UNEVALUABLE.
+
+`check-lane-integrity.py` covers the two ways to neuter a lane that
+`continue-on-error` does not: a `defaults.run.shell` override — the Actions
+analogue of a Makefile `SHELL := /usr/bin/true`, which makes every `run:` step
+in the job a no-op that still reports success — and a step-level `if:`, since a
+skipped JOB is refused by the fan-in but a skipped STEP leaves the job green. A
+constant false is refused by name; any other condition is refused too, because
+nothing here can evaluate it and a step that might not run is not a gate. It
+also owns job existence, which was previously a grep over `*.yml` only and
+would have reported a lane defined in a `.yaml` workflow as missing.
 
 The aggregate's row-selection rules run outside Actions too, which is how they
 can be demonstrated at all:
@@ -152,6 +208,9 @@ mutation, shows the check red, restores, and shows it green.
 | `demo-4-broken-relative-link.txt` | one resolving and one broken relative link added to `docs/MILESTONES.md` |
 | `demo-5-floor-lane-deleted.txt` | `validate` removed from the manifest, both non-empty and empty |
 | `demo-6-continue-on-error-three-spellings.txt` | `continue-on-error`, `"continue-on-error"`, `Continue-On-Error` inserted into the real `validate` job |
+| `demo-7-generator-wrote-nothing.txt` | a generator that writes nothing, an empty file, only some declared files, and the pre-fix generator under the C/POSIX locale |
+| `demo-8-range-and-slash-list-expansion.txt` | a range whose end does not exist, a slash-list with one bad member, a descending range |
+| `demo-9-shell-override-and-conditional-step.txt` | `defaults.run.shell` at workflow and job level, `if: false`, a non-constant `if:`, and the required job renamed — all on the real `validate` workflow |
 
 Demos 1 and 2 commit the mutation, because that is how one reaches CI: with the
 mutation uncommitted, the dirty-tree precheck fires instead of the regeneration
