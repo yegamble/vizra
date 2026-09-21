@@ -1,8 +1,54 @@
 # Execution plan: vizra-user artifact privacy II — nothing private leaves CI in a test artifact
 
-**PHASE 1 OF 2 — PLAN ONLY.** No product code, no branch, no push. This document is
-the deliverable of phase 1. The chair puts it in front of `vizra-security`; phase 2
-implements it, amended by that review.
+**REVISION 2 — phase 2, after the `vizra-security` plan review and the chair's tick-97
+rulings.** The seat's report and the binding rulings are
+`docs/evidence/warroom/2026-09-21-vizra-user-artifact-privacy-PLAN-REVIEW-security.md`.
+The architecture survived: Lane A / Lane B split by Playwright **invocation**,
+"not produced" as the control, "path, not option", and Lane B recorders `off`
+rather than "retained on the runner" (explicitly accepted). Eight things changed,
+and the chair split the work into **two pull requests**.
+
+| | PR A | PR B |
+|---|---|---|
+| Branch | `fix/m0-artifact-privacy-a` | `fix/m0-artifact-privacy` (after A merges) |
+| Title | close today's gaps in the lane that exists | the authenticated lane |
+| New lane? | **no** | yes |
+| The hard rule (no spec may authenticate, fill a credential or touch a signed URL) | **still stands; `AGENTS.md` keeps saying so** | **lifted**, replaced by the structural rule |
+| Overlapping files | `check-e2e-lane.mjs`, `e2e.yml`, `redact.ts`, `redact-artifacts.sh` — which is why B waits for A to merge | same |
+| Review | independent verifier | independent verifier **+** the `vizra-security` seat's code review |
+
+## Rulings applied — where each finding is handled
+
+| Source | What it requires | PR | Where in this plan |
+|---|---|---|---|
+| Debt (a) | `worker-guard.ts:70-71` corrected + `mutation-digests.txt` regenerated in the SAME commit | **A** | PR A commit 1 |
+| Debt (b) / **O-3** | tokenising lane check: comments AND string literals ignored; `void f()` refused; **shadowed callee refused**; general call-and-discard recorded review-only | **A** | PR A commit 2 |
+| Debt (c) | `globalSetup`/`globalTeardown` refused, plus the argv and second-config evasions | **A** | PR A commits 3–4 |
+| **FINDING 3(1)** | drop `playwright-report/index.html` from the upload set; correct the VZ-FOUND-008 evidence README ("0 live queries" never searched the base64 archive) | **A** | PR A commit 5; measurement **M8 (corrected)** |
+| **FINDING 3(2,3)** | scanner decodes base64 → detects archive magic → recurses; `sweep-artifacts.sh` gains the same or stops being named as the proof | **B** | PR B scanner |
+| **FINDING 8** | workflow-FILE-wide default-deny: literal `path:` from a fixed allowlist, `uses:` allowlist incl. `actions/cache`, no reusable workflows, no `$GITHUB_STEP_SUMMARY`, `include-hidden-files` absent/false, `.vizra-e2e` in no `path:` of ANY workflow | **A** | PR A commit 6 (six mutations) |
+| **FINDING 9** | `package.json` scripts byte-equal to documented literals; `DEBUG`/`PWDEBUG`/`PLAYWRIGHT_*` env keys refused | **A** | PR A commit 4 |
+| **FINDING 10** | `PLAYWRIGHT_NO_COPY_PROMPT=1` at job level, asserted, red/green demonstrated; M6's "ungated" corrected | **A** | PR A commit 7; measurement **M6 (corrected)** |
+| **FINDING 13** | one sanitiser for externally-sourced text (CR/LF, leading `::`, length cap) beside the URL redaction | **A** | PR A commit 8 |
+| **FINDING 4 (2nd half)** / PR#3 **F13** | `redact.ts` + `redact-artifacts.sh` handle scheme-less and authority-relative URLs, demonstrated against the verbatim F13 string | **A** | PR A commit 9 |
+| **FINDING 19** | retention ≤ 3 days; visibility stated exactly | **A** | PR A commits 10–11 |
+| **FINDING 1** | `headersArray()` not `headers()`; credential-shaped **body parameter names**; the 250 ms settle dependency made explicit | **B** | Decision 3.2 (revised) |
+| **FINDING 2** | patch `APIRequestContext.prototype.fetch`; interim refuse-outright only if the patch proves fragile, and say which and why | **B** | Decision 3.2 (revised) |
+| **FINDING 5** / **O-4** | write → scan → print as three ordered steps, scan `if: always()`; **no** exit-code-handling exception | **B** | CI inventory (revised) |
+| **FINDING 6** | per-invocation taint; a request-side credential FAILS the test, a response-side `Set-Cookie` TAINTS and suppresses the upload with a named message, without failing an honest Lane-A test | **B** | Decision 4 (revised) |
+| **FINDING 7 + 22** | the canary runs the SHIPPED config; **positive control first** (every marker FOUND with recorders on, in a scratch dir in no upload path) before asserting absence; vacuity guards; ~8 unique mutations, not 22 | **B** | canary section |
+| **FINDING 11** | egress allowlist via `context.route` + the APIRequestContext patch; the auth config never reads `E2E_BASE_URL` | **B** | Lane B config |
+| **FINDING 12** | summary URLs reduced below path level; residual stated (the path IS the secret for reset/verify/invite/share links) | **B** | summary reporter |
+| **FINDING 14** | per-file tripwire exemptions carrying acceptance IDs; `npm run ci` green at every commit boundary; sweep extended to `e2e/harness/authenticated.ts` | **B** (the ci-at-every-boundary rule applies to **A** as well) | PR B |
+| **FINDING 15** | `.vizra-e2e/secret/` vs `.vizra-e2e/out/` | **B** | Lane B paths |
+| **FINDING 16 + 21** | credential-SHAPE detectors with a recorded false-positive corpus; bounds sized from measured artifacts with their own exit code; depth **4**, not 8 | **B** | scanner |
+| **FINDING 17 / 18** | non-wire channels and the pixel channel stated as residuals with the named trigger (first spec rendering media moves its project to screenshot/video off) | **B** | Residuals |
+| **FINDING 20** | the `AGENTS.md` sentence written **LAST**, every clause mapped to a demonstration ID | **B** | PR B final commit |
+| **FINDING 23** | agreement recorded: no trace redactor, the "canary not classifier" sentence survives verbatim, "delete the directory afterwards" is not a control | both | Decisions 1, 5; Residuals |
+| **O-1** | Lane A keeps uploading for M0 only, under four mechanical conditions | A (i, ii) + B (iii, iv) | CI inventory |
+| **O-2** | Lane-B floor **≥ 1 per project**, pinned by the canary — not 0 | **B** | — |
+| **O-5** | the chair lands the trimmed ledger text through the generator once PR B is verified | chair | — |
+| **O-6** | header and body-parameter names from a **fixed allowlist** only; never echo an arbitrary observed name | **B** | Decision 3.2 |
 
 ---
 
@@ -136,8 +182,8 @@ failmsg  3  error-context.md, rep/data/46f3…md, playwright-report/results.json
 ```
 
 `error-context.md` is written by `node_modules/playwright/lib/index.js:709` in
-`didFinishTest()` whenever `this._testInfo.errors.length > 0`. **No configuration
-option gates it** — not `trace`, not `screenshot`, not `video`. Its content
+`didFinishTest()` whenever `this._testInfo.errors.length > 0`. **No Playwright
+CONFIG option gates it** — not `trace`, not `screenshot`, not `video`. Its content
 (`lib/errorContext.js:buildErrorContext`) is:
 
 * `# Test info` — title path and file:line
@@ -145,8 +191,8 @@ option gates it** — not `trace`, not `screenshot`, not `video`. Its content
 * `# Page snapshot` — an `ariaSnapshot({mode:"ai"})` of the live page: **every DOM
   text node and every input's current value**, which is how the typed password
   landed there
-* `# Test source` — **the spec's own source around the failure**, i.e. the channel
-  `use.trace.sources:false` exists to close, re-opened by a different file
+* `# Test source` — a code frame, i.e. the channel `use.trace.sources:false` exists
+  to close, re-opened by a different file
 
 The HTML reporter then copies it into `playwright-report/data/` (`lib/runner/index.js:1349`).
 
@@ -154,6 +200,32 @@ The HTML reporter then copies it into `playwright-report/data/` (`lib/runner/ind
 projects" is necessary and *not* sufficient. The only control that holds is that the
 authenticated run's output directory is **never inside an upload path**, and that a
 scanner proves it.
+
+#### M6 — CORRECTED by the security seat's FINDING 10, and re-read at source
+
+Two things I got wrong, both now verified in the installed package:
+
+1. **The `# Page snapshot` section IS gated** — by an environment variable, not a
+   config option. `node_modules/playwright/lib/index.js:657-658`:
+
+   ```js
+   async _takePageSnapshot(context) {
+     if (process.env.PLAYWRIGHT_NO_COPY_PROMPT)
+       return;
+   ```
+
+   So `PLAYWRIGHT_NO_COPY_PROMPT=1` removes the single richest private-data channel
+   in the Lane-A upload set — every DOM text node and every input's current value —
+   while leaving the error details that make the file useful. My sentence "nothing
+   gates its contents" was false. **PR A sets it at job level and asserts it**
+   (FINDING 10). It remains true that the *file* has no config gate, which is why
+   Lane B's control stays the path.
+2. **`# Test source` is not "the spec source around the failure".** It is a code
+   frame of **±100 lines read from `errorLocation.file` at run time**
+   (`lib/errorContext.js`, `buildCodeFrame`, `linesAbove`/`linesBelow` = 100), so
+   for an error raised inside a helper it is the **helper's** source, not the
+   spec's. The threat row is "whatever file the error was raised in", which is
+   wider than I wrote.
 
 ### M7 — the GitHub log is a leaking artifact too
 
@@ -171,14 +243,71 @@ log, which no post-hoc redactor can reach because the log is streamed as it is
 written. This is the reason markers must be minted at runtime and the reason the
 authenticated lane must not use the `list` reporter.
 
-### M8 — encoded survival, this probe
+### M8 — RETRACTED AND RE-MEASURED. Markers DO survive only in an encoded form.
 
-I also scanned for percent-encoded and base64 forms of each marker. In this probe
-**no marker survived only in an encoded form** — every survival was raw bytes. Trace
-`postData` is stored as a separate `resources/*.json` file with `"text":""` in the
-HAR-shaped member, not base64-inlined. I state this as *measured in this probe*, not
-as a property of Playwright: the scanner still decodes (below), because a decoder
-that is only added after the first miss is not a control.
+**My phase-1 sentence was wrong**, and the security seat's FINDING 3 was right to
+refuse it. The original claim — "no marker survived only in an encoded form" — came
+from a scan that never decoded `playwright-report/index.html`. Re-measured:
+
+`node_modules/playwright/lib/runner/index.js:3704-3712` (`_writeReportData`) appends
+to `index.html`:
+
+```js
+fs.appendFileSync(filePath, '<template id="playwrightReportBase64">data:application/zip;base64,');
+… this._dataZipFile.outputStream.pipe(new Base64Encoder()).pipe(fs.createWriteStream(filePath,{flags:"a"}))
+fs.appendFileSync(filePath, "</template>");
+```
+
+Measured on a failing run of the same probe:
+
+```
+decoded bytes: 2612   magic: 504b0304      (a ZIP)
+members: 903210ec32f953d9c779.json, report.json
+
+markers surviving ONLY inside that embedded zip:
+  gotoquery   (the F13 scheme-less signed URL)   -> 903210ec32f953d9c779.json
+  fill        (the typed password)               -> 903210ec32f953d9c779.json
+  failmsg     (the assertion's received value)   -> 903210ec32f953d9c779.json
+
+raw grep of index.html for those markers:  NOTHING FOUND
+```
+
+And after running the **shipped** `scripts/ci/redact-artifacts.sh` over the tree
+(`OK: redacted URL query strings in 23 file(s) and 2 archive(s)`):
+
+```
+STILL LIVE AFTER REDACTION: gotoquery, fill, failmsg
+```
+
+The redactor rewrites `index.html` as text, so it changes the plaintext and cannot
+touch the base64 payload; it unpacks `*.zip` **files** only. `sweep-artifacts.sh`
+greps raw bytes of a copy with `.zip` files unpacked and cannot decode base64
+either. **Every "verified end to end" redaction claim in `AGENTS.md`, including
+"239 `?<redacted>`, zero live queries" and D9's "3 members → 0", was measured with a
+search blind to this file.** Nothing private exists today, so this is not a live
+incident; it is a fifth URL shape after four rounds, and it is exactly the shape a
+scanner must be designed for before code rather than after the first miss.
+
+**PR A's control is the seat's preferred one: drop `playwright-report/index.html`
+from the upload set.** Re-encoding would be a fifth prediction, which is the thing
+Decision 1 exists to refuse. Traces stay diagnosable — `playwright-report/data/*.zip`
+still opens in `npx playwright show-trace`. PR B's scanner additionally treats
+"decoded bytes whose magic is an archive" as an archive and recurses.
+
+Trace `postData` is stored as a separate `resources/*.json` file with `"text":""` in
+the HAR-shaped member, not base64-inlined — that part of the original measurement
+stands.
+
+### M9 — facts the rulings required me to verify at source, not assume
+
+| Fact | How confirmed | Value |
+|---|---|---|
+| `actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02`'s `include-hidden-files` default | `gh api "repos/actions/upload-artifact/contents/action.yml?ref=ea165f8d…"`, decoded and read | **`default: 'false'`** — so `test-results/.last-run.json` is genuinely not published today, and the lane guard may assert absent-or-false |
+| repository visibility | `gh repo view yegamble/<r> --json visibility` for all four | `vizra`, `vizra-core`, `vizra-user`, `vizra-search` — **all `PRIVATE`** |
+
+So the FINDING 19 sentence is: artifacts and job logs are readable by **repository
+collaborators**, not by the world. That is the exact claim; "world-readable" would
+have been wrong and "internal only" would have been vague.
 
 ---
 
@@ -517,23 +646,70 @@ Documented in `vizra-user/AGENTS.md` and in `README.md`'s command table.
 
 ---
 
-## Implementation
+## Implementation — PR A: close today's gaps in the lane that exists
 
-Commit order. (a)–(c) are the inherited debts and land first because they touch the
-same files; each is small.
+Branch `fix/m0-artifact-privacy-a` off `origin/main` (`6bf0a0e`). **No new lane.**
+The hard rule stands and `AGENTS.md` keeps saying so. `npm run ci` is run and
+recorded at **every** commit boundary (measured baseline: exit 0, 15 files / 355
+tests / 0 skipped, 8.3 s — cheap enough that there is no excuse to batch it).
 
-| # | Commit | Files | Demonstration |
+| # | Commit | Files | Red demonstration |
 |---|---|---|---|
-| **a** | `fix(e2e): correct the retracted claim in worker-guard.ts and regenerate the digest ledger` | `e2e/harness/worker-guard.ts` (lines 70-71 → the measured truth: the grep is an early warning defeatable by a trailing comment, a string literal or call-and-discard; pointer to `AGENTS.md § Residuals`, which `creation-guard.ts` already has and this file does not), `docs/evidence/VZ-FOUND-008/mutation-digests.txt` regenerated **in the same commit** by a full `npm run e2e:demos` | the regenerated ledger's `BEFORE`/`RESTORED` digests for `worker-guard.ts` change from `4fc5c024…` to the new hash, in one commit, so the ledger is never stale |
-| **b** | `fix(ci): the lane guard's harness checks match tokenised source, not raw text` | `scripts/ci/check-e2e-lane.mjs` — replace `withoutComments` (lines 546-550) with a **TypeScript AST** matcher built on the existing `typescript` 5.9.3 devDependency: parse each harness file with `ts.createSourceFile`, walk for a `CallExpression` whose callee resolves to the required name. Comments and string literals are not nodes, so both defeats vanish structurally. Call-and-discard: a `CallExpression` under a `VoidExpression` does **not** satisfy a check (see O-3). | `require-checks_test.sh` gains, for **`formatOrphans`** and **`guardBrowser`**: call removed (RED, existing); call removed + trailing comment (**RED**, new); call removed + string literal (**RED**, new); call-and-discard (**RED**, new). 4 × 2 = **8 new cases**, plus the green control. |
-| **c** | `fix(ci): refuse globalSetup/globalTeardown in the Playwright configs` | `scripts/ci/check-e2e-lane.mjs` — parse each config named by the workflow and refuse a `globalSetup` or `globalTeardown` property (AST again, so a commented one does not trip it and a computed one fails closed); `AGENTS.md § Residuals` bullet updated from "queued" to "refused" | `require-checks_test.sh` gains 4 cases: each key present in `playwright.config.ts` and in `playwright.auth.config.ts` ⇒ RED by name; the clean tree ⇒ green |
-| **d** | `fix(ci): redact authority-relative URLs (F13)` | `scripts/ci/redact-artifacts.sh` — third perl program for `host[:port]/path?query`; guard it so ordinary prose and `1:23/foo` timestamps are not rewritten | D9 gains a **`page.goto`** half: sentinel reached by navigation, measured 3 members → **0** after redaction, host and path still readable. The existing sub-resource half stays. |
-| **e** | `feat(e2e): the privacy fixture server, the markers and the canary spec` | `scripts/e2e/privacy-fixture-server.mjs`, `e2e/canary/all-channels.canary.ts`, `playwright.canary.config.ts`, `.gitignore` for `.vizra-e2e/` | the canary runs and **fails** (it is meant to); no assertion yet |
-| **f** | `feat(ci): the artifact scanner` | `scripts/ci/scan-artifacts.mjs`, `scripts/ci/scan-artifacts_test.mjs` | ≈ 22 self-test cases including every fail-closed mode |
-| **g** | `feat(e2e): the authenticated lane — Lane B, off by construction` | `playwright.auth.config.ts`, `e2e/harness/authenticated.ts` (`vizraCredentials`, branded), `e2e/harness/private-summary-reporter.ts`, `e2e/authenticated/.gitkeep`, `e2e/harness/required-projects.json` (+2 projects, floor **0** until M1 adds a spec — see O-2), `package.json` (`e2e:auth`, `e2e:auth:local`) | the canary now runs under Lane B and the scanner reports **0 markers** |
-| **h** | `feat(e2e): the guard refuses authentication outside the authenticated lane` | `e2e/harness/browser-errors.ts` (+`request` listener, header-**name**-only recording), `e2e/harness/worker-guard.ts` (taint file), `e2e/harness/creation-guard.ts` (`addCookies`/`storageState` observation) | a Lane-A spec that authenticates by each of the tripwire's four measured evasions ⇒ **RED at runtime**, each named; an honest Lane-A spec stays green |
-| **i** | `feat(ci): the e2e workflow uploads an allowlisted, scanned summary` | `.github/workflows/e2e.yml` (steps 2,3,5,6 of the inventory), `scripts/ci/check-e2e-lane.mjs` (+ the AP-5 assertions) | `require-checks_test.sh` gains the AP-5 mutations: an upload step with an extra path; an upload step not gated on `scan`; `.vizra-e2e` inside an upload path; an auth project with `trace` not `"off"`; the summary step laundering its exit code |
-| **j** | `docs: replace the hard rule with the structural rule` | `vizra-user/AGENTS.md` (the § "Artifact privacy" rewrite, the § Residuals updates, the command table), `docs/evidence/VZ-FOUND-008/README.md` | — |
+| **1** | `fix(e2e): correct the retracted claim in worker-guard.ts and regenerate the digest ledger` — debt (a) | `e2e/harness/worker-guard.ts` (lines 70-71: the grep is an **early warning**, defeatable by a trailing comment, a string literal and call-and-discard; add the `AGENTS.md § Residuals` pointer `creation-guard.ts` has and this file lacks), `docs/evidence/VZ-FOUND-008/mutation-digests.txt` **regenerated in the same commit** | the ledger's `worker-guard.ts` digests move from `4fc5c024…` to the new hash in one commit, so the byte-pinned file and its ledger are never out of step |
+| **2** | `fix(ci): the lane guard matches tokenised source, not raw text` — debt (b), O-3 | `scripts/ci/check-e2e-lane.mjs`: replace `withoutComments` (:546-550) with a **TypeScript AST** matcher on the existing `typescript@5.9.3` devDependency. A check is satisfied only by a `CallExpression` whose callee is the required identifier, **not** under a `VoidExpression`, and **not** resolving to a local binding that shadows the harness symbol | `require-checks_test.sh`, for `formatOrphans` **and** `guardBrowser`: call removed (RED, existing); + trailing comment (**RED**); + string literal (**RED**); `void f()` (**RED**); **shadowed callee** (**RED**). 5 × 2 = **10 cases**, plus the green control |
+| **3** | `fix(ci): refuse globalSetup/globalTeardown in every Playwright config` — debt (c) | `scripts/ci/check-e2e-lane.mjs` (AST over each config the workflow names, so a commented key does not trip it and a computed one fails closed); `AGENTS.md § Residuals` bullet moves from "queued" to "refused" | each key present ⇒ RED by name; a **second config file** reached via `--config` ⇒ RED; clean tree ⇒ green |
+| **4** | `fix(ci): the lane guard reads package.json and the job env` — FINDING 9 | `check-e2e-lane.mjs` asserts `scripts.e2e` / `e2e:install` / `e2e:demos` are **byte-equal** to documented literals, and refuses `DEBUG`, `PWDEBUG`, `PLAYWRIGHT_HTML_REPORT` and any other `PLAYWRIGHT_*` key in the e2e job outside an allowlist (`PLAYWRIGHT_NO_COPY_PROMPT` is the allowlisted one, commit 7) | appending `--trace on` to `scripts.e2e` ⇒ RED; appending `--output test-results` ⇒ RED; `DEBUG: pw:api` in a step env ⇒ RED |
+| **5** | `fix(ci): drop the HTML report index from the upload set` — FINDING 3(1) | `.github/workflows/e2e.yml` upload `path:` becomes an explicit list that excludes `playwright-report/index.html`; `scripts/e2e/sweep-artifacts.sh` gains a decode-then-recurse stage **or** loses its `AGENTS.md` billing as "the proof" (decided in the commit, stated either way); `docs/evidence/VZ-FOUND-008/README.md` records that the earlier "0 live queries" measurement never searched the base64-embedded archive | M8's transcript is the red half: three markers live inside `index.html` after the shipped redactor, invisible to a raw grep. Green half: the file is not in the upload set and the scan finds nothing |
+| **6** | `fix(ci): upload scope is default-deny across the whole workflow file` — FINDING 8 | `check-e2e-lane.mjs` widens from `jobs.e2e` to **every job of the file**, and asserts (a) every uploader `path:` entry is a literal from a fixed allowlist — no `* ? [ ] !`, no `${{`, no `.`/`..`; (b) every `uses:` is in a pinned allowlist, which also catches `actions/cache`; (c) no `jobs.*.uses`; (d) no `$GITHUB_STEP_SUMMARY` write in the e2e job; (e) `include-hidden-files` absent or `false` (**default `'false'` confirmed at the pinned SHA — M9**); (f) `.vizra-e2e` in no `path:` of **any** workflow | **six** `require-checks_test.sh` mutations: a glob in `path:`; a `${{ }}` in `path:`; `include-hidden-files: true`; an `actions/cache` step whose path is `.vizra-e2e`; a `$GITHUB_STEP_SUMMARY` write in the e2e job; a second job in `e2e.yml` with an uploader |
+| **7** | `fix(e2e): suppress the error-context page snapshot in CI` — FINDING 10 | `.github/workflows/e2e.yml` sets `PLAYWRIGHT_NO_COPY_PROMPT: "1"` at **job** level (never locally); `check-e2e-lane.mjs` asserts it, in the `E2E_COVERAGE_FLOOR` idiom | one demo pair: without the variable `error-context.md` has a `# Page snapshot` naming the sentinel; with it, the section is absent and the error details remain. Removing it from the workflow ⇒ RED |
+| **8** | `fix(e2e): sanitise externally-sourced text before it reaches the log` — FINDING 13 | `e2e/harness/redact.ts` gains one sanitiser beside the URL redaction — strip CR/LF, refuse a leading `::`, escape `%0A`/`%0D`/`%25`, cap length — applied to every externally-sourced string the harness prints or attaches (`describeConsole`, page-error text) | `redact.test.ts` unit cases + one demo pair: a page whose console message begins with `::error::` produces a harness message in which that text is inert |
+| **9** | `fix(e2e): redact scheme-less and authority-relative URLs` — PR#3 FINDING 13 / seat FINDING 4 | `scripts/ci/redact-artifacts.sh` third perl program for `host[:port]/path?query`, guarded so prose and `1:23/foo` timestamps are untouched; the same shape in `e2e/harness/redact.ts` | demonstrated against the **verbatim F13 string** `"subtitle":"host:3219/m.jpg?X-Amz-Sig=SENTINELVALUE&e=60"` → `?<redacted>`; plus the D9 `page.goto` half (sentinel 3 members → 0, host and path readable) |
+| **10** | `fix(ci): shorten artifact retention` — FINDING 19 | `.github/workflows/e2e.yml` `retention-days: 3`; `check-e2e-lane.mjs` asserts the ceiling | `retention-days: 14` ⇒ RED; absent ⇒ RED |
+| **11** | `docs: state what the artifact controls do and do not cover` | `vizra-user/AGENTS.md` (§ Artifact privacy, § Residuals, the command table, the retention/visibility sentence), `docs/evidence/VZ-FOUND-008/README.md` | — |
+
+**The visibility sentence, exactly** (FINDING 19; all four repositories confirmed
+`PRIVATE` — M9):
+
+> Uploaded artifacts and the job log are readable by anyone with access to this
+> **private** repository — every collaborator, and anyone an owner later adds — not
+> by the public. They are retained for **3 days**. "Not public" is not "not
+> published": a trace is a durable copy of whatever the lane saw, held by GitHub,
+> outside this repository's own access controls.
+
+**What PR A explicitly does NOT do:** no Lane B, no `e2e/authenticated/**`, no
+`vizraCredentials`, no scanner, no canary, no taint, no change to the hard rule.
+Every one of those is PR B.
+
+## Implementation — PR B: the authenticated lane
+
+Opened only after PR A is **verified and merged**, because the two overlap in
+`check-e2e-lane.mjs`, `.github/workflows/e2e.yml`, `redact.ts` and
+`redact-artifacts.sh`. Contents, per the ruling: Lane B config and the structural
+rule with FINDING 1's `headersArray()` + body-parameter-name detection and the
+explicit 250 ms settle dependency; FINDING 2's `APIRequestContext.prototype.fetch`
+patch (or the interim refuse-outright, with a written reason if the patch proves
+fragile); FINDING 6's per-invocation taint, where a request-side credential **fails**
+the test and a response-side `Set-Cookie` **taints and suppresses the upload** with a
+named message without failing an honest Lane-A test; FINDING 11's egress allowlist
+and an auth config that never reads `E2E_BASE_URL`; FINDING 4's allowlisted
+structured summary; FINDING 5 / O-4's write → scan → print as three ordered steps
+with the scan `if: always()` and **no** exit-code-handling exception; FINDING 12's
+below-path URL reduction with the residual stated; FINDING 15's `.vizra-e2e/secret/`
+vs `.vizra-e2e/out/`; FINDING 3(2,3) + 16 + 21's scanner — base64 → archive-magic →
+recurse, credential-**shape** detectors with a recorded false-positive corpus, bounds
+sized from measured artifacts with their own exit code, depth **4**; FINDING 7 + 22's
+canary on the **shipped** config with the **positive control first** (every marker
+demonstrated FOUND with recorders on, in a scratch directory in no upload path)
+before absence is asserted, vacuity guards, and ~**8** unique mutations rather than
+22; FINDING 14's per-file tripwire exemptions carrying acceptance IDs; O-2's floor of
+**≥ 1** per Lane-B project pinned by the canary; and FINDING 20's `AGENTS.md`
+sentence written **last**, every clause mapped to a demonstration ID.
+
+The exact replacement sentence is **deliberately not drafted here.** FINDING 20
+blocks it on the demonstrations existing, and this repository's own history is that
+the sentence written first is the one that turns out to be stronger than its control.
+The phase-1 draft below is kept only as a record of what it claimed, with the four
+clauses the seat falsified struck through in the commit that replaces it.
 
 ### The exact replacement sentence for `AGENTS.md`
 
@@ -648,101 +824,94 @@ image is built locally.
 
 ---
 
-## Open questions for the chair (with my recommendation)
+## Open questions — CLOSED by the chair at tick 97
 
-**O-1 — Does Lane A still upload traces at all?**
-My recommendation: **yes**, redacted and scanned, because Lane A is unauthenticated by
-runtime construction and removing its traces removes the only CI debuggability the
-repository has. The stricter reading of default-deny would upload only the summary for
-both lanes. Either is a one-line change to the inventory; I want the ruling before I
-write the lane-guard assertions, because they encode the answer.
+All six are ruled. The rulings are binding and are reproduced in the "Rulings
+applied" table at the top of this file; the full text is in
+`docs/evidence/warroom/2026-09-21-vizra-user-artifact-privacy-PLAN-REVIEW-security.md`.
 
-**O-2 — The coverage floor for the two new Lane-B projects.**
-They have no specs until M1. A floor of `0` is a floor that proves nothing; omitting
-them from `required-projects.json` means the ratchet does not apply to them when M1
-adds specs. My recommendation: register them at **0** now with a comment saying the
-first authenticated slice raises them in the same PR that adds its specs, matching the
-existing "raising the minimum is part of adding them" rule. The alternative — not
-creating Lane B until M1 needs it — would leave this slice unable to demonstrate
-anything, so I do not recommend it.
+| | My recommendation | Ruling |
+|---|---|---|
+| **O-1** Lane A still uploads traces? | yes, redacted and scanned | **yes for M0 only**, under four mechanical conditions: drop `index.html` (PR A), `PLAYWRIGHT_NO_COPY_PROMPT=1` (PR A), the per-lane taint self-closes Lane A on the first auth signal (PR B), and FINDING 18's trigger moves Lane A to summary-only at the first private-media page (PR B). "Yes with an expiry date the CI enforces." |
+| **O-2** Lane-B floor | register at 0 | **no — ≥ 1 per auth project, pinned by the canary.** A floor of 0 is the vacuity mode this repo has already been bitten by twice |
+| **O-3** call-and-discard | refuse `void f()`, general case review-only | **accepted verbatim**, plus: the AST matcher must also refuse a **shadowed callee**, or it trades a string defeat for a scope defeat |
+| **O-4** allowlist capture-and-re-raise | allowlist the exact shape | **declined, and unnecessary**: `run: npm run e2e:auth > .vizra-e2e/out/auth-lane.log 2>&1` preserves the exit code with no `\|\|` and no `exit "$code"`. The absolute no-exit-code-handling rule stays absolute |
+| **O-5** ledger privacy case | proposed text | **chair lands the seat's trimmed text** through the generator once PR B is verified. My text was trimmed: no "every byte of every path the workflow would upload" (FINDING 8), no claim about non-wire channels |
+| **O-6** record header names | keep names, never values | **keep names from a FIXED allowlist only.** Never echo an arbitrary observed header or body-parameter name — an echoed name is untrusted text going into the job log (FINDING 13) and an unbounded name list is itself request metadata |
 
-**O-3 — Call-and-discard: refuse, or record as review-only?**
-The chair allowed either. With a real AST I can refuse a `CallExpression` under a
-`VoidExpression`, which kills `void formatOrphans(a,b)`. It does **not** kill
-`const _ = formatOrphans(a,b);` or a call inside dead code — "the result is used in a
-way that matters" is not decidable by a parser. My recommendation: **refuse the `void`
-form** (it is the measured defeat) and **record the general case as review-only** in
-`AGENTS.md § Residuals`, rather than pretend to a stronger claim. I would rather write
-the honest sentence than the impressive one.
+### Where I was wrong, recorded rather than quietly fixed
 
-**O-4 — The Lane-B step re-raises a captured exit code (inventory step 3).**
-That is exit-code handling in a `run:` step, and `check-e2e-lane.mjs` exists partly to
-refuse exit-code laundering. I propose to allowlist **this exact shape** in the lane
-guard — capture, scan, print summary, `exit "$code"` — and add a `require-checks_test.sh`
-mutation that a step which exits 0 after a non-zero capture is RED. If the chair would
-rather not create the exception at all, the alternative is to let Lane B print its raw
-stdout, which reintroduces T21. I recommend the allowlisted shape.
+Four of my phase-1 claims did not survive review, and three of them I have now
+re-measured myself:
 
-**O-5 — The ledger privacy case is a meta-repo edit.**
-Board row 2f names "a privacy case added through the generator". That is
-`docs/quality/features.json` in the meta repo, which I must not touch. Proposed text
-for the chair to hand a meta builder: *VZ-FOUND-008 — "no session cookie,
-Authorization header, signed URL, request/response body, DOM snapshot or Playwright
-call parameter reaches an uploaded CI artifact; proved by an end-to-end canary whose
-runtime-minted markers are searched for in every byte of every upload path"*, status
-UNVERIFIED until this slice's verifier returns PASS.
-
-**O-6 — Does `vizra-security` want the `request` listener to record header names at
-all?** It records the NAME and never the value, but a header-name list in a failure
-message is still information about the request. My recommendation: keep the name — a
-failure that says "a request carried `authorization`" is actionable and a failure that
-says "a request carried a credential" is not — but I will drop to a generic message if
-the security seat prefers it.
-
----
-
+1. **M8** — "no marker survived only in an encoded form". **False.** Three do, inside
+   `index.html`'s base64 template, and they are still live after the shipped
+   redactor runs. Re-measured above.
+2. **M6** — "no configuration option gates `error-context.md`'s contents". **False**
+   for its worst section: `PLAYWRIGHT_NO_COPY_PROMPT` gates the page snapshot at
+   `lib/index.js:657-658`. Re-read at source above.
+3. **M6** — "`# Test source` is the spec's source around the failure". **Imprecise:**
+   it is ±100 lines of `errorLocation.file`, which for an error raised in a helper is
+   the helper.
+4. **Decision 3.2** — the wire-signal control as I described it **cannot see a
+   sign-in**: `request.headers()` / `response.headers()` omit cookie headers by API
+   contract in 1.63.0, and a login POST carries no auth header at all — it is a
+   request **body**. And the context `request` event never fires for
+   `page.request.post()`. Both are PR B's to fix; both are why the `AGENTS.md`
+   sentence is now written last rather than first.
 ## Progress and evidence
 
-**Phase 1 — plan only. No product code written, no branch created, no commit, no push.**
-
-### Measurement transcript (2026-09-21, macOS arm64, `@playwright/test` 1.63.0)
+### Phase 1 — plan only (2026-09-21, macOS arm64, `@playwright/test` 1.63.0)
 
 Probe: `…/scratchpad/vzap-probe-ZNSCIV` (created with `mktemp -d`, symlinked to
-`vizra-user/node_modules`; contains `server.mjs`, `playwright.config.ts`,
-`specs/leak.spec.ts`, `markers.json`, `run.log`, `run2.log`, `run3.log`). Markers
-minted at runtime by `crypto.randomBytes(6)`; nothing credential-shaped; nothing
-committed.
+`vizra-user/node_modules`). Markers minted at runtime by `crypto.randomBytes`;
+nothing credential-shaped; nothing committed.
 
 | Run | Command | Exit | Outcome |
 |---|---|---|---|
-| 1 | `npx playwright test --config=playwright.config.ts` with `trace:{mode:"retain-on-failure",sources:false}`, `screenshot:"only-on-failure"`, `video:"retain-on-failure"` | 1 (intended) | 21-member `trace.zip` + a **second copy** at `playwright-report/data/<sha>.zip`; **all 14 channels survive** — table M3 |
-| 2 | same spec, `trace/screenshot/video:"off"` | 1 (intended) | only `error-context.md` (+ its report copy) and `results.json` remain — **3 channels still survive**: DOM text, the typed password, the assertion value — table M6 |
-| 3 | a `page.fill` that times out | 1 (intended) | the value is **not** in stdout (call log names the locator); the **spec source excerpt is** — M7 |
+| 1 | `npx playwright test` with `trace:{mode:"retain-on-failure",sources:false}`, `screenshot:"only-on-failure"`, `video:"retain-on-failure"` | 1 (intended) | 21-member `trace.zip` + a **second copy** at `playwright-report/data/<sha>.zip`; **all 14 channels survive** — M3 |
+| 2 | same spec, `trace/screenshot/video:"off"` | 1 (intended) | only `error-context.md` (+ its report copy) and `results.json` remain — **3 channels still survive** — M6 |
+| 3 | a `page.fill` that times out | 1 (intended) | the value is **not** in stdout (the call log names the locator); the **source excerpt is** — M7 |
+| 4 | run 1's config, then `bash scripts/ci/redact-artifacts.sh test-results playwright-report` | redactor exit 0, `23 file(s) and 2 archive(s)` | **three markers still live inside `index.html`'s base64 template**, invisible to a raw grep — M8 (corrected) |
 
-Type-level facts read from `node_modules/playwright/types/test.d.ts` lines 421, 7161,
-7196, 7238, 7241-7243 (M1). Producer of `error-context.md` read from
-`node_modules/playwright/lib/index.js:697-717` and
-`node_modules/playwright/lib/errorContext.js`; its copy into the report from
-`node_modules/playwright/lib/runner/index.js:1349` (M6).
+Type-level facts from `node_modules/playwright/types/test.d.ts` (421, 7161, 7196,
+7238, 7241-7243). `error-context.md`'s producer and its `PLAYWRIGHT_NO_COPY_PROMPT`
+gate from `node_modules/playwright/lib/index.js:657-671, 697-717`; its code frame from
+`lib/errorContext.js`; its copy into the report from `lib/runner/index.js:1349`; the
+base64 report embed from `lib/runner/index.js:3704-3712`.
+
+### Phase 2 — PR A
+
+Baseline before any change, on `fix/m0-artifact-privacy-a` at `6bf0a0e`:
+
+| Command | Exit | Counts |
+|---|---|---|
+| `npm run ci` | **0** | 15 files / **355 tests** / 0 skipped (8.3 s) |
+
+Per-commit `npm run ci` results, the demonstration transcripts and the final lane
+results are appended below as they are produced. Nothing here is a narrative: each
+row is a command, an exit code and a count.
 
 ### Status
 
-**PLAN_READY.** Implementation state: PLANNED. Verification state: none —
-nothing has been implemented, so nothing is IMPLEMENTED and nothing is VERIFIED.
+PR A: IN_PROGRESS. PR B: PLANNED, blocked on PR A being verified and merged.
+Nothing is VERIFIED — that is an independent verifier's word, not mine.
 
 ---
 
 ## Blockers and handoff
 
-**No external blocker.** Everything this slice needs is local: Node, the pinned
+**No external blocker.** Everything both PRs need is local: Node, the pinned
 Chromium, `perl`/`unzip`/`zip`, and the `typescript` and `yaml` devDependencies
-already in the lockfile. No credential, no vizra-core, no network.
+already in the lockfile. No credential, no vizra-core, no network beyond localhost.
 
-**Next concrete action:** the chair puts this plan in front of the `vizra-security`
-seat, together with the six open questions. On its findings and the chair's rulings
-for O-1 … O-6, phase 2 opens `fix/m0-artifact-privacy` off `main@6bf0a0e` and lands
-commits (a) … (j) in that order, with a red/green transcript for every row of the
-threat table and every fail-closed mode of the scanner.
+**Next concrete action:** land PR A's eleven commits in order, `npm run ci` recorded
+at every boundary, each new rule red-demonstrated with the digest before/after and the
+unapplied-mutation refusal; push; open the PR; report when CI concludes. **Do not
+create PR B's branch until PR A is verified and merged** — they overlap in
+`check-e2e-lane.mjs`, `.github/workflows/e2e.yml`, `redact.ts` and
+`redact-artifacts.sh`. The PR B half of this plan may be refined while PR A is under
+verification.
 
-**Deferred cleanup:** the phase-1 probe directory is mine and is deleted at the end of
-phase 2, not before — phase 2 reuses its fixture shape.
+**Deferred cleanup:** the phase-1 probe directory is mine and is deleted when PR B
+finishes, not before — PR B's canary reuses its fixture shape.

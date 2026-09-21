@@ -101,8 +101,63 @@ local run carries no acceptance claim (ADR-009 / Q-027).
 
 ## Progress and evidence
 
-(appended as it runs)
+READY_FOR_REVIEW. PR https://github.com/yegamble/vizra-search/pull/4, head
+`852b38291c3ec8109f27ebd924ef48eec3b11a9d` (three commits: the rename +
+demonstration, a bounded `docker-build` refusal step, an `AGENTS.md` scope-note
+line). Base `3619fed`. Host
+darwin/arm64, go1.27.1, Docker 29.8.0, gh 2.98.0 — all present at preflight;
+nothing was BLOCKED.
+
+### TDD order (transcripts in the session scratchpad, superseded by the committed ones)
+
+1. Tests added first → build failure `undefined: config.EnvSearchTopology`.
+2. Constants only, no refusal → behavioural red, including the danger case
+   itself: with `VIZRA_SEARCH_MODE=development` alone the process booted
+   **production** and the only error was the dev key's, never naming the mode
+   variable.
+3. `(*validator).searchTopology()` added → green.
+
+### Lanes (exit codes recorded without a pipe)
+
+| Command | Exit | Result |
+|---|---|---|
+| `make ci` (fmt-check, vet, echo-containment, build, contract-drift, test -race, test-noskip, tidy-check) | 0 | contract-drift 346 tests / 4 packages / 0 deselected; `test-noskip` 371 pass events, **0 skips** |
+| `govulncheck ./...` (v1.8.0) | 0 | No vulnerabilities found |
+| `./scripts/ci-required-guard.sh` | 0 | floor intact, anchor present, 6 workflow fixtures exercised, base images pinned |
+| `python3 scripts/check-workflows.py …` | 0 | 2 workflows parsed, no `continue-on-error` |
+| `make vendor-contract-check` | 0 | every vendored file matches the manifest (untouched by this slice) |
+| `shellcheck scripts/boot-matrix.sh` | 0 | clean |
+| `./scripts/boot-matrix.sh` | 0 | 14 passed, 0 failed |
+| `./scripts/boot-matrix.sh --mutate fallback-to-the-old-name` | 0 (red as required) | 11 passed, 3 failed |
+| `./scripts/boot-matrix.sh --mutate drop-the-refusal` | 0 (red as required) | 7 passed, 7 failed |
+| `./scripts/boot-matrix.sh --mutate default-to-development` | 0 (red as required) | 11 passed, 3 failed |
+
+Transcripts: `vizra-search/docs/evidence/pr4/` (`README.md` maps each mutation
+to the boot cases and the named tests it turns red). Every mutation run records
+config.go's sha256 before and after, refuses an unapplied patch, and ends by
+restoring the pre-mutation digest
+`538ba2729e53b66fcc83e9e5416dfa49637a0a92f37182ceb410d98c935b631d`.
+
+### Did NOT run locally
+
+- `docker-build` — the image build is a CI lane on ubuntu-24.04/amd64 (ADR-009 /
+  Q-027) and this host is arm64 with little free disk. The Dockerfile `ENV`
+  rename and the new "the image refuses the retired runtime-mode name" step are
+  verified only by `ci-required` on the PR head.
+- `make vendor-contract` / `vendor-contract-selftest` — out of scope; nothing
+  vendored changed.
 
 ## Blockers and handoff
 
-(none yet)
+No blocker in this repository. One **cross-repo dependency** the chair must
+route, because it is not mine to edit:
+
+`vizra/docker-compose.yml` sets the **search service's** environment literally
+to `VIZRA_SEARCH_MODE: production` (recorded at line 329 in
+`docs/evidence/warroom/2026-09-21-meta-pr4-compose-topology-VERIFY.md` § "The
+`VIZRA_SEARCH_MODE` clash"). Once this PR merges, that key on the search service
+becomes a **boot refusal** — which is the designed behaviour, and exactly why
+the refusal is loud. Meta must deliver **`VIZRA_MODE: production`** to the
+search service instead. Core's own `${VIZRA_SEARCH_MODE:-off}` on the api and
+worker services (line 87) is correct as it stands and must not change: that is
+the topology, and it is now the only meaning of the name.

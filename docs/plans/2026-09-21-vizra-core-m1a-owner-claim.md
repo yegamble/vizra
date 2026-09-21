@@ -855,9 +855,46 @@ These are recorded in the PR body, not silently absorbed.
 validation only). PLAN_READY.
 
 **Phase 2 (2026-09-21).** Revision 2 written against the rulings. Preflight: Go 1.26.2, sqlc v1.31.1,
-PostgreSQL 18.6, Valkey 9.1.2 — all present. Build proceeds in the order migration → sqlc → handlers
-and middleware → OpenAPI → CLI and doctor → config → tests → mutation harness → docs. Exact commands,
-exit codes, counts, skips and artifact paths are appended below as they run.
+PostgreSQL 18.6, Valkey 9.1.2 — all present.
+
+**Preflight gates (§11), both PASSED before any handler code:**
+
+- `sqlc generate` put **no generated column** in any INSERT column list, and the explicit casts in the
+  `ClaimOwner` CTE produced fully typed parameters (`[]byte`, `uuid.UUID`, `string`) rather than
+  `interface{}`. `sqlc diff` clean. The B-R1/B-R11 risk did not materialise.
+- Migration 0005 applies and rolls back on PostgreSQL 18.6; every invariant probed directly
+  (second live owner → 23505 `users_one_owner`; tombstoned owner → replacement **succeeds**;
+  audit UPDATE/DELETE/TRUNCATE → 42501; user named by an audit row → 23503; plaintext and bcrypt
+  refused by `credentials_password_is_argon2id`; second password credential → 23505; token
+  singleton and terminal-state CHECKs fire).
+
+**Rebased onto `origin/main` 5eb2829 (PR #7, `vizra healthcheck`)** before any push. One conflict, in
+`cmd/vizra/main.go`'s subcommand switch, resolved **additively** — both `healthcheck` and
+`claim-token` are registered. All evidence below was retaken after the rebase; the pre-rebase runs
+are discarded.
+
+| Lane | Command | Result |
+|---|---|---|
+| Gate | `make ci` | **exit 0** — all 10 lanes |
+| Integration | `go test -tags=integration -race -count=1 -v ./internal/integration/` | **exit 0** — 102 run, 102 passed, **0 failed, 0 skipped** |
+| Shuffle | `make test-integration-shuffle` | **exit 0** |
+| Mutations | `docs/evidence/m1a-owner-claim/demonstrate.sh` | 23 cases, 0 failed, 0 harness-fail |
+
+Environment: darwin/arm64, go1.27.1 toolchain, PostgreSQL **18.6** (container `vizra-m1a-pg18`),
+Valkey **9.1.2** (container `vizra-m1a-valkey`). Artifacts in `vizra-core` under
+`docs/evidence/m1a-owner-claim/`.
+
+**Two harness defects the before/after digest gate caught in itself**, both fixed and recorded rather
+than quietly patched: the restore covered the mutated `.sql` but not the sqlc-generated Go beside it
+(so a following GREEN run failed for an unrelated reason), and MUT-27's pattern had stopped matching
+(reported `HARNESS-FAIL`, never as a pass).
+
+**Three properties are review-only, measured rather than assumed** — listed in the transcript beside
+MUT-4 instead of being implied as covered: the constant-time comparison; passing the row's own digest
+rather than the presented one; and the `consumed_at` / `superseded_at` predicates in the redeem CTE.
+The last is the interesting one: dropping `consumed_at IS NULL` leaves the race test **green**,
+because `users_one_owner` plus the 23505→409 mapper produce exactly the answer the row guard would
+have. That is defence in depth working, and it is reported as such.
 
 ## 15. Blockers and handoff
 
