@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-21, tick 84 — meta PR #4 round 1 PUSHED at `3261ad3` (`validate` + `ci-required` success; GitGuardian red on intermediate commit `a96f188` — fake `zzMARKERzz…` literals in demo.sh, fixed at `bb8163f`; chair ruling: leave history, squash keeps it off `main`, owner dismisses the incident) → same verifier re-verifying + infrastructure seat re-judging its four blockers. In flight: those two; search #3 verifier; user #7 re-verification; two plan-review seats (core M1-A); core B2 builder. Owner inbox: +GitGuardian incident 37486665. History: "Tick log" at the end of this file.
+Last tick: 2026-09-21, tick 85 — backend seat's review of the core M1-A owner-claim PLAN is in: six BLOCKING-BEFORE-CODE (tombstoned owner bricks the instance under `users_one_owner`; RESTRICT + append-only trigger makes users undeletable with no erasure path; OpenAPI char bound vs SQL byte CHECK → 500 on the claim endpoint; unstated isolation level; N replicas print N indistinguishable tokens; every 429 writes an undeletable audit row) + twelve required; awaiting the security seat before the chair rules and phase 2 starts. In flight: security seat; meta #4 verifier + infrastructure seat; search #3 verifier; user #7 re-verification; core B2 builder. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -133,6 +133,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 85 (2026-09-21) — backend seat's plan review for core M1-A filed (`docs/evidence/warroom/2026-09-21-vizra-core-m1a-owner-claim-PLAN-REVIEW-backend.md`): six blocking-before-code, twelve required, rulings on OQ-1…OQ-10 + new OQ-11; chair rules once the security seat reports.
 - Tick 84 (2026-09-21) — meta PR #4 round 1 pushed at `3261ad3`; GitGuardian red on an intermediate commit's fake marker literals (history left alone; squash keeps it off main); verifier + infrastructure seat re-judging.
 - Tick 83 (2026-09-21) — search PR #3 re-vendor ready at `aa1c3fb` (adds the vendoring command the repo lacked); fresh verifier dispatched.
 - Tick 82 (2026-09-21) — core M1-A owner-claim plan ready with ten open questions (OQ-10: does ADR-003's setup-wizard row bind the public claim API?); security + backend seats reviewing the plan before code.
