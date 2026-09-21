@@ -141,7 +141,48 @@ Appended as it happens. Nothing here is a narrative; each line names a command,
 an exit code and a file.
 
 - 2026-09-21 — preflight done; worktree clean at `9c4b5d3`; baseline demo run
-  73/73 exit 0 (`demo-baseline.txt` in the session scratchpad).
+  73/73 exit 0, 39 cases, 3 min 51 s.
+- 2026-09-21 — items 1–7 implemented. Code commit
+  **`e82e659e251356a55c94fc36a0f6dc0730239808`**; evidence commit
+  **`cf9e4c86b077335fcad8cf8050c8fe57a50431c2`**. Plain push onto
+  `feat/m0-compose-topology`, no amend, no rebase, no force.
+
+| Command | Exit | From tool output |
+|---|---|---|
+| `./scripts/check-generated-ledger.sh` | 0 | 191 requirements, reproduces byte-for-byte in both locales |
+| `./scripts/check-quality-json.py` | 0 | 191 ids, 287 references, all resolve |
+| `./scripts/check-doc-links.py` | 0 | 95 markdown files; 6 compose paths resolve |
+| `./scripts/ci-required-guard.sh` | 0 | fixtures 6 / 7 / 10, floors met |
+| `./scripts/compose-render.py --all` | 0 | 13 shapes |
+| `./scripts/check-compose-topology.py` | 0 | `13 shape(s) … 27 rules, 0 violations; 2 known-false` |
+| `./scripts/check-config-coverage.py` | 0 | `34 component keys, 58 template keys, 58 interpolated, 13 shapes; 1 alias; 1 retired refused` |
+| `./scripts/check-template-claims.py` | 0 | `10 files, 16 references; 5 shipped, 11 future; 0 resolved on disk, 6 future scripts` |
+| `python3 docs/evidence/compose-topology/claims.py --check` | 0 | `CLAIMS.md is current (47 audited claims)` |
+| `./scripts/check-config-coverage.py --drift` (checkouts absent) | **2** | **BLOCKED**, recorded as BLOCKED |
+| `bash docs/evidence/compose-topology/demo.sh` | 0 | `RESULT: 95 assertion(s) passed, 0 failed, across 50 case(s)`; tree byte-identical; **0** `broken pipe` |
+
+Demonstrations added this round, each red for the DECLARED rule id with a
+digest pair either side and green after restore:
+
+| Case | Rule id | Mutation |
+|---|---|---|
+| 26a–26e | `gated-probe-unrecognised` | `pg_isready \|\| true`; `true # pg_isready`; `sh -c 'exit 0; pg_isready'`; `echo pg_isready`; `["NONE"]` |
+| 27 | `known-false-stale-disclosure` | `known_false_probes: []` with both paragraphs present |
+| 28a–28d | `unmarked-future-script` ×3, `unknown-script` ×1 | `./backup.sh`; `scripts/backup.sh`; `` `./backup.sh` ``; `rotate-secrets.sh` |
+| 28e | — (green) | `./backup.sh` **with** its marker in the window stays exit 0 |
+| drift transcript | `registry-drift` | `"secret": true` deleted from `VIZRA_SESSION_SECRET` |
+
+Residuals measured rather than asserted, recorded in `local-run.txt`:
+`["CMD-SHELL","pg_isready --version"]` is **green** (the S-2 limit), and an
+absent rule id is still reported absent after the here-string change (the S-4
+acceptance criterion that the fix must not make a condition unconditionally
+true).
+
+Scope checks: `docs/quality/features.json` byte-identical to `main`;
+`.github/required-checks.txt`, `scripts/ci-required-guard.sh` and
+`docs/evidence/ledger-generator/` untouched; no path under `vizra-{core,user,search}/`
+in the diff; no container started; added lines carry no credential-shaped
+literal and no `scheme://user:pass@host`.
 
 ## Blockers and handoff
 
