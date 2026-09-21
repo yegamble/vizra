@@ -216,6 +216,55 @@ not apply.
 Artifacts: `docs/evidence/meta-validate/ci-run-validate.txt`,
 `docs/evidence/meta-validate/ci-run-ci-required.txt`.
 
+### Fix round 1 — verifier PASS at `e667b60`, four findings closed
+
+Head after the round: **`5dfa75ca1453f390cea1da1a7bd9accbfd641cb3`**.
+`validate` success (6s), `ci-required` success (27s) on ubuntu-24.04.
+Ledger content byte-identical to base on all four quality JSON files
+(`features.json` `25231b8411f7`, `ui-controls.json` `7bc463afc1a2`,
+`release-profiles/core.json` `a86d3b2704d2`, `full.json` `ecef08429693`).
+
+**Finding 1 — the lane's primary check was a false green.** A generator that
+exits 0 without writing anything passed as "reproduces byte-for-byte", because
+`git diff --exit-code` cannot tell "rewrote identically" from "wrote nothing".
+Fixed by deleting the declared files before regenerating, then requiring each to
+exist, be non-empty and parse before the diff. Set equality now holds in both
+directions. Plus a C/POSIX locale regression pass on every run.
+
+**Finding 2 — ranges and slash-lists were not expanded.** Coverage went from 139
+distinct ids to 287 expanded from 191 written references.
+
+*The verifier's scope premise was wrong and I did not adopt it.* It suggested
+widening to `docs/plans/` because "all ids there resolve today". Measured: the
+13 slice plans are clean, but `docs/plans/WARROOM-BOARD.md` row 2b names four
+**proposed** ids (`VZ-SEC-SSR-001`, `VZ-SEC-HDR-001`, `VZ-SEC-SSR-002`,
+`VZ-SEC-SUPPLY-001`) that dangle by design. Gating that directory would make the
+lane red for proposing a requirement. Took the chair's stated alternative:
+scope unchanged, both exclusions documented with their measured reasons.
+
+**Finding 3 — two simpler ways to neuter a lane.** New
+`scripts/check-lane-integrity.py`: refuses `defaults.run.shell` at workflow or
+job level and any step-level `if:` on a required lane; job existence moved from
+a `.yml`-only grep to a YAML parse. Seven fixtures, one `.yaml` by design.
+
+**Finding 4 — I was wrong about the locale bug.** My previous PR body claimed the
+failure could not be reproduced on macOS. It can: with
+`LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0` (PEP 538 coercion was
+masking it) the pre-fix generator raises
+`UnicodeEncodeError: 'ascii' codec can't encode character '—' in position 428`
+and truncates the ledger. Reproduced in demo 7d; the invocation is now a lane
+step. PR body corrected. The stale `87` file count was removed rather than
+updated — it is 92 at this SHA, which is the argument against quoting it.
+
+**Self-found during the round:** the id checker printed "every one resolves"
+alongside a reported unreadable range — two statements about one run, one false.
+Fixed.
+
+Nine demonstrations now, each printing a sha256 before and after so a mutation
+that did not land cannot be mistaken for a demonstration. Transcripts:
+`docs/evidence/meta-validate/demo-1…9`, `ci-run-validate.txt`,
+`ci-run-ci-required.txt`.
+
 ## Blockers and handoff
 
 No blockers. State is **READY_FOR_REVIEW**, not VERIFIED: an independent
