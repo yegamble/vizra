@@ -1,0 +1,1165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Lumen Atlas — Photography, discovered</title>
+<style>
+  /* ---------- Tokens ---------- */
+  :root {
+    --bg:          oklch(0.985 0.003 250);
+    --bg-elev:    #ffffff;
+    --bg-tint:    oklch(0.96 0.004 250);
+    --ink:         oklch(0.18 0.015 260);
+    --ink-2:       oklch(0.38 0.012 260);
+    --ink-3:       oklch(0.56 0.010 260);
+    --line:        oklch(0.90 0.006 260);
+    --line-2:     oklch(0.94 0.005 260);
+    --accent:      oklch(0.58 0.18 255);
+    --accent-ink:  oklch(0.36 0.16 258);
+    --accent-soft: oklch(0.95 0.04 255);
+    --radius-xl:   28px;
+    --radius-lg:   22px;
+    --radius-md:   16px;
+    --radius-sm:   12px;
+    --shadow-sm: 0 1px 2px rgba(17,22,40,.04), 0 1px 1px rgba(17,22,40,.03);
+    --shadow-md: 0 8px 24px -12px rgba(17,22,40,.12), 0 2px 6px rgba(17,22,40,.05);
+    --shadow-lg: 0 30px 60px -25px rgba(17,22,40,.25), 0 10px 24px -15px rgba(17,22,40,.10);
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+    --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+    --nav-h: 56px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  html { background: var(--bg); }
+  body {
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-size: 15px;
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+  }
+  img { display: block; max-width: 100%; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+  }
+  .muted { color: var(--ink-3); }
+
+  /* ---------- Nav ---------- */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: var(--nav-h);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    background: color-mix(in oklab, white 82%, transparent);
+    backdrop-filter: saturate(180%) blur(22px);
+    -webkit-backdrop-filter: saturate(180%) blur(22px);
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  }
+  .brand {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+  }
+  .brand-mark {
+    width: 22px; height: 22px; border-radius: 7px;
+    background:
+      radial-gradient(circle at 30% 30%, oklch(0.75 0.15 80), transparent 60%),
+      linear-gradient(135deg, oklch(0.58 0.18 255), oklch(0.45 0.14 285));
+    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,.35);
+  }
+  .brand-name b { font-weight: 600; }
+  .brand-name span { color: var(--ink-3); font-weight: 400; }
+
+  .nav-search {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--bg-tint);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    color: var(--ink-3);
+    font-size: 14px;
+    transition: border-color .15s, background .15s;
+  }
+  .nav-search:focus-within { border-color: var(--accent); background: white; color: var(--ink); }
+  .nav-search input {
+    all: unset;
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    color: var(--ink);
+  }
+  .nav-search input::placeholder { color: var(--ink-3); }
+
+  .nav-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 999px;
+    color: var(--ink-2);
+    transition: background .15s, color .15s;
+  }
+  .icon-btn:hover { background: var(--bg-tint); color: var(--ink); }
+  .icon-btn svg { width: 19px; height: 19px; }
+
+  /* Apple-style tooltip */
+  .has-tip { position: relative; }
+  .has-tip::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-4px);
+    background: rgba(28, 28, 30, 0.92);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    padding: 5px 9px;
+    border-radius: 7px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .18s ease, transform .18s ease;
+    transition-delay: 0s;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 4px 14px rgba(0,0,0,.14), 0 0 0 0.5px rgba(255,255,255,.08) inset;
+    z-index: 200;
+  }
+  .has-tip::before {
+    content: "";
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-4px);
+    width: 8px; height: 8px;
+    background: rgba(28, 28, 30, 0.92);
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .18s ease, transform .18s ease;
+    z-index: 200;
+  }
+  .has-tip:hover::after,
+  .has-tip:focus-visible::after,
+  .has-tip:hover::before,
+  .has-tip:focus-visible::before {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    transition-delay: .35s;
+  }
+  .has-tip.tip-end::after,
+  .has-tip.tip-end::before { left: auto; right: 0; transform: translateX(0) translateY(-4px); }
+  .has-tip.tip-end:hover::after,
+  .has-tip.tip-end:hover::before { transform: translateX(0) translateY(0); }
+
+  /* ---------- Avatar profile menu ---------- */
+  .avatar-wrap { position: relative; }
+  .avatar-btn {
+    all: unset;
+    cursor: pointer;
+    border-radius: 50%;
+    display: inline-flex;
+    transition: transform .12s, box-shadow .15s;
+  }
+  .avatar-btn:focus-visible,
+  .avatar-btn.open { box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 35%, transparent); }
+
+  .profile-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 280px;
+    background: color-mix(in oklab, white 92%, transparent);
+    backdrop-filter: saturate(180%) blur(28px);
+    -webkit-backdrop-filter: saturate(180%) blur(28px);
+    border-radius: 16px;
+    box-shadow:
+      0 24px 48px -16px rgba(17,22,40,.28),
+      0 8px 20px -8px rgba(17,22,40,.14),
+      inset 0 0 0 0.5px rgba(255,255,255,.7),
+      inset 0 0 0 1px color-mix(in oklab, var(--line) 60%, transparent);
+    z-index: 250;
+    padding: 6px;
+    opacity: 0;
+    transform: translateY(-6px) scale(.98);
+    transform-origin: top right;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .22s cubic-bezier(.2,.9,.3,1.05);
+    overflow: hidden;
+  }
+  .profile-menu.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .profile-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 12px 14px;
+  }
+  .profile-head .avatar {
+    width: 44px; height: 44px; font-size: 15px;
+    box-shadow: 0 2px 6px rgba(17,22,40,.12);
+    flex-shrink: 0;
+  }
+  .profile-head .who { min-width: 0; }
+  .profile-name {
+    font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em;
+    color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .profile-handle {
+    font-size: 12.5px; color: var(--ink-3);
+    margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .menu-sep {
+    height: 1px;
+    background: color-mix(in oklab, var(--line) 70%, transparent);
+    margin: 2px 4px;
+  }
+
+  .menu-item {
+    all: unset;
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .menu-item:hover,
+  .menu-item:focus-visible {
+    background: color-mix(in oklab, var(--accent) 10%, transparent);
+    color: var(--accent-ink);
+  }
+  .menu-item .mi-ico {
+    width: 20px; height: 20px;
+    color: var(--ink-2);
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .menu-item:hover .mi-ico { color: var(--accent-ink); }
+  .menu-item .mi-ico svg { width: 17px; height: 17px; }
+  .menu-item .mi-label { flex: 1; }
+  .menu-item .mi-aside {
+    font-size: 11px;
+    color: var(--ink-3);
+    letter-spacing: .02em;
+  }
+  .menu-item.danger { color: oklch(0.52 0.18 25); }
+  .menu-item.danger .mi-ico { color: oklch(0.52 0.18 25); }
+  .menu-item.danger:hover {
+    background: color-mix(in oklab, oklch(0.52 0.18 25) 10%, transparent);
+    color: oklch(0.48 0.20 25);
+  }
+
+  /* Stats row inside menu */
+  .profile-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    background: color-mix(in oklab, var(--bg-tint) 70%, transparent);
+    border-radius: 12px;
+    padding: 10px 4px;
+    margin: 2px 4px 4px;
+  }
+  .profile-stat { text-align: center; }
+  .profile-stat .n {
+    font-size: 14px; font-weight: 600; color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .profile-stat .l {
+    font-size: 10.5px; color: var(--ink-3);
+    letter-spacing: .06em; text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  @media (max-width: 520px) {
+    .profile-menu { width: 260px; right: -8px; }
+  }
+
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg, oklch(0.78 0.09 50), oklch(0.55 0.14 25));
+    color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+    border: 1px solid rgba(0,0,0,.05);
+    margin-left: 4px;
+  }
+
+  .nav-links { display: none; }
+  .nav-link {
+    font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-2);
+    padding: 8px 12px; border-radius: 999px;
+  }
+  .nav-link:hover { color: var(--ink); }
+  .nav-pill {
+    display: none;
+    align-items: center; gap: 6px;
+    height: 34px; padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .nav-pill:hover { border-color: var(--ink-2); color: var(--ink); }
+  .nav-pill svg { width: 13px; height: 13px; }
+
+  /* ---------- Layout ---------- */
+  .shell { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
+  .section { padding: 48px 0; }
+  .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
+  .section-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    margin: 0;
+  }
+  .section-sub { margin-top: 4px; color: var(--ink-3); font-size: 14px; }
+  .link-inline {
+    color: var(--accent);
+    font-size: 13px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 4px;
+    white-space: nowrap;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    position: relative;
+    margin: 12px 16px 0;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+    background: #0e1820;
+    isolation: isolate;
+  }
+  .hero-img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 0;
+  }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 35%, rgba(6,14,22,.55) 90%);
+    z-index: 1;
+  }
+  .hero-card {
+    position: absolute;
+    left: 16px; right: 16px; bottom: 16px;
+    z-index: 2;
+    padding: 22px;
+    border-radius: var(--radius-lg);
+    background: color-mix(in oklab, white 80%, transparent);
+    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: var(--shadow-md), inset 0 0 0 1px rgba(255,255,255,.5);
+  }
+  .hero-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    margin: 12px 0 10px;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+  .hero-desc {
+    font-size: 15px;
+    color: var(--ink-2);
+    margin: 0 0 18px;
+    max-width: 46ch;
+    text-wrap: pretty;
+  }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 44px; padding: 0 20px;
+    border-radius: 999px;
+    font-size: 14px; font-weight: 600; letter-spacing: -0.005em;
+    transition: transform .08s ease, background .15s, color .15s, border-color .15s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn svg { width: 15px; height: 15px; }
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 6px 20px -8px oklch(0.58 0.18 255 / .55);
+  }
+  .btn-primary:hover { background: oklch(0.52 0.18 255); }
+  .btn-secondary {
+    background: white;
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .btn-secondary:hover { border-color: var(--ink-3); }
+
+  /* ---------- Categories (pills) ---------- */
+  .pill-row {
+    display: flex; gap: 8px;
+    overflow-x: auto; overflow-y: hidden;
+    padding: 4px 16px 12px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pill-row::-webkit-scrollbar { display: none; }
+  .pill {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    height: 36px; padding: 0 16px;
+    border-radius: 999px;
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    font-size: 13.5px; font-weight: 500;
+    color: var(--ink-2);
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: all .15s;
+  }
+  .pill:hover { border-color: var(--ink-3); color: var(--ink); }
+  .pill.active {
+    background: var(--ink);
+    color: white;
+    border-color: var(--ink);
+  }
+  .pill .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .4; }
+
+  /* ---------- Artists ---------- */
+  .artists {
+    background: var(--bg-tint);
+    padding: 48px 0;
+    border-top: 1px solid var(--line-2);
+    border-bottom: 1px solid var(--line-2);
+  }
+  .artists-head { text-align: center; margin-bottom: 28px; }
+  .artists-head .eyebrow { display: block; margin-bottom: 8px; }
+  .artists-scroll {
+    display: flex; gap: 14px;
+    padding: 0 16px 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .artists-scroll::-webkit-scrollbar { display: none; }
+  .artist-card {
+    flex-shrink: 0;
+    width: 160px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .artist-avatar {
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--line-2);
+    box-shadow: var(--shadow-sm), inset 0 0 0 1px rgba(255,255,255,.5);
+  }
+  .artist-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .artist-thumb {
+    width: 160px; height: 160px;
+    border-radius: 28px;
+    overflow: hidden;
+    background: var(--ink);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+  }
+  .artist-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .artist-name { font-weight: 600; font-size: 15px; }
+  .artist-style { font-size: 13px; color: var(--ink-3); margin-top: -6px; }
+  .artist-card .link-inline {
+    font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  }
+
+  /* ---------- Collections ---------- */
+  .collections-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .collection {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: #111;
+    isolation: isolate;
+    box-shadow: var(--shadow-sm);
+    transition: transform .25s ease, box-shadow .25s ease;
+  }
+  .collection:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .collection img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: cover;
+    z-index: 0;
+    transition: transform .5s ease;
+  }
+  .collection:hover img { transform: scale(1.04); }
+  .collection::after {
+    content: "";
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,.7) 100%);
+  }
+  .collection-body {
+    position: absolute; left: 20px; right: 20px; bottom: 18px;
+    z-index: 2;
+    color: white;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+  }
+  .collection h3 {
+    font-family: var(--font-display);
+    font-weight: 700; font-size: 22px; line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 3px;
+  }
+  .collection-curator { font-size: 12px; opacity: .8; }
+  .chip {
+    flex-shrink: 0;
+    height: 28px; padding: 0 11px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.18);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,.22);
+    color: white;
+    font-size: 11px; font-weight: 600;
+    display: inline-flex; align-items: center;
+  }
+
+  /* ---------- Discover grid ---------- */
+  .discover-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .tool-group {
+    display: inline-flex; background: var(--bg-elev); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px; gap: 2px;
+  }
+  .tool-btn {
+    width: 34px; height: 34px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--ink-3);
+  }
+  .tool-btn.active { background: var(--ink); color: white; }
+  .tool-btn svg { width: 16px; height: 16px; }
+
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .photo {
+    position: relative;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--line-2);
+    aspect-ratio: 1;
+    box-shadow: var(--shadow-sm);
+  }
+  .photo.tall { aspect-ratio: 3/4; }
+  .photo.wide { grid-column: span 2; aspect-ratio: 16/10; }
+  .photo img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform .6s ease;
+  }
+  .photo:hover img { transform: scale(1.04); }
+  .photo-meta {
+    position: absolute; left: 10px; bottom: 10px; right: 10px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    color: white;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .photo:hover .photo-meta { opacity: 1; }
+  .photo-meta::before {
+    content: "";
+    position: absolute; left: -10px; right: -10px; bottom: -10px; top: -20px;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,.55));
+    z-index: -1;
+    pointer-events: none;
+  }
+  .photo-meta .author { font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  .heart {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(0,0,0,.3); backdrop-filter: blur(8px);
+    border-radius: 999px; padding: 4px 8px;
+    font-size: 11px; font-weight: 600;
+  }
+  .heart svg { width: 11px; height: 11px; }
+
+  /* ---------- Editorial ---------- */
+  .editorial {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 22px;
+    align-items: center;
+  }
+  .editorial-img {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: #222;
+    box-shadow: var(--shadow-md);
+  }
+  .editorial-img img { width: 100%; height: 100%; object-fit: cover; }
+  .editorial-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    margin: 10px 0 14px;
+    text-wrap: balance;
+  }
+  .editorial-desc { color: var(--ink-2); margin: 0 0 20px; text-wrap: pretty; }
+  .play-row {
+    display: inline-flex; align-items: center; gap: 12px;
+    color: var(--accent);
+  }
+  .play-btn {
+    width: 42px; height: 42px; border-radius: 50%;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s;
+  }
+  .play-btn:hover { background: var(--accent); color: white; }
+  .play-btn svg { width: 14px; height: 14px; margin-left: 2px; }
+  .play-row span { font-weight: 600; font-size: 14px; }
+
+  /* ---------- Footer ---------- */
+  .footer {
+    margin-top: 24px;
+    padding: 40px 16px 32px;
+    border-top: 1px solid var(--line-2);
+    background: var(--bg-tint);
+  }
+  .footer-inner { max-width: 1240px; margin: 0 auto; }
+  .footer-row { display: flex; flex-direction: column; gap: 18px; }
+  .footer-brand { font-weight: 600; font-size: 16px; }
+  .footer-copy { font-size: 12px; color: var(--ink-3); letter-spacing: .05em; text-transform: uppercase; }
+  .footer-links {
+    display: flex; flex-wrap: wrap; gap: 14px 20px;
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .footer-links a:hover { color: var(--ink); }
+  .footer-social { display: flex; gap: 6px; }
+
+  /* ---------- Mobile bottom bar ---------- */
+  .mobile-tabs {
+    position: fixed;
+    left: 12px; right: 12px; bottom: 12px;
+    z-index: 40;
+    height: 58px;
+    border-radius: 999px;
+    background: color-mix(in oklab, white 72%, transparent);
+    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: 0 10px 30px -10px rgba(17,22,40,.2), inset 0 0 0 1px rgba(255,255,255,.6);
+    display: flex; align-items: center; justify-content: space-around;
+    padding: 0 8px;
+  }
+  .mobile-tabs .tab {
+    flex: 1;
+    display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px;
+    color: var(--ink-3);
+    font-size: 10px; font-weight: 500;
+    height: 100%;
+    border-radius: 999px;
+  }
+  .mobile-tabs .tab.active { color: var(--accent); }
+  .mobile-tabs .tab.upload {
+    background: var(--ink);
+    color: white;
+    width: 44px; height: 44px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+  }
+  .mobile-tabs .tab.upload svg { width: 18px; height: 18px; }
+  .mobile-tabs .tab svg { width: 20px; height: 20px; }
+
+  body { padding-bottom: 90px; }
+
+  /* ---------- Desktop ---------- */
+  @media (min-width: 760px) {
+    :root { --nav-h: 64px; }
+    body { font-size: 16px; padding-bottom: 0; }
+    .shell { padding: 0 32px; }
+    .nav { padding: 0 28px; gap: 20px; }
+    .nav-search { max-width: 460px; margin: 0 auto; height: 38px; }
+    .nav-links { display: flex; align-items: center; gap: 4px; }
+    .nav-pill { display: inline-flex; }
+    .hero {
+      margin: 20px 32px 0;
+      aspect-ratio: 16/9;
+      border-radius: 32px;
+    }
+    .hero-card {
+      left: 32px; bottom: 32px; right: auto;
+      width: 440px;
+      padding: 30px;
+    }
+    .hero-title { font-size: 48px; }
+    .hero-desc { font-size: 16px; }
+    .section { padding: 72px 0; }
+    .section-title { font-size: 36px; }
+    .pill-row { padding: 8px 32px 14px; }
+    .artists { padding: 72px 0; }
+    .artists-head { margin-bottom: 36px; }
+    .artists-head .section-title { font-size: 36px; }
+    .artists-scroll { padding: 4px 32px 10px; gap: 18px; }
+    .artist-card { width: 190px; }
+    .artist-avatar, .artist-thumb { width: 190px; height: 190px; }
+    .collections-grid { grid-template-columns: 1fr 1fr; gap: 18px; }
+    .collection { aspect-ratio: 3/2; }
+    .collection h3 { font-size: 26px; }
+    .photo-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .photo.wide { grid-column: span 2; aspect-ratio: 4/3; }
+    .photo.hero-row { grid-column: span 3; aspect-ratio: 21/9; }
+    .editorial { grid-template-columns: 1fr 1fr; gap: 56px; }
+    .editorial-title { font-size: 32px; }
+    .footer-row { flex-direction: row; align-items: center; justify-content: space-between; }
+    .footer { padding: 56px 32px 40px; }
+    .mobile-tabs { display: none; }
+  }
+
+  @media (min-width: 1100px) {
+    .hero { aspect-ratio: 16/8; }
+    .hero-title { font-size: 56px; }
+    .section-title { font-size: 42px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav">
+  <a class="brand" href="#">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name"><b>Lumen</b> <span>Atlas</span></span>
+  </a>
+
+  <label class="nav-search" aria-label="Search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input placeholder="Search photographers, places, moods…" />
+    <span style="font-size:11px;color:var(--ink-3);border:1px solid var(--line);border-radius:5px;padding:2px 5px;">⌘K</span>
+  </label>
+
+  <nav class="nav-links" aria-label="Primary">
+    <a class="nav-link" href="#">Discover</a>
+    <a class="nav-link" href="#">Collections</a>
+    <a class="nav-link" href="#">Artists</a>
+    <a class="nav-pill" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h5l8 8-8 8-8-8Z"/><circle cx="11" cy="11" r="1.5"/></svg>
+      Surprise
+    </a>
+  </nav>
+
+  <div class="nav-actions">
+    <button class="icon-btn has-tip" aria-label="Notifications" data-tip="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+    </button>
+    <a class="icon-btn has-tip" href="Upload Studio.html" aria-label="Upload a photo" data-tip="Add a photo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>
+    </a>
+    <span class="avatar-wrap">
+      <button class="avatar-btn" id="avatarBtn" aria-label="Your profile" aria-haspopup="menu" aria-expanded="false">
+        <span class="avatar">MK</span>
+      </button>
+
+      <div class="profile-menu" id="profileMenu" role="menu" aria-labelledby="avatarBtn">
+        <div class="profile-head">
+          <span class="avatar">MK</span>
+          <div class="who">
+            <div class="profile-name">Marie Kowalski</div>
+            <div class="profile-handle">@marie.kowalski · Curator</div>
+          </div>
+        </div>
+
+        <div class="profile-stats">
+          <div class="profile-stat"><div class="n">142</div><div class="l">Photos</div></div>
+          <div class="profile-stat"><div class="n">18</div><div class="l">Series</div></div>
+          <div class="profile-stat"><div class="n">2.4k</div><div class="l">Followers</div></div>
+        </div>
+
+        <div class="menu-sep"></div>
+
+        <a class="menu-item" href="Artist Profile.html" role="menuitem">
+          <span class="mi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg></span>
+          <span class="mi-label">View Profile</span>
+        </a>
+        <a class="menu-item" href="My Photos.html" role="menuitem">
+          <span class="mi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+          <span class="mi-label">My Photos</span>
+          <span class="mi-aside">312</span>
+        </a>
+        <a class="menu-item" href="My Albums.html" role="menuitem">
+          <span class="mi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg></span>
+          <span class="mi-label">Albums</span>
+        </a>
+        <a class="menu-item" href="Photo Insights.html" role="menuitem">
+          <span class="mi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></span>
+          <span class="mi-label">Insights</span>
+        </a>
+        <a class="menu-item" href="Upload Studio.html" role="menuitem">
+          <span class="mi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="m21 15-5-4-9 7"/></svg></span>
+          <span class="mi-label">Upload Studio</span>
+        </a>
+
+        <div class="menu-sep"></div>
+
+        <a class="menu-item" href="Edit Profile.html" role="menuitem">
+          <span class="mi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
+          <span class="mi-label">Edit Profile</span>
+        </a>
+        <a class="menu-item" href="Account Settings.html" role="menuitem">
+          <span class="mi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+          <span class="mi-label">Account Settings</span>
+          <span class="mi-aside">⌘,</span>
+        </a>
+        <a class="menu-item" href="Notifications.html" role="menuitem">
+          <span class="mi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg></span>
+          <span class="mi-label">Notifications &amp; Privacy</span>
+        </a>
+        <button class="menu-item" role="menuitem">
+          <span class="mi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+          <span class="mi-label">Help &amp; Feedback</span>
+        </button>
+
+        <div class="menu-sep"></div>
+
+        <button class="menu-item danger" role="menuitem">
+          <span class="mi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg></span>
+          <span class="mi-label">Sign Out</span>
+        </button>
+      </div>
+    </span>
+  </div>
+</header>
+
+<!-- ============ HERO ============ -->
+<section class="hero" aria-label="Featured work">
+  <img class="hero-img" src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1800&q=80" alt="Misty mountain range at dawn" />
+  <div class="hero-card">
+    <span class="eyebrow">Featured Series</span>
+    <h1 class="hero-title">The Silence of High Places</h1>
+    <p class="hero-desc">An immersive study of stillness in the Northern Cascades — twelve frames captured during the blue hour of mid‑winter by Marie Okafor.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="#">
+        Read the Narrative
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>
+      </a>
+      <a class="btn btn-secondary" href="#">View Collection</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CATEGORIES ============ -->
+<div class="pill-row" role="tablist" aria-label="Browse categories" style="margin-top:22px;">
+  <button class="pill active">For You</button>
+  <button class="pill">Landscapes</button>
+  <button class="pill">Portraiture</button>
+  <button class="pill">Architecture</button>
+  <button class="pill">Street</button>
+  <button class="pill">Analog</button>
+  <button class="pill">Minimalism</button>
+  <button class="pill">Wildlife</button>
+  <button class="pill">Night Sky</button>
+  <button class="pill">Abstract</button>
+</div>
+
+<!-- ============ ARTISTS ============ -->
+<section class="artists">
+  <div class="artists-head shell">
+    <span class="eyebrow">Visionaries</span>
+    <h2 class="section-title">Artist Showcases</h2>
+    <p class="section-sub">Photographers shaping the way we see this month.</p>
+  </div>
+  <div class="artists-scroll">
+    <div class="artist-card">
+      <div class="artist-avatar"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=380&q=80" alt="" /></div>
+      <div class="artist-name">Alex Rivera</div>
+      <div class="artist-style">Urban Brutalism</div>
+      <a href="#" class="link-inline">View Profile ›</a>
+    </div>
+    <div class="artist-card">
+      <div class="artist-thumb"><img src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=500&q=80" alt="Architectural study"/></div>
+    </div>
+    <div class="artist-card">
+      <div class="artist-thumb"><img src="https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=500&q=80" alt="City light trails"/></div>
+    </div>
+    <div class="artist-card">
+      <div class="artist-thumb"><img src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=500&q=80" alt="Still life"/></div>
+    </div>
+    <div class="artist-card">
+      <div class="artist-thumb"><img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=500&q=80" alt="Solitary tree"/></div>
+    </div>
+    <div class="artist-card">
+      <div class="artist-avatar"><img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=380&q=80" alt="" /></div>
+      <div class="artist-name">Elena Vogel</div>
+      <div class="artist-style">Organic Minimalism</div>
+      <a href="#" class="link-inline">View Profile ›</a>
+    </div>
+    <div class="artist-card">
+      <div class="artist-avatar"><img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=380&q=80" alt=""/></div>
+      <div class="artist-name">Hana Mori</div>
+      <div class="artist-style">Color Theory</div>
+      <a href="#" class="link-inline">View Profile ›</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ COLLECTIONS ============ -->
+<section class="section shell">
+  <div class="section-head">
+    <div>
+      <span class="eyebrow">Curated Series</span>
+      <h2 class="section-title" style="margin-top:6px;">Thematic Collections</h2>
+    </div>
+    <a href="#" class="link-inline">Browse all ›</a>
+  </div>
+  <div class="collections-grid">
+    <a class="collection" href="#">
+      <img src="https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80" alt="Geometric shadows"/>
+      <div class="collection-body">
+        <div>
+          <h3>Geometric Shadows</h3>
+          <div class="collection-curator">Curated by Marcus Thorne</div>
+        </div>
+        <span class="chip">24 images</span>
+      </div>
+    </a>
+    <a class="collection" href="#">
+      <img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80" alt="Pulse of the forest"/>
+      <div class="collection-body">
+        <div>
+          <h3>Pulse of the Forest</h3>
+          <div class="collection-curator">Curated by Elena Vogel</div>
+        </div>
+        <span class="chip">18 images</span>
+      </div>
+    </a>
+    <a class="collection" href="#">
+      <img src="https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80" alt="Quiet thresholds"/>
+      <div class="collection-body">
+        <div>
+          <h3>Quiet Thresholds</h3>
+          <div class="collection-curator">Curated by Jun Park</div>
+        </div>
+        <span class="chip">31 images</span>
+      </div>
+    </a>
+    <a class="collection" href="#">
+      <img src="https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=1200&q=80" alt="Reflections"/>
+      <div class="collection-body">
+        <div>
+          <h3>After the Rain</h3>
+          <div class="collection-curator">Curated by Sara Linde</div>
+        </div>
+        <span class="chip">16 images</span>
+      </div>
+    </a>
+  </div>
+</section>
+
+<!-- ============ DISCOVER GRID ============ -->
+<section class="section shell" style="padding-top: 0;">
+  <div class="discover-head">
+    <div>
+      <h2 class="section-title">Discover Latest</h2>
+      <p class="section-sub">Fresh uploads from the community, refreshed hourly.</p>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div class="tool-group" role="tablist" aria-label="Layout">
+        <button class="tool-btn active" aria-label="Grid">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        </button>
+        <button class="tool-btn" aria-label="Mosaic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+        </button>
+      </div>
+      <button class="tool-btn" style="background:var(--bg-elev);border:1px solid var(--line);width:36px;height:36px;border-radius:50%;" aria-label="Filter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18"/><path d="M6 12h12"/><path d="M10 18h4"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="photo-grid">
+    <a class="photo" href="#"><img src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=900&q=80" alt="Sun rays over hills"/>
+      <div class="photo-meta"><span class="author">@milo_fields</span><span class="heart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>1.2k</span></div>
+    </a>
+    <a class="photo tall" href="#"><img src="https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?auto=format&fit=crop&w=900&q=80" alt="Night sky milky way"/>
+      <div class="photo-meta"><span class="author">@astra.maps</span><span class="heart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>3.4k</span></div>
+    </a>
+    <a class="photo" href="#"><img src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=900&q=80" alt="Abstract silk flow"/>
+      <div class="photo-meta"><span class="author">@noir.studio</span><span class="heart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>840</span></div>
+    </a>
+    <a class="photo" href="#"><img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=900&q=80" alt="Mountain reflection"/>
+      <div class="photo-meta"><span class="author">@marie_okafor</span><span class="heart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>2.1k</span></div>
+    </a>
+    <a class="photo" href="#"><img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=900&q=80" alt="Wheat field at golden hour"/>
+      <div class="photo-meta"><span class="author">@june_harvest</span><span class="heart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>976</span></div>
+    </a>
+    <a class="photo" href="#"><img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=900&q=80" alt="Layered blue mountains"/>
+      <div class="photo-meta"><span class="author">@highland.ink</span><span class="heart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>1.9k</span></div>
+    </a>
+    <a class="photo wide" href="#"><img src="https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=1400&q=80" alt="Forest path"/>
+      <div class="photo-meta"><span class="author">@elena.vogel</span><span class="heart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>4.6k</span></div>
+    </a>
+    <a class="photo" href="#"><img src="https://images.unsplash.com/photo-1504198266287-1659872e6590?auto=format&fit=crop&w=900&q=80" alt="Architectural geometry"/>
+      <div class="photo-meta"><span class="author">@alex_rivera</span><span class="heart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>1.4k</span></div>
+    </a>
+    <a class="photo" href="#"><img src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=900&q=80" alt="Lake at dusk"/>
+      <div class="photo-meta"><span class="author">@dusk.files</span><span class="heart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>2.7k</span></div>
+    </a>
+  </div>
+
+  <div style="display:flex; justify-content:center; margin-top:28px;">
+    <button class="btn btn-secondary">Load more</button>
+  </div>
+</section>
+
+<!-- ============ EDITORIAL ============ -->
+<section class="section shell" style="padding-top:16px;">
+  <div class="editorial">
+    <div class="editorial-img">
+      <img src="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=80" alt="Desk with laptop and notebook"/>
+    </div>
+    <div>
+      <span class="eyebrow">Editorial Journal</span>
+      <h2 class="editorial-title">The Art of Seeing: a conversation with Alex Rivera</h2>
+      <p class="editorial-desc">We sit down with the master of urban brutalism to discuss the intersection of concrete architecture and the human soul. Rivera shares his process for finding beauty in the overlooked corners of the metropolis.</p>
+      <div class="play-row">
+        <button class="play-btn" aria-label="Play interview">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7Z"/></svg>
+        </button>
+        <span>Listen to the interview · 28 min</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="footer-inner footer-row">
+    <div>
+      <div class="footer-brand">Lumen Atlas</div>
+      <div class="footer-copy">© 2026 Lumen Atlas — Photography, discovered.</div>
+    </div>
+    <div class="footer-links">
+      <a href="#">About</a>
+      <a href="#">Terms</a>
+      <a href="#">Privacy</a>
+      <a href="#">Licensing</a>
+      <a href="#">Contact</a>
+    </div>
+    <div class="footer-social">
+      <a class="icon-btn" href="#" aria-label="Share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.9 4M15.5 6.5l-6.9 4"/></svg></a>
+      <a class="icon-btn" href="#" aria-label="Email"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></a>
+    </div>
+  </div>
+</footer>
+
+<!-- ============ MOBILE TAB BAR ============ -->
+<nav class="mobile-tabs" aria-label="Mobile navigation">
+  <button class="tab active" aria-label="Home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+    Home
+  </button>
+  <button class="tab" aria-label="Discover">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    Explore
+  </button>
+  <a class="tab upload" href="Upload Studio.html" aria-label="Upload photo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  </a>
+  <button class="tab" aria-label="Saved">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg>
+    Saved
+  </button>
+  <a class="tab" href="Artist Profile.html" aria-label="Profile">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
+    You
+  </button>
+</nav>
+
+<script>
+  // Simple pill toggle
+  document.querySelectorAll('.pill').forEach(p => p.addEventListener('click', () => {
+    document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
+    p.classList.add('active');
+  }));
+  // Tool group toggle
+  document.querySelectorAll('.tool-group .tool-btn').forEach(b => b.addEventListener('click', () => {
+    b.parentElement.querySelectorAll('.tool-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+  }));
+
+  // Profile dropdown (avatar)
+  (function(){
+    const btn = document.getElementById('avatarBtn');
+    const menu = document.getElementById('profileMenu');
+    if (!btn || !menu) return;
+
+    const setOpen = (open) => {
+      btn.classList.toggle('open', open);
+      menu.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setOpen(!menu.classList.contains('open'));
+    });
+    document.addEventListener('click', (e) => {
+      if (!menu.contains(e.target) && !btn.contains(e.target)) setOpen(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    });
+    menu.querySelectorAll('.menu-item').forEach(mi => {
+      mi.addEventListener('click', () => setOpen(false));
+    });
+  })();
+</script>
+
+</body>
+</html>

@@ -25,7 +25,7 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - transcripts with exit codes on both hosts
 
 ## Dependencies / blockers
-Second clean host; Q-028
+Second clean host; Q-028 RTO stated for host-local restore of the declared corpus
 
 ## Definition of done
 Ledger entries updated with evidence; UI-control inventory updated where controls changed; execution plan checkpointed; PR opened as READY_FOR_REVIEW. Never self-merge; never mark VERIFIED without independent verification.

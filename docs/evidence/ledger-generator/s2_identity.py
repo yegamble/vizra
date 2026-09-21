@@ -26,7 +26,7 @@ req("VZ-AUTH-006","OAuth2 social login providers",
     "Member: signs up/in with configured OAuth2 providers; owner enables providers from the admin UI; email required for social signup when configured; connected providers visible in settings.",
     "identity", CHEV, [{"source":"CHEV-COMPARE","note":"OAuth2 login providers (Amazon, Google, Discord, etc) Lite/Pro"},{"source":"CHEV-LOGIN-PROVIDERS","note":"30 providers listed"}], edition="Lite",
     deps=["VZ-AUTH-001"], success=["Google, GitHub, Discord live-tested; generic OIDC provider supported"], negative=["State/PKCE mismatch rejected; email collision handled explicitly"],
-    privacy=["Provider tokens encrypted; scopes minimal"], api=["GET /api/v1/auth/oauth/{provider}/start|callback"], ui=["/login","/settings/connections","/admin/settings/login-providers"], evidence=EV_API+["live provider evidence per advertised provider"], unresolved=["Q-012"],
+    privacy=["Provider tokens encrypted; scopes minimal"], api=["GET /api/v1/auth/oauth/{provider}/start|callback"], ui=["/login","/settings/connections","/admin/settings/login-providers"], evidence=EV_API+["live provider evidence per advertised provider"], decided=["Q-012"],
     mechanism="Chevereto lists 30 named providers. Proposed equivalent: a generic OAuth2/OIDC adapter plus first-class configs for the most used providers; each advertised provider needs live evidence before it is claimed.")
 req("VZ-AUTH-007","Sign in with an AT Protocol identity",
     "Member: links or signs in with a DID-anchored AT identity via the OAuth profile (PKCE, PAR, DPoP, ES256); handle changes do not break the link.",
@@ -36,11 +36,11 @@ req("VZ-AUTH-008","API keys per user and guest API key",
     "Member: creates/revokes personal API keys; owner sets a guest upload key; keys hashed; scopes at least upload/read/manage.",
     "identity", CHEV, [{"source":"CHEV-API-V4","note":"X-API-Key; user keys at /settings/api; admin guest key"},{"source":"CHEV-COMPARE","note":"Guest API key all editions"}], edition="all",
     deps=["VZ-AUTH-001"], success=["Key used on upload API; revoked key 401"], negative=["Key leaked in logs test"], privacy=["Scopes limit damage"], api=["GET/POST/DELETE /api/v1/me/api-keys","admin guest key setting"], ui=["/settings/api","/admin/settings/api"], evidence=EV_API+EV_NEG,
-    mechanism="Chevereto documents no scopes or rate limits for keys; Vizra adds scopes and rate limits (Q-033).", unresolved=["Q-033"])
+    mechanism="Chevereto documents no scopes or rate limits for keys; Vizra adds scopes and rate limits (Q-033).", decided=["Q-033"])
 req("VZ-AUTH-009","Rate limits on auth, upload, comments, search, federation inbox and password reset",
     "Operator: bounded per-IP/per-account limits with Redis-backed counters; configurable; documented; flood reports to admin email optional.",
     "identity", CHEV, [{"source":"CHEV-COMPARE","note":"Flood protection (Pro)"},{"source":"CHEV-FEATURES","note":"limits by minute/hour/week/month; flood reports by email"}], edition="Pro",
-    deps=["VZ-AUTH-001","VZ-TOPOLOGY-003"], success=["Limits enforced with 429 and Retry-After"], negative=["Redis down → conservative fallback, no fail-open on auth brute force"], api=["all mutating endpoints"], ui=["/admin/settings/limits"], evidence=EV_API+["load test transcript"], unresolved=["Q-024"])
+    deps=["VZ-AUTH-001","VZ-TOPOLOGY-003"], success=["Limits enforced with 429 and Retry-After"], negative=["Redis down → conservative fallback, no fail-open on auth brute force"], api=["all mutating endpoints"], ui=["/admin/settings/limits"], evidence=EV_API+["load test transcript"], decided=["Q-024"])
 req("VZ-ACCOUNT-001","Profile: username, display name, bio, website, avatar, background, language, timezone, privacy",
     "Member: edits profile fields; avatar/background size limits set by admin; private profile hides content from non-followers/anonymous.",
     "identity", CHEV, [{"source":"CHEV-COMPARE","note":"User profiles; Private user profiles; User avatar/background max file size"},{"source":"CHEV-FEATURES","note":"Website and Bio fields; Avatar and profile background images"}], edition="all",

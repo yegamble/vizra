@@ -1,7 +1,7 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "generated": "2026-09-15",
-  "notice": "Atomic requirement ledger produced by Prompt 00 on 2026-09-15. Every entry is PLANNED/UNVERIFIED. No entry may be marked IMPLEMENTED or VERIFIED without recorded evidence (commands, exit codes, counts, SHA, artifacts). Removing or narrowing an entry requires an owner decision recorded in docs/OPEN_QUESTIONS.md.",
+  "notice": "Atomic requirement ledger produced by Prompt 00 on 2026-09-15. Every entry is PLANNED/UNVERIFIED. No entry may be marked IMPLEMENTED or VERIFIED without recorded evidence (commands, exit codes, counts, SHA, artifacts). Removing or narrowing an entry requires an owner decision recorded in docs/OPEN_QUESTIONS.md. Open questions ratified 2026-09-15; DECIDED ids are listed under `decided`, remaining open ids under `unresolved` — see docs/OPEN_QUESTIONS.md ratification record.",
   "parity_baseline_status": "UNVERIFIED",
   "status_vocabulary": {
     "implementation_status": [
@@ -37,25 +37,25 @@
     "meta_repo_parity_with_vidra": "mechanism mirrored from the Vidra meta repo by owner direction"
   },
   "summary": {
-    "total": 188,
+    "total": 191,
     "core_profile": 141,
-    "full_profile": 188,
+    "full_profile": 191,
     "by_area": {
       "activitypub": 4,
       "admin": 26,
       "atproto": 2,
       "backup": 4,
       "ci": 5,
-      "community": 18,
+      "community": 19,
       "design": 4,
       "foundation": 8,
       "identity": 14,
       "import": 4,
       "install": 4,
       "ipfs": 2,
-      "media": 12,
+      "media": 13,
       "operations": 8,
-      "organization": 23,
+      "organization": 24,
       "search": 12,
       "storage": 15,
       "topology": 8,
@@ -64,14 +64,22 @@
     },
     "by_source_kind": {
       "chevereto_parity": 90,
-      "explicit_user_requirement": 20,
-      "flickr_workflow": 26,
+      "explicit_user_requirement": 21,
+      "flickr_workflow": 27,
       "meta_repo_parity_with_vidra": 19,
       "operator_requirement": 5,
-      "recommended_safeguard": 18,
+      "recommended_safeguard": 19,
       "requested_integration": 10
     },
     "open_questions_referenced": [
+      "Q-016",
+      "Q-021",
+      "Q-022",
+      "Q-028",
+      "Q-032",
+      "Q-036"
+    ],
+    "decided_questions_referenced": [
       "Q-001",
       "Q-002",
       "Q-003",
@@ -87,11 +95,8 @@
       "Q-013",
       "Q-014",
       "Q-015",
-      "Q-016",
       "Q-017",
       "Q-018",
-      "Q-021",
-      "Q-022",
       "Q-023",
       "Q-024",
       "Q-027",
@@ -99,11 +104,9 @@
       "Q-029",
       "Q-030",
       "Q-031",
-      "Q-032",
       "Q-033",
       "Q-034",
       "Q-035",
-      "Q-036",
       "Q-037",
       "Q-038",
       "Q-039",
@@ -160,7 +163,8 @@
         "clean-clone build transcript per repo with SHA"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-001",
         "Q-002"
       ],
@@ -217,6 +221,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -273,6 +278,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -320,11 +326,12 @@
         "ADR with versions and license table; govulncheck/npm audit lane output"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-003",
         "Q-004"
       ],
-      "notes": null,
+      "notes": "Q-003/Q-004 decided 2026-09-15: Echo v5 ≥ 5.3.1 on Go 1.27.x, tracing via otelhttp + route middleware; Valkey managed (digest-pinned) + go-redis v9 with a Valkey/Redis 7.2 integration matrix.",
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
       "merge_status": "NOT_STARTED",
@@ -379,6 +386,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -435,6 +443,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -485,6 +494,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -537,6 +547,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -595,6 +606,7 @@
       "unresolved": [
         "Q-032"
       ],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -644,6 +656,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -694,6 +707,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -746,6 +760,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -794,6 +809,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -854,7 +870,8 @@
         "clean-target transcript; install_test.sh results"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-027"
       ],
       "notes": null,
@@ -917,6 +934,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -981,6 +999,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1029,6 +1048,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1041,7 +1061,7 @@
       "id": "VZ-TOPOLOGY-001",
       "title": "Base + production overlay + external-datastore overlays render the declared topology",
       "area": "topology",
-      "outcome": "Operator: docker-compose.yml (dev), docker-compose.prod.yml (loopback binds, pinned images, restart, log caps, named volumes, edge), and external overlays for PostgreSQL/Redis/ClickHouse/IPFS; explicit -f chain in production; Compose ≥ 2.24 enforced.",
+      "outcome": "Operator: docker-compose.yml (dev), docker-compose.prod.yml (loopback binds, pinned images, restart, log caps, named volumes, edge), and external overlays for PostgreSQL/Redis/ClickHouse/IPFS; explicit -f chain in production; Compose ≥ 2.24.4 enforced.",
       "source_kind": "meta_repo_parity_with_vidra",
       "provenance": [
         {
@@ -1066,7 +1086,7 @@
           "Every shape in META_REPO.md §2 renders; postgres/redis/search/clickhouse/ipfs RPC publish nothing"
         ],
         "negative": [
-          "Compose < 2.24 refused by the scripts",
+          "Compose < 2.24.4 (including 2.24.0–2.24.3) refused by install.sh, deploy, rollback, restore and doctor",
           "Bare `docker compose` on a prod host is documented as wrong and compose.sh used instead"
         ],
         "privacy": [],
@@ -1082,7 +1102,8 @@
         "rendered compose model assertion"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-017"
       ],
       "notes": null,
@@ -1143,6 +1164,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1201,6 +1223,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1257,6 +1280,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1310,6 +1334,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1359,6 +1384,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1407,6 +1433,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1457,6 +1484,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1512,6 +1540,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1566,6 +1595,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1616,6 +1646,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1671,6 +1702,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1723,6 +1755,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1785,6 +1818,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1797,7 +1831,7 @@
       "id": "VZ-OPS-007",
       "title": "Capacity and performance budgets declared and measured",
       "area": "operations",
-      "outcome": "Owner: reference hardware, dataset, request/media mix, p95/p99, error rate, queue drain, RPO/RTO recorded and approved before acceptance; metadata-only vs real-bytes workloads separated.",
+      "outcome": "Owner: reference hardware, dataset, request/media mix, p95/p99, error rate, queue drain, RPO/RTO recorded and approved before acceptance; metadata-only vs real-bytes workloads separated; the load corpus is declared here (count, total bytes, megapixel mix; 10k photos proposed) separately from the VZ-FOUND-007 correctness corpus; budgets provisional until the first M0 measurement run, then frozen.",
       "source_kind": "recommended_safeguard",
       "provenance": [
         {
@@ -1815,7 +1849,9 @@
       ],
       "cases": {
         "success": [
-          "Budgets documented; load run recorded"
+          "Budgets documented; load run recorded",
+          "Declared load corpus (count, total bytes, megapixel mix; 10k photos proposed) recorded with the run",
+          "Oldest-pending-job age exposed as a metric and failing doctor/readiness above the declared threshold"
         ],
         "negative": [
           "Budget changed to excuse a failed run is rejected in review"
@@ -1833,6 +1869,9 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [
+        "Q-028"
+      ],
+      "decided": [
         "Q-028"
       ],
       "notes": null,
@@ -1888,6 +1927,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -1948,6 +1988,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2007,6 +2048,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2060,6 +2102,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2110,6 +2153,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2167,6 +2211,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2215,6 +2260,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2283,6 +2329,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2346,6 +2393,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2404,6 +2452,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2464,6 +2513,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2522,6 +2572,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2583,7 +2634,8 @@
         "live provider evidence per advertised provider"
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto lists 30 named providers. Proposed equivalent: a generic OAuth2/OIDC adapter plus first-class configs for the most used providers; each advertised provider needs live evidence before it is claimed.",
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-012"
       ],
       "notes": null,
@@ -2647,6 +2699,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2708,7 +2761,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto documents no scopes or rate limits for keys; Vizra adds scopes and rate limits (Q-033).",
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-033"
       ],
       "notes": null,
@@ -2769,7 +2823,8 @@
         "load test transcript"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-024"
       ],
       "notes": null,
@@ -2837,6 +2892,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2902,6 +2958,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -2955,6 +3012,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3012,6 +3070,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3069,6 +3128,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3146,6 +3206,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3207,6 +3268,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3258,6 +3320,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3315,6 +3378,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3378,6 +3442,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3439,6 +3504,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3497,6 +3563,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3552,7 +3619,8 @@
         "control row in docs/quality/ui-controls.json"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-015"
       ],
       "notes": null,
@@ -3606,6 +3674,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3665,6 +3734,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3722,7 +3792,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto ships PHP forum plugins. Proposed equivalent: one embeddable uploader plus a documented plugin contract; per-forum plugins are separate optional deliverables.",
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-029"
       ],
       "notes": null,
@@ -3788,6 +3859,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3846,6 +3918,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -3906,10 +3979,11 @@
         "decoded output hashes"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-034"
       ],
-      "notes": null,
+      "notes": "Q-034 decided 2026-09-15: libvips build pinned by digest with loader list recorded; API never decodes; unsupported formats rejected at upload.",
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
       "merge_status": "NOT_STARTED",
@@ -3919,9 +3993,9 @@
     },
     {
       "id": "VZ-MEDIA-002",
-      "title": "Format matrix: JPEG, PNG, GIF (animated), WebP (animated), AVIF, BMP; HEIC/RAW only if approved",
+      "title": "Format matrix: JPEG, PNG, GIF (animated), WebP (animated), AVIF, BMP; HEIC/HEIF decode is VZ-MEDIA-010 (full); RAW declined",
       "area": "media",
-      "outcome": "Photographer: every advertised format uploads, decodes, derives correctly; animation preserved where advertised; HEIC/RAW are separate approved capabilities.",
+      "outcome": "Photographer: every advertised format uploads, decodes, derives correctly; animation preserved where advertised; HEIC/HEIF decode-to-JPEG/AVIF is VZ-MEDIA-010 (full profile, Q-010 decided 2026-09-15); RAW is declined unless the owner adds it.",
       "source_kind": "chevereto_parity",
       "provenance": [
         {
@@ -3961,10 +4035,79 @@
         "fixture matrix results"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-010"
       ],
       "notes": null,
+      "implementation_status": "PLANNED",
+      "verification_status": "UNVERIFIED",
+      "merge_status": "NOT_STARTED",
+      "release_status": "NOT_RELEASED",
+      "test_ids": [],
+      "evidence": []
+    },
+    {
+      "id": "VZ-MEDIA-010",
+      "title": "HEIC/HEIF decode-to-JPEG/AVIF on upload (config-gated, OFF by default, licence-reviewed build)",
+      "area": "media",
+      "outcome": "Photographer (full): when the operator enables it, an iPhone HEIC/HEIF upload is converted to JPEG or AVIF on ingest with correct orientation and colour; the running image reports whether HEIC decode is available; HEIC is never written (no x265 in the image); RAW remains declined.",
+      "source_kind": "flickr_workflow",
+      "provenance": [
+        {
+          "source": "FLICKR-UPLOAD-REQ",
+          "note": "Flickr converts HEIC to JPEG in-app; RAW unsupported"
+        },
+        {
+          "source": "RATIFICATION-FACTS",
+          "note": "libvips/libheif HEIC decode via libde265; x265 encode is GPL-2+ and excluded; Q-010 decided 2026-09-15"
+        }
+      ],
+      "reference_edition": null,
+      "profiles": [
+        "full"
+      ],
+      "dependencies": [
+        "VZ-MEDIA-002",
+        "VZ-FOUND-004"
+      ],
+      "cases": {
+        "success": [
+          "HEIC fixture with EXIF orientation converts to JPEG/AVIF upright with ICC honoured; derivative hashes recorded"
+        ],
+        "negative": [
+          "With HEIC decode absent from the build or the option disabled, a HEIC upload is rejected at the API naming the format; no job is enqueued"
+        ],
+        "privacy": [
+          "EXIF/GPS policy applies to the converted output"
+        ],
+        "recovery": [
+          "Reprocess regenerates the converted output idempotently"
+        ]
+      },
+      "surfaces": {
+        "api": [
+          "POST /api/v1/uploads (HEIC accepted only when enabled)"
+        ],
+        "ui": [
+          "uploader format hint",
+          "/admin/settings/uploads HEIC toggle"
+        ],
+        "cli": [
+          "vizra doctor (reports HEIC decode availability)"
+        ]
+      },
+      "evidence_required": [
+        "fixture conversion results",
+        "image loader list in releases/<tag>.json",
+        "licence review record for libheif/libde265"
+      ],
+      "competitor_mechanism_vs_equivalent": null,
+      "unresolved": [],
+      "decided": [
+        "Q-010"
+      ],
+      "notes": "Q-010 decided 2026-09-15: decode only (libheif + libde265), never encode; OFF by default; full profile; RAW declined unless the owner adds it.",
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
       "merge_status": "NOT_STARTED",
@@ -4014,6 +4157,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4075,6 +4219,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4129,7 +4274,8 @@
         "control row in docs/quality/ui-controls.json"
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto accepts video files and generates a frame image; transcoding depth undocumented. Vizra scope: store + poster + browser-native playback; transcoding is a separate decision.",
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-009"
       ],
       "notes": null,
@@ -4185,6 +4331,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4243,6 +4390,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4290,6 +4438,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4341,6 +4490,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4402,7 +4552,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-007"
       ],
       "notes": null,
@@ -4454,6 +4605,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4506,6 +4658,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4564,6 +4717,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4624,6 +4778,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4673,6 +4828,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4732,6 +4888,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4789,6 +4946,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4842,6 +5000,7 @@
       "unresolved": [
         "Q-016"
       ],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -4886,7 +5045,8 @@
         "provider lane or owner decision"
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto keeps a legacy native B2 adapter. Proposed: satisfy via S3-compatible unless owner requires native.",
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-030"
       ],
       "notes": null,
@@ -4933,7 +5093,8 @@
         "provider lane"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-031"
       ],
       "notes": null,
@@ -4980,7 +5141,8 @@
         "provider lane"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-031"
       ],
       "notes": null,
@@ -5027,7 +5189,8 @@
         "provider lane"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-031"
       ],
       "notes": null,
@@ -5074,7 +5237,8 @@
         "provider lane"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-031"
       ],
       "notes": null,
@@ -5127,7 +5291,8 @@
         "provider lane"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-031"
       ],
       "notes": null,
@@ -5176,7 +5341,8 @@
         "provider lane"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-031"
       ],
       "notes": null,
@@ -5233,6 +5399,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5280,6 +5447,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5338,6 +5506,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5388,7 +5557,8 @@
         "transcript"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-035"
       ],
       "notes": null,
@@ -5442,6 +5612,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5493,6 +5664,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5553,6 +5725,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5609,6 +5782,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5659,6 +5833,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5711,6 +5886,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5767,6 +5943,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5824,6 +6001,7 @@
       "unresolved": [
         "Q-036"
       ],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5885,6 +6063,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5930,6 +6109,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -5999,6 +6179,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6063,6 +6244,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6125,6 +6307,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6192,6 +6375,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6243,6 +6427,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6310,6 +6495,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6380,6 +6566,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6445,6 +6632,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6494,6 +6682,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6553,6 +6742,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6607,6 +6797,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6666,7 +6857,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-037"
       ],
       "notes": null,
@@ -6735,7 +6927,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-006"
       ],
       "notes": null,
@@ -6787,6 +6980,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6848,6 +7042,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6908,6 +7103,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -6972,6 +7168,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7029,6 +7226,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7083,6 +7281,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7138,7 +7337,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-038"
       ],
       "notes": null,
@@ -7151,9 +7351,9 @@
     },
     {
       "id": "VZ-PRIVACY-001",
-      "title": "Asset-level visibility: public, unlisted (link), private; plus audience groups (followers-only / named lists) and site-wide privacy mode",
+      "title": "Asset-level visibility: public, unlisted (link), private; plus site-wide privacy mode",
       "area": "organization",
-      "outcome": "Photographer: sets visibility per asset (not only per album, unlike Chevereto); audience lists (e.g. friends/family style labels) grant view access; owner can force site-private mode (login required) with content privacy defaults; every read surface enforces.",
+      "outcome": "Photographer: sets visibility per asset (not only per album, unlike Chevereto); owner can force site-private mode (login required) with content privacy defaults; every read surface enforces one authorization decision. Named audiences and follower-only visibility are VZ-PRIVACY-004 (full).",
       "source_kind": "explicit_user_requirement",
       "provenance": [
         {
@@ -7180,7 +7380,7 @@
       ],
       "cases": {
         "success": [
-          "Matrix: 3 visibilities × anonymous/member/follower/grantee/owner/admin × every read surface"
+          "Matrix: 3 visibilities × anonymous/member/grantee/owner/admin × every read surface"
         ],
         "negative": [
           "Tightening privacy invalidates caches, embeds, feeds, federation copies (Delete sent), IPFS (unpin)"
@@ -7192,8 +7392,7 @@
       },
       "surfaces": {
         "api": [
-          "PATCH /api/v1/photos/{id} visibility",
-          "/api/v1/me/audiences"
+          "PATCH /api/v1/photos/{id} visibility"
         ],
         "ui": [
           "privacy dialog",
@@ -7209,7 +7408,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto: privacy only at album level ('Media on its own cannot be private'). Flickr: per-item privacy with friends/family. Vizra outcome: per-item visibility plus album privacy plus explicit grants; album never widens.",
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-039"
       ],
       "notes": null,
@@ -7264,6 +7464,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7316,6 +7517,76 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
+      "notes": null,
+      "implementation_status": "PLANNED",
+      "verification_status": "UNVERIFIED",
+      "merge_status": "NOT_STARTED",
+      "release_status": "NOT_RELEASED",
+      "test_ids": [],
+      "evidence": []
+    },
+    {
+      "id": "VZ-PRIVACY-004",
+      "title": "Named audiences and follower-only visibility",
+      "area": "organization",
+      "outcome": "Photographer: maintains named audiences (friends/family-style lists) and targets an item at an audience or at approved followers; the single core authorization evaluator applies the precedence site mode → asset visibility → album privacy / share grant → audience on every read surface.",
+      "source_kind": "explicit_user_requirement",
+      "provenance": [
+        {
+          "source": "FLICKR-PRIVACY",
+          "note": "friends/family audiences; per-item overrides"
+        },
+        {
+          "source": "CATALOG-F1",
+          "note": "decide private/unlisted/public semantics before social features spread"
+        }
+      ],
+      "reference_edition": null,
+      "profiles": [
+        "full"
+      ],
+      "dependencies": [
+        "VZ-PRIVACY-001",
+        "VZ-FOLLOW-002"
+      ],
+      "cases": {
+        "success": [
+          "Audience-targeted item visible to listed members and followers only; matrix covers anonymous/member/follower/non-approved follower/owner/admin across every read surface"
+        ],
+        "negative": [
+          "A non-approved follower is denied follower-only items"
+        ],
+        "privacy": [
+          "Audience membership never revealed to non-owners; counts exclude items the viewer cannot see"
+        ],
+        "recovery": [
+          "Removing a member from an audience invalidates caches, embeds and feeds"
+        ]
+      },
+      "surfaces": {
+        "api": [
+          "GET/POST/PATCH/DELETE /api/v1/me/audiences",
+          "PATCH /api/v1/photos/{id} audience targets"
+        ],
+        "ui": [
+          "privacy dialog audience picker",
+          "/settings/privacy/audiences"
+        ],
+        "cli": []
+      },
+      "evidence_required": [
+        "integration test on real PostgreSQL/Redis with exit code and counts",
+        "OpenAPI operation present and drift-checked",
+        "production-build browser test with desktop+mobile screenshots and console/network error capture",
+        "control row in docs/quality/ui-controls.json",
+        "negative/permission test that fails against a controlled mutation"
+      ],
+      "competitor_mechanism_vs_equivalent": null,
+      "unresolved": [],
+      "decided": [
+        "Q-039"
+      ],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7388,6 +7659,7 @@
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto offers Disqus or arbitrary comment HTML. Vizra ships a native engine; an optional external-provider embed is a separate, sandboxed question (Q-011).",
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7456,6 +7728,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7524,7 +7797,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto 'likes' and Flickr 'faves' are both binary. Proposed decision: Vizra unifies likes and favorites into one action named Favorite (no separate public like).",
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-018"
       ],
       "notes": null,
@@ -7539,7 +7813,7 @@
       "id": "VZ-FOLLOW-001",
       "title": "Follow/unfollow, followers and following lists, following feed",
       "area": "community",
-      "outcome": "Member: follows users; lists at /{username}/followers and /following; a following feed sorted by recency; counts live; private profiles require approval (Q-040).",
+      "outcome": "Member: follows users; lists at /{username}/followers and /following; a following feed sorted by recency; counts live; approval is VZ-FOLLOW-002 (full).",
       "source_kind": "chevereto_parity",
       "provenance": [
         {
@@ -7572,7 +7846,7 @@
           "Blocked user cannot follow"
         ],
         "privacy": [
-          "Feed respects per-item visibility and audiences"
+          "Feed respects per-item visibility"
         ],
         "recovery": []
       },
@@ -7594,7 +7868,82 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
+        "Q-040"
+      ],
+      "notes": null,
+      "implementation_status": "PLANNED",
+      "verification_status": "UNVERIFIED",
+      "merge_status": "NOT_STARTED",
+      "release_status": "NOT_RELEASED",
+      "test_ids": [],
+      "evidence": []
+    },
+    {
+      "id": "VZ-FOLLOW-002",
+      "title": "Follow requests with approval and re-evaluation on profile privacy change",
+      "area": "community",
+      "outcome": "Member: on a private profile a follow becomes a request; the owner approves or denies it from a pending list; approved followers may see follower-only items; the requester sees their own pending state and nobody else's; flipping a profile to private re-evaluates existing local and remote followers.",
+      "source_kind": "recommended_safeguard",
+      "provenance": [
+        {
+          "source": "CHEV-USERS-SETTINGS",
+          "note": "private profile setting"
+        },
+        {
+          "source": "FLICKR-CONTACTS",
+          "note": "asymmetric follow; Flickr has no approval step"
+        },
+        {
+          "source": "FLICKR-PRIVACY",
+          "note": "follower/friend audiences presuppose an approved relationship"
+        }
+      ],
+      "reference_edition": null,
+      "profiles": [
+        "full"
+      ],
+      "dependencies": [
+        "VZ-FOLLOW-001",
+        "VZ-ACCOUNT-001"
+      ],
+      "cases": {
+        "success": [
+          "Private profile → follow becomes a request; approve/deny UI; pending state visible to requester only"
+        ],
+        "negative": [
+          "Stranger self-follows a private profile → still denied follower-only items"
+        ],
+        "privacy": [
+          "Flipping a profile to private re-evaluates existing local and remote (ActivityPub Follow/Accept/Reject/Undo) followers"
+        ],
+        "recovery": [
+          "Re-evaluation job is idempotent"
+        ]
+      },
+      "surfaces": {
+        "api": [
+          "PUT/DELETE /api/v1/users/{u}/follow",
+          "GET /api/v1/me/follow-requests",
+          "POST /api/v1/me/follow-requests/{id}/approve|deny"
+        ],
+        "ui": [
+          "profile follow button pending state",
+          "/settings/follow-requests"
+        ],
+        "cli": []
+      },
+      "evidence_required": [
+        "integration test on real PostgreSQL/Redis with exit code and counts",
+        "OpenAPI operation present and drift-checked",
+        "production-build browser test with desktop+mobile screenshots and console/network error capture",
+        "control row in docs/quality/ui-controls.json",
+        "negative/permission test that fails against a controlled mutation"
+      ],
+      "competitor_mechanism_vs_equivalent": null,
+      "unresolved": [],
+      "decided": [
         "Q-040"
       ],
       "notes": null,
@@ -7651,6 +8000,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7716,6 +8066,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7777,6 +8128,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7836,6 +8188,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7899,6 +8252,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -7964,6 +8318,7 @@
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto: binary NSFW flag. Flickr: three levels paywalled. Vizra outcome: three levels, operator policy, no billing.",
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8024,6 +8379,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8084,6 +8440,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8143,6 +8500,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8198,6 +8556,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8252,7 +8611,8 @@
         "control row in docs/quality/ui-controls.json"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-041"
       ],
       "notes": null,
@@ -8309,7 +8669,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-041"
       ],
       "notes": null,
@@ -8366,7 +8727,8 @@
         "control row in docs/quality/ui-controls.json"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-042"
       ],
       "notes": null,
@@ -8420,6 +8782,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8487,6 +8850,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8539,6 +8903,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8593,6 +8958,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8664,6 +9030,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8725,6 +9092,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8781,6 +9149,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8841,10 +9210,11 @@
         "fault-injection transcript"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-001"
       ],
-      "notes": null,
+      "notes": "Q-001 decided 2026-09-15: repo created in M0 as a real minimal service returning not_indexed; SEARCH_MODE=off default before M3, managed default from M3; misconfiguration is a doctor FAIL with degraded readiness, served from SQL.",
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
       "merge_status": "NOT_STARTED",
@@ -8903,6 +9273,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -8957,6 +9328,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9020,6 +9392,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9070,6 +9443,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9122,6 +9496,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9184,6 +9559,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9245,6 +9621,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9297,7 +9674,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-023"
       ],
       "notes": null,
@@ -9359,7 +9737,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto allows raw Custom JS and PHP pages. Vizra provides theme tokens, sanitized CSS and typed extension points instead; owner decision Q-014.",
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-014"
       ],
       "notes": null,
@@ -9416,6 +9795,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9472,7 +9852,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-014"
       ],
       "notes": null,
@@ -9525,6 +9906,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9574,6 +9956,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9627,6 +10010,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9680,7 +10064,8 @@
         "control row in docs/quality/ui-controls.json"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-043"
       ],
       "notes": null,
@@ -9732,6 +10117,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9784,6 +10170,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9839,7 +10226,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-013"
       ],
       "notes": null,
@@ -9900,6 +10288,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -9955,7 +10344,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-005"
       ],
       "notes": null,
@@ -10011,6 +10401,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10062,6 +10453,7 @@
       "unresolved": [
         "Q-022"
       ],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10113,6 +10505,7 @@
       "unresolved": [
         "Q-021"
       ],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10165,7 +10558,8 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-011",
         "Q-014"
       ],
@@ -10227,6 +10621,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10277,6 +10672,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10328,6 +10724,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10378,6 +10775,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10437,6 +10835,7 @@
       ],
       "competitor_mechanism_vs_equivalent": "Chevereto upgrades from the web UI. Vizra shows availability in the UI and performs upgrades via the CLI for privilege separation.",
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10504,10 +10903,11 @@
         "negative/permission test that fails against a controlled mutation"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-008"
       ],
-      "notes": null,
+      "notes": "Q-008 decided 2026-09-15: database-per-tenant (tenant registry → DSN); no tenant column or per-tenant schema in core; M5 must design N search DSNs or one search instance per tenant.",
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
       "merge_status": "NOT_STARTED",
@@ -10554,7 +10954,8 @@
         "rendered compose model assertion"
       ],
       "competitor_mechanism_vs_equivalent": null,
-      "unresolved": [
+      "unresolved": [],
+      "decided": [
         "Q-008"
       ],
       "notes": null,
@@ -10608,6 +11009,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10659,6 +11061,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10705,6 +11108,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
@@ -10751,6 +11155,7 @@
       ],
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
+      "decided": [],
       "notes": null,
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",

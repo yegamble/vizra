@@ -1,0 +1,18 @@
+# Component repositories are nested checkouts with their own history (docs/META_REPO.md)
+/vizra-core/
+/vizra-user/
+/vizra-search/
+
+# War-room worktrees and local agent state
+/.claude/worktrees/
+/.claude/settings.local.json
+/.claude/hooks/.state/
+
+# Secrets and local environment — only *.env.example is tracked
+/env/*.env
+.env
+.env.*
+!.env.example
+!*.env.example
+
+.DS_Store

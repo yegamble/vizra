@@ -26,7 +26,7 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - decoded thumbnail hash asserted in boot lane
 
 ## Dependencies / blockers
-Q-034
+Q-034 decided 2026-09-15 (pinned libvips build; HEIC decode-only gate per Q-010)
 
 ## Definition of done
 Ledger entries updated with evidence; UI-control inventory updated where controls changed; execution plan checkpointed; PR opened as READY_FOR_REVIEW. Never self-merge; never mark VERIFIED without independent verification.

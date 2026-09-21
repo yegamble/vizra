@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Notifications &amp; Privacy — goimg</title>
+<link rel="stylesheet" href="account.css"/>
+<style>
+  .matrix { display: grid; grid-template-columns: 1fr 44px 44px 44px; gap: 0; align-items: center; }
+  .matrix .mhead { font-size: 11px; font-weight: 600; color: var(--ink-3); text-align: center; letter-spacing: .06em; text-transform: uppercase; padding: 8px 0; }
+  .matrix .mhead:first-child { text-align: left; padding-left: 2px; }
+  .matrix .mrow { display: contents; }
+  .matrix .mlabel { padding: 12px 0; font-size: 14px; color: var(--ink); border-top: 1px solid var(--line-2); }
+  .matrix .mlabel .s { display: block; font-size: 12px; color: var(--ink-3); margin-top: 1px; font-weight: 400; }
+  .matrix .mcell { padding: 12px 0; text-align: center; border-top: 1px solid var(--line-2); }
+  .cb { appearance: none; width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--line); cursor: pointer; vertical-align: middle; position: relative; transition: background .12s, border-color .12s; }
+  .cb:checked { background: var(--accent); border-color: var(--accent); }
+  .cb:checked::after { content: ""; position: absolute; left: 5px; top: 2px; width: 6px; height: 11px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+</style>
+</head>
+<body>
+<div id="nav-slot"></div>
+<main class="app">
+  <div id="sidebar-slot"></div>
+  <section class="main">
+    <div id="mobile-header-slot"></div>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Notifications &amp; Privacy</h1>
+        <p class="page-sub">Choose what you hear about and who can reach you.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">How you get notified</h2></div>
+      <div class="card-body">
+        <div class="matrix">
+          <div class="mhead">Event</div>
+          <div class="mhead">Push</div>
+          <div class="mhead">Email</div>
+          <div class="mhead">In-app</div>
+
+          <div class="mrow">
+            <div class="mlabel">New follower<span class="s">Someone starts following you.</span></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+            <div class="mcell"><input type="checkbox" class="cb"/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+          </div>
+          <div class="mrow">
+            <div class="mlabel">Favorites on your photos<span class="s">Batched daily.</span></div>
+            <div class="mcell"><input type="checkbox" class="cb"/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+          </div>
+          <div class="mrow">
+            <div class="mlabel">Comments and replies</div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+          </div>
+          <div class="mrow">
+            <div class="mlabel">Mentions<span class="s">When someone @mentions you.</span></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+          </div>
+          <div class="mrow">
+            <div class="mlabel">Featured in a collection<span class="s">A curator adds you to a collection.</span></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+          </div>
+          <div class="mrow">
+            <div class="mlabel">Weekly digest<span class="s">Your top photos &amp; discoveries.</span></div>
+            <div class="mcell"><input type="checkbox" class="cb"/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+            <div class="mcell"><input type="checkbox" class="cb"/></div>
+          </div>
+          <div class="mrow">
+            <div class="mlabel">Product announcements</div>
+            <div class="mcell"><input type="checkbox" class="cb"/></div>
+            <div class="mcell"><input type="checkbox" class="cb" checked/></div>
+            <div class="mcell"><input type="checkbox" class="cb"/></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Quiet hours</h2></div>
+      <div class="row-list">
+        <div class="row">
+          <div class="row-main"><div class="row-title">Pause push notifications</div><div class="row-sub">Apply Do Not Disturb during a daily window.</div></div>
+          <label class="toggle"><input type="checkbox" checked/><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">From</div></div>
+          <select class="select" style="width:120px;"><option>22:00</option><option>21:00</option><option>23:00</option></select>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Until</div></div>
+          <select class="select" style="width:120px;"><option>07:30</option><option>08:00</option><option>07:00</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Privacy</h2></div>
+      <div class="row-list">
+        <div class="row">
+          <div class="row-main"><div class="row-title">Profile visibility</div><div class="row-sub">Who can find your profile.</div></div>
+          <div class="segmented"><button class="active">Public</button><button>Signed-in</button><button>Private</button></div>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Who can message you</div></div>
+          <select class="select" style="width:180px;"><option>Anyone</option><option>People you follow</option><option>Mutual follows only</option><option>No one</option></select>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Show me in search engines</div><div class="row-sub">Let Google and others index your profile.</div></div>
+          <label class="toggle"><input type="checkbox" checked/><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Hide EXIF from viewers by default</div></div>
+          <label class="toggle"><input type="checkbox"/><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Hide precise location</div><div class="row-sub">Round GPS to the nearest city.</div></div>
+          <label class="toggle"><input type="checkbox" checked/><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Allow AI training on public photos</div><div class="row-sub">Opt out of third-party dataset inclusion.</div></div>
+          <label class="toggle"><input type="checkbox"/><span class="track"></span><span class="thumb"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2 class="card-title">Blocked &amp; muted</h2></div>
+      <div class="row-list">
+        <div class="row">
+          <div class="row-main"><div class="row-title">Blocked accounts</div><div class="row-sub">4 accounts can't see or contact you.</div></div>
+          <button class="btn btn-secondary btn-sm">Manage</button>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Muted tags</div><div class="row-sub">Hide photos with these tags from Discover.</div></div>
+          <button class="btn btn-secondary btn-sm">Manage</button>
+        </div>
+        <div class="row">
+          <div class="row-main"><div class="row-title">Comment filter</div></div>
+          <div class="segmented"><button>Off</button><button class="active">Standard</button><button>Strict</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="mobile-tabs-slot"></div>
+<script>window.__page = { key: 'notifications' };</script>
+<script src="account-shell.js"></script>
+<script>
+  document.querySelectorAll('.segmented').forEach(s=>s.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{s.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');})));
+</script>
+</body>
+</html>

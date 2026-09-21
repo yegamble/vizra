@@ -1,10 +1,10 @@
 # Issue drafts
 
-Twelve implementable issues drafted locally on 2026-09-15 for milestones M0–M2 (see `docs/MILESTONES.md`). They are not filed on GitHub; filing requires owner authorization. Keep the active queue small: file the next issue only when its dependencies are READY_FOR_REVIEW or merged. The complete obligation set lives in `docs/quality/features.json`; these drafts never narrow it.
+Twelve implementable issues drafted locally on 2026-09-15 for milestones M0–M2 (see `docs/MILESTONES.md`). VZ-ISSUE-001 was filed on 2026-09-15 after the owner authorized gh writes; the others stay local until their dependencies are READY_FOR_REVIEW or merged. Keep the active queue small: file the next issue only when its dependencies are READY_FOR_REVIEW or merged. The complete obligation set lives in `docs/quality/features.json`; these drafts never narrow it.
 
 | Issue | Milestone | Title |
 |---|---|---|
-| VZ-ISSUE-001 | M0 | create component repositories, pin the toolchain, record ADRs |
+| VZ-ISSUE-001 | M0 | create component repositories, pin the toolchain, record ADRs — FILED https://github.com/yegamble/vizra/issues/1 (#1) |
 | VZ-ISSUE-002 | M0 | meta compose topology with production overlay and external-datastore overlays |
 | VZ-ISSUE-003 | M0 | `ci-required` fan-in and required-check manifests in every repo |
 | VZ-ISSUE-004 | M0 | installer, `vizra setup` wizard, deployment bundle, boot lane |

@@ -27,7 +27,7 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - Branch-protection configuration record (enforcement UNVERIFIED if no admin rights, Q-032)
 
 ## Dependencies / blockers
-Q-032
+Q-032: owner action — apply recorded rulesets after repo creation; add the ruleset drift-check job
 
 ## Definition of done
 Ledger entries updated with evidence; UI-control inventory updated where controls changed; execution plan checkpointed; PR opened as READY_FOR_REVIEW. Never self-merge; never mark VERIFIED without independent verification.

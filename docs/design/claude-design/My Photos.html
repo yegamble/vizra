@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>My Photos — goimg</title>
+<link rel="stylesheet" href="account.css"/>
+<style>
+  .toolbar { display: flex; align-items: center; gap: 10px; margin: 6px 0 16px; flex-wrap: wrap; }
+  .toolbar .search { flex: 1; min-width: 220px; max-width: 360px; height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: white; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: var(--ink-3); }
+  .toolbar .search input { all: unset; flex: 1; min-width: 0; font: inherit; color: var(--ink); }
+  .toolbar .spacer { flex: 1; }
+  .photos-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  @media (min-width: 600px) { .photos-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 900px) { .photos-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; } }
+  @media (min-width: 1100px) { .photos-grid { grid-template-columns: repeat(5, 1fr); } }
+  .pcard { position: relative; aspect-ratio: 1; border-radius: 14px; overflow: hidden; background: var(--line-2); cursor: pointer; box-shadow: var(--shadow-sm); }
+  .pcard img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
+  .pcard:hover img { transform: scale(1.04); }
+  .pcard::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.18) 0%, transparent 30%, transparent 60%, rgba(0,0,0,.6) 100%); opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .pcard:hover::after, .pcard.selected::after { opacity: 1; }
+  .pcard .check { position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,.9); border: 1.5px solid white; display: inline-flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s, background .12s; z-index: 2; }
+  .pcard:hover .check { opacity: 1; }
+  .pcard.selected .check { background: var(--accent); border-color: var(--accent); opacity: 1; }
+  .pcard.selected .check::after { content: ""; width: 6px; height: 11px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -2px; }
+  .pcard.selected { outline: 3px solid var(--accent); outline-offset: -3px; }
+  .pmeta { position: absolute; left: 10px; right: 10px; bottom: 10px; color: white; font-size: 12px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transition: opacity .2s; z-index: 2; }
+  .pcard:hover .pmeta { opacity: 1; }
+  .pmeta .pills { display: inline-flex; gap: 4px; }
+  .pmeta .pill-stat { display: inline-flex; align-items: center; gap: 3px; background: rgba(0,0,0,.45); padding: 3px 7px; border-radius: 999px; backdrop-filter: blur(10px); font-size: 11px; }
+  .pmeta .pill-stat svg { width: 10px; height: 10px; }
+  .pbadge { position: absolute; top: 8px; right: 8px; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: rgba(0,0,0,.45); color: white; backdrop-filter: blur(10px); z-index: 2; }
+  .pbadge.draft { background: rgba(211,151,53,.9); }
+  .pbadge.private { background: rgba(31,34,48,.8); }
+  .bulk-bar { position: sticky; bottom: 12px; margin-top: 18px; background: var(--ink); color: white; border-radius: 16px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; box-shadow: var(--shadow-lg); z-index: 20; }
+  .bulk-bar .chip { background: rgba(255,255,255,.15); color: white; border: none; }
+  .bulk-bar button:not(.btn-primary) { color: white; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+  .bulk-bar button:not(.btn-primary):hover { background: rgba(255,255,255,.18); }
+  .bulk-bar .s { flex: 1; font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div id="nav-slot"></div>
+<main class="app">
+  <div id="sidebar-slot"></div>
+  <section class="main">
+    <div id="mobile-header-slot"></div>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">My Photos</h1>
+        <p class="page-sub">312 photos · 8.2 GB · last uploaded 3 days ago</p>
+      </div>
+      <div class="page-actions">
+        <a class="btn btn-secondary" href="Photo Insights.html">Insights</a>
+        <a class="btn btn-primary" href="Upload Studio.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Upload</a>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input placeholder="Search your photos…"/></div>
+      <div class="segmented"><button class="active">All 312</button><button>Published 280</button><button>Drafts 22</button><button>Private 10</button></div>
+      <div class="spacer"></div>
+      <select class="select" style="width:150px;height:34px;"><option>Newest</option><option>Oldest</option><option>Most favorited</option><option>Most viewed</option></select>
+      <div class="view-toggle">
+        <button class="view-btn active" aria-label="Grid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+        <button class="view-btn" aria-label="Rows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      </div>
+    </div>
+
+    <div class="photos-grid" id="photosGrid">
+      <a class="pcard selected" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1487958449943-2429e8be8625?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span><div class="pmeta"><span>2.1k</span><div class="pills"><span class="pill-stat"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9Z"/></svg>820</span></div></div></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1520962880247-cfaf541c8724?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1511818966892-d7d671e672a2?auto=format&fit=crop&w=600&q=80" alt=""/><span class="pbadge draft">Draft</span><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+      <a class="pcard selected" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1496564203457-11bb12075d90?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1493246318656-5bfd4cfb29b8?auto=format&fit=crop&w=600&q=80" alt=""/><span class="pbadge private">Private</span><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1486325212027-8081e485255e?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1504805572947-34fad45aed93?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=600&q=80" alt=""/><span class="pbadge draft">Draft</span><span class="check"></span></a>
+      <a class="pcard selected" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+      <a class="pcard" href="Edit Photo.html"><img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=600&q=80" alt=""/><span class="check"></span></a>
+    </div>
+
+    <div class="bulk-bar" id="bulkBar">
+      <span class="chip tag">3 selected</span>
+      <div class="s">Bulk actions apply to all selected photos.</div>
+      <button>Move to album…</button>
+      <button>Set visibility</button>
+      <button>Download</button>
+      <button class="btn-danger">Delete</button>
+    </div>
+  </section>
+</main>
+<div id="mobile-tabs-slot"></div>
+<script>window.__page = { key: 'photos' };</script>
+<script src="account-shell.js"></script>
+<script>
+  document.querySelectorAll('.segmented').forEach(s=>s.querySelectorAll('button').forEach(b=>b.addEventListener('click',(ev)=>{ev.preventDefault();s.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');})));
+  document.querySelectorAll('.view-toggle .view-btn').forEach(b=>b.addEventListener('click',()=>{b.parentElement.querySelectorAll('.view-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');}));
+  document.querySelectorAll('.pcard .check').forEach(c=>c.addEventListener('click',(ev)=>{ev.preventDefault();ev.stopPropagation();c.parentElement.classList.toggle('selected');const n=document.querySelectorAll('.pcard.selected').length;const chip=document.querySelector('.bulk-bar .chip');if(chip) chip.textContent=n+' selected';document.getElementById('bulkBar').style.display=n?'flex':'none';}));
+</script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Insights — goimg</title>
+<link rel="stylesheet" href="account.css"/>
+<style>
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
+  .kpi { background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px 18px; box-shadow: var(--shadow-sm); }
+  .kpi .lbl { font-size: 11.5px; color: var(--ink-3); letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+  .kpi .val { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin-top: 6px; }
+  .kpi .delta { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; margin-top: 4px; font-weight: 500; padding: 2px 8px; border-radius: 999px; }
+  .kpi .delta.up { color: var(--success); background: color-mix(in oklab, var(--success) 12%, transparent); }
+  .kpi .delta.down { color: var(--danger); background: color-mix(in oklab, var(--danger) 12%, transparent); }
+  .kpi .delta svg { width: 11px; height: 11px; }
+  .chart-wrap { background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 18px 20px 22px; box-shadow: var(--shadow-sm); }
+  .chart-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .chart-legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-3); }
+  .chart-legend .lg { display: inline-flex; align-items: center; gap: 5px; }
+  .chart-legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+  .grid-two { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .grid-two { grid-template-columns: 1fr; } }
+  .top-list { display: flex; flex-direction: column; }
+  .top-row { display: flex; gap: 12px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--line-2); }
+  .top-row:last-child { border-bottom: none; }
+  .top-thumb { width: 48px; height: 48px; border-radius: 10px; overflow: hidden; background: var(--line-2); flex-shrink: 0; }
+  .top-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .top-title { font-size: 13.5px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top-sub { font-size: 12px; color: var(--ink-3); }
+  .top-stat { text-align: right; font-size: 14px; font-weight: 600; color: var(--ink); }
+  .top-stat .d { font-size: 11px; font-weight: 500; color: var(--success); }
+  .bars { display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: grid; grid-template-columns: 120px 1fr 52px; gap: 12px; align-items: center; font-size: 12.5px; }
+  .bar-track { height: 8px; background: var(--bg-tint-2); border-radius: 999px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), oklch(0.72 0.12 220)); border-radius: 999px; }
+  .bar-val { font-weight: 600; color: var(--ink); text-align: right; }
+  .map-chip { display: inline-flex; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 999px; background: var(--bg-tint); font-size: 12.5px; color: var(--ink-2); }
+  .map-chip .flag { width: 14px; height: 10px; border-radius: 2px; background: var(--accent); }
+</style>
+</head>
+<body>
+<div id="nav-slot"></div>
+<main class="app">
+  <div id="sidebar-slot"></div>
+  <section class="main">
+    <div id="mobile-header-slot"></div>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Insights</h1>
+        <p class="page-sub">How your work is performing on goimg.</p>
+      </div>
+      <div class="page-actions">
+        <div class="segmented"><button>7d</button><button class="active">30d</button><button>90d</button><button>1y</button></div>
+        <button class="btn btn-secondary btn-sm">Export CSV</button>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="lbl">Views</div><div class="val">184.2k</div><div class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>+24% vs last 30d</div></div>
+      <div class="kpi"><div class="lbl">Favorites</div><div class="val">12.8k</div><div class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>+18%</div></div>
+      <div class="kpi"><div class="lbl">New followers</div><div class="val">+642</div><div class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>+9%</div></div>
+      <div class="kpi"><div class="lbl">Engagement rate</div><div class="val">6.9%</div><div class="delta down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>−0.3 pp</div></div>
+    </div>
+
+    <div class="chart-wrap" style="margin-bottom:22px;">
+      <div class="chart-head">
+        <div>
+          <div style="font-size:15px;font-weight:600;">Views over time</div>
+          <div style="font-size:12.5px;color:var(--ink-3);margin-top:2px;">Daily views across all published photos</div>
+        </div>
+        <div class="chart-legend">
+          <span class="lg"><span class="sw" style="background:var(--accent);"></span>Views</span>
+          <span class="lg"><span class="sw" style="background:oklch(0.72 0.12 220);"></span>Favorites</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 800 220" preserveAspectRatio="none" style="width:100%;height:220px;">
+        <defs>
+          <linearGradient id="gv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="oklch(0.58 0.18 255)" stop-opacity=".25"/><stop offset="100%" stop-color="oklch(0.58 0.18 255)" stop-opacity="0"/></linearGradient>
+        </defs>
+        <g stroke="var(--line-2)" stroke-width="1">
+          <line x1="0" y1="40" x2="800" y2="40"/><line x1="0" y1="100" x2="800" y2="100"/><line x1="0" y1="160" x2="800" y2="160"/>
+        </g>
+        <path d="M0,170 C50,150 80,120 120,140 S200,90 240,95 320,60 360,80 440,30 480,50 560,70 600,55 680,90 720,70 800,40 800,40 L800,220 L0,220 Z" fill="url(#gv)"/>
+        <path d="M0,170 C50,150 80,120 120,140 S200,90 240,95 320,60 360,80 440,30 480,50 560,70 600,55 680,90 720,70 800,40 800,40" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+        <path d="M0,190 C80,185 160,170 240,170 S360,155 480,150 600,140 720,130 800,125 800,125" fill="none" stroke="oklch(0.72 0.12 220)" stroke-width="2" stroke-dasharray="3 3"/>
+      </svg>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:11px;color:var(--ink-3);letter-spacing:.04em;">
+        <span>Feb 20</span><span>Feb 28</span><span>Mar 8</span><span>Mar 15</span><span>Mar 22</span><span>Today</span>
+      </div>
+    </div>
+
+    <div class="grid-two">
+      <div class="card">
+        <div class="card-head"><h2 class="card-title">Top photos</h2><p class="card-sub">Highest engagement in the last 30 days.</p></div>
+        <div class="card-body" style="padding-top:4px;">
+          <div class="top-list">
+            <div class="top-row">
+              <div class="top-thumb"><img src="https://images.unsplash.com/photo-1487958449943-2429e8be8625?auto=format&fit=crop&w=200&q=80" alt=""/></div>
+              <div style="flex:1;min-width:0;"><div class="top-title">Brutalist facade, Turin</div><div class="top-sub">8,214 views · 842 favorites</div></div>
+              <div class="top-stat">1</div>
+            </div>
+            <div class="top-row">
+              <div class="top-thumb"><img src="https://images.unsplash.com/photo-1520962880247-cfaf541c8724?auto=format&fit=crop&w=200&q=80" alt=""/></div>
+              <div style="flex:1;min-width:0;"><div class="top-title">Stair well, Palacio de Los Deportes</div><div class="top-sub">6,912 views · 710 favorites</div></div>
+              <div class="top-stat">2</div>
+            </div>
+            <div class="top-row">
+              <div class="top-thumb"><img src="https://images.unsplash.com/photo-1511818966892-d7d671e672a2?auto=format&fit=crop&w=200&q=80" alt=""/></div>
+              <div style="flex:1;min-width:0;"><div class="top-title">Casa Gilardi</div><div class="top-sub">5,802 views · 612 favorites</div></div>
+              <div class="top-stat">3</div>
+            </div>
+            <div class="top-row">
+              <div class="top-thumb"><img src="https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?auto=format&fit=crop&w=200&q=80" alt=""/></div>
+              <div style="flex:1;min-width:0;"><div class="top-title">Shadow grid</div><div class="top-sub">4,611 views · 501 favorites</div></div>
+              <div class="top-stat">4</div>
+            </div>
+            <div class="top-row">
+              <div class="top-thumb"><img src="https://images.unsplash.com/photo-1493246318656-5bfd4cfb29b8?auto=format&fit=crop&w=200&q=80" alt=""/></div>
+              <div style="flex:1;min-width:0;"><div class="top-title">Plinth at dusk · Marseille</div><div class="top-sub">3,908 views · 440 favorites</div></div>
+              <div class="top-stat">5</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-foot"><a class="link-inline" href="My Photos.html">View all photos</a></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2 class="card-title">Traffic sources</h2></div>
+        <div class="card-body">
+          <div class="bars">
+            <div class="bar-row"><span>goimg Discover</span><div class="bar-track"><div class="bar-fill" style="width:72%;"></div></div><span class="bar-val">72%</span></div>
+            <div class="bar-row"><span>Direct &amp; shares</span><div class="bar-track"><div class="bar-fill" style="width:38%;"></div></div><span class="bar-val">14%</span></div>
+            <div class="bar-row"><span>Search engines</span><div class="bar-track"><div class="bar-fill" style="width:22%;"></div></div><span class="bar-val">8%</span></div>
+            <div class="bar-row"><span>Referrals</span><div class="bar-track"><div class="bar-fill" style="width:12%;"></div></div><span class="bar-val">4%</span></div>
+            <div class="bar-row"><span>Other</span><div class="bar-track"><div class="bar-fill" style="width:6%;"></div></div><span class="bar-val">2%</span></div>
+          </div>
+        </div>
+        <div class="card-head" style="border-top:1px solid var(--line-2);padding-top:14px;"><h2 class="card-title">Audience locations</h2></div>
+        <div class="card-body" style="display:flex;flex-wrap:wrap;gap:6px;">
+          <span class="map-chip"><span class="flag"></span>United States · 31%</span>
+          <span class="map-chip"><span class="flag" style="background:oklch(0.75 0.12 140);"></span>Germany · 14%</span>
+          <span class="map-chip"><span class="flag" style="background:oklch(0.7 0.14 25);"></span>Mexico · 11%</span>
+          <span class="map-chip"><span class="flag" style="background:oklch(0.8 0.1 90);"></span>Japan · 8%</span>
+          <span class="map-chip"><span class="flag" style="background:oklch(0.6 0.15 280);"></span>UK · 7%</span>
+          <span class="map-chip"><span class="flag" style="background:oklch(0.65 0.13 160);"></span>France · 5%</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="mobile-tabs-slot"></div>
+<script>window.__page = { key: 'insights' };</script>
+<script src="account-shell.js"></script>
+<script>
+  document.querySelectorAll('.segmented').forEach(s=>s.querySelectorAll('button').forEach(b=>b.addEventListener('click',(e)=>{e.preventDefault();s.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');})));
+</script>
+</body>
+</html>

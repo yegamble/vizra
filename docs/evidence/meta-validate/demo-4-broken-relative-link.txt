@@ -1,0 +1,24 @@
+
+########## DEMO 4 — broken relative markdown link ##########
+
+SOURCE SHA: 957f059756fe60868dcc24b71b0ba7e3118e2624
+
+NOTE: this repository contains ZERO relative markdown links today (every
+link-shaped string in docs/ is inside code, or an external URL), so the
+check passes vacuously on a clean tree. This mutation is what proves the
+check works at all.
+
+########## RED: add one link that resolves and one that does not ##########
+
+
+[a real file](../AGENTS.md) and [a missing one](./NO_SUCH_DOC.md).
+$ ./scripts/check-doc-links.py
+BROKEN RELATIVE LINK(S): 1
+  docs/MILESTONES.md:18: [./NO_SUCH_DOC.md] — 'docs/NO_SUCH_DOC.md' does not exist
+EXIT=1
+
+########## GREEN: restore ##########
+
+$ ./scripts/check-doc-links.py
+relative links: none exist yet across 87 markdown file(s) (checked nothing); 6 external URL(s) recorded and not fetched
+EXIT=0

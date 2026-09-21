@@ -19,10 +19,10 @@ video-specific parts are dropped, and the photo-specific services are added.
 | Repo | Role | Notes |
 |---|---|---|
 | `vizra` (this) | meta: `AGENTS.md`, `docs/`, compose files, `deploy/`, `env/*.env.example`, `install.sh`, `bootstrap.sh`, `tests/`, `releases/`, `.github/` | component checkouts nested, gitignored, pinned detached at release tags on hosts |
-| `vizra-core` | Go/Echo API + worker + `vizra` operator CLI; `api/openapi.yaml`; sqlc; migrations compiled into the binary | publishes `ghcr.io/<owner>/vizra-core:<tag>`, the CLI binaries, checksums and the deployment bundle |
-| `vizra-user` | Next.js/TypeScript/Tailwind application | publishes `ghcr.io/<owner>/vizra-user:<tag>` |
-| `vizra-search` | internal Go search service (PostgreSQL FTS/trigram + Redis) | publishes `ghcr.io/<owner>/vizra-search:<tag>`; may start inside core (Q-001) |
-| `vizra-branding` (proposed) | brand mark, tokens, Figma references | Q-002 |
+| `vizra-core` | Go/Echo API + worker + `vizra` operator CLI; `api/openapi.yaml`; sqlc; migrations compiled into the binary | publishes `ghcr.io/yegamble/vizra-core:<tag>`, the CLI binaries, checksums and the deployment bundle |
+| `vizra-user` | Next.js/TypeScript/Tailwind application | publishes `ghcr.io/yegamble/vizra-user:<tag>` |
+| `vizra-search` | internal Go search service (PostgreSQL FTS/trigram + Redis) | publishes `ghcr.io/yegamble/vizra-search:<tag>` from M0 as a real minimal service; SEARCH_MODE=off default before M3 (Q-001 decided 2026-09-15) |
+| `vizra-branding` (proposed) | brand mark, tokens, Figma references | not created; tokens in `vizra-user/packages/ui`, brand assets in meta `brand/` after Prompt 02 (Q-002 decided 2026-09-15) |
 
 `bootstrap.sh` clones or fast-forwards the component checkouts; `VIZRA_REF=<tag>`
 pins all of them detached. Compose files here `include:` the component compose
@@ -42,12 +42,12 @@ Services and profiles (target):
 | Service | Profile | Mode model | Off-host port |
 |---|---|---|---|
 | `postgres` | core | MANAGED (bundled) or EXTERNAL via overlay | none |
-| `redis` | core | MANAGED or EXTERNAL via overlay | none |
+| `redis` | core | valkey (MANAGED, image `valkey/valkey` digest-pinned) or EXTERNAL RESP-compatible ≥ 7.2 (Q-004 decided 2026-09-15) | none |
 | `migrate` (one-shot, `vizra-core` image, `migrate up`) | core | always | none |
 | `api` (`vizra-core`, role api) | core | always | loopback only |
 | `worker` (`vizra-core`, role worker) | core (or `worker` for split topology) | always | none |
 | `frontend` (`vizra-user`) | frontend | always | loopback only |
-| `search` + `search-migrate` (`vizra-search`) | core | always unless folded into core (Q-001) | none |
+| `search` + `search-migrate` (`vizra-search`) | core | `SEARCH_MODE=off` (default before M3) / `managed` (default from M3) / `external`; never a hard dependency; misconfiguration = doctor FAIL + degraded readiness (Q-001) | none |
 | `clickhouse` | analytics | OFF (default) / MANAGED / EXTERNAL via overlay | none |
 | `ipfs` (Kubo) | ipfs | OFF (default) / MANAGED / EXTERNAL (remote node or pinning service) | 4001 swarm only, gated in cloud firewall |
 | `minio` | storage | dev/QA emulator only; never a production substitute for provider qualification | none |
@@ -62,7 +62,10 @@ Rules carried over from Vidra and asserted in CI, not assumed:
    and requires the DSN (`${VAR:?…}`). MANAGED starts the pinned container.**
    Invalid external configuration fails the render or the boot; it never
    falls back to a fresh local database, cache or store.
-2. **Compose ≥ 2.24** for the production overlay; the version check stays.
+   The base file publishes no ports; developer port mappings live in
+   `docker-compose.override.yml` bound to 127.0.0.1, so the merge tags are
+   never the only thing closing a port (Q-017).
+2. **Compose ≥ 2.24.4** for the production overlay; the version check stays.
 3. **Only caddy 80/443 and the IPFS swarm port face the network.** Every other
    service publishes nothing or loopback, asserted with every optional
    profile enabled.
@@ -78,9 +81,9 @@ Rules carried over from Vidra and asserted in CI, not assumed:
 
 `install.sh` (POSIX sh, `curl … | sh`-safe, idempotent, resumable):
 
-1. detect platform (Ubuntu 24.04 amd64 first; separate ARM64 qualification);
+1. detect platform (Ubuntu 24.04 amd64 first; separate ARM64 qualification); refuse non-amd64 server hosts by name; the CLI is built for linux/darwin × amd64/arm64 (Q-027);
 2. privileges; 3. survey and confirmation (`--yes` for unattended);
-4. install Docker Engine + Compose v2 (≥ 2.24) if missing;
+4. install Docker Engine + Compose v2 (≥ 2.24.4) if missing;
 5. resolve the release (`--ref`), unpack the checksum-verified deployment
    **bundle** (`vizra-bundle_<tag>.tar.gz`) into `/opt/vizra` — no git needed;
    `--git` clones instead; a release without a bundle falls back to clone, out

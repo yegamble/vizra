@@ -1,0 +1,10 @@
+name: fixture
+on:
+  pull_request:
+  merge_group:
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout
+      - run: ./scripts/check-doc-links.py

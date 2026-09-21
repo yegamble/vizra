@@ -28,7 +28,7 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - fixture manifest committed
 
 ## Dependencies / blockers
-Q-028 budgets proposed
+Q-028 method decided 2026-09-15; numbers provisional until the M0 measurement run
 
 ## Definition of done
 Ledger entries updated with evidence; UI-control inventory updated where controls changed; execution plan checkpointed; PR opened as READY_FOR_REVIEW. Never self-merge; never mark VERIFIED without independent verification.

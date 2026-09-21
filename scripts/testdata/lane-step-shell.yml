@@ -1,0 +1,11 @@
+name: fixture
+on:
+  pull_request:
+  merge_group:
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: the generated ledger matches its sources
+        shell: bash -c "eval \"$@\" || true" --
+        run: ./scripts/check-generated-ledger.sh

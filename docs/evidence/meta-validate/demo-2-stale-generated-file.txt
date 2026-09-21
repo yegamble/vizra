@@ -1,0 +1,50 @@
+
+########## DEMO 2 — generator source changed without regenerating (COMMITTED) ##########
+
+BASE SHA: 9da584e117c1b3fd616b7c6e8a251fa787fdc0b1
+
+########## RED: change a requirement title in the SOURCE, leave features.json alone ##########
+
+edited VZ-FOUND-001 title in docs/evidence/ledger-generator/s0_foundation.py
+   docs/evidence/ledger-generator/s0_foundation.py | 2 +-
+   1 file changed, 1 insertion(+), 1 deletion(-)
+committed: b61bab5
+working tree is clean:
+  ?? docs/evidence/meta-validate/
+  (no output above = clean)
+$ ./scripts/check-generated-ledger.sh
+regenerating with: Python 3.9.6
+OK 191 requirements; core=141; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 14, 'upload': 13, 'media': 13, 'storage': 15, 'import': 4, 'activitypub': 4, 'atproto': 2, 'ipfs': 2, 'organization': 24, 'community': 19, 'search': 12, 'admin': 26, 'design': 4}; questions=['Q-016', 'Q-021', 'Q-022', 'Q-028', 'Q-032', 'Q-036']; decided=['Q-001', 'Q-002', 'Q-003', 'Q-004', 'Q-005', 'Q-006', 'Q-007', 'Q-008', 'Q-009', 'Q-010', 'Q-011', 'Q-012', 'Q-013', 'Q-014', 'Q-015', 'Q-017', 'Q-018', 'Q-023', 'Q-024', 'Q-027', 'Q-028', 'Q-029', 'Q-030', 'Q-031', 'Q-033', 'Q-034', 'Q-035', 'Q-037', 'Q-038', 'Q-039', 'Q-040', 'Q-041', 'Q-042', 'Q-043']
+diff --git a/docs/quality/features.json b/docs/quality/features.json
+index f49ec58..64ec7fa 100644
+--- a/docs/quality/features.json
++++ b/docs/quality/features.json
+@@ -119,7 +119,7 @@
+   "features": [
+     {
+       "id": "VZ-FOUND-001",
+-      "title": "Component repositories exist with binding contracts",
++      "title": "Component repositories exist with binding contracts (edited by demo 2)",
+       "area": "foundation",
+       "outcome": "Owner/operator: vizra-core, vizra-user and vizra-search repositories exist, each with AGENTS.md, lockfiles, pinned toolchain, and a canonical contract source (OpenAPI in core; generated client in user).",
+       "source_kind": "meta_repo_parity_with_vidra",
+
+GENERATED FILE IS NOT REPRODUCIBLE. The following generated file(s) changed when
+the generator was re-run, which means the committed copy does not match its sources:
+  - docs/quality/features.json
+
+  Either the file was hand-edited (AGENTS.md forbids it), or a generator source
+  under docs/evidence/ledger-generator was changed without regenerating.
+  Fix: edit the sources, run
+      (cd docs/evidence/ledger-generator && python3 build.py ../../quality/features.json)
+  and commit BOTH the sources and the regenerated file.
+EXIT=1
+
+########## GREEN: drop the source edit ##########
+
+back to 9da584e
+$ ./scripts/check-generated-ledger.sh
+regenerating with: Python 3.9.6
+OK 191 requirements; core=141; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 14, 'upload': 13, 'media': 13, 'storage': 15, 'import': 4, 'activitypub': 4, 'atproto': 2, 'ipfs': 2, 'organization': 24, 'community': 19, 'search': 12, 'admin': 26, 'design': 4}; questions=['Q-016', 'Q-021', 'Q-022', 'Q-028', 'Q-032', 'Q-036']; decided=['Q-001', 'Q-002', 'Q-003', 'Q-004', 'Q-005', 'Q-006', 'Q-007', 'Q-008', 'Q-009', 'Q-010', 'Q-011', 'Q-012', 'Q-013', 'Q-014', 'Q-015', 'Q-017', 'Q-018', 'Q-023', 'Q-024', 'Q-027', 'Q-028', 'Q-029', 'Q-030', 'Q-031', 'Q-033', 'Q-034', 'Q-035', 'Q-037', 'Q-038', 'Q-039', 'Q-040', 'Q-041', 'Q-042', 'Q-043']
+generated ledger reproduces byte-for-byte: docs/quality/features.json
+EXIT=0

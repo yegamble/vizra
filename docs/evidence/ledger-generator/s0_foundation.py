@@ -6,7 +6,7 @@ req("VZ-FOUND-001","Component repositories exist with binding contracts",
     "foundation", META, [{"source":"OWNER-2026-09-15","note":"meta repo mirrors Vidra"},{"source":"VIDRA-AGENTS","note":"repo-map shape"}],
     deps=(), success=["Each repo builds from a clean clone with documented commands","bootstrap.sh clones/pins all components; VIZRA_REF pins detached"],
     negative=["A missing lockfile or unpinned toolchain fails CI"], privacy=[], recovery=["bootstrap.sh is idempotent on rerun"],
-    cli=["bootstrap.sh"], evidence=["clean-clone build transcript per repo with SHA"], unresolved=["Q-001","Q-002"])
+    cli=["bootstrap.sh"], evidence=["clean-clone build transcript per repo with SHA"], decided=["Q-001","Q-002"])
 req("VZ-FOUND-002","OpenAPI is the API source; TypeScript client is generated and drift-checked",
     "Developer: vizra-core/api/openapi.yaml defines every route; route↔spec drift fails CI in both directions; vizra-user's client is generated, never hand-edited.",
     "foundation", META, [{"source":"AGENTS","note":"regenerate clients from source contracts"},{"source":"VIDRA-AGENTS","note":"TestOpenAPIContract both directions"}],
@@ -22,7 +22,8 @@ req("VZ-FOUND-004","Pinned, reviewed dependency versions and preserved licenses"
     "Owner: Go, Node, Next.js, Echo, sqlc, PostgreSQL, Redis, libvips binding, Lucide and Compose versions are pinned to reviewed releases with license notices preserved; the Echo major and Redis license question are decided explicitly.",
     "foundation", SAFE, [{"source":"RES-PROTOCOLS","note":"versions observed 2026-09-15: Go 1.27.1, Next.js 16.3.5, Echo v5 (requires Go 1.25+), sqlc 1.31.1, PostgreSQL 18, Redis 8.10.1 (RSALv2/SSPLv1/AGPLv3), libvips 8.18 LGPL-2.1+, govips 2.18.0 MIT, lucide-react 1.46.0 ISC"}],
     deps=["VZ-FOUND-001"], success=["Lockfiles committed; versions match ADR"], negative=["Dependabot/audit lane flags an unpinned or vulnerable dependency"],
-    evidence=["ADR with versions and license table; govulncheck/npm audit lane output"], unresolved=["Q-003","Q-004"])
+    evidence=["ADR with versions and license table; govulncheck/npm audit lane output"], decided=["Q-003","Q-004"],
+    notes="Q-003/Q-004 decided 2026-09-15: Echo v5 ≥ 5.3.1 on Go 1.27.x, tracing via otelhttp + route middleware; Valkey managed (digest-pinned) + go-redis v9 with a Valkey/Redis 7.2 integration matrix.")
 req("VZ-FOUND-005","Health, readiness, version and schema probes",
     "Operator: the API exposes /healthz, /readyz (fails when DB/Redis/storage unavailable), /version and a migration-state probe; readiness fails closed when the schema is behind.",
     "foundation", OPS, [{"source":"VIDRA-README","note":"/healthz /readyz /schemaz /version"}],

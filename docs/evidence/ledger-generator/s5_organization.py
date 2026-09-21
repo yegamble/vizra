@@ -48,11 +48,11 @@ req("VZ-COLLECTION-001","Collections: hierarchical grouping of own albums (up to
 req("VZ-GALLERY-001","Galleries: curated sets of other members' public safe photos with creator opt-out",
     "Member: curates up to N (proposed 500) other people's public, safe-rated photos into a titled gallery with description; owners can opt out of gallery inclusion globally; blocking removes content from the blocker's galleries.",
     "organization", FLICKR, [{"source":"FLICKR-GALLERIES","note":"500 items; other members only; safe only; opt-out"}],
-    deps=["VZ-ALBUM-001","VZ-NSFW-001","VZ-BLOCK-001"], success=["Add/remove; opt-out removes and prevents"], negative=["Own item or non-safe/non-public item rejected"], privacy=["Inclusion is a grant checked at add time and at render time"], api=["/api/v1/galleries*"], ui=["/galleries","photo → add to gallery"], evidence=EV_API+EV_UI+EV_NEG, profiles=("full",), unresolved=["Q-037"])
+    deps=["VZ-ALBUM-001","VZ-NSFW-001","VZ-BLOCK-001"], success=["Add/remove; opt-out removes and prevents"], negative=["Own item or non-safe/non-public item rejected"], privacy=["Inclusion is a grant checked at add time and at render time"], api=["/api/v1/galleries*"], ui=["/galleries","photo → add to gallery"], evidence=EV_API+EV_UI+EV_NEG, profiles=("full",), decided=["Q-037"])
 req("VZ-TAG-001","User-defined tags with on-the-fly creation, autocomplete, tag pages, top tags, rename/delete across items, phrase tags",
     "Photographer: adds comma/space-separated tags with quoted phrases; autocomplete; tag pages /tag/{name} with sorts; top tags; rename or delete a tag across all own items; admin edits/deletes tags globally; optional camera-model auto-tag.",
     "organization", CHEV, [{"source":"CHEV-COMPARE","note":"Tags features list"},{"source":"FLICKR-TAGS","note":"rename across items; quoted phrases"},{"source":"CHEV-FEATURES-NOTSHIPPED","note":"tags marked upcoming on marketing page; shipped per docs"}], edition="all",
-    deps=["VZ-UPLOAD-001"], success=["Tag page lists only visible items; counts match"], negative=["Tag spam limits (count/length) enforced"], privacy=["Private items never surface on tag pages or counts"], api=["/api/v1/tags*"], ui=["/explore/tags","/tag/{name}"], evidence=EV_API+EV_UI+EV_NEG, unresolved=["Q-006"])
+    deps=["VZ-UPLOAD-001"], success=["Tag page lists only visible items; counts match"], negative=["Tag spam limits (count/length) enforced"], privacy=["Private items never surface on tag pages or counts"], api=["/api/v1/tags*"], ui=["/explore/tags","/tag/{name}"], evidence=EV_API+EV_UI+EV_NEG, decided=["Q-006"])
 req("VZ-TAG-002","Machine tags (namespace:predicate=value) stored and searchable",
     "Photographer/API: structured tags recognized and queryable; not shown as plain tags unless configured.",
     "organization", FLICKR, [{"source":"FLICKR-API","note":"machinetags.* — API-only, no user docs"}],
@@ -80,11 +80,11 @@ req("VZ-LICENSE-001","Per-item license (All Rights Reserved, Public Domain, CC0,
 req("VZ-GEO-001","Geotags with geo-privacy, map view, geofences, and EXIF location import policy",
     "Photographer: location per photo (from EXIF when allowed or manual); geo-privacy (who sees location) separate from photo privacy; geofences apply stricter defaults; map view of own/public geotagged photos; location never in public derivatives/exports unless allowed.",
     "organization", FLICKR, [{"source":"FLICKR-GEO","note":"geofences (10); EXIF embedded warning"}],
-    deps=["VZ-MEDIA-004"], success=["Map shows only permitted locations"], privacy=["Geo-privacy tested on API, page, search, federation, IPFS"], api=["/api/v1/photos/{id}/location"], ui=["viewer map","/map"], evidence=EV_API+EV_UI+EV_NEG, profiles=("full",), unresolved=["Q-038"])
-req("VZ-PRIVACY-001","Asset-level visibility: public, unlisted (link), private; plus audience groups (followers-only / named lists) and site-wide privacy mode",
-    "Photographer: sets visibility per asset (not only per album, unlike Chevereto); audience lists (e.g. friends/family style labels) grant view access; owner can force site-private mode (login required) with content privacy defaults; every read surface enforces.",
+    deps=["VZ-MEDIA-004"], success=["Map shows only permitted locations"], privacy=["Geo-privacy tested on API, page, search, federation, IPFS"], api=["/api/v1/photos/{id}/location"], ui=["viewer map","/map"], evidence=EV_API+EV_UI+EV_NEG, profiles=("full",), decided=["Q-038"])
+req("VZ-PRIVACY-001","Asset-level visibility: public, unlisted (link), private; plus site-wide privacy mode",
+    "Photographer: sets visibility per asset (not only per album, unlike Chevereto); owner can force site-private mode (login required) with content privacy defaults; every read surface enforces one authorization decision. Named audiences and follower-only visibility are VZ-PRIVACY-004 (full).",
     "organization", EXPLICIT, [{"source":"CATALOG-F1","note":"decide private/unlisted/public semantics before social features spread"},{"source":"FLICKR-PRIVACY","note":"private/friends/family/public; overrides via groups, people tags, guest passes"},{"source":"CHEV-WEBSITE","note":"Website privacy mode; Content privacy mode"}],
-    deps=["VZ-AUTH-001","VZ-UPLOAD-001"], success=["Matrix: 3 visibilities × anonymous/member/follower/grantee/owner/admin × every read surface"], negative=["Tightening privacy invalidates caches, embeds, feeds, federation copies (Delete sent), IPFS (unpin)"], privacy=["Counts (favorites/views) of private items not leaked"], api=["PATCH /api/v1/photos/{id} visibility","/api/v1/me/audiences"], ui=["privacy dialog","/settings/privacy"], evidence=EV_API+EV_UI+EV_NEG, unresolved=["Q-039"],
+    deps=["VZ-AUTH-001","VZ-UPLOAD-001"], success=["Matrix: 3 visibilities × anonymous/member/grantee/owner/admin × every read surface"], negative=["Tightening privacy invalidates caches, embeds, feeds, federation copies (Delete sent), IPFS (unpin)"], privacy=["Counts (favorites/views) of private items not leaked"], api=["PATCH /api/v1/photos/{id} visibility"], ui=["privacy dialog","/settings/privacy"], evidence=EV_API+EV_UI+EV_NEG, decided=["Q-039"],
     mechanism="Chevereto: privacy only at album level ('Media on its own cannot be private'). Flickr: per-item privacy with friends/family. Vizra outcome: per-item visibility plus album privacy plus explicit grants; album never widens.")
 req("VZ-PRIVACY-002","Hide from public search/explore while remaining visible on the profile",
     "Photographer: per-item or default flag to exclude from search, explore, tag pages, feeds and sitemap while the item stays public by link.",
@@ -94,3 +94,14 @@ req("VZ-PRIVACY-003","Content type (photo / screenshot / art-illustration / virt
     "Photographer: declares content type (with an explicit AI-generated option); filterable in search and explore; owner may require it.",
     "organization", FLICKR, [{"source":"FLICKR-CONTENT-TYPE","note":"four categories; AI guidance"}],
     deps=["VZ-LIBRARY-002"], success=["Filter works"], api=["field content_type"], ui=["edit form"], evidence=EV_API+EV_UI, profiles=("full",))
+req("VZ-PRIVACY-004","Named audiences and follower-only visibility",
+    "Photographer: maintains named audiences (friends/family-style lists) and targets an item at an audience or at approved followers; the single core authorization evaluator applies the precedence site mode → asset visibility → album privacy / share grant → audience on every read surface.",
+    "organization", EXPLICIT, [{"source":"FLICKR-PRIVACY","note":"friends/family audiences; per-item overrides"},{"source":"CATALOG-F1","note":"decide private/unlisted/public semantics before social features spread"}],
+    deps=["VZ-PRIVACY-001","VZ-FOLLOW-002"],
+    success=["Audience-targeted item visible to listed members and followers only; matrix covers anonymous/member/follower/non-approved follower/owner/admin across every read surface"],
+    negative=["A non-approved follower is denied follower-only items"],
+    privacy=["Audience membership never revealed to non-owners; counts exclude items the viewer cannot see"],
+    recovery=["Removing a member from an audience invalidates caches, embeds and feeds"],
+    api=["GET/POST/PATCH/DELETE /api/v1/me/audiences","PATCH /api/v1/photos/{id} audience targets"],
+    ui=["privacy dialog audience picker","/settings/privacy/audiences"],
+    evidence=EV_API+EV_UI+EV_NEG, profiles=("full",), decided=["Q-039"])

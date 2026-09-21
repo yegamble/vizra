@@ -162,7 +162,7 @@
       "external"
     ],
     "search": [
-      "managed (vizra-search or in-core per Q-001)"
+      "managed (vizra-search; SEARCH_MODE=off permitted before M3 — Q-001 decided 2026-09-15)"
     ],
     "clickhouse": [
       "off"
@@ -199,10 +199,26 @@
     "architecture": "amd64",
     "hardware": null,
     "status": "PROPOSED_NOT_QUALIFIED",
-    "arm64": "separate qualification before any claim (Q-027)"
+    "arm64": "not claimed; CLI built for arm64; separate qualification before any claim (Q-027 decided 2026-09-15)"
   },
-  "performance_budgets": null,
-  "recovery_objectives": null,
+  "performance_budgets": {
+    "status": "PROVISIONAL_UNTIL_M0_MEASUREMENT",
+    "note": "Q-028 decided 2026-09-15 (method); the numbers below are provisional targets calibrated once by the first M0 boot-lane run on the reference host, then frozen. A budget may not be changed to excuse a failed run (VZ-OPS-007).",
+    "reference_host": "minimum supported host: 2 vCPU / 4 GB, Ubuntu 24.04 amd64, core profile with ClickHouse/IPFS OFF, images pulled (never built on the host), 2 GB swapfile declared, worker concurrency 1, capped libvips operation cache, cache maxmemory set; doctor refuses hosts below the minimum by name",
+    "load_corpus": "declared by VZ-OPS-007 (count, total bytes, megapixel mix; 10k photos proposed), separate from the VZ-FOUND-007 correctness corpus",
+    "measurement_points": [
+      "metadata reads p95 < 300 ms at the API process (not through Next SSR) with 10 concurrent readers over the declared load corpus",
+      "one derivative set (thumbnail/medium/display) for a 12 MP JPEG p95 <= 8 s",
+      "burst: 100 queued 12 MP uploads drain within 15 minutes",
+      "oldest-pending-job age exposed as a metric; fails doctor/readiness above 15 minutes (killing the worker turns doctor red while /healthz may stay 200)"
+    ]
+  },
+  "recovery_objectives": {
+    "status": "PROVISIONAL_UNTIL_M0_MEASUREMENT",
+    "note": "Q-028 decided 2026-09-15 (method); numbers provisional until the first M0 measurement run, then frozen.",
+    "rpo": "24 h (nightly), explicitly covering originals uploaded since the last run, not only database rows",
+    "rto": "2 h, stated for host-local restore of the declared corpus; off-site pull and S3-hosted originals get their own measured RTO in the runbook, which must state which datastores a provider owns"
+  },
   "required_check_manifest": {
     "meta": [
       "validate",

@@ -25,6 +25,9 @@ Tests must challenge the implementation: demonstrate the relevant test fails bef
 5. Update the feature ledger, UI-control inventory, execution plan, and relevant docs without changing the acceptance target.
 6. Open/update the focused PR when authorized; report what passed, what did not run, and the remaining gate. Do not self-merge, deploy production, switch DNS, incur cloud spend, or delete resources without explicit authorization.
 
+### Merge authorization (owner decision, 2026-09-20)
+The owner authorized verifier-gated merging for the war room (`/warroom`). The chair may squash-merge a PR only when all of these hold: an independent verifier that did not write the code returned PASS with an evidence file under `docs/evidence/warroom/`; `ci-required` is green on the verified SHA; the head has not moved since the verdict; no blocking specialist finding is open. A builder never merges or verifies its own work. This authorizes merges only — release approval, production deploy, DNS, cloud spend, and deleting resources remain owner-only, and a merge never makes a ledger entry VERIFIED without the independent evidence.
+
 If an external blocker persists after two materially different attempts, preserve a runnable reproducer and exact missing input. Continue only independent in-scope work; stop claiming that blocked item is complete. No endless audit or retry loop.
 
 ## Engineering guardrails

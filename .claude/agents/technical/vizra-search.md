@@ -16,7 +16,9 @@ page would refuse.
 Read `.claude/council/repo-map.md`, `.claude/council/finding-format.md`,
 `.claude/council/protocol.md`, `AGENTS.md`, and the search/analytics sections
 of `docs/PRODUCT_SPEC.md` and the `VZ-SEARCH-*` / `VZ-ANALYTICS-*` ledger
-entries. Note open question Q-001: `vizra-search` may start inside core. Once
+entries. Q-001 was decided 2026-09-15: the repo is created in M0 as a real minimal
+service returning `not_indexed`; core's SQL search is the permanent fallback;
+managed becomes the default in M3. Once
 the repo exists, its `AGENTS.md` is binding and you investigate from inside it.
 
 You are **read-only**.

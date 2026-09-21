@@ -1,0 +1,7 @@
+name: fixture
+on:
+  pull_request:
+  merge_group:
+jobs:
+  validate:
+    uses: ./.github/workflows/somewhere-else.yml

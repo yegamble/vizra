@@ -15,8 +15,8 @@ here, and pinned DETACHED at release tags on operator hosts.
 | `.` | `vizra` (meta) | AGENTS.md contract, `docs/` (product spec, feature ledger, UI-control inventory, release profiles, plans, evidence), and — once built — docker-compose files, Caddy, `deploy/`, `env/` templates, `install.sh`/`bootstrap.sh`, `tests/`, `releases/` | docs only; no compose, deploy, CI or code yet |
 | `./vizra-core` | `vizra-core` | Go/Echo API, worker, and the `vizra` operator CLI (`setup`, `doctor`, `deploy`, `backup`, `restore`, …); **canonical `api/openapi.yaml` product contract**; sqlc queries; append-only migrations; media pipeline; storage adapters; federation; imports; instance settings | PLANNED — does not exist |
 | `./vizra-user` | `vizra-user` | Next.js/TypeScript/Tailwind — the ENTIRE user-facing product: public exploration, personal library, viewer, albums, community, admin console, moderation | PLANNED — does not exist |
-| `./vizra-search` | `vizra-search` | internal-only Go search service on PostgreSQL FTS/trigram + Redis; ranked IDs + scores only | PLANNED — does not exist; owner may fold it into core initially (open question Q-001) |
-| `./vizra-branding` | `vizra-branding` | original brand mark, design tokens, Figma references | PROPOSED (open question Q-002) |
+| `./vizra-search` | `vizra-search` | internal-only Go search service on PostgreSQL FTS/trigram + Redis; ranked IDs + scores only | PLANNED — created in M0 as a real minimal service; search logic ships in core SQL first, remote managed default from M3 (Q-001 decided 2026-09-15) |
+| `./vizra-branding` | `vizra-branding` | original brand mark, design tokens, Figma references | not created (Q-002 decided 2026-09-15: tokens in `vizra-user/packages/ui`, assets in meta `brand/`) |
 
 Binding documents in the meta repo, in priority order: `AGENTS.md` →
 `docs/PRODUCT_SPEC.md` → `docs/quality/features.json` (the atomic requirement

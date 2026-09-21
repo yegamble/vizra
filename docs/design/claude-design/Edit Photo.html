@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Edit Photo — goimg</title>
+<link rel="stylesheet" href="account.css"/>
+<style>
+  .edit-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .photo-pane { background: #0a0c12; border-radius: var(--radius-lg); overflow: hidden; aspect-ratio: 4/3; box-shadow: var(--shadow-sm); position: sticky; top: calc(var(--nav-h) + 16px); }
+  .photo-pane img { width: 100%; height: 100%; object-fit: contain; }
+  .tag-input { display: flex; flex-wrap: wrap; gap: 6px; padding: 7px; background: var(--bg-elev); border: 1px solid var(--line); border-radius: 10px; min-height: 40px; }
+  .tag-input .t { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; background: var(--accent-soft); color: var(--accent-ink); font-size: 12.5px; font-weight: 500; border-radius: 999px; }
+  .tag-input .t button { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--accent-ink); }
+  .tag-input .t svg { width: 10px; height: 10px; }
+  .tag-input input { all: unset; flex: 1; min-width: 120px; padding: 4px 6px; font: inherit; }
+  @media (max-width: 900px) { .edit-grid { grid-template-columns: 1fr; } .photo-pane { position: relative; top: 0; aspect-ratio: 16/9; } }
+</style>
+</head>
+<body>
+<div id="nav-slot"></div>
+<main class="app">
+  <div id="sidebar-slot"></div>
+  <section class="main">
+    <div id="mobile-header-slot"></div>
+    <a class="back-btn" href="My Photos.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>My Photos</a>
+    <div class="page-head" style="margin-top:10px;">
+      <div>
+        <h1 class="page-title">Edit photo</h1>
+        <p class="page-sub">Update details and metadata. Changes apply instantly.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-ghost">Cancel</button>
+        <button class="btn btn-primary">Save changes</button>
+      </div>
+    </div>
+
+    <div class="edit-grid">
+      <div class="photo-pane"><img src="https://images.unsplash.com/photo-1487958449943-2429e8be8625?auto=format&fit=crop&w=1600&q=80" alt=""/></div>
+
+      <div>
+        <div class="card">
+          <div class="card-head"><h2 class="card-title">Details</h2></div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="field">
+                <label>Title</label>
+                <input class="input" value="Brutalist facade, Turin"/>
+              </div>
+              <div class="field">
+                <label>Description</label>
+                <textarea class="textarea">Concrete fins catching the last direct sun before Lingotto's shadow falls across the courtyard.</textarea>
+              </div>
+              <div class="form-grid two">
+                <div class="field">
+                  <label>Album</label>
+                  <select class="select"><option>North Light</option><option>Concrete Sundays</option><option>Working Edits</option></select>
+                </div>
+                <div class="field">
+                  <label>License</label>
+                  <select class="select"><option>All rights reserved</option><option>CC BY 4.0</option><option>CC BY-NC</option><option>CC0 Public Domain</option></select>
+                </div>
+              </div>
+              <div class="field">
+                <label>Location</label>
+                <div class="input-with-prefix">
+                  <span class="prefix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M20 10c0 7-8 12-8 12S4 17 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span>
+                  <input value="Turin, Italy"/>
+                </div>
+              </div>
+              <div class="field">
+                <label>Tags</label>
+                <div class="tag-input">
+                  <span class="t">brutalism<button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span>
+                  <span class="t">italy<button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span>
+                  <span class="t">architecture<button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span>
+                  <input placeholder="Add a tag…"/>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2 class="card-title">Audience</h2></div>
+          <div class="row-list">
+            <div class="row">
+              <div class="row-main"><div class="row-title">Visibility</div><div class="row-sub">Who can see this photo.</div></div>
+              <div class="segmented"><button class="active">Public</button><button>Followers</button><button>Private</button></div>
+            </div>
+            <div class="row">
+              <div class="row-main"><div class="row-title">Allow comments</div></div>
+              <label class="toggle"><input type="checkbox" checked/><span class="track"></span><span class="thumb"></span></label>
+            </div>
+            <div class="row">
+              <div class="row-main"><div class="row-title">Show EXIF data</div></div>
+              <label class="toggle"><input type="checkbox" checked/><span class="track"></span><span class="thumb"></span></label>
+            </div>
+            <div class="row">
+              <div class="row-main"><div class="row-title">Allow downloads</div></div>
+              <label class="toggle"><input type="checkbox"/><span class="track"></span><span class="thumb"></span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2 class="card-title">EXIF</h2><p class="card-sub">Read-only, from the file.</p></div>
+          <div class="row-list">
+            <div class="row"><div class="row-main"><div class="row-title">Camera</div></div><div class="row-value"><b>Leica Q3</b></div></div>
+            <div class="row"><div class="row-main"><div class="row-title">Lens</div></div><div class="row-value"><b>28mm f/1.7</b></div></div>
+            <div class="row"><div class="row-main"><div class="row-title">Exposure</div></div><div class="row-value"><b>1/500s · f/5.6 · ISO 200</b></div></div>
+            <div class="row"><div class="row-main"><div class="row-title">Captured</div></div><div class="row-value"><b>Mar 2, 2026 · 16:42</b></div></div>
+            <div class="row"><div class="row-main"><div class="row-title">Dimensions</div></div><div class="row-value"><b>6000 × 4000</b></div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2 class="card-title" style="color:var(--danger);">Danger zone</h2></div>
+          <div class="row-list">
+            <div class="row">
+              <div class="row-main"><div class="row-title">Delete photo</div><div class="row-sub">Permanently removes this photo and all stats.</div></div>
+              <button class="btn btn-danger btn-sm">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="mobile-tabs-slot"></div>
+<script>window.__page = { key: 'photos' };</script>
+<script src="account-shell.js"></script>
+<script>
+  document.querySelectorAll('.segmented').forEach(s=>s.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{s.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');})));
+</script>
+</body>
+</html>

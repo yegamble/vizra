@@ -5,7 +5,7 @@
 **Implementation status:** PLANNED · **Verification status:** UNVERIFIED
 
 ## Outcome
-Operator: `docker-compose.yml`, `docker-compose.override.yml`, `docker-compose.dev.yml`, `docker-compose.prod.yml`, `docker-compose.external-postgres.yml`, `docker-compose.external-redis.yml` (plus placeholder overlays for ClickHouse/IPFS that render OFF) exist; every shape in docs/META_REPO.md §2 renders; postgres/redis/search publish nothing; api/frontend loopback; caddy on the edge profile; Compose ≥ 2.24 asserted by rendered model.
+Operator: `docker-compose.yml`, `docker-compose.override.yml`, `docker-compose.dev.yml`, `docker-compose.prod.yml`, `docker-compose.external-postgres.yml`, `docker-compose.external-redis.yml` (plus placeholder overlays for ClickHouse/IPFS that render OFF) exist; every shape in docs/META_REPO.md §2 renders; postgres/redis/search publish nothing; api/frontend loopback; caddy on the edge profile; Compose ≥ 2.24.4 asserted by rendered model.
 
 ## Scope
 One focused PR per session; complete vertical slice (migration/query → API → real UI → tests → operations/docs) for the IDs above. Anything not listed stays in `docs/quality/features.json` and is not narrowed by this issue.
@@ -26,7 +26,7 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - rendered models attached as artifacts
 
 ## Dependencies / blockers
-Q-017 (Compose floor verified empirically)
+Q-017 decided 2026-09-15: Compose floor 2.24.4; base file publishes no ports
 
 ## Definition of done
 Ledger entries updated with evidence; UI-control inventory updated where controls changed; execution plan checkpointed; PR opened as READY_FOR_REVIEW. Never self-merge; never mark VERIFIED without independent verification.
