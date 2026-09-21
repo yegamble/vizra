@@ -1,0 +1,9 @@
+name: fixture
+on:
+  pull_request:
+  merge_group:
+jobs:
+  something-else:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: ./scripts/check-doc-links.py

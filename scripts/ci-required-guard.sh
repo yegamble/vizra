@@ -96,18 +96,22 @@ if printf '%s\n' "$required" | grep -nvE '^[a-z0-9][a-z0-9-]*$'; then
 fi
 echo "manifest entries are bare job names"
 
-# Every required check must exist as a job in a workflow, or the aggregate would
-# wait forever for something nobody defined.
-missing=0
-while IFS= read -r check; do
-  [ -z "$check" ] && continue
-  if ! grep -qE "^  ${check}:[[:space:]]*$" .github/workflows/*.yml; then
-    echo "required check '$check' has no job of that name in .github/workflows/"
-    missing=1
-  fi
-done <<< "$required"
-test "$missing" = "0" || exit 1
-echo "every required check is defined by a job"
+# Every required check must exist as a job in a workflow — or the aggregate
+# would wait forever for something nobody defined — and every step of that job
+# must actually run.
+#
+# This was a grep:
+#     grep -qE "^  ${check}:[[:space:]]*$" .github/workflows/*.yml
+# which is indentation-sensitive and matches only *.yml, while every other
+# checker here globs *.yml AND *.yaml. A required lane defined in a .yaml
+# workflow was reported as having no job at all. It is now a parse, like the
+# rest, and the same checker refuses the two ways to neuter a lane that
+# `continue-on-error` does not cover: a `defaults.run.shell` override (the
+# Actions analogue of `SHELL := /usr/bin/true`) and a step-level `if:`.
+if ! ./scripts/check-lane-integrity.py --required "$manifest"; then
+  echo "a required lane is undefined, shell-overridden, or has a conditional step"
+  exit 1
+fi
 
 # The workflow checker must itself still reject every spelling it exists to
 # catch. A checker that silently stopped matching would leave the gate open, so
@@ -358,3 +362,91 @@ if [ "$pin_checked" -lt "$pin_floor" ]; then
   exit 1
 fi
 echo "the pin checker rejects every unpinned-action and untriggered-lane spelling in $fixtures_dir/ ($pin_checked fixtures exercised, floor $pin_floor)"
+
+# And the same again for scripts/check-lane-integrity.py.
+#
+# `lane-*.yml` plus ONE `.yaml` accept fixture — the extension is the point of
+# that one: job existence used to be a grep over *.yml only, so a required lane
+# defined in a .yaml workflow was reported as missing. The fixture fails if that
+# regresses.
+lane_accept_fixtures="lane-clean.yml
+lane-yaml-extension.yaml"
+#               fixture|reason reported by check-lane-integrity.py
+lane_reject_fixtures="lane-workflow-shell.yml|defaults-shell-override
+lane-job-shell.yml|defaults-shell-override
+lane-if-false.yml|constant-false-if
+lane-if-expression.yml|conditional-step-on-required-lane
+lane-missing-job.yml|no-such-job"
+
+expected_lane_fixtures=5
+declared_lane_fixtures="$(printf '%s\n' "$lane_reject_fixtures" | grep -c .)"
+if [ "$declared_lane_fixtures" != "$expected_lane_fixtures" ]; then
+  echo "LANE FIXTURE FLOOR CHANGED: $declared_lane_fixtures rule(s) are declared;"
+  echo "  expected_lane_fixtures says $expected_lane_fixtures."
+  exit 1
+fi
+
+for entry in $(printf '%s\n' "$lane_accept_fixtures") $(printf '%s\n' "$lane_reject_fixtures" | cut -d'|' -f1); do
+  f="$fixtures_dir/$entry"
+  if [ ! -f "$f" ]; then
+    echo "MISSING FIXTURE: '$f' is a non-optional lane-integrity fixture and is absent."
+    exit 1
+  fi
+  if [ ! -r "$f" ] || [ ! -s "$f" ]; then
+    echo "UNUSABLE FIXTURE: '$f' is unreadable or empty; an unusable fixture is not a rejection."
+    exit 1
+  fi
+done
+
+shopt -s nullglob
+lane_present=("$fixtures_dir"/lane-*.yml "$fixtures_dir"/lane-*.yaml)
+shopt -u nullglob
+if [ "${#lane_present[@]}" -eq 0 ]; then
+  echo "NO LANE FIXTURES MATCHED: '$fixtures_dir/lane-*' matched nothing."
+  exit 1
+fi
+
+lane_declared_reason() {
+  printf '%s\n' "$lane_reject_fixtures" | awk -F'|' -v want="$1" '$1 == want { print $2 }'
+}
+
+lane_checked=0
+for fixture in "${lane_present[@]}"; do
+  base="$(basename "$fixture")"
+  set +e
+  out="$(./scripts/check-lane-integrity.py --required "$manifest" "$fixture" 2>&1)"
+  rc=$?
+  set -e
+  if printf '%s\n' "$lane_accept_fixtures" | grep -qxF "$base"; then
+    if [ "$rc" != "0" ]; then
+      echo "the lane checker did not accept its own clean fixture: $fixture (exit $rc)"
+      printf '%s\n' "$out" | sed 's/^/    /'
+      exit 1
+    fi
+  else
+    if [ "$rc" = "0" ]; then
+      echo "the lane checker ACCEPTED $fixture, which it must catch"
+      exit 1
+    fi
+    if [ "$rc" != "1" ]; then
+      echo "UNEVALUABLE FIXTURE: the lane checker could not evaluate $fixture (exit $rc)."
+      printf '%s\n' "$out" | sed 's/^/    /'
+      exit 1
+    fi
+    want_reason="$(lane_declared_reason "$base")"
+    if [ -n "$want_reason" ] && ! printf '%s\n' "$out" | grep -qF "reason=$want_reason"; then
+      echo "WRONG RULE TRIPPED: $fixture was rejected, but not for the rule it declares."
+      echo "  declared: reason=$want_reason"
+      printf '%s\n' "$out" | grep -o 'reason=[a-z-]*' | sed 's/^/    /' || echo "    (no reason= at all)"
+      exit 1
+    fi
+  fi
+  lane_checked=$((lane_checked + 1))
+done
+
+lane_floor=$((expected_lane_fixtures + 2))
+if [ "$lane_checked" -lt "$lane_floor" ]; then
+  echo "only $lane_checked lane fixture(s) were exercised; the floor is $lane_floor"
+  exit 1
+fi
+echo "the lane checker rejects every shell-override, conditional-step and missing-job case in $fixtures_dir/ ($lane_checked fixtures exercised, floor $lane_floor)"

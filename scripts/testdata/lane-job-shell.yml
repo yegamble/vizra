@@ -1,0 +1,12 @@
+name: fixture
+on:
+  pull_request:
+  merge_group:
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash -c "eval \"$@\" || true" --
+    steps:
+      - run: ./scripts/check-doc-links.py

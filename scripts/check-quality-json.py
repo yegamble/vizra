@@ -13,6 +13,27 @@ Two separate failures, reported separately:
    either a typo or a requirement that was renamed or dropped without the
    owner decision AGENTS.md requires. Either way the plan points at nothing.
 
+**Ranges and slash-lists are expanded, and every member is resolved.**
+The milestone rows do not spell ids out one per line; they write
+
+    VZ-FOUND-001…008          a range:      001 002 003 004 005 006 007 008
+    VZ-CI-001/002/004         a list:       001 002 004
+    VZ-MEDIA-002/005…010      both:         002 005 006 007 008 009 010
+    VZ-STORAGE-002…006/014/015              002 003 004 005 006 014 015
+
+Resolving only the leading id — which is what a single-id regex does — means
+`VZ-FOUND-001…008` is validated by checking `VZ-FOUND-001` alone. The M0 row
+schedules eight requirements and seven of them would go unchecked, so renaming
+or dropping `VZ-FOUND-005` (exactly the owner-decision violation this check
+exists to catch) would leave the plan pointing at nothing and the lane green.
+
+A range separator is `…`, `...`, `–` or `—`; a list separator is `/`. A
+separator only counts when digits follow it, so the `.` ending a sentence
+(`… see VZ-CI-001.`) and the `/` in a path (`docs/evidence/VZ-FOUND-008/`) end
+the run instead of extending it. A range that cannot be read as a range — end
+before start, or an implausible span — is a NAMED FAILURE, never a silent skip:
+an unreadable reference is not a resolved one.
+
 Two `VZ-…` namespaces are deliberately NOT ledger requirement ids:
 
   VZ-ISSUE-NNN  the issue files themselves (docs/issues/VZ-ISSUE-NNN.md)
@@ -21,7 +42,32 @@ Two `VZ-…` namespaces are deliberately NOT ledger requirement ids:
 They are allowlisted by name, not by a wildcard. `VZ-ISSUE-NNN` is additionally
 resolved against an actual `docs/issues/VZ-ISSUE-NNN.md` file, so the allowlist
 cannot be used to smuggle a made-up id through: a reference to a nonexistent
-issue is still red.
+issue is still red. Ranges expand in this namespace too (`VZ-ISSUE-001…012`).
+
+**Scope: exactly `docs/MILESTONES.md` and `docs/issues/*.md`.** These are the
+two documents that SCHEDULE work: a `VZ-…` id in them is a commitment to build
+a requirement, so an id naming nothing is a planning error. Two directories are
+deliberately excluded, and each exclusion was measured rather than assumed:
+
+  docs/evidence/  Evidence transcripts quote deliberately-nonexistent ids —
+                  `VZ-NOSUCH-999`, `VZ-ISSUE-404`, `VZ-FOUND-001…999` — because
+                  recording a red/green demonstration REQUIRES writing down the
+                  id that was made to dangle. Checking this directory would turn
+                  every demonstration transcript into a lane failure.
+
+  docs/plans/     Plans are working documents, and one of the things they
+                  legitimately do is PROPOSE ids that do not exist yet.
+                  Measured at the time of writing: the 13 slice plans are
+                  clean, but `docs/plans/WARROOM-BOARD.md` row 2b names four
+                  proposed requirement ids — `VZ-SEC-SSR-001`, `VZ-SEC-HDR-001`,
+                  `VZ-SEC-SSR-002`, `VZ-SEC-SUPPLY-001` — whose whole purpose is
+                  to be evaluated and possibly added to the ledger. They dangle
+                  by design. Including this directory would make the lane red
+                  for proposing a requirement, which is backwards, and would put
+                  a gate in the way of the war room's own working notes.
+
+If a plan or the board should be gated later, the honest way in is a marker
+that distinguishes "proposed" from "referenced", not a wildcard exemption.
 
 Ids inside fenced code blocks and inline code spans are still checked — unlike a
 markdown LINK, an id written in backticks is a real reference to a real
@@ -41,11 +87,23 @@ import sys
 QUALITY_DIR = "docs/quality"
 LEDGER = os.path.join(QUALITY_DIR, "features.json")
 
-# Referencing documents. These are the two the acceptance names; a file that is
-# listed but missing is a failure, not a silent skip.
+# Referencing documents. A glob that is listed but matches nothing is a
+# failure, not a silent skip. docs/evidence/ and docs/plans/ are excluded on
+# purpose, each for a measured reason — see the module docstring.
 REFERENCING_GLOBS = ["docs/MILESTONES.md", "docs/issues/*.md"]
 
+# A bare id, and then the run of range/list continuations that may follow it.
 ID_PATTERN = re.compile(r"\bVZ-[A-Z0-9]+(?:-[A-Z]+)*-\d+\b")
+# A separator only counts when digits follow, so a sentence-ending "." and a
+# path "/" terminate the run rather than extending it. Applied with .match(s, pos),
+# which anchors at pos (Python's re has no \G).
+CONTINUATION = re.compile(r"(?:(…|\.\.\.|–|—)|(/))(\d+)")
+
+# An upper bound on how many ids one range may name. A range is shorthand for a
+# handful of consecutive requirements; anything larger is a typo (VZ-FOUND-001…999
+# is 999 ids) and must be reported rather than silently expanded into a thousand
+# lookups that all happen to fail.
+MAX_RANGE_SPAN = 200
 
 # Namespaces that are not requirement ids. Each carries how it is resolved.
 ISSUE_PREFIX = "VZ-ISSUE-"
@@ -54,6 +112,57 @@ SLICE_PREFIX = "VZ-SLICE-"
 
 def fail(messages, text):
     messages.append(text)
+
+
+def expand_reference(text, match, problems, path):
+    """Expand one id and any range/list run that follows it.
+
+    Returns the list of fully-qualified ids the reference names. Appends to
+    `problems` (and returns what it could read) when a range is unreadable —
+    an unreadable reference must be reported, never silently dropped.
+    """
+    base = match.group(0)
+    prefix, _, first_digits = base.rpartition("-")
+    width = len(first_digits)
+    numbers = [int(first_digits)]
+    shorthand = base
+
+    pos = match.end()
+    previous = int(first_digits)
+    while True:
+        cont = CONTINUATION.match(text, pos)
+        if not cont:
+            break
+        range_sep, _list_sep, digits = cont.group(1), cont.group(2), cont.group(3)
+        shorthand += cont.group(0)
+        value = int(digits)
+        width = max(width, len(digits))
+        if range_sep:
+            if value < previous:
+                fail(
+                    problems,
+                    f"UNREADABLE RANGE: {path}: '{shorthand}' ends at {value:0{width}d} "
+                    f"but starts at {previous:0{width}d}. A range must ascend; this cannot "
+                    f"be read as a reference, so it is reported rather than skipped.",
+                )
+                return [f"{prefix}-{n:0{width}d}" for n in numbers]
+            span = value - previous + 1
+            if span > MAX_RANGE_SPAN:
+                fail(
+                    problems,
+                    f"IMPLAUSIBLE RANGE: {path}: '{shorthand}' names {span} ids, ending at "
+                    f"{prefix}-{value:0{width}d}; the cap is {MAX_RANGE_SPAN}. A range is "
+                    f"shorthand for a handful of consecutive requirements, so a span this "
+                    f"large is a typo, not a range.",
+                )
+                return [f"{prefix}-{n:0{width}d}" for n in numbers]
+            numbers.extend(range(previous + 1, value + 1))
+        else:
+            numbers.append(value)
+        previous = value
+        pos = cont.end()
+
+    return [f"{prefix}-{n:0{width}d}" for n in numbers]
 
 
 def check_json_parses(problems):
@@ -120,6 +229,8 @@ def check_ids(ids, problems):
     }
 
     references = {}
+    expanded_total = 0
+    written_total = 0
     for path in paths:
         try:
             with open(path, "r", encoding="utf-8") as handle:
@@ -127,8 +238,24 @@ def check_ids(ids, problems):
         except OSError as err:
             fail(problems, f"UNREADABLE: {path}: {err}")
             continue
-        for match in ID_PATTERN.finditer(text):
-            references.setdefault(match.group(0), set()).add(path)
+        pos = 0
+        while True:
+            match = ID_PATTERN.search(text, pos)
+            if not match:
+                break
+            written_total += 1
+            ids_here = expand_reference(text, match, problems, path)
+            expanded_total += len(ids_here)
+            for one in ids_here:
+                references.setdefault(one, set()).add(path)
+            # Continue past the whole expanded run, so the trailing numbers of a
+            # range are not re-matched as bare ids.
+            pos = match.end()
+            while True:
+                cont = CONTINUATION.match(text, pos)
+                if not cont:
+                    break
+                pos = cont.end()
 
     if not references:
         fail(problems, "NO VZ-… ids were found in any referencing document — nothing was checked")
@@ -158,8 +285,9 @@ def check_ids(ids, problems):
         return
 
     print(
-        f"requirement ids: {len(references)} distinct VZ-… reference(s) across "
-        f"{len(paths)} document(s); every one resolves"
+        f"requirement ids: {written_total} written reference(s) expanded to "
+        f"{expanded_total} id(s), {len(references)} distinct, across {len(paths)} "
+        f"document(s); every one resolves"
     )
 
 
