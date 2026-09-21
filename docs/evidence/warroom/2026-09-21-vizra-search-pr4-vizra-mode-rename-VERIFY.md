@@ -1044,3 +1044,374 @@ cross-repo alarm that could never fire and guarded an accepted risk that could b
 on upgrade. I record them for the chair, which may still choose to hold for the one-line fixes.
 
 FINAL VERDICT: PASS — SHA 6a02ab2975a6f5c4da49b5af62b9822ead2e885e
+
+---
+---
+
+# Re-confirmation at `cb02cdf` — 2026-09-21
+
+- **SHA verified:** `cb02cdf19ddfdc57f06adcce8963f85cac0cdaf0`
+- **Ancestry:** `git merge-base --is-ancestor 6a02ab2… HEAD` → **true**. One commit
+  (`cb02cdf test(config): make "every refusal path" true, and keep it true`) on top of the
+  PASSed head. **No force-push.**
+- **Base:** `origin/main` still `3619fed…` (unmoved through all three rounds).
+- Fresh `mktemp -d` clone; round-2 scratch already deleted. darwin/arm64, go1.26.2.
+- **Question before me:** does my PASS at `6a02ab2` carry, given the chair held it for
+  FINDINGS 4 and 5 and asked for the sentence to be made **true**, not softened.
+
+## 1. Proof that `config.go` and `ci.yml` changed only in comments
+
+**Go — token-stream comparison (my own method, not a diff reading).** I wrote a `go/scanner`
+pass in scanner mode `0`, which *drops comments entirely*, and compared the full non-comment
+token stream (token kind + literal) of `config.go` at `6a02ab2` and at `cb02cdf`:
+
+```
+old tokens: 1933
+new tokens: 1933
+RESULT: token streams IDENTICAL -> the change is comments (and whitespace) ONLY
+```
+
+**Workflow — parsed-YAML comparison.** `yaml.safe_load` discards comments, so structural
+equality is proof of a comment-only edit:
+
+```
+RESULT: parsed YAML IDENTICAL -> the workflow change is comments ONLY
+```
+
+The textual `ci.yml` diff is three comment lines, and it also removes the
+`(off|managed|external)` enumeration from that comment — part of F5.
+
+**Behaviour spot-check — 14 rows of my 84-combination matrix, re-run against the new binary**
+with mode proven from dev-key acceptance. Every row matches `6a02ab2` exactly:
+
+| VIZRA_MODE | VIZRA_SEARCH_MODE | expected | observed | |
+|---|---|---|---|---|
+| `<unset>` | `<unset>` | production | production | OK |
+| `<unset>` | `development` *(the danger case)* | REFUSED | REFUSED | OK |
+| `<unset>` | `production` | REFUSED | REFUSED | OK |
+| `<unset>` | `DEVELOPMENT` | REFUSED | REFUSED | OK |
+| `<unset>` | `' development '` | REFUSED | REFUSED | OK |
+| `<unset>` | `off` | production | production | OK |
+| `<unset>` | `developmnt` *(near-miss)* | production | production | OK |
+| `<unset>` | `dev` *(near-miss)* | production | production | OK |
+| `<unset>` | `'   '` | production | production | OK |
+| `development` | `<unset>` *(dev row)* | development | development | OK |
+| `development` | `managed` *(dev row)* | development | development | OK |
+| `development` | marker garbage | development | development | OK |
+| `production` | `external` | production | production | OK |
+| marker garbage | `<unset>` | REFUSED | REFUSED | OK |
+
+**Zero behavioural change**, as the token comparison predicted.
+
+## 2. The coverage claim: is it 17 of 17?
+
+**My own count, three independent ways:**
+
+- `grep -c 'v\.addf('` on `config.go` → **17**
+- my own `go/ast` pass (separate program, my own constant-folder) → **17 sites, 14 distinct
+  messages, 2 messages emitted from more than one place** (`must be greater than zero` ×2,
+  `looks like a development placeholder…` ×3)
+- the table's own declarations: **14 rows summing to 17 sites**
+
+So the substantive claim — the table accounts for **all 17 `v.addf` sites** — is **true**, and
+round-2 FINDING 4 (6 of 17) is closed.
+
+### Are the constrained rows genuinely unable to take a marker?
+
+Measured on the real binary, not assumed:
+
+| probe | refusal actually produced |
+|---|---|
+| `VIZRA_SEARCH_MAX_CLOCK_SKEW=zzmarkerabc` | `… is not a duration (for example 30s, 5m)` — **the marker never reaches the ceiling** |
+| `VIZRA_SEARCH_MAX_CLOCK_SKEW=3607s` | `… must not exceed 5m0s in production mode` — the ceiling, as the row's `why` says |
+| `MAX_INTERNAL_BODY_BYTES=zzmarkerabc` | `… is not an integer number of bytes` |
+| `MAX_INTERNAL_BODY_BYTES=16777217` | `… must not exceed 8388608 bytes in production mode` |
+| `SEARCH_HMAC_KEY="   "` | `SEARCH_HMAC_KEY must be set` — nothing echoed, as the row says |
+
+Each constrained row asserts a **rendered fragment** as well as its probe, so a probe that
+starts provoking a *different* refusal fails rather than silently passing — I confirmed the
+`rendered` field is checked per probe. Each still proves no-echo for the value it *can* supply
+(the over-limit value, the placeholder-shaped key, the `  DeVeLoPmEnT\t` shape).
+
+### Attacking the AST guard — seven evasions
+
+| # | Evasion | Guard |
+|---|---|---|
+| A1 | new `v.addf` refusal with no table row | **RED** — *"config.go can refuse with … and no row in refusalSites() drives it"* |
+| A2 | refusal via `fmt.Errorf` returned directly, **echoing the value** | **GREEN — escapes** |
+| A3 | refusal via a new helper `v.note(...)`, **echoing the value** | **GREEN — escapes** |
+| A4 | `v.addf` moved into a **second file** in the package, **echoing the value** | **GREEN — escapes** |
+| A5 | format built with `+` from a **variable** | **RED** — *"a format string the guard cannot read"* (a failure, not a skip) |
+| A6 | duplicate format string, count 3 where the row declares 2 | **RED** — count mismatch |
+| A7 | `addf` inside a loop | **GREEN** — correctly so: one call site, one message, no new echo surface |
+
+**The guard's true reach: every `v.addf` call site in `internal/config/config.go`, with a
+constant-foldable format string.** That is exactly what `AGENTS.md:317` and
+`config.go:334` claim — *"every `v.addf` site in this file (17 as of 2026-09-21)"* — a
+precise, dated, and true scope. A5 and A6 show the guard defends its own readability and its
+counts; A1 shows it defends the table.
+
+What no document states is the **limitation** A2/A3/A4 demonstrate: a refusal added outside
+`v.addf`, or outside `config.go`, is not covered. `config_test.go:616` in fact goes the other
+way, equating the two: *"finds every `v.addf` call — **every way this loader can refuse to
+boot**"*. That apposition has one live counterexample — `config.go:219`,
+`return nil, fmt.Errorf("%w: nil environment lookup", ErrInvalidConfig)`, a genuine loader
+refusal that is not an `addf` call and has no row. It fires only when the injected `Lookup` is
+nil (a programming error, never an operator value), so **it cannot echo anything** and the
+property is unaffected. See FINDING 7.
+
+## 3. Mutations
+
+Baseline digest measured by me: `b88139cec44a9a441e5b75a0c3fc2c99ba10a8ba80cbcae77295baa7b31fcb3c`
+— **matches the claimed `b88139ce…1fcb3c`**. Green matrix **21 passed, 0 failed**.
+
+| Mutation | my digest after | passed/failed | claim | match |
+|---|---|---|---|---|
+| `fallback-to-the-old-name` | `cf1f3ef142767edb…` | 17 / 4 | 17/4 | ✅ |
+| `drop-the-refusal` | `d1eed525b629f0d1…` | 15 / 6 | 15/6 | ✅ |
+| `default-to-development` | `ecdc31a95cdad758…` | 14 / 7 | 14/7 | ✅ |
+| `unknown-value-as-development` | `48445dd2a70baeb4…` | 15 / 6 | 15/6 | ✅ |
+| `echo-the-value` | `620bb7d829d12d57…` | 19 / 2 | 19/2 | ✅ |
+| `add-an-unrowed-refusal` | `e1254d1f39aa788e…` | **20 / 1** | 20/1 | ✅ |
+
+All six restored to `b88139ce…`; `git status --porcelain` empty after each.
+
+**`add-an-unrowed-refusal` changes no behaviour, as claimed:** all **20 boot cases pass**; the
+single failure is the focused suite, and the named test is
+`TestEveryRefusalSiteInTheLoaderHasANoEchoRow`. A mutation whose only detector is the new guard
+is the right shape for this fix.
+
+**My own V4 (echo the raw value in the retired-name refusal), re-applied:** **RED at unit level**
+(`TestNoRefusalEchoesTheSuppliedValue/OLD_runtime-mode_vocabulary`) **and at matrix level**
+(19/2). Round-1 FINDING 1 stays closed.
+
+## 4. F5 — enumerations of core's vocabulary
+
+Round-2 FINDING 5's target, `config_test.go:155-156`, now reads:
+
+> `VIZRA_SEARCH_MODE` is core's search TOPOLOGY variable, owned and read by core alone; its
+> vocabulary is core's and is **deliberately not restated in this repository**.
+
+The second enumeration, in the `ci.yml` comment, is also gone. A tree-wide grep outside
+`docs/evidence/**` for `off | managed | external`, `off|managed|external`, `off/managed/external`
+and `SearchTopologyValues` returns **only two hits**, both at `config_test.go:263` and `:306` —
+and both are **test probe data**, not prose:
+
+```go
+// core's topology values, which a shared env file legitimately carries
+"off", "managed", "external",
+```
+
+They are inputs to `TestEveryValueButTheOldVocabularyIsIgnored` and
+`TestNoValueInTheOldNameCanEverProduceDevelopment`, proving core's real values are **ignored**.
+That is the opposite of a vocabulary the code validates against — deleting them would weaken the
+tests. **FINDING 5 is closed.**
+
+## 5. Absolutes re-read
+
+I swept `AGENTS.md`, `README.md`, the `config.go` comments, `docs/evidence/pr4/README.md` and
+the PR body for `every / never / all / cannot / only / always`.
+
+**Weakened correctly, as claimed:** "the only process that reads it" → "owned and read by
+`vizra-core`" (a claim about another repository this one cannot test); site counts are now
+dated ("17 as of 2026-09-21").
+
+**Still true against my measurements:** production is the default; the refusal runs in every
+mode; running development requires an explicit `VIZRA_MODE=development` and "can never come from
+this variable" (84 rows + 16 near-misses agree); "no refusal message ever echoes the value an
+operator supplied" (now enforced 17/17, and my V4 turns it red).
+
+**Three numeric slips** in prose describing the table — measured precisely with my own AST pass
+and a row-by-row parse. None weakens a control; see FINDING 6.
+
+## 6. Lanes from the clean clone, and CI
+
+| Command | Exit | Result I measured |
+|---|---|---|
+| `make ci` | **0** | contract-drift **363 tests / 4 packages / 0 deselected**; **test-noskip 391 pass events, 0 skips** |
+| `go test -count=1 -json ./...` (my count) | **0** | pass **391**, skip **0**, fail **0** |
+| `grep -rn 't\.Skip\|testing.Short()'` | — | **0** |
+| `./scripts/ci-required-guard.sh` | **0** | — |
+| `python3 scripts/check-workflows.py` | **0** | — |
+| `make vendor-contract-check` | **0** | *every vendored file matches the manifest* |
+| `./scripts/boot-matrix.sh` | **0** | **21 passed, 0 failed** |
+
+**Test deletions since `6a02ab2`: none.** `config_test.go` is `+372 −59`; the diff removes **no
+test function** (`git diff … | grep '^-func Test'` is empty) — the deletions are the
+restructuring of `TestNoRefusalEchoesTheSuppliedValue`'s inline case list into the
+`refusalSites()` table, which strictly widens it from 7 probes to 17 accounted sites.
+
+**Across all three commits** (`3619fed..cb02cdf`): `scripts/ci-required-guard.sh`,
+`scripts/check-workflows.py` and `.github/required-checks.txt` are **not in the diff**; `api/`
+and vendored files are **not in the diff**; the Makefile `ci:` target line is unchanged.
+
+**CI on `cb02cdf`:** **12 check runs, all `success`** — `ci-required`, `build`, `contract-drift`,
+`docker-build`, `echo-containment`, `fmt`, `govulncheck`, `test`, `test-noskip`, `tidy-check`,
+`vet`, `GitGuardian Security Checks`. All ten manifest lanes present and green; none skipped,
+cancelled or timed out. Both workflow runs report `headSha = cb02cdf…` on `pull_request`; `main`
+is still `3619fed`, so **the merge tree is the head tree** — CI tested what I tested.
+
+## Round-2 findings — status
+
+| | Finding | Status |
+|---|---|---|
+| 4 | no-echo test documented as driving "every refusal path"; drove 6 of 17 | **CLOSED** — 17 of 17, verified by my own AST count, and now *mechanically* enforced by a guard I attacked seven ways (A1, A5, A6 red) |
+| 5 | stale `off \| managed \| external` enumeration in a test comment | **CLOSED** — that comment and one in `ci.yml` rewritten; only test probe data remains |
+
+## New findings
+
+```
+FINDING 6: three numeric slips in the prose describing the refusal table
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-search
+  files:     AGENTS.md:318-319, AGENTS.md:321 ; PR #4 body (the FINDING 4 row)
+  requirements: acceptance bullet 5
+
+Observed:
+  Measured with my own go/ast pass over config.go and a row-by-row parse of
+  refusalSites():
+    - 17 v.addf sites, 14 distinct messages — both claimed correctly.
+    - messages emitted from more than one place: TWO
+      (`must be greater than zero` x2, `looks like a development placeholder` x3).
+      AGENTS.md:318-319 and the PR body both say "three of which are emitted
+      from more than one place". The figure three is the number of EXTRA sites
+      (17 - 14), not the number of messages.
+    - marker-driven: SIX ROWS covering EIGHT SITES. AGENTS.md:321 says "Six
+      sites take a marker assembled at run time"; six is the row count, eight
+      the site count.
+    - the PR body says the constrained group is "11 of 17"; by my count nine
+      sites are not marker-covered (or eight rows of fourteen).
+
+Failure:
+  A reader reconciling the prose against the table finds three figures that do
+  not add up, in the one document whose job this round was to make exact. No
+  control is weakened: the guard enforces the table by format AND count, and the
+  table itself is correct.
+
+Perspective:
+  developer
+
+Recommendation:
+  AGENTS.md: "14 distinct messages, TWO of which are emitted from more than one
+  place" and "Six ROWS drive their sites with a marker assembled at run time
+  (eight sites in all); the rest fire only for a constrained value". Correct the
+  PR body's "three" and "11 of 17" to match.
+
+Acceptance criteria:
+  - Every count in AGENTS.md's no-echo bullets reproduces from
+    `refusalSites()` and a go/ast pass over config.go.
+  - No figure conflates rows with sites.
+
+Tests:
+  None — the table is already guarded; the prose is not, and deliberately so
+  ("the guard, not the prose, keeps them honest"). That is a reasonable design,
+  but it does mean the prose must be right by review.
+
+Cross-repo implications:
+  core: none | user: none | search: three figures | meta: none
+
+Challenge:
+  These are descriptive statistics about a table that is itself machine-checked,
+  so nothing a reader relies on for safety is wrong, and the load-bearing claim
+  ("every v.addf site in this file, 17 as of 2026-09-21") is exactly true.
+  Counter: this round existed to make a sentence true rather than softer, and a
+  sentence with a wrong number in it is not yet true.
+```
+
+```
+FINDING 7: the guard's blind spots are real and unstated, and one comment claims more than v.addf
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-search
+  files:     internal/config/config_test.go:614-620 ; internal/config/config.go:219
+             PR #4 body (the FINDING 1 row: "drives every refusal path in the loader")
+  requirements: acceptance bullet 5
+
+Observed:
+  config_test.go:616 — "finds every `v.addf` call — every way this loader can
+  refuse to boot". config.go:219 is a counterexample:
+    return nil, fmt.Errorf("%w: nil environment lookup", ErrInvalidConfig)
+  a loader refusal that is not an addf call and has no row. It fires only for a
+  nil injected Lookup — a programming error, never an operator value — so it
+  cannot echo anything and the no-echo property is unaffected.
+  My evasion attacks: a refusal via fmt.Errorf (A2), via a new non-addf helper
+  (A3), and via a second file in package config (A4) each ECHOED a supplied
+  value and each left the guard GREEN. A1/A5/A6 are red, so the guard is sound
+  within its scope.
+  AGENTS.md:317 and config.go:334 scope themselves correctly to "every `v.addf`
+  site"; only config_test.go:616 and the PR body drop the qualifier.
+
+Failure:
+  A maintainer who reads the guard as covering "every way this loader can refuse
+  to boot" may add a refusal through fmt.Errorf, a new helper, or a new file in
+  the package, echo an operator's value there, and see every lane stay green.
+  The guard is the thing that is supposed to make that impossible.
+
+Perspective:
+  developer
+
+Recommendation:
+  Two sentences, no code. In config_test.go's guard comment, replace the
+  apposition with the true scope and its limit: "finds every `v.addf` call in
+  config.go. Refusals raised any other way — a bare fmt.Errorf, a new helper, or
+  a v.addf in another file of this package — are NOT covered; keep refusals
+  going through v.addf in this file, or widen this guard." Drop the unqualified
+  "every refusal path in the loader" from the PR body.
+  If a control is ever wanted rather than a convention, the smallest version is
+  to parse the whole package rather than one file and to fail on any
+  `fmt.Errorf`/`errors.New` in the validator that is not the known aggregator.
+
+Acceptance criteria:
+  - No sentence equates "every v.addf call" with "every way the loader can
+    refuse".
+  - The guard's comment names fmt.Errorf, a new helper and a second file as
+    uncovered.
+  - config.go:219's nil-lookup refusal is acknowledged as out of scope and why
+    (it carries no operator value).
+
+Tests:
+  None required for the wording. Widening the guard to the package would turn my
+  A3 and A4 red; A2 would need the fmt.Errorf rule above.
+
+Cross-repo implications:
+  core: none | user: none | search: two sentences | meta: none
+
+Challenge:
+  A2/A3/A4 are all "a maintainer deliberately routes around the house style",
+  which no in-repo guard fully prevents, and the one real non-addf refusal that
+  exists today cannot echo. So this is a convention gap, not a defect. Accepted
+  — hence NIT, and the recommendation is wording, not machinery.
+```
+
+## Cross-repo note for the chair — still owed, unchanged
+
+Meta PR #4 still sets `VIZRA_SEARCH_MODE: production` on the **search** service. That remains a
+designed boot refusal (`production` is old runtime vocabulary — the one refused class).
+**Meta must deliver `VIZRA_MODE: production`.** Core's `${VIZRA_SEARCH_MODE:-off}` on api/worker
+is correct and must not change. The compose comment claiming "SEARCH'S OWN vocabulary —
+`production|development`" is now doubly wrong.
+
+## Verdict
+
+**My PASS carries.** The chair asked for the sentence to be made true rather than softened, and
+it was: what was "6 of 17" is now **17 of 17**, confirmed by my own independent AST count, and it
+is no longer merely asserted — a parsing guard enforces the table by format *and* by count, and I
+could not get a new `v.addf` refusal, an unreadable format string or a miscounted duplicate past
+it. The non-test changes are provably **comment-only** (identical 1933-token stream; identical
+parsed YAML) and behaviour is unchanged on every row I re-checked, including the danger case, two
+near-misses and two development rows. All six mutations reproduce with my digests, the new one
+changes no behaviour and is caught only by the new guard, my own V4 is still red at both levels,
+and every lane plus 12/12 CI is green on this SHA with no test function deleted.
+
+The two findings I record are NITs of the descriptive kind: three counts in prose that conflate
+rows with sites, and an unstated limitation of the guard's scope whose single live counterexample
+cannot echo anything. Neither touches behaviour, neither weakens a control, and neither is the
+class that failed round 1 — a claim standing where no control stood. Both fix with sentences. I
+leave to the chair whether a third hold is proportionate; on the evidence, the slice is done.
+
+FINAL VERDICT: PASS — SHA cb02cdf19ddfdc57f06adcce8963f85cac0cdaf0
