@@ -1090,3 +1090,232 @@ Challenge:
 ```
 
 **BLOCKING FINDINGS OPEN AT 3261ad3: none.**
+
+---
+
+## Chair note on the final re-review (2026-09-21, tick 98)
+
+The seat reports **no blocking finding open at `9c4b5d3`**; F1–F4 and NEW-1 CLOSED. Its NEW-2 is rated NIT, but the chair checked the tree at `9c4b5d3` and the claim the seat disproved is written down in three places — `docs/META_REPO.md:175` ("it fails in both directions"), `docs/quality/COMMANDS.md:352`, and `scripts/check-compose-topology.py:871` ("fails in both directions by construction") — while the seat measured that emptying `known_false_probes` with both paragraphs present exits 0. A documented control that does not exist is exactly what the standing "no false guarantee merges" ruling holds, whatever its severity label. The fix is the seat's four-line `else:` branch (`known-false-stale-disclosure`, red-demonstrated) — making the sentences TRUE rather than softening them — plus NEW-3's three one-line operator-surface edits. It is consolidated with the verifier's verdict on `9c4b5d3`. The seat's healthcheck-values note is carried to the follow-up meta PR that adopts `vizra healthcheck` (core #7 is merged at `5eb2829`): api timeout 5s, start_period 60s (the host-reboot case, where `depends_on` is not re-evaluated), worker timeout 10s, `degraded` = healthy kept, the worker window derived from the poll interval, and the open question for core: what is the claim loop's poll interval and does it back off when idle? The seat's final re-review follows verbatim.
+
+---
+
+# Final re-review at 9c4b5d3 — `vizra-infrastructure` seat, 2026-09-21
+
+- **PR:** yegamble/vizra#4, `feat/m0-compose-topology`
+- **SHA:** `9c4b5d3285e1368634bc2042a83a91bfcb7e564b` (round 2 = `7e95989` + evidence `9c4b5d3`)
+- **Method:** fresh `git archive 9c4b5d3 | tar -x` into a private `mktemp -d` under the shared scratchpad. Read-only, render-only, no container started. Rendered all 13 shapes; ran `check-compose-topology.py`, `check-config-coverage.py`, `check-template-claims.py`, `check-doc-links.py` — all exit 0. **Independently red-demonstrated four of the five new/claimed rules** in a throwaway copy; the fifth did not fire (see NEW-2). Read `env/production.env.example`, `README.md` and every compose `:?` message end to end. Deleted every file and directory I created; nothing else in the scratchpad was touched.
+- **Checker output at this SHA:** topology `13 shapes, 26 rules, 0 violations, 2 known-false probes named`; coverage `34 component keys, 58 template keys, 1 alias, 1 retired key refused, 0 violations`; template-claims `10 files, 16 command references, 5 shipped + 11 future commands, 0 scripts present + 6 declared future, 0 violations`.
+
+## Verdict table
+
+| Finding | State | One-line reason |
+|---|---|---|
+| **F1** retired key delivered | **CLOSED** (was CLOSED at 3261ad3) | Unchanged and still correct: `SEARCH_HMAC_KEY` only, retired name absent, `core.json` at `4a80a1e`. |
+| **F2** false capability promises | **CLOSED** | `env/registry/meta.json` declares six future scripts; I appended a present-tense `backup.sh` line and `unmarked-future-script` fired (exit 1) with the right message. All nine surviving references are future tense with the slice id inside the 2-line marker window. Item 4 of the external-PostgreSQL checklist now stands alone ("Backup ownership is yours and nothing in Vizra takes it back… do not defer it pending a Vizra backup tool"). The round also self-caught two claims I had missed — `bootstrap.sh` mis-attributed to VZ-ISSUE-003, and the arm64 line reading as though a preflight existed. |
+| **F3** healthcheck that cannot fail | **CLOSED** | Disclosure is in both files; in the template it sits directly under `VIZRA_HTTP_PORT`/`VIZRA_FRONTEND_PORT`, which is the right place; it names frontend's liveness-only probe and `up -d --wait`; commands match the rendered loopback publishes. `known-false-undisclosed` fired when I deleted the README section. (Its third acceptance criterion — "so the two cannot drift" — is only half met; that is NEW-2, not a regression of F3.) |
+| **F4** caps and concurrency | **CLOSED** | Template line 265 now says "at the SHIPPED `VIZRA_WORKER_CONCURRENCY=2`"; caddy 160m; the capacity note gained what happens when *each* cap is reached (worker = intended victim; postgres = postmaster crash recovery, raise with any tuning change; caddy = total downtime), the swapless-host paragraph, and /dev/shm charging. `missing-mem-limit` still red on deletion. **4092 MiB stands — I would not trim** (see below). |
+| **NEW-1** PostgreSQL /dev/shm | **CLOSED** | `shm_size: ${VIZRA_POSTGRES_SHM_SIZE:-256m}`; renders 256 MiB on postgres **only**, and only in the six shapes that have postgres (absent in `prod-external-postgres`/`-both`/`-worker-split`/`-frontend-only`). Template quotes the exact error string with "if you are reading this because you searched for that message: this is the setting." I deleted the line and `postgres-shm-floor` fired 9×. |
+| **NEW-2** `known-false-undisclosed` enforces one direction only | **OPEN (new, NIT)** | The builder's claim that it "fails in BOTH directions" is not what ships: I emptied `known_false_probes` with both paragraphs still present and topology passed, exit 0. |
+| **NEW-3** three small operator-surface nits | **OPEN (new, NIT)** | README hardcodes `8080`/`3000` without naming the variables that change them; `curl -f` on `/readyz` exits 0 on `degraded`; the capacity note calls "4092 on 4096" deliberate when only the oversubscription is. |
+
+## Did the round break anything — no
+
+All from rendered models, not from the YAML:
+
+- **Cold-start ordering byte-identical.** `migrate → postgres:healthy`; `api → {postgres healthy, redis healthy, migrate completed(required:true)}`; `worker → {…, migrate completed(required:false)}`; `frontend → api:started(required:false)`; caddy unchanged. postgres probe still `pg_isready -U vizra -d vizra`, `start_period 30s / interval 10s / retries 10` — the 40-second-PostgreSQL case keeps its ~130 s of headroom. `shm_size` and `mem_limit` touched no edge.
+- **`prod-worker-split` renders alone**: one service, `media_data` only, no ports, 1500m cap, migrate edge optional.
+- **External overlays still delete the container**: `prod-external-both` = 5 services, `postgres_data` dropped, `shm_size` gone with the service; `prod-external-ipfs` and `-clickhouse` render no such service and no 4001.
+- **Ports exactly right** with every optional profile on: `caddy 0.0.0.0:80,443`, `ipfs 0.0.0.0:4001/tcp+udp`, `api 127.0.0.1:8080`, `frontend 127.0.0.1:3000`, nothing else. `prod-external-tls` publishes loopback only; `prod-worker-split` publishes nothing.
+- **Production hygiene intact**: `VIZRA_MODE=production`, zero `VIZRA_DEV_*` keys in any production shape.
+
+Two rules I did not ask for and that earn their place: `gated-probe-unrecognised` (I swapped `pg_isready` for `true` and got 27 violations naming why `-U` matters) and the topology checker's new SCOPE paragraph, which states in its own output that `probe-gates-readiness` "cannot tell a real probe from a fake one nobody declared". A checker that publishes its own blind spot is rarer than it should be.
+
+## My call on 4092 MiB / 4096 MiB: ship it, do not trim
+
+Caddy's 96m→160m does **not** tip anything, because the cap sum is not the load-bearing number. Realistic concurrent peak on the default shape is ~2300–2400 MiB (postgres ~250, valkey ~320 at its 256m maxmemory plus fragmentation, api 100–200, frontend 150–250, caddy 30–60, worker 800–1200 at concurrency 2 with an AVIF encode), against ~3500 MiB usable after Ubuntu 24.04 and dockerd. Both OOM mechanisms still select the worker: it is the only service that realistically reaches its own `memory.max`, and in any global-pressure scenario I can construct it is also the largest RSS. If someone insists on a sum under physical RAM, the trim I would take is `frontend` 512m→448m (Next.js standalone idles 120–200 MiB; 448 is still >2× headroom) for 4028 — but I would not spend the churn.
+
+---
+
+```
+FINDING NEW-2: the known-false disclosure is gated in the dangerous direction only, not both
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/check-compose-topology.py:~872-892 (the rule body, guarded
+             by `if known_false:`) and :914 (`if known_false:` for the printout);
+             README.md:107-111; env/production.env.example:185-188
+  requirements: VZ-OPS-002, VZ-OPS-003
+
+Observed:
+  The fix round's claim is "a new rule `known-false-undisclosed` fails in BOTH
+  directions so the known-false list and the paragraphs are deleted together."
+  Direction one is real and I proved it: deleting the README section while
+  `known_false_probes` is non-empty gives
+
+    VIOLATION shape=(manifest) rule=known-false-undisclosed service=README.md
+    detail=must carry the disclosure 'IGNORE THE `healthy` COLUMN' while
+    known_false_probes is non-empty (['api', 'worker']), and does not.
+
+  Direction two is not. I emptied `known_false_probes` to `[]` in
+  scripts/compose-shapes.json, leaving both paragraphs in place, re-rendered all
+  13 shapes and ran the checker: **exit 0, zero violations**. The rule body sits
+  inside `if known_false:`, so an empty list makes it unreachable. What carries
+  that direction today is prose in the two files themselves — "if that list is
+  empty and this is still here, one of the two is wrong" — which is an
+  instruction to a human, not a gate.
+
+Failure:
+  Mild and the opposite of dangerous, which is why this is a NIT and not more.
+  When vizra-core PR #7 lands `vizra healthcheck` and the meta follow-up swaps
+  the probes, whoever does it can delete the declarations and forget the
+  paragraphs, and nothing complains. The operator is then told to ignore a
+  `healthy` column that has become trustworthy, and to hand-curl `/readyz`
+  instead of using the tooling — so they distrust a good signal and keep a
+  workaround alive past its usefulness. Stale reassurance, not a false one.
+  It matters now precisely because the follow-up PR is the next thing to happen.
+
+Perspective: operator, developer
+
+Recommendation:
+  Four lines: an `else:` branch on the existing guard that fails when either
+  disclosure marker is still present while `known_false_probes` is empty —
+
+    rule: known-false-stale-disclosure
+    detail: carries the disclosure 'IGNORE THE `healthy` COLUMN' while
+            known_false_probes is empty. Every probe is real now; telling the
+            operator to ignore the healthy column keeps a workaround alive past
+            its usefulness. Delete the section.
+
+  Correct the "both directions" sentence wherever it was written down
+  (docs/META_REPO.md §2a and the round-2 evidence), so the record matches the
+  code. I would take this in THIS PR if it is reopened for any other reason,
+  and otherwise as the first commit of the `vizra healthcheck` follow-up, where
+  it is the rule that makes that PR's own cleanup checkable.
+
+Acceptance criteria:
+  - Emptying `known_false_probes` while either paragraph survives fails the
+    topology check, demonstrated red.
+  - Deleting the paragraphs while the list is non-empty still fails (unchanged).
+  - The `vizra healthcheck` follow-up cannot go green until both sides move.
+
+Tests:
+  scripts/check-compose-topology.py, new rule id, red-demoed exactly as I did it:
+  set `known_false_probes: []`, re-render, expect exit 1. Harness exists.
+
+Cross-repo implications:
+  core: none. meta: four lines and one corrected sentence.
+
+Challenge:
+  "The prose in both files already says it, and the follow-up PR is one person
+  who has just read the rule." True, and it is why this is a NIT — but the
+  entire argument of this slice is that a standing admission beats a note
+  somebody is supposed to re-read, and the same argument applies to its removal.
+```
+
+```
+FINDING NEW-3: three small things on the operator surfaces
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     README.md:101-104; env/production.env.example:180-183;
+             docker-compose.prod.yml:115,~150 (`127.0.0.1:${VIZRA_HTTP_PORT:-8080}:8080`,
+             `127.0.0.1:${VIZRA_FRONTEND_PORT:-3000}:3000`);
+             docs/quality/COMMANDS.md §5a ("sum to 4092 MiB on a 4096 MiB host,
+             and that is deliberate")
+  requirements: VZ-OPS-002, VZ-OPS-007
+
+Observed and what each costs:
+
+  (a) PORTS HARDCODED IN README. The diagnostic commands name 127.0.0.1:8080 and
+      :3000. Those are the DEFAULTS of VIZRA_HTTP_PORT and VIZRA_FRONTEND_PORT,
+      confirmed against the rendered model — correct for anyone who left them
+      alone. In env/production.env.example this is fine, because the paragraph
+      sits two lines under the variables. In README there is no such context, and
+      the template explicitly invites changing them ("Change them only if
+      something else on the host already owns the port"). An operator who did
+      gets connection-refused from the one command they were told to trust.
+      Fix: "…:8080 (VIZRA_HTTP_PORT) … :3000 (VIZRA_FRONTEND_PORT)".
+
+  (b) `curl -fsS …/readyz`. `-f` makes curl exit 0 on any 2xx — and /readyz
+      returns 200 `degraded` for cache down, search misconfigured or queue age
+      over threshold. So `curl -fsS /readyz && echo OK` prints OK on a degraded
+      instance. The inline comment explains the semantics, so a reader is warned;
+      a copy-paste into a monitoring script is not. `-f` also swallows the 503
+      body, though there the status code carries the whole meaning.
+      Fix: drop `-f` on the readyz line and show the code —
+        curl -sS -o /dev/tmp -w '%{http_code}\n' http://127.0.0.1:8080/readyz
+      or simply `curl -sS …/readyz` so the JSON (which names the component) prints.
+
+  (c) "The default-shape caps sum to 4092 MiB on a 4096 MiB host, and that is
+      deliberate." The OVERSUBSCRIPTION is deliberate; the sum landing 4 MiB
+      under physical RAM is coincidence, and the sentence reads as though the
+      numbers were engineered to fit — which is the opposite of the argument the
+      same paragraph then makes ("caps on peak, not reservations; nothing is set
+      aside"). Someone sizing an 8 GB host from that sentence will scale the
+      wrong quantity.
+      Fix: "…sum to 4092 MiB on a 4096 MiB host. The oversubscription is
+      deliberate; landing just under physical RAM is coincidence, and not the
+      number that matters — realistic concurrent peak is roughly 2.3 GB."
+
+Perspective: operator
+
+Recommendation:
+  All three are single-line edits on files this PR already touches. Take them
+  together in whatever commit next touches these surfaces; none justifies
+  reopening the PR on its own.
+
+Acceptance criteria:
+  - The README diagnostic names the two variables beside the ports.
+  - No documented command exits 0 on `degraded` without the reader being told
+    in the same line.
+  - No sentence attributes design intent to the 4092/4096 coincidence.
+
+Tests:
+  Doc-level; no harness change. (a) and (c) are not mechanisable at sane cost.
+  (b) becomes testable in VZ-ISSUE-004's boot lane: with the cache stopped,
+  /readyz returns 200 `degraded` and the documented command must not read as OK.
+
+Cross-repo implications: none.
+
+Challenge:
+  "These are three nits and the seat was told to cap itself at three." That is
+  exactly the cap, and they are bundled as one finding for that reason.
+```
+
+## Healthcheck values note — for the `vizra healthcheck` follow-up PR
+
+Core PR #7's proposal, judged before it lands. **UNVERIFIED:** I have not read vizra-core PR #7; this is from the summary relayed to me, and the worker's claim-loop poll interval is the one fact I could not check and that changes one of my numbers.
+
+**`degraded` = exit 0 is right — keep it, and it is the most important decision in the set.** `/readyz` 503s only on PostgreSQL; everything else is 200 `degraded`. If the probe treated degraded as unhealthy, an instance with a job backlog over `VIZRA_QUEUE_AGE_THRESHOLD` (15m) would report api unhealthy, a `service_healthy` gate on frontend would never clear on a cold start, and `up -d --wait` would fail the deploy *because the instance is busy*. A backlogged instance that cannot be deployed is how you get stuck at 3am. Gate semantics should be "is this thing fit to receive traffic", and a degraded Vizra is.
+
+**My values, against theirs:**
+
+| | proposed | mine | why |
+|---|---|---|---|
+| api `test` | `vizra healthcheck api` | same | correct |
+| api `interval` | 15s | 15s | fine |
+| api `timeout` | 3s | **5s** | the probe pings PostgreSQL; under the 768m cap on a 2-vCPU box mid-checkpoint, connect + `SELECT 1` can exceed 3s. Three timeouts flip a working api to red. Must stay < interval, so 5s is safe |
+| api `start_period` | 30s | **60s** | see below |
+| api `retries` | 3 | 3 | fine |
+| worker `timeout` | 3s | **10s** | same ping plus loop introspection, on the process that is simultaneously running libvips at its cap |
+| worker window | 15s fixed | **derived: max(3 × poll interval, 30s)** | see below |
+
+**`start_period` 30s vs a 40-second PostgreSQL — the answer is "not the case you think, but raise it anyway."** On `up`, api's container does not start until postgres is healthy *and* migrate exited 0, so the start_period clock never races a slow PostgreSQL. The case that does bite is **a host reboot**: Docker restarts containers from `restart: unless-stopped` without re-evaluating `depends_on`, which is an `up`-time ordering only. api can therefore start while PostgreSQL is doing crash recovery, which on a large database runs into minutes. 60s costs nothing when things are fine — the container goes healthy on the first successful probe, whenever that is — and avoids a red that means nothing.
+
+**There is no restart-loop risk from any of these values, and the follow-up PR should say so** rather than tuning against an imagined one: Docker takes no action on `unhealthy`. It does not restart, it does not stop, it only reports. The blast radius of a too-aggressive probe is a false red in `ps`, a blocked `service_healthy` gate and a failed `--wait` — bad, but not a loop. Conversely, nothing self-heals from a correct red either; that needs `vizra deploy`/`doctor` or an external supervisor.
+
+**The worker semantics need one word pinned down before it ships.** "Claim-loop progress within 15 s" must mean *the loop completed an iteration, including a no-op poll* — never *a job moved*. If it means the latter, a healthy idle worker on a quiet instance reports unhealthy at 3am, which is the false-red failure inverted. Ask core to name the field `last_claim_attempt_at`, not "progress". And the window must be **derived from the worker's own poll setting**, not hardcoded at 15: a window equal to `interval` tolerates a single missed poll, and if the loop backs off when idle (as idle loops usually do) any jitter goes red. `max(3 × poll, 30s)`, read from config, so tuning the poll cannot silently break the probe. **This is the question I would put to PR #7's verifier: what is the poll interval, and does it back off when the queue is empty?**
+
+**Do not add a healthcheck to `migrate`.** It is right as it is — "a process that is supposed to exit cannot be healthy".
+
+**What the follow-up meta PR owes beyond swapping four lines:**
+1. Delete both `known_false_probes` entries **and** the two disclosure paragraphs in the same commit — with NEW-2's reverse rule landed first, so that is enforced rather than remembered.
+2. Restore `frontend → api` to `condition: service_healthy`, **keeping `required: false`** so `prod-frontend-only` still renders. Getting a real probe is the entire point; `probe-gates-readiness` permits it once the declaration is gone.
+3. Add the two new probe commands to `gated-probe-unrecognised`'s expected-command table, so a future swap back to `version` is red.
+4. **Replace** the disclosure rather than deleting it outright: one sentence saying `healthy` now means "PostgreSQL reachable and the loop is turning", that `degraded` still shows as healthy by design, and pointing at `/readyz`'s body and `vizra doctor` for component detail.
+
+**BLOCKING FINDINGS OPEN AT 9c4b5d3: none.**
