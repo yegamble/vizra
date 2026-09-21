@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-21, tick 59 — **seventh merge: vizra-core #4 (stabilise) → `9e44d30`** (root cause proven: cross-clock job eligibility). Dispatched: core fixture corpus (VZ-FOUND-007). In flight also: user re-vendor, meta validate lane. Next core slice after fixtures: public search contract + `SEARCH_HMAC_KEY` rename (one `api/` change, one downstream re-vendor). Owner inbox unchanged. History: "Tick log" at the end of this file.
+Last tick: 2026-09-21, tick 60 — user re-vendor (PR #6) READY_FOR_REVIEW at `ca23fef` → verifier dispatched. In flight: that verifier, core fixtures builder, meta validate-lane builder. Owner inbox unchanged. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -31,7 +31,7 @@ Recorded verbatim from the session of 2026-09-20. The owner answered two questio
 | Slice | Repo | Branch | Acceptance IDs | Builder state | PR | Verified SHA | Verdict |
 |---|---|---|---|---|---|---|---|
 | core PR5 fixtures | vizra-core | `feat/m0-fixtures` | VZ-FOUND-007 | DISPATCHED 2026-09-21 (`vizra-builder`) from main `9e44d30`: pinned generator synthesising ADR-009's twelve M0 fixtures (no third-party images), sha256 manifest with tool versions, per-fixture property tests, separate load-corpus generator, `fixtures-verify` lane in the manifest and floor. Determinism must be PROVEN on the acceptance platform (ubuntu-24.04/amd64 in CI); arm64 reproduction stated honestly; exiftool is absent on the owner's machine, so generation runs in the pinned container | — | — | — |
-| user PR4 re-vendor | vizra-user | `chore/revendor-core-main` | provenance of the vendored API contract (PR #1 verifier F3) | DISPATCHED 2026-09-21 (`vizra-builder`) from main `f49bca4`: re-vendor `api/openapi.yaml` from core `main` `415a6d1`, regenerate the client, manifest sanity check; staleness still undetectable without a read token (owner inbox 6) | — | — | — |
+| user re-vendor (PR #6) | vizra-user | `chore/revendor-core-main` | provenance of the vendored API contract (PR #1 verifier F3) | READY_FOR_REVIEW (builder) — head `ca23fef`. Spec BYTE-IDENTICAL across core's squash (blob `58030e7f…`), so only `contracts/manifest.json` changes under contracts/ and lib/; vendor script now reads the blob from core's object database and the working-tree mode is removed (it produced PR #1's dead pin); new `check-manifest.mjs` (+26 tests) in `check:contract` and contract-ci; AGENTS.md states staleness is undetectable without a read token. Claims: 315 tests / 0 skips, e2e 18 + 18 stamps, `ci-required` green (docker-build path-filtered, optional-if-absent). PR #1's real dead-pin state now goes red | yegamble/vizra-user#6 | verifying `ca23fef` | fresh `vizra-verifier` dispatched 2026-09-21 (incl. option/command-injection probes on `--ref`/`--from`); pending |
 | meta validate lane | vizra (meta) | `ci/meta-validate` (own worktree `.claude/worktrees/meta-validate`, stacked on `chore/m0-meta-baseline`) | VZ-CI-004-class: ledger generator reproduces `docs/quality/*` with no diff; dangling VZ ids; relative links; `ci-required` + floor guard; CODEOWNERS; `docs/quality/COMMANDS.md` from commands that ran | DISPATCHED 2026-09-21 (`vizra-builder`) — unblocks meta PR #2, which has had no `ci-required` lane to satisfy the merge rule | — | — | — |
 
 Open points on user PR1 for the verdict: `required-checks.txt` is not at the repo root on the branch (where is the manifest, does it match the jobs that ran?); the vendored contract records core SHA `b0dbeb6`, which is on core's feature branch — after core PR1 squash-merges, user re-vendors from core `main` as the first step of user PR2 so provenance never dangles (verifier F3: no lane reads `manifest.json`'s `source_commit`, so nothing breaks if it dangles — the re-vendor plus the freshness lane in owner inbox 6 is what closes it); the builder wrote its red/green transcripts under `docs/evidence/warroom/VZ-FOUND-002/` (builder claims — the verifier's file is separate).
@@ -117,6 +117,7 @@ While verifying vizra-user #2, a nested sub-agent's Bash tool result ended with 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 60 (2026-09-21) — user re-vendor PR #6 ready at `ca23fef` (spec byte-identical; provenance fixed); verifier dispatched.
 - Tick 59 (2026-09-21) — vizra-core #4 merged (`bfd2d5f` → `9e44d30`); core fixture corpus dispatched.
 - Tick 58 (2026-09-21) — vizra-user #3 merged (`3b566c3` → `f49bca4`); user re-vendor and the meta validate lane dispatched.
 - Tick 57 — core PR2 fix round at `bfd2d5f` (wait on the observable; safeError at 11/11 sites; 0/120); re-verify dispatched; `.gitguardian.yaml` shown not to affect the App check.
