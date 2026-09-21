@@ -1,0 +1,192 @@
+{
+  "component": "vizra-core",
+  "source_commit": "c043df72f06cc7b5d7237a12d2be4dac25fa788e",
+  "source_files": [
+    "internal/config/keys.go",
+    "internal/config/config.go",
+    ".env.example"
+  ],
+  "read_2026_09_21_by": "VZ-ISSUE-002",
+  "services": [
+    "api",
+    "worker",
+    "migrate"
+  ],
+  "keys": [
+    {
+      "name": "VIZRA_MODE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": "development",
+      "reason": "the deployment decides its own mode; docker-compose.prod.yml sets production and docker-compose.override.yml sets development. An operator-settable mode would let a production host boot with vizra-core's production refusals disabled."
+    },
+    {
+      "name": "VIZRA_PUBLIC_ORIGIN",
+      "required": "production",
+      "secret": false,
+      "delivered_by": "template"
+    },
+    {
+      "name": "VIZRA_LISTEN_ADDR",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": ":8080",
+      "reason": "the in-container listen address is a topology fact, not an operator choice; the published port is VIZRA_HTTP_PORT."
+    },
+    {
+      "name": "VIZRA_METRICS_ADDR",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": "127.0.0.1:9090",
+      "reason": "pinned to loopback. /metrics is not in api/openapi.yaml and no client should reach it."
+    },
+    {
+      "name": "VIZRA_SITE_HANDLE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "default"
+    },
+    {
+      "name": "DATABASE_URL",
+      "required": "production",
+      "secret": true,
+      "delivered_by": "compose-or-template",
+      "reason": "composed from POSTGRES_* in the MANAGED shape; supplied verbatim by the operator in the EXTERNAL shape (docker-compose.external-postgres.yml)."
+    },
+    {
+      "name": "VIZRA_CACHE_URL",
+      "required": "production",
+      "secret": true,
+      "delivered_by": "compose-or-template",
+      "reason": "fixed to the bundled service in the MANAGED shape; supplied verbatim in the EXTERNAL shape (docker-compose.external-redis.yml)."
+    },
+    {
+      "name": "VIZRA_CACHE_NAMESPACE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "default"
+    },
+    {
+      "name": "VIZRA_STORAGE_PREFIX",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "default"
+    },
+    {
+      "name": "VIZRA_SESSION_SECRET",
+      "required": "production",
+      "secret": true,
+      "delivered_by": "template"
+    },
+    {
+      "name": "VIZRA_MFA_KEY_KEK",
+      "required": "production",
+      "secret": true,
+      "delivered_by": "template"
+    },
+    {
+      "name": "VIZRA_SEARCH_MODE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "off"
+    },
+    {
+      "name": "VIZRA_SEARCH_URL",
+      "required": "conditional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "http://search:8081"
+    },
+    {
+      "name": "VIZRA_SEARCH_HMAC_KEY",
+      "required": "conditional",
+      "secret": true,
+      "delivered_by": "alias",
+      "reason": "fed from the operator key SEARCH_HMAC_KEY; see env/registry/aliases.json."
+    },
+    {
+      "name": "VIZRA_SEARCH_TIMEOUT",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "2s"
+    },
+    {
+      "name": "VIZRA_CORS_ALLOWED_ORIGINS",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template"
+    },
+    {
+      "name": "VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template"
+    },
+    {
+      "name": "VIZRA_QUEUE_AGE_THRESHOLD",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "15m"
+    },
+    {
+      "name": "VIZRA_WORKER_CONCURRENCY",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "4"
+    },
+    {
+      "name": "VIZRA_JOB_LEASE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "60s"
+    },
+    {
+      "name": "VIZRA_JOB_TIMEOUT",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "5m"
+    },
+    {
+      "name": "VIZRA_SHUTDOWN_GRACE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "20s"
+    }
+  ],
+  "escape_hatches": [
+    "VIZRA_DEV_DISABLE_AUTH",
+    "VIZRA_DEV_ALLOW_ANY_ORIGIN",
+    "VIZRA_DEV_SKIP_MIGRATIONS",
+    "VIZRA_DEV_AUTOLOGIN_USER",
+    "VIZRA_DEV_FAKE_SEARCH",
+    "VIZRA_DEV_INSECURE_COOKIES",
+    "VIZRA_DEV_TRUST_ANY_HMAC"
+  ],
+  "escape_hatch_note": "vizra-core refuses every one of these by name when VIZRA_MODE=production. They must never appear in a rendered production model at all - not set to false, not set to anything - because VIZRA_DEV_AUTOLOGIN_USER is refused on PRESENCE. scripts/check-config-coverage.py asserts their absence.",
+  "non_registry_env": [
+    "PGOPTIONS"
+  ],
+  "non_registry_env_note": "PGOPTIONS is libpq's own variable, not a Vizra config key: docker-compose.prod.yml sets `-c lock_timeout=...` on the migrate one-shot so a migration that cannot take its lock fails the deploy instead of holding the database. It is declared here so the coverage check can tell 'deliberately delivered, read by the driver' from 'delivered and read by nobody'.",
+  "drift_ignore": [
+    "CHANGE",
+    "ME",
+    "SEARCH_HMAC_KEY",
+    "VIZRA_TEST_CACHE_FLAVOUR",
+    "VIZRA_TEST_CACHE_URL",
+    "VIZRA_TEST_DATABASE_URL"
+  ],
+  "drift_ignore_note": "The drift extractor is a deliberately coarse literal scan: it over-reports rather than under-reports, and every entry here is a token it found that is NOT a key the component reads. SEARCH_HMAC_KEY appears in vizra-core's vendored copy of api/search-internal.openapi.yaml, which names the contract's spelling; vizra-core itself still reads VIZRA_SEARCH_HMAC_KEY. When core renames, this entry and the alias in aliases.json go together."
+}

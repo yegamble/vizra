@@ -1,0 +1,664 @@
+{
+  "note": "The supported compose shapes (docs/META_REPO.md \u00a72). Every one is rendered and asserted by the `validate` lane. `floor` is a DECISION, not a count of whatever rows survive: scripts/compose-render.py refuses to run when the declared ids do not match the shapes below, so deleting a shape is a visible edit rather than a quietly smaller matrix. This is the same rule .github/required-checks.txt has for lanes, for the same reason.",
+  "floor": [
+    "dev-default",
+    "dev-build-from-checkouts",
+    "prod-default",
+    "prod-external-tls",
+    "prod-worker-split",
+    "prod-all-optional",
+    "prod-external-postgres",
+    "prod-external-redis",
+    "prod-external-both",
+    "prod-external-clickhouse",
+    "prod-external-ipfs",
+    "bundle-no-checkouts"
+  ],
+  "env_file": "env/production.env.example",
+  "dev_env_file": "env/development.env.example",
+  "ci_overrides": {
+    "_note": "Shell environment beats --env-file in Compose, so these fill exactly the values the template ships BLANK. They are obviously fake and are on both components' refused-value lists in spirit: nothing here is a value a host should ever run. Secret values are redacted out of every rendered model before it is written or uploaded.",
+    "VIZRA_CORE_TAG": "v0.0.0-ci",
+    "VIZRA_USER_TAG": "v0.0.0-ci",
+    "VIZRA_SEARCH_TAG": "v0.0.0-ci",
+    "VIZRA_PUBLIC_ORIGIN": "https://photos.ci.invalid",
+    "VIZRA_SESSION_SECRET": "ci-render-only-session-secret-not-a-real-value",
+    "VIZRA_MFA_KEY_KEK": "ci-render-only-mfa-kek-not-a-real-value",
+    "SEARCH_HMAC_KEY": "ci-render-only-search-hmac-key-not-a-real-value",
+    "POSTGRES_PASSWORD": "ci-render-only-postgres-password-not-a-real-value",
+    "CLICKHOUSE_PASSWORD": "ci-render-only-clickhouse-password-not-a-real-value"
+  },
+  "external_dsn_overrides": {
+    "_note": "Deliberately CREDENTIAL-FREE. These only have to satisfy scripts/compose-render.py's DSN validator (scheme + host), and a `user:password@host` placeholder is a credential-shaped string in a tracked file - a secret scanner is right to flag one, and a reviewer should not have to decide whether it is real. `.invalid` is reserved by RFC 2606 and resolves nowhere.",
+    "DATABASE_URL": "postgres://db.ci.invalid:5432/vizra?sslmode=require",
+    "VIZRA_CACHE_URL": "rediss://cache.ci.invalid:6379/0"
+  },
+  "redact_keys": [
+    "VIZRA_SESSION_SECRET",
+    "VIZRA_MFA_KEY_KEK",
+    "VIZRA_SEARCH_HMAC_KEY",
+    "SEARCH_HMAC_KEY",
+    "POSTGRES_PASSWORD",
+    "CLICKHOUSE_PASSWORD",
+    "DATABASE_URL",
+    "VIZRA_CACHE_URL"
+  ],
+  "shapes": [
+    {
+      "id": "dev-default",
+      "title": "bare `docker compose` on a developer machine (base + auto-loaded override)",
+      "kind": "development",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.override.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "search"
+      ],
+      "checkouts": "any",
+      "requires_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "search"
+      ],
+      "forbids_services": [
+        "caddy",
+        "clickhouse",
+        "ipfs"
+      ],
+      "published_allow": [
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dev-build-from-checkouts",
+      "title": "developer build chain: every Vizra image built from ./vizra-*",
+      "kind": "development",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.override.yml",
+        "docker-compose.dev.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "search"
+      ],
+      "checkouts": "any",
+      "requires_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "search"
+      ],
+      "forbids_services": [
+        "caddy",
+        "clickhouse",
+        "ipfs"
+      ],
+      "requires_build": [
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "search"
+      ],
+      "published_allow": [
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prod-default",
+      "title": "the default self-hosted deploy: core + frontend + Caddy edge",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "edge"
+      ],
+      "checkouts": "any",
+      "requires_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "caddy"
+      ],
+      "forbids_services": [
+        "search",
+        "clickhouse",
+        "ipfs"
+      ],
+      "published_allow": [
+        {
+          "service": "caddy",
+          "ports": [
+            80,
+            443
+          ],
+          "public": true,
+          "reason": "the edge. 80/443 are the ports a self-hosted instance exists to answer on."
+        },
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prod-external-tls",
+      "title": "VIZRA_TLS_MODE=external: the operator's own nginx terminates TLS, no Caddy",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend"
+      ],
+      "checkouts": "any",
+      "requires_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend"
+      ],
+      "forbids_services": [
+        "caddy",
+        "search",
+        "clickhouse",
+        "ipfs"
+      ],
+      "published_allow": [
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prod-worker-split",
+      "title": "a second host running only the worker, against external datastores",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "docker-compose.external-postgres.yml",
+        "docker-compose.external-redis.yml"
+      ],
+      "profiles": [
+        "worker"
+      ],
+      "external_dsn": true,
+      "checkouts": "any",
+      "requires_services": [
+        "worker"
+      ],
+      "forbids_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "frontend",
+        "caddy",
+        "search",
+        "clickhouse",
+        "ipfs"
+      ],
+      "published_allow": []
+    },
+    {
+      "id": "prod-all-optional",
+      "title": "every optional profile enabled at once - the authority for port closure",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "edge",
+        "worker",
+        "search",
+        "analytics",
+        "ipfs"
+      ],
+      "checkouts": "any",
+      "requires_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "caddy",
+        "search",
+        "clickhouse",
+        "ipfs"
+      ],
+      "forbids_services": [],
+      "published_allow": [
+        {
+          "service": "caddy",
+          "ports": [
+            80,
+            443
+          ],
+          "public": true,
+          "reason": "the edge. 80/443 are the ports a self-hosted instance exists to answer on."
+        },
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        },
+        {
+          "service": "ipfs",
+          "ports": [
+            4001
+          ],
+          "public": true,
+          "reason": "the libp2p swarm port. An IPFS node that cannot be dialled cannot participate; the Kubo HTTP API (5001) and gateway are never published. docs/META_REPO.md 2 additionally requires this port to be gated in the cloud firewall, which compose cannot assert."
+        }
+      ]
+    },
+    {
+      "id": "prod-external-postgres",
+      "title": "EXTERNAL PostgreSQL: the bundled database is gone and the DSN is required",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "docker-compose.external-postgres.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "edge"
+      ],
+      "external_dsn": true,
+      "checkouts": "any",
+      "requires_services": [
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "caddy"
+      ],
+      "forbids_services": [
+        "postgres",
+        "search",
+        "clickhouse",
+        "ipfs"
+      ],
+      "published_allow": [
+        {
+          "service": "caddy",
+          "ports": [
+            80,
+            443
+          ],
+          "public": true,
+          "reason": "the edge. 80/443 are the ports a self-hosted instance exists to answer on."
+        },
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prod-external-redis",
+      "title": "EXTERNAL cache: the bundled Valkey is gone and the DSN is required",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "docker-compose.external-redis.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "edge"
+      ],
+      "external_dsn": true,
+      "checkouts": "any",
+      "requires_services": [
+        "postgres",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "caddy"
+      ],
+      "forbids_services": [
+        "redis",
+        "search",
+        "clickhouse",
+        "ipfs"
+      ],
+      "published_allow": [
+        {
+          "service": "caddy",
+          "ports": [
+            80,
+            443
+          ],
+          "public": true,
+          "reason": "the edge. 80/443 are the ports a self-hosted instance exists to answer on."
+        },
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prod-external-both",
+      "title": "both datastores external - Vizra owns no data store on this host",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "docker-compose.external-postgres.yml",
+        "docker-compose.external-redis.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "edge"
+      ],
+      "external_dsn": true,
+      "checkouts": "any",
+      "requires_services": [
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "caddy"
+      ],
+      "forbids_services": [
+        "postgres",
+        "redis",
+        "search",
+        "clickhouse",
+        "ipfs"
+      ],
+      "published_allow": [
+        {
+          "service": "caddy",
+          "ports": [
+            80,
+            443
+          ],
+          "public": true,
+          "reason": "the edge. 80/443 are the ports a self-hosted instance exists to answer on."
+        },
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prod-external-clickhouse",
+      "title": "analytics profile ON with the external overlay: still no container",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "docker-compose.external-clickhouse.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "edge",
+        "analytics"
+      ],
+      "checkouts": "any",
+      "requires_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "caddy"
+      ],
+      "forbids_services": [
+        "clickhouse",
+        "search",
+        "ipfs"
+      ],
+      "published_allow": [
+        {
+          "service": "caddy",
+          "ports": [
+            80,
+            443
+          ],
+          "public": true,
+          "reason": "the edge. 80/443 are the ports a self-hosted instance exists to answer on."
+        },
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prod-external-ipfs",
+      "title": "ipfs profile ON with the external overlay: no container, and no swarm port",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "docker-compose.external-ipfs.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "edge",
+        "ipfs"
+      ],
+      "checkouts": "any",
+      "requires_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "caddy"
+      ],
+      "forbids_services": [
+        "ipfs",
+        "search",
+        "clickhouse"
+      ],
+      "published_allow": [
+        {
+          "service": "caddy",
+          "ports": [
+            80,
+            443
+          ],
+          "public": true,
+          "reason": "the edge. 80/443 are the ports a self-hosted instance exists to answer on."
+        },
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bundle-no-checkouts",
+      "title": "the deployment bundle: the production chain rendered with ./vizra-core, ./vizra-user and ./vizra-search ABSENT",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "edge",
+        "worker",
+        "search",
+        "analytics",
+        "ipfs"
+      ],
+      "checkouts": "absent",
+      "requires_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "caddy",
+        "search",
+        "clickhouse",
+        "ipfs"
+      ],
+      "forbids_services": [],
+      "published_allow": [
+        {
+          "service": "caddy",
+          "ports": [
+            80,
+            443
+          ],
+          "public": true,
+          "reason": "the edge. 80/443 are the ports a self-hosted instance exists to answer on."
+        },
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        },
+        {
+          "service": "ipfs",
+          "ports": [
+            4001
+          ],
+          "public": true,
+          "reason": "the libp2p swarm port. An IPFS node that cannot be dialled cannot participate; the Kubo HTTP API (5001) and gateway are never published. docs/META_REPO.md 2 additionally requires this port to be gated in the cloud firewall, which compose cannot assert."
+        }
+      ]
+    }
+  ]
+}

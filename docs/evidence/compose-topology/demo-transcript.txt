@@ -1,0 +1,225 @@
+vizra compose-topology red/green demonstrations
+date:  2026-09-21T05:44:37Z
+tree:  864f77f5c949c52855c430b59338a9b5eb0706b4
+dirty: 0 file(s)
+docker compose: 5.5.1
+python: Python 3.9.6
+
+==============================================================
+CASE 0 — BASELINE: the unmutated tree is green
+==============================================================
+    ok  (baseline: exit 0)
+
+==============================================================
+CASE 1 — a ports: entry on postgres in the BASE file
+==============================================================
+    digest before: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    digest after : fb95391a047b7cfa5dd2345b3edcf57210676a7fce97c87a1cd2dc0cad93bbb2
+    ok  (postgres publishes in the base file: exit 1, signal "rule=never-published service=postgres")
+      | VIOLATION shape=dev-default rule=never-published service=postgres detail=publishes 0.0.0.0:5432->5432; this service must publish nothing in any shape file=docker-compose.yml
+      | VIOLATION shape=dev-build-from-checkouts rule=never-published service=postgres detail=publishes 0.0.0.0:5432->5432; this service must publish nothing in any shape file=docker-compose.yml
+      | VIOLATION shape=prod-default rule=never-published service=postgres detail=publishes 0.0.0.0:5432->5432; this service must publish nothing in any shape file=docker-compose.yml
+      | VIOLATION shape=prod-external-tls rule=never-published service=postgres detail=publishes 0.0.0.0:5432->5432; this service must publish nothing in any shape file=docker-compose.yml
+    digest restored: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 2 — a ports: entry on the CACHE in an OVERLAY (docker-compose.prod.yml)
+==============================================================
+    digest before: 5665234a11f667e89780dd1a5c4c0059b82ebabda52cfe2ab4b757acae51be2c
+    digest after : 6bb1f357953b6e8399b20060017aeb4682494dd89c995c4daf4ff4a352a3c816
+    ok  (the cache publishes from an overlay: exit 1, signal "rule=never-published service=redis")
+      | VIOLATION shape=prod-default rule=never-published service=redis detail=publishes 0.0.0.0:6379->6379; this service must publish nothing in any shape file=docker-compose.prod.yml
+      | VIOLATION shape=prod-external-tls rule=never-published service=redis detail=publishes 0.0.0.0:6379->6379; this service must publish nothing in any shape file=docker-compose.prod.yml
+      | VIOLATION shape=prod-all-optional rule=never-published service=redis detail=publishes 0.0.0.0:6379->6379; this service must publish nothing in any shape file=docker-compose.prod.yml
+      | VIOLATION shape=prod-external-postgres rule=never-published service=redis detail=publishes 0.0.0.0:6379->6379; this service must publish nothing in any shape file=docker-compose.prod.yml
+    digest restored: 5665234a11f667e89780dd1a5c4c0059b82ebabda52cfe2ab4b757acae51be2c
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 3 — a ports: entry on SEARCH in the BASE file
+==============================================================
+    digest before: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    digest after : ec16d8bb1998841578f10661e8961cc62e96ceb567f979f40273c237e64aad54
+    ok  (search publishes: exit 1, signal "rule=never-published service=search")
+      | VIOLATION shape=dev-default rule=never-published service=search detail=publishes 0.0.0.0:8081->8081; this service must publish nothing in any shape file=docker-compose.yml
+      | VIOLATION shape=dev-build-from-checkouts rule=never-published service=search detail=publishes 0.0.0.0:8081->8081; this service must publish nothing in any shape file=docker-compose.yml
+      | VIOLATION shape=prod-all-optional rule=never-published service=search detail=publishes 0.0.0.0:8081->8081; this service must publish nothing in any shape file=docker-compose.yml
+      | VIOLATION shape=bundle-no-checkouts rule=never-published service=search detail=publishes 0.0.0.0:8081->8081; this service must publish nothing in any shape file=docker-compose.yml
+    digest restored: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 4 — api bound to 0.0.0.0 instead of 127.0.0.1
+==============================================================
+    digest before: 5665234a11f667e89780dd1a5c4c0059b82ebabda52cfe2ab4b757acae51be2c
+    digest after : 513f7d32e6275bbd2ae7939b8b03d7e89c9344413500efc61061792a07b87dca
+    ok  (api faces the network: exit 1, signal "rule=public-bind service=api")
+      | VIOLATION shape=prod-default rule=public-bind service=api detail=binds 0.0.0.0:8080, but this shape allows that port only on loopback (127.0.0.1/::1); a port faces the network only with an explicit "public": true and a reason in scripts/compose-shapes.json file=docker-compose.prod.yml
+      | VIOLATION shape=prod-external-tls rule=public-bind service=api detail=binds 0.0.0.0:8080, but this shape allows that port only on loopback (127.0.0.1/::1); a port faces the network only with an explicit "public": true and a reason in scripts/compose-shapes.json file=docker-compose.prod.yml
+      | VIOLATION shape=prod-all-optional rule=public-bind service=api detail=binds 0.0.0.0:8080, but this shape allows that port only on loopback (127.0.0.1/::1); a port faces the network only with an explicit "public": true and a reason in scripts/compose-shapes.json file=docker-compose.prod.yml
+      | VIOLATION shape=prod-external-postgres rule=public-bind service=api detail=binds 0.0.0.0:8080, but this shape allows that port only on loopback (127.0.0.1/::1); a port faces the network only with an explicit "public": true and a reason in scripts/compose-shapes.json file=docker-compose.prod.yml
+    digest restored: 5665234a11f667e89780dd1a5c4c0059b82ebabda52cfe2ab4b757acae51be2c
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 5 — caddy present OUTSIDE the edge profile
+==============================================================
+    digest before: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    digest after : 78b601c369ec09f699bec915b5ac6bb7a3b2ac839f322d47578d309914e65819
+    ok  (caddy escapes the edge profile: exit 1, signal "rule=edge-profile service=caddy")
+      | VIOLATION shape=dev-default rule=edge-profile service=caddy detail=declares profiles ['core']; it must carry the 'edge' profile so a TLS-external operator never starts a second web server (VZ-TOPOLOGY-006) file=docker-compose.yml
+      | VIOLATION shape=dev-default rule=unexpected-service service=caddy detail=rendered in a shape that forbids it; present: ['api', 'caddy', 'frontend', 'migrate', 'postgres', 'redis', 'search', 'worker']
+      | VIOLATION shape=dev-build-from-checkouts rule=edge-profile service=caddy detail=declares profiles ['core']; it must carry the 'edge' profile so a TLS-external operator never starts a second web server (VZ-TOPOLOGY-006) file=docker-compose.yml
+      | VIOLATION shape=dev-build-from-checkouts rule=unexpected-service service=caddy detail=rendered in a shape that forbids it; present: ['api', 'caddy', 'frontend', 'migrate', 'postgres', 'redis', 'search', 'worker']
+    digest restored: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 6a — a long-running service with NO restart policy
+==============================================================
+    digest before: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    digest after : 2facb93607eae1d18e57b869a00ed4eb3820b2eaa0f6e1aac0e21e926fcb8e69
+    ok  (frontend would not survive a reboot: exit 1, signal "rule=missing-restart service=frontend")
+      | VIOLATION shape=dev-default rule=missing-restart service=frontend detail=restart=None; every long-running service must declare restart: unless-stopped so a host reboot brings the stack back
+      | VIOLATION shape=dev-build-from-checkouts rule=missing-restart service=frontend detail=restart=None; every long-running service must declare restart: unless-stopped so a host reboot brings the stack back
+      | VIOLATION shape=prod-default rule=missing-restart service=frontend detail=restart=None; every long-running service must declare restart: unless-stopped so a host reboot brings the stack back
+      | VIOLATION shape=prod-external-tls rule=missing-restart service=frontend detail=restart=None; every long-running service must declare restart: unless-stopped so a host reboot brings the stack back
+    digest restored: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 6b — a service with NO log cap
+==============================================================
+    digest before: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    digest after : dace99a44e71991aaf0581a4ca02f7a8c41912543b90d5c25fa531c820af38ba
+    ok  (clickhouse logs are unbounded: exit 1, signal "rule=missing-log-cap service=clickhouse")
+      | VIOLATION shape=prod-all-optional rule=missing-log-cap service=clickhouse detail=logging={}; every service needs driver json-file with max-size and max-file, or one busy day fills the disk
+      | VIOLATION shape=bundle-no-checkouts rule=missing-log-cap service=clickhouse detail=logging={}; every service needs driver json-file with max-size and max-file, or one busy day fills the disk
+    digest restored: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 6c — a long-running service with NO healthcheck
+==============================================================
+    digest before: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    digest after : 8a811b1a41ab4f5559d2c5f9c23e87381193aea883a17e9bc0ab8d6263bf84cf
+    ok  (the cache cannot gate a depends_on: exit 1, signal "rule=missing-healthcheck service=redis")
+      | VIOLATION shape=dev-default rule=missing-healthcheck service=redis detail=healthcheck={}; a long-running service with no healthcheck cannot gate a depends_on and cannot be diagnosed by doctor
+      | VIOLATION shape=dev-build-from-checkouts rule=missing-healthcheck service=redis detail=healthcheck={}; a long-running service with no healthcheck cannot gate a depends_on and cannot be diagnosed by doctor
+      | VIOLATION shape=prod-default rule=missing-healthcheck service=redis detail=healthcheck={}; a long-running service with no healthcheck cannot gate a depends_on and cannot be diagnosed by doctor
+      | VIOLATION shape=prod-external-tls rule=missing-healthcheck service=redis detail=healthcheck={}; a long-running service with no healthcheck cannot gate a depends_on and cannot be diagnosed by doctor
+    digest restored: 2b4ff66dd5b787432c9abea0c0c22c224082b4537c041f7e13026fc1681bf5bc
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 7 — build: on the migration one-shot in a PRODUCTION shape
+==============================================================
+    digest before: 5665234a11f667e89780dd1a5c4c0059b82ebabda52cfe2ab4b757acae51be2c
+    digest after : cfbebd4d595b456c37b6c5bda807f68a6de4e87441f50d0e5975bcc23ba3d1da
+    ok  (the one-shot would compile on the host: exit 1, signal "rule=production-build service=migrate")
+      | VIOLATION shape=prod-default rule=production-build service=migrate detail=carries build: in a production shape (one_shot=true); production runs `up -d --no-build` from published images and must never need a compiler or a source checkout on the host file=docker-compose.prod.yml
+      | VIOLATION shape=prod-external-tls rule=production-build service=migrate detail=carries build: in a production shape (one_shot=true); production runs `up -d --no-build` from published images and must never need a compiler or a source checkout on the host file=docker-compose.prod.yml
+      | VIOLATION shape=prod-all-optional rule=production-build service=migrate detail=carries build: in a production shape (one_shot=true); production runs `up -d --no-build` from published images and must never need a compiler or a source checkout on the host file=docker-compose.prod.yml
+      | VIOLATION shape=prod-external-postgres rule=production-build service=migrate detail=carries build: in a production shape (one_shot=true); production runs `up -d --no-build` from published images and must never need a compiler or a source checkout on the host file=docker-compose.prod.yml
+    digest restored: 5665234a11f667e89780dd1a5c4c0059b82ebabda52cfe2ab4b757acae51be2c
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 8a — an image tagged :latest in a production shape
+==============================================================
+    digest before: 5665234a11f667e89780dd1a5c4c0059b82ebabda52cfe2ab4b757acae51be2c
+    digest after : 98f46aff28430fdf102556cf53cc094b8c28f69552ddbe991b600b6b64fe2d8d
+    ok  (frontend runs :latest: exit 1, signal "rule=unpinned-image service=frontend")
+      | VIOLATION shape=prod-default rule=unpinned-image service=frontend detail='ghcr.io/yegamble/vizra-user:latest' is tagged latest, which is not an artefact; production images come from the release record (VIZRA_*_TAG) or a digest file=docker-compose.yml
+      | VIOLATION shape=prod-external-tls rule=unpinned-image service=frontend detail='ghcr.io/yegamble/vizra-user:latest' is tagged latest, which is not an artefact; production images come from the release record (VIZRA_*_TAG) or a digest file=docker-compose.yml
+      | VIOLATION shape=prod-all-optional rule=unpinned-image service=frontend detail='ghcr.io/yegamble/vizra-user:latest' is tagged latest, which is not an artefact; production images come from the release record (VIZRA_*_TAG) or a digest file=docker-compose.yml
+      | VIOLATION shape=prod-external-postgres rule=unpinned-image service=frontend detail='ghcr.io/yegamble/vizra-user:latest' is tagged latest, which is not an artefact; production images come from the release record (VIZRA_*_TAG) or a digest file=docker-compose.yml
+    digest restored: 5665234a11f667e89780dd1a5c4c0059b82ebabda52cfe2ab4b757acae51be2c
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 8b — an UNTAGGED image in a production shape
+==============================================================
+    digest before: 5665234a11f667e89780dd1a5c4c0059b82ebabda52cfe2ab4b757acae51be2c
+    digest after : c72e2ec681fc8c05d09125347a872fbb0d616976020dfa8ab1d3d25c77bd120d
+    ok  (frontend has no tag, which Docker resolves to :latest: exit 1, signal "rule=unpinned-image service=frontend")
+      | VIOLATION shape=prod-default rule=unpinned-image service=frontend detail='ghcr.io/yegamble/vizra-user' has no tag; Docker resolves that to :latest; production images come from the release record (VIZRA_*_TAG) or a digest file=docker-compose.yml
+      | VIOLATION shape=prod-external-tls rule=unpinned-image service=frontend detail='ghcr.io/yegamble/vizra-user' has no tag; Docker resolves that to :latest; production images come from the release record (VIZRA_*_TAG) or a digest file=docker-compose.yml
+      | VIOLATION shape=prod-all-optional rule=unpinned-image service=frontend detail='ghcr.io/yegamble/vizra-user' has no tag; Docker resolves that to :latest; production images come from the release record (VIZRA_*_TAG) or a digest file=docker-compose.yml
+      | VIOLATION shape=prod-external-postgres rule=unpinned-image service=frontend detail='ghcr.io/yegamble/vizra-user' has no tag; Docker resolves that to :latest; production images come from the release record (VIZRA_*_TAG) or a digest file=docker-compose.yml
+    digest restored: 5665234a11f667e89780dd1a5c4c0059b82ebabda52cfe2ab4b757acae51be2c
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 9a — a config key added to a component registry with NO template entry
+==============================================================
+    digest before: de6c637085dab81f560c518ee9db266cf64a7100294ca8403d3425d9352c0835
+    digest after : c96d8f9717f3de8b3996c712d0aaa40adba02b7e8868ea9a78983e365970ecd6
+    ok  (core declares a key nothing delivers: exit 1, signal "rule=service-key-missing")
+      | VIOLATION rule=service-key-missing subject=bundle-no-checkouts/api/VIZRA_BRAND_NEW_KEY detail=vizra-core reads VIZRA_BRAND_NEW_KEY (env/registry/core.json at c043df72f06c) but the rendered environment map does not deliver it, so the service gets its built-in default and the operator has no way to change it
+      | VIOLATION rule=service-key-missing subject=bundle-no-checkouts/worker/VIZRA_BRAND_NEW_KEY detail=vizra-core reads VIZRA_BRAND_NEW_KEY (env/registry/core.json at c043df72f06c) but the rendered environment map does not deliver it, so the service gets its built-in default and the operator has no way to change it
+      | VIOLATION rule=service-key-missing subject=bundle-no-checkouts/migrate/VIZRA_BRAND_NEW_KEY detail=vizra-core reads VIZRA_BRAND_NEW_KEY (env/registry/core.json at c043df72f06c) but the rendered environment map does not deliver it, so the service gets its built-in default and the operator has no way to change it
+      | VIOLATION rule=service-key-missing subject=dev-build-from-checkouts/api/VIZRA_BRAND_NEW_KEY detail=vizra-core reads VIZRA_BRAND_NEW_KEY (env/registry/core.json at c043df72f06c) but the rendered environment map does not deliver it, so the service gets its built-in default and the operator has no way to change it
+    digest restored: de6c637085dab81f560c518ee9db266cf64a7100294ca8403d3425d9352c0835
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 9b — a template key with NO consumer (the reverse direction)
+==============================================================
+    digest before: fad31d047ed3dd0c45bc5f626dc0471a92ab7083448016feeea4e09e622ea02d
+    digest after : 8e53a720721126f25b85a89c128afe903e1a9e344529e4256b6161bd4107f8ac
+    ok  (a template key reaches no process: exit 1, signal "rule=template-key-unused")
+      | VIOLATION rule=template-key-unused subject=env/production.env.example/VIZRA_KEY_NOBODY_READS detail=no compose file in any rendered shape interpolates it, so setting it does nothing at all
+    digest restored: fad31d047ed3dd0c45bc5f626dc0471a92ab7083448016feeea4e09e622ea02d
+    ok  (restored: exit 0)
+
+==============================================================
+CASE 10a — an INVALID external DSN
+==============================================================
+    (no file is mutated: the DSN is supplied through the environment,
+     exactly as an operator's env file supplies it)
+    ok  (exit 1, names the variable, does not echo the value)
+      | shape prod-external-postgres: DATABASE_URL is not a valid DSN: it does not start with postgres:// or postgresql://.
+      |   Expected: postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require
+      |   Required by docker-compose.external-postgres.yml.
+      |   (The value is not echoed here; it carries a password.)
+      | docker compose 5.5.1 (parsed 5.5.1) meets the floor 2.24.4 (Q-017)
+
+==============================================================
+CASE 10b — a MISSING external DSN
+==============================================================
+    ok  (exit 1, names the variable and the overlay that requires it)
+      | shape prod-external-postgres: DATABASE_URL is empty, but docker-compose.external-postgres.yml is in the chain and requires it.
+      |   Expected: postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require
+      |   The bundled service is disabled by that overlay and will NOT be
+      |   started as a fallback - a fallback would write your data into a
+      |   database nothing backs up.
+      |   (The value is not echoed here; it carries a password.)
+      | docker compose 5.5.1 (parsed 5.5.1) meets the floor 2.24.4 (Q-017)
+
+==============================================================
+CASE 11 — a production shape rendered with the component checkouts ABSENT (expects GREEN)
+==============================================================
+    ok  (exit 0 - rendered from a tree containing no vizra-core, vizra-user or vizra-search)
+      | docker compose 5.5.1 (parsed 5.5.1) meets the floor 2.24.4 (Q-017)
+      |   rendered bundle-no-checkouts        -> build/compose-models/bundle-no-checkouts.json
+
+==============================================================
+CASE 12 — a SHAPE REMOVED from the lane's list
+==============================================================
+    digest before: 854f941c80933298bff045afdab571b77d1e1f1679261602680e4ed4b3cab517
+    digest after : c29250cbf796d8919ac1d7909b37f00988a993f1df9448d86c022d694bc00777
+    ok  (exit 1 - the floor refuses a smaller matrix)
+      | SHAPE FLOOR VIOLATION in scripts/compose-shapes.json:
+      |   MISSING: 'prod-external-postgres' is in `floor` but no shape defines it. A shape
+      |            in the floor may not be removed - docs/META_REPO.md §2
+      |            lists the topologies Vizra claims to support, and an
+      |            unrendered one is an unsupported one.
+    digest restored: 854f941c80933298bff045afdab571b77d1e1f1679261602680e4ed4b3cab517
+    ok  (restored: exit 0)
+
+==============================================================
+RESULT: 32 assertion(s) passed, 0 failed
+final tree digest check:
+  tree is clean - every mutation was reverted

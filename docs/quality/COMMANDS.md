@@ -19,10 +19,18 @@ repository's own `AGENTS.md` for its lanes.
 | `python3` ≥ 3.9 | every check; the ledger generator | `python3 --version` |
 | PyYAML | the workflow checkers parse YAML rather than grepping it | `python3 -c 'import yaml; print(yaml.__version__)'` |
 | `git` | the generated-ledger diff | `git --version` |
-| `bash` | the two shell guards | — |
+| `bash` | the two shell guards, and the compose demonstration script | — |
+| Docker Engine + Compose **>= 2.24.4** | rendering the compose shapes | `docker compose version --short` |
 
-No Docker, no database, no browser and no network access is required. The link
-checker deliberately performs **no** network I/O.
+No database and no browser is required. The link checker deliberately performs
+**no** network I/O, and **no compose command here pulls or builds an image**:
+`docker compose config` resolves the model from the files and the environment
+and never contacts a registry. The base images are pinned by digest in
+`docker-compose.yml`, which a render reads as a string.
+
+A missing or too-old Compose is **BLOCKED**, never a pass:
+`scripts/compose-render.py` exits 2 on a version string it cannot parse and 1
+below the floor, and it renders nothing in either case.
 
 ## What a green check covers, and which tree it covers
 
@@ -45,11 +53,24 @@ This is also how the first version of this file came to record a markdown-file
 count that the head itself does not have: the count came from the merge tree.
 
 CI pins the interpreter to **Python 3.12.14** (`actions/setup-python`, pinned by
-commit SHA). PyYAML is **not** pinned in practice: the `ubuntu-24.04` runner
-image ships it, and the `pyyaml==6.0.3` line in `ci-required.yml` is only a
-fallback for an image that does not. The first CI run used the runner's
-preinstalled **PyYAML 6.0.1**; the pinned install did not execute. Recorded
-here because "pinned" and "what actually ran" are different facts.
+commit SHA). PyYAML's availability depends on **which** interpreter runs:
+
+- In `ci-required.yml` the first CI run used the runner's preinstalled
+  **PyYAML 6.0.1** and the pinned `pyyaml==6.0.3` install did not execute.
+- In `validate.yml` it did **not** resolve. The first run of the compose steps
+  failed with `ModuleNotFoundError: No module named 'yaml'`, because
+  `actions/setup-python` puts a *different* interpreter first on `PATH` and
+  PyYAML is preinstalled on the system Python only. `validate.yml` now carries
+  the same install-if-absent step, with the same pin.
+
+Recorded because "pinned", "preinstalled" and "what actually ran" are three
+different facts, and the first version of this paragraph got the third wrong.
+
+`scripts/check-compose-topology.py` additionally treats PyYAML as optional and
+says so on stderr: it uses YAML only to name the source file in a failure
+message, and every rule it enforces reads the rendered JSON model. A missing
+parser degrades an error message; it never decides whether the topology is
+asserted.
 
 The local transcripts below were produced on macOS with the system
 **Python 3.9.6** and PyYAML 6.0.3. The CI transcripts in
@@ -57,8 +78,9 @@ The local transcripts below were produced on macOS with the system
 
 ## The `validate` lane
 
-`.github/workflows/validate.yml` runs these three, in this order. Run them from
-the repository root.
+`.github/workflows/validate.yml` runs these, in this order. Run them from the
+repository root. Checks 1-3 are documentary; 4-7 are the compose topology added
+by VZ-ISSUE-002.
 
 ### 1. The generated ledger matches its sources
 
@@ -250,6 +272,99 @@ least one is still pending or never ran. `runs.tsv` is name/status/conclusion/
 started_at, as `.github/workflows/ci-required.yml` produces it from the
 check-runs API.
 
+### 4. Every declared compose shape renders
+
+```
+./scripts/compose-render.py --list
+./scripts/compose-render.py --all --out build/compose-models
+```
+
+Renders the twelve shapes in `scripts/compose-shapes.json` — the topologies
+`docs/META_REPO.md` §2 says Vizra supports — to one JSON model each, plus
+`shapes.json` carrying the manifest and the interpolation variables Compose
+reported. Before rendering anything it refuses a Compose below **2.24.4**
+(Q-017), failing closed on an unparseable version, and it validates any external
+DSN the chain requires with a message that names the variable and **never echoes
+the value**.
+
+`bundle-no-checkouts` is rendered from a temporary tree built by copying in only
+what a deployment bundle ships — no `vizra-core`, `vizra-user` or `vizra-search`
+directory, and no `docker-compose.override.yml` or `docker-compose.dev.yml`. It
+is built by copying in rather than by trusting that the component directories
+happen to be absent today.
+
+Declared secret values are redacted from every model before it is written, and
+the renderer re-scans the redacted model for each value it substituted and
+refuses to write a file that still contains one. The models are uploaded as the
+`meta-validate-compose-models` artifact.
+
+### 5. The rendered topology is closed, capped and pinned
+
+```
+./scripts/check-compose-topology.py build/compose-models
+```
+
+Nineteen rules, every one read from `docker compose config --format json` parsed
+as JSON — never from the YAML sources, because what is reachable on a host is
+decided by the merged model and a source file can look closed while an overlay
+opens it. The only YAML parsing is the diagnostic that names *which file* to
+edit after a rule has already failed.
+
+| Rule | What it refuses |
+|---|---|
+| `never-published` | postgres, the cache, search, the one-shots, worker and every optional datastore publishing anything, in any shape |
+| `port-not-allowed` / `public-bind` | a port the shape does not allow, or one facing the network without an explicit `"public": true` and a reason in the manifest |
+| `edge-profile` | caddy outside the `edge` profile |
+| `missing-restart` / `oneshot-restart` | a long-running service that would not survive a reboot; a one-shot that would loop |
+| `missing-log-cap` | a service inheriting the daemon's unbounded json-file default |
+| `missing-healthcheck` | a long-running service that cannot gate a `depends_on` |
+| `production-build` / `missing-build` | a `build:` in a production shape; a developer shape that stopped building from the checkouts |
+| `unpinned-image` | in a production shape: no image, no tag, or `:latest` |
+| `docker-socket` / `privileged` / `host-network` / `no-new-privileges` | VZ-OPS-008 |
+| `missing-service` / `unexpected-service` | a shape that lost a service it needs, or rendered one it forbids |
+| `dev-mode-in-production` / `dev-hatch-in-production` | the developer override leaking into a production chain |
+
+**What this does NOT prove.** It proves what the *model* declares. It has never
+started a container, so it does not prove a service is healthy, that a probe
+answers, that a port is genuinely closed on a running host, or that the IPFS
+swarm port is firewalled. Those belong to the `boot` lane (VZ-ISSUE-004), which
+does not exist.
+
+### 6. Configuration-key coverage, in both directions
+
+```
+./scripts/check-config-coverage.py build/compose-models
+./scripts/check-config-coverage.py --drift        # needs the component checkouts
+```
+
+Compares `env/registry/<component>.json` — a snapshot of each component's
+declared keys at a named component commit — against the rendered `environment:`
+map of every service, and `env/*.env.example` against the variables Compose says
+it interpolates. Fails on a key a component reads that nothing delivers, on a
+template key nothing consumes, on api and worker carrying different key sets
+(they run the same binary), on a development escape hatch in the production
+template, and on an undeclared alias.
+
+**What a green result does NOT prove.** It proves the topology is consistent
+with the snapshots. It does **not** prove the snapshots are current: this
+repository's CI has no token to check out a private sibling repository, so
+`--drift` — the check that compares a snapshot against the component's live
+source — **cannot run in CI at all** and reports BLOCKED, exit 2, when a
+checkout is absent. See `env/registry/README.md`.
+
+### 7. Every compose guard still fails against a controlled mutation
+
+```
+bash docs/evidence/compose-topology/demo.sh
+```
+
+Runs the red/green demonstrations on every CI run, not only once. Each case
+prints a sha256 either side of its mutation and **refuses to score a case whose
+mutation did not apply** — otherwise a mutation that silently failed would run
+the checker against the unmodified tree, pass, and be recorded as a guard that
+caught something. It restores every file it touches and fails if the tree is not
+byte-identical afterwards. 32 assertions.
+
 ## Red/green demonstrations
 
 Transcripts are under `docs/evidence/meta-validate/`. Each applies a controlled
@@ -278,9 +393,9 @@ check, which proves something weaker than intended.
 
 | Lane | State |
 |---|---|
-| `validate` | **implemented here** |
-| `bundle` | **not built.** There is no deployment bundle, no installer and no release record to build one from. |
-| `boot` | **not built.** There is no compose file, no image and no service to boot. |
+| `validate` | **implemented here**, including the compose-topology checks added by VZ-ISSUE-002 |
+| `bundle` | **not built.** There is no deployment bundle builder, no installer and no release record to build one from. `validate` renders the bundle *shape* (`bundle-no-checkouts`) from a tree with no component checkouts, which is a necessary condition for a bundle and not a bundle. |
+| `boot` | **not built.** No lane in this repository starts a container. Everything the compose checks assert is read from a rendered model. |
 
 `bundle` and `boot` are deliberately absent from `.github/required-checks.txt`
 rather than listed and empty: `ci-required` fails on a required check that never

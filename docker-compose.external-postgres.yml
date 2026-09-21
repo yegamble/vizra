@@ -1,0 +1,71 @@
+# Vizra — EXTERNAL PostgreSQL. Add to the chain when you run your own database
+# (managed cloud, existing cluster, anything that is not the bundled container):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#                  -f docker-compose.external-postgres.yml …
+#
+# ADR-002 / docs/META_REPO.md §2 rule 1: EXTERNAL suppresses the local
+# container, requires the DSN, and NEVER falls back to a fresh local database.
+# Falling back is worse than failing: the stack comes up, answers 200, and
+# writes the operator's photos into a database that nothing backs up.
+#
+# THE TWO MERGE TAGS, AND WHY EACH IS THE ONE IT IS
+#
+#   profiles: !override ["external-disabled"]
+#     `profiles` is a SEQUENCE and Compose MERGES sequences across a -f chain.
+#     A plain `profiles: ["external-disabled"]` renders `["core",
+#     "external-disabled"]`, so `--profile core` still starts the bundled
+#     database — the exact failure this file exists to prevent. `!override`
+#     REPLACES the list.
+#     `!reset` would be WRONG here and dangerously so: it deletes the key
+#     outright, leaving a service with NO profiles, i.e. one that starts on
+#     EVERY invocation.
+#
+#   depends_on: { postgres: !reset null }
+#     `depends_on` is a MAP, so `!reset` on one key removes exactly that edge
+#     and leaves the others intact. This is not tidiness. Without it the whole
+#     project is INVALID — verified 2026-09-21 on Compose v5.5.1:
+#         service "worker" depends on undefined service "migrate":
+#         invalid compose project
+#     is the same error class Compose raises for a depends_on pointing at a
+#     service that is not in the rendered model.
+#
+#   The edge must be cut on `worker` too, even though `worker` renders only
+#   under its own profile in a split topology: Compose validates EVERY loaded
+#   definition, selected or not.
+#
+# POSTGRES_PASSWORD IS STILL REQUIRED, AND THAT IS NOT A BUG IN THIS FILE.
+# Compose interpolates each file AS IT LOADS IT — before profiles are evaluated
+# and before this overlay merges — so `${POSTGRES_PASSWORD:?…}` in
+# docker-compose.yml fires whatever happens afterwards. `env/external-postgres.
+# env.example` therefore ships POSTGRES_PASSWORD with a placeholder that says so
+# in its own value. It is never used: the bundled service does not exist and
+# every DSN below comes from DATABASE_URL.
+#
+# BACKUP OWNERSHIP MOVES TO YOU. `backup.sh` refuses to back up a database it
+# does not manage (docs/META_REPO.md §6) and the runbook must name the provider
+# snapshot/PITR path. That is VZ-TOPOLOGY-002's recovery case and it is NOT
+# satisfied by this file.
+
+services:
+
+  postgres:
+    profiles: !override ["external-disabled"]
+
+  migrate:
+    depends_on:
+      postgres: !reset null
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must name your external PostgreSQL (postgres://USER:PASSWORD@HOST:5432/DB?sslmode=require) because docker-compose.external-postgres.yml disabled the bundled database - the bundled service will NOT be started as a fallback}
+
+  api:
+    depends_on:
+      postgres: !reset null
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must name your external PostgreSQL (postgres://USER:PASSWORD@HOST:5432/DB?sslmode=require) because docker-compose.external-postgres.yml disabled the bundled database - the bundled service will NOT be started as a fallback}
+
+  worker:
+    depends_on:
+      postgres: !reset null
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must name your external PostgreSQL (postgres://USER:PASSWORD@HOST:5432/DB?sslmode=require) because docker-compose.external-postgres.yml disabled the bundled database - the bundled service will NOT be started as a fallback}

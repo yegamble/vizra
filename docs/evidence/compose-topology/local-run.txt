@@ -1,0 +1,45 @@
+### environment
+2026-09-21T05:46:47Z
+arm64
+Python 3.9.6
+Docker version 29.8.0, build 88096ef
+docker compose 5.5.1
+branch: feat/m0-compose-topology
+head:   864f77f5c949c52855c430b59338a9b5eb0706b4
+
+### $ ./scripts/check-generated-ledger.sh
+OK 191 requirements; core=141; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 14, 'upload': 13, 'media': 13, 'storage': 15, 'import': 4, 'activitypub': 4, 'atproto': 2, 'ipfs': 2, 'organization': 24, 'community': 19, 'search': 12, 'admin': 26, 'design': 4}; questions=['Q-016', 'Q-021', 'Q-022', 'Q-028', 'Q-032', 'Q-036']; decided=['Q-001', 'Q-002', 'Q-003', 'Q-004', 'Q-005', 'Q-006', 'Q-007', 'Q-008', 'Q-009', 'Q-010', 'Q-011', 'Q-012', 'Q-013', 'Q-014', 'Q-015', 'Q-017', 'Q-018', 'Q-023', 'Q-024', 'Q-027', 'Q-028', 'Q-029', 'Q-030', 'Q-031', 'Q-033', 'Q-034', 'Q-035', 'Q-037', 'Q-038', 'Q-039', 'Q-040', 'Q-041', 'Q-042', 'Q-043']
+locale regression: re-running under LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0
+generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+exit=0
+
+### $ ./scripts/check-quality-json.py
+json parsed: 4 file(s) under docs/quality/
+ledger: 191 requirement id(s) in docs/quality/features.json
+requirement ids: 191 written reference(s) expanded to 287 id(s), 204 distinct, across 14 document(s); every one resolves
+exit=0
+
+### $ ./scripts/check-doc-links.py
+relative links: none exist yet across 94 markdown file(s) (checked nothing); 7 external URL(s) recorded and not fetched
+exit=0
+
+### $ ./scripts/ci-required-guard.sh
+the workflow checker rejects every continue-on-error spelling in scripts/testdata/ (6 fixtures exercised, floor 6)
+the pin checker rejects every unpinned-action and untriggered-lane spelling in scripts/testdata/ (7 fixtures exercised, floor 7)
+the lane checker rejects every shell-override (workflow/job/step), conditional-step, self-hosted-runner, reusable-workflow and missing-job case in scripts/testdata/ (10 fixtures exercised, floor 10)
+exit=0
+
+### $ ./scripts/compose-render.py --all --out build/compose-models
+  rendered prod-external-clickhouse   -> build/compose-models/prod-external-clickhouse.json
+  rendered prod-external-ipfs         -> build/compose-models/prod-external-ipfs.json
+  rendered bundle-no-checkouts        -> build/compose-models/bundle-no-checkouts.json
+exit=0
+
+### $ ./scripts/check-compose-topology.py build/compose-models
+compose topology: 12 shape(s) asserted from their rendered models; 19 rules, 0 violations
+exit=0
+
+### $ ./scripts/check-config-coverage.py build/compose-models
+config coverage: 34 component keys across 3 components, 47 template keys, 47 interpolated variables, 12 shapes; 2 declared alias(es); 0 violations
+exit=0
+

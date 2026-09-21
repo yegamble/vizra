@@ -1,0 +1,70 @@
+# Vizra — developer defaults. AUTO-LOADED by a bare `docker compose`.
+#
+# That auto-loading is the whole reason this file exists separately, and it is
+# also the reason it must never reach a production host: the production chain is
+# an explicit `-f docker-compose.yml -f docker-compose.prod.yml …` and Compose
+# does not auto-load an override when `-f` is given. `deploy/` and the
+# deployment bundle (VZ-ISSUE-004) omit this file outright, so a bare
+# `docker compose` on a production host cannot pick it up.
+#
+# THE ONLY PORTS IN THIS TREE THAT ARE NOT PRODUCTION PORTS.
+# They are bound to 127.0.0.1 explicitly — not to the Docker default, which is
+# every interface. Q-017 puts developer port maps here rather than in the base
+# so that a merge tag is never the only thing closing a port.
+#
+# There is deliberately NO published port for postgres, for the cache, or for
+# search — not even on loopback, not even in development. `postgres/cache/search
+# publish nothing in ANY shape` is asserted by
+# `scripts/check-compose-topology.py` against this file too. Reach them with
+# `docker compose exec postgres psql -U vizra vizra` and
+# `docker compose exec redis valkey-cli`.
+
+services:
+
+  api:
+    environment:
+      # Development mode. vizra-core's production refusals (dev secrets, short
+      # secrets, wildcard CORS, plain-http origins, every named escape hatch)
+      # are what make this a seam rather than a hole: a file that says
+      # `development` here can never be the file a production host boots,
+      # because docker-compose.prod.yml sets `production` and this file is not
+      # in that chain. `scripts/check-compose-topology.py` asserts that every
+      # production shape renders VIZRA_MODE=production and carries no
+      # VIZRA_DEV_* key at all.
+      VIZRA_MODE: development
+      # THE DEV SEAMS (VZ-TOPOLOGY-007). Every one of these is refused by name
+      # when vizra-core runs with VIZRA_MODE=production, and
+      # VIZRA_DEV_AUTOLOGIN_USER is refused on PRESENCE with any non-empty
+      # value — so they are passed through HERE, in the file the production
+      # chain never loads, and nowhere else. They default to empty, which
+      # vizra-core reads as off, so a developer who sets none of them gets a
+      # stack that behaves like production minus TLS.
+      VIZRA_DEV_DISABLE_AUTH: ${VIZRA_DEV_DISABLE_AUTH:-}
+      VIZRA_DEV_ALLOW_ANY_ORIGIN: ${VIZRA_DEV_ALLOW_ANY_ORIGIN:-}
+      VIZRA_DEV_SKIP_MIGRATIONS: ${VIZRA_DEV_SKIP_MIGRATIONS:-}
+      VIZRA_DEV_AUTOLOGIN_USER: ${VIZRA_DEV_AUTOLOGIN_USER:-}
+      VIZRA_DEV_FAKE_SEARCH: ${VIZRA_DEV_FAKE_SEARCH:-}
+      VIZRA_DEV_INSECURE_COOKIES: ${VIZRA_DEV_INSECURE_COOKIES:-}
+      VIZRA_DEV_TRUST_ANY_HMAC: ${VIZRA_DEV_TRUST_ANY_HMAC:-}
+    ports:
+      - "127.0.0.1:${VIZRA_HTTP_PORT:-8080}:8080"
+
+  worker:
+    environment:
+      VIZRA_MODE: development
+      VIZRA_DEV_DISABLE_AUTH: ${VIZRA_DEV_DISABLE_AUTH:-}
+      VIZRA_DEV_ALLOW_ANY_ORIGIN: ${VIZRA_DEV_ALLOW_ANY_ORIGIN:-}
+      VIZRA_DEV_SKIP_MIGRATIONS: ${VIZRA_DEV_SKIP_MIGRATIONS:-}
+      VIZRA_DEV_AUTOLOGIN_USER: ${VIZRA_DEV_AUTOLOGIN_USER:-}
+      VIZRA_DEV_FAKE_SEARCH: ${VIZRA_DEV_FAKE_SEARCH:-}
+      VIZRA_DEV_INSECURE_COOKIES: ${VIZRA_DEV_INSECURE_COOKIES:-}
+      VIZRA_DEV_TRUST_ANY_HMAC: ${VIZRA_DEV_TRUST_ANY_HMAC:-}
+
+  frontend:
+    ports:
+      - "127.0.0.1:${VIZRA_FRONTEND_PORT:-3000}:3000"
+
+  search:
+    environment:
+      # search's own vocabulary again (production|development), not core's.
+      VIZRA_SEARCH_MODE: development

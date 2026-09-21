@@ -77,6 +77,49 @@ Rules carried over from Vidra and asserted in CI, not assumed:
    additional native adapters (GCS, Azure, OSS, Swift, SFTP, FTP, legacy B2)
    are separate ledger obligations and separate qualification lanes.
 
+### 2a. What VZ-ISSUE-002 actually built, and where it deviates
+
+The eight compose files above exist, plus `env/production.env.example`,
+`env/development.env.example`, `env/registry/*.json` and three checkers wired
+into the required `validate` lane. Twelve shapes are rendered on every run and
+asserted from `docker compose config --format json` parsed as JSON — never from
+the YAML — and the models are uploaded as a CI artifact. See
+`docs/quality/COMMANDS.md` §§4–7 for the commands and, more importantly, for
+what a green result does **not** prove.
+
+**Nothing in this repository starts a container.** Every assertion is about a
+rendered model. "The port is closed" means the model publishes nothing, not that
+a running host was scanned.
+
+Deviations from §1 and §2 above, each deliberate and none of them silent:
+
+| § | Says | Built | Why |
+|---|---|---|---|
+| §1 | compose files here `include:` the component compose files | services are defined in `docker-compose.yml` | none of the three component repositories ships a compose file (checked at `vizra-core` c043df7, `vizra-user` 7730500, `vizra-search` 808a549; each AGENTS.md says compose wiring is not theirs), and VZ-ISSUE-002 may not add one |
+| §2 | `search` on profile `core` | profile `search` | rule 1 of §2 says OFF creates no container and Q-001 makes `off` the default until M3. A service on `core` starts on every invocation, so `core` and "OFF creates no container" cannot both hold. The engine adds `--profile search` when `VIZRA_SEARCH_MODE=managed`, exactly as it adds `edge` unless TLS is external |
+| §2 | `search-migrate` one-shot | not defined | `vizra-search` owns no migrations at M0 and reports `search_schema_version: null`. It is still in the never-published list so it cannot arrive with a port |
+| §2 | `minio`, `clamav`, `otel-collector`, `jaeger` | not defined | they belong to the storage, scan and otel slices. All four are in the checker's never-published list, so whichever slice adds them cannot add them open |
+| §2/§3 | `SEARCH_MODE`, `REDIS_URL`, `SEARCH_REDIS_URL`, `PUBLIC_BASE_URL`, `VIZRA_TLS_MODE`, `VIZRA_EXTERNAL_*`, `ANALYTICS_MODE`, `IPFS_MODE` | `VIZRA_SEARCH_MODE`, `VIZRA_CACHE_URL`, `VIZRA_PUBLIC_ORIGIN`; the rest are absent | the templates carry the names the services **actually read** — a key nobody reads is a lie an operator can act on. The engine-facing keys have no reader until VZ-ISSUE-003/004, so topology is selected with explicit `--profile` and `-f` arguments meanwhile. `SEARCH_REDIS_URL` has no consumer at all: `vizra-search` reads no cache variable at M0 |
+| §2 | ClickHouse and IPFS external overlays | present, and they render OFF | they suppress the bundled container and wire no DSN, because no Vizra service reads one yet. For IPFS that is still a real property: no container means no swarm port |
+
+Two operator-facing values feed two differently-spelled service keys, declared
+in `env/registry/aliases.json` with a floor so adding a third is a visible edit:
+`SEARCH_HMAC_KEY` (the contract's name; `vizra-core` still reads
+`VIZRA_SEARCH_HMAC_KEY`, rename queued) and `VIZRA_PUBLIC_ORIGIN`
+(`vizra-user` reads `PUBLIC_ORIGIN`) — the second is the same conflict as the
+first and has not been ruled on.
+
+`VIZRA_SEARCH_MODE` is read by **both** `vizra-core` (`off|managed|external`)
+and `vizra-search` (`production|development`), with incompatible vocabularies.
+No service in this tree takes an `env_file:`, which is what keeps them apart;
+`vizra-search`'s value is set literally by the compose files.
+
+`api` and `worker` declare a healthcheck that runs `vizra version` — the same
+self-probe the image ships. It proves the binary runs; it does **not** prove
+`/readyz` answers, because the runtime image carries no curl or wget and
+`vizra-core` has no `healthcheck` subcommand (`vizra-search` has exactly that).
+That subcommand is requested from the core owner; this slice does not make it.
+
 ## 3. Installer and wizard (`install.sh` → `vizra setup`)
 
 `install.sh` (POSIX sh, `curl … | sh`-safe, idempotent, resumable):
@@ -186,6 +229,22 @@ agent lacks permission to set them, enforcement is recorded UNVERIFIED.
 
 ## 8. What this run did not do
 
-No compose file, script, workflow, CLI or image exists. This document is the
-target; `docs/quality/features.json` carries the obligations; issues
-`VZ-ISSUE-001…` under `docs/issues/` carry the first slices.
+*(Written 2026-09-15, when nothing existed. Updated 2026-09-21 by VZ-ISSUE-002.)*
+
+The compose topology, the env templates, the component key registries and the
+`validate`-lane assertions now exist — see §2a, which also lists every place the
+build deviates from §1 and §2 and why.
+
+Still absent, and not to be read as existing anywhere above: `install.sh`,
+`bootstrap.sh`, `vizra setup`, `deploy/` and its scripts, the operator CLI's
+`doctor`/`deploy`/`backup`/`restore`/`rollback`/`release` subcommands, the
+deployment bundle builder, `releases/<tag>.json`, the `bundle` and `boot` lanes,
+and any published image. Sections 3–7 remain targets.
+
+`docs/quality/features.json` carries the obligations; issues `VZ-ISSUE-001…`
+under `docs/issues/` carry the slices. Every entry in that ledger is still
+`PLANNED`/`UNVERIFIED`: the generator (`docs/evidence/ledger-generator/build.py`)
+asserts that for every requirement, so no slice can record implementation status
+there until its owner relaxes that rule to the one the file's own notice states
+("no entry may be marked IMPLEMENTED or VERIFIED without recorded evidence").
+Evidence therefore lives under `docs/evidence/` and in `docs/plans/` until then.

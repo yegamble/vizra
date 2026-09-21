@@ -1,0 +1,19 @@
+=== drift with the component checkouts ABSENT (the CI situation) ===
+BLOCKED: the drift check needs the component checkouts and these are absent:
+  - vizra-core
+  - vizra-user
+  - vizra-search
+  This is BLOCKED, not a pass and not a skip. Run bootstrap.sh (or
+  clone the components) and run this again. It cannot run in this
+  repository's CI at all: there is no token for a private sibling
+  repository, which is why env/registry/*.json are snapshots.
+exit=2
+
+=== drift with the component checkouts PRESENT (symlinked from the main checkout) ===
+config registry drift: every snapshot matches its component source
+exit=0
+
+component SHAs the snapshots name (git -C <path> rev-parse HEAD):
+  vizra-core    c043df72f06cc7b5d7237a12d2be4dac25fa788e
+  vizra-user    77305009a7ae5b20411134ce5497f88d824e68ce
+  vizra-search  808a5499dae1d58971d740f34749c2f35149fa4d

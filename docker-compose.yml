@@ -1,0 +1,441 @@
+# Vizra — base compose model.
+#
+# THIS FILE PUBLISHES NO PORTS. Not one, in any service, under any profile.
+# That is ruling Q-017 (2026-09-15) and it is deliberately absolute: a datastore
+# or an internal service reachable from off-host on a VPS is an incident, and
+# the cheapest way to never have one is for the file every other file inherits
+# from to contain no `ports:` key at all. Developer port maps live in
+# `docker-compose.override.yml`, bound to 127.0.0.1. Production port maps live
+# in `docker-compose.prod.yml`. The `!reset`/`!override` merge tags are used
+# elsewhere in this tree, but they are never the only thing closing a port:
+# there is nothing here for them to close.
+#
+# WHAT SELECTS A TOPOLOGY
+#   profiles         which services exist at all
+#   -f chain         which overlay supplies images, ports and production policy
+#   external-*.yml   suppresses a bundled datastore and requires its DSN
+#
+# HOW CONFIGURATION REACHES A CONTAINER
+#   Every key reaches a service because THAT SERVICE'S `environment:` map names
+#   it. There is no `env_file:` on any service and no wildcard passthrough.
+#   Two consequences worth stating, because both are load-bearing:
+#
+#   (a) A key added to `env/*.env.example` with no `${...}` consumer below does
+#       nothing at all. `scripts/check-config-coverage.py` fails on exactly that
+#       (and on the converse: a key a service reads with no template entry).
+#
+#   (b) `VIZRA_SEARCH_MODE` means DIFFERENT things to vizra-core and to
+#       vizra-search — core reads `off|managed|external`, search reads
+#       `production|development` and fails closed on anything else. A shared
+#       env_file would hand search the string `off` and search would refuse to
+#       boot. Explicit per-service maps are what keep those two apart. See the
+#       `search` service below.
+#
+# COMPONENT COMPOSE FILES
+#   docs/META_REPO.md §1 describes this file as `include:`-ing a compose file
+#   from each component repository. None of the three component repositories
+#   ships one (checked at vizra-core c043df7, vizra-user 7730500,
+#   vizra-search 808a549 — each AGENTS.md says compose wiring is not theirs),
+#   and this slice may not add one. The services are therefore defined here.
+#   That is a deviation from §1 and it is reported, not hidden.
+
+name: vizra
+
+# --------------------------------------------------------------------------
+# Shared fragments. Extension fields, so they never render as services.
+# --------------------------------------------------------------------------
+
+# Capped logs on EVERY service, including one-shots. The Docker daemon default
+# is unbounded json-file, and one noisy day fills the disk of a 4 GB host.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+# VZ-OPS-008. Applied in the base rather than only in the production overlay:
+# a hardening flag that is only on in production is one an operator can lose by
+# forgetting an -f argument.
+x-hardening: &hardening
+  security_opt:
+    - "no-new-privileges:true"
+
+# The vizra-core image serves three roles (api, worker, operator CLI) chosen by
+# argv — there is no ROLE variable (vizra-core/Dockerfile: ENTRYPOINT tini,
+# CMD vizra-api). All three read the same config registry, so api and worker
+# MUST receive identical keys or one half is configured differently than its
+# operator believes. `scripts/check-config-coverage.py` asserts that equality
+# from the rendered model.
+x-core-env: &core-env
+  # Operator-facing key on the left of the `${}` in every case; the name on the
+  # left of the colon is what vizra-core's registry actually reads
+  # (internal/config/keys.go).
+  VIZRA_MODE: production
+  VIZRA_PUBLIC_ORIGIN: ${VIZRA_PUBLIC_ORIGIN:?VIZRA_PUBLIC_ORIGIN must be the origin browsers use, e.g. https://photos.example.org}
+  VIZRA_LISTEN_ADDR: ":8080"
+  # Never off-host. The metrics listener is not part of api/openapi.yaml and no
+  # client should reach it; vizra-core defaults it to loopback and this pins it.
+  VIZRA_METRICS_ADDR: "127.0.0.1:9090"
+  VIZRA_SITE_HANDLE: ${VIZRA_SITE_HANDLE:-default}
+  DATABASE_URL: postgres://${POSTGRES_USER:-vizra}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set for the bundled PostgreSQL; use docker-compose.external-postgres.yml with DATABASE_URL instead if you run your own}@postgres:5432/${POSTGRES_DB:-vizra}?sslmode=disable
+  VIZRA_CACHE_URL: redis://redis:6379/0
+  VIZRA_CACHE_NAMESPACE: ${VIZRA_CACHE_NAMESPACE:-default}
+  VIZRA_STORAGE_PREFIX: ${VIZRA_STORAGE_PREFIX:-default}
+  VIZRA_SESSION_SECRET: ${VIZRA_SESSION_SECRET:?VIZRA_SESSION_SECRET must be set - generate with `openssl rand -base64 32`}
+  VIZRA_MFA_KEY_KEK: ${VIZRA_MFA_KEY_KEK:?VIZRA_MFA_KEY_KEK must be set - generate with `openssl rand -base64 32`; rotating it re-seals MFA secrets}
+  # core's vocabulary: off | managed | external. Not search's vocabulary.
+  VIZRA_SEARCH_MODE: ${VIZRA_SEARCH_MODE:-off}
+  VIZRA_SEARCH_URL: ${VIZRA_SEARCH_URL:-http://search:8081}
+  # THE ONE DOCUMENTED ALIAS ON THIS SIDE. The contract
+  # (api/search-internal.openapi.yaml, vendored identically in both component
+  # repositories) names the shared secret `SEARCH_HMAC_KEY`, and vizra-search
+  # reads exactly that. vizra-core still reads `VIZRA_SEARCH_HMAC_KEY`; its
+  # rename is queued in another slice. Both services are fed from the SINGLE
+  # operator value `SEARCH_HMAC_KEY` so the boundary cannot 401 because an
+  # operator set one spelling and not the other.
+  # Declared in env/registry/aliases.json; the coverage checker tolerates it and
+  # nothing else.
+  VIZRA_SEARCH_HMAC_KEY: ${SEARCH_HMAC_KEY:?SEARCH_HMAC_KEY must be set - generate with `openssl rand -hex 32`; core and search must hold the same value in the same instant}
+  VIZRA_SEARCH_TIMEOUT: ${VIZRA_SEARCH_TIMEOUT:-2s}
+  VIZRA_CORS_ALLOWED_ORIGINS: ${VIZRA_CORS_ALLOWED_ORIGINS:-}
+  VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN: ${VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN:-}
+  VIZRA_QUEUE_AGE_THRESHOLD: ${VIZRA_QUEUE_AGE_THRESHOLD:-15m}
+  VIZRA_WORKER_CONCURRENCY: ${VIZRA_WORKER_CONCURRENCY:-4}
+  VIZRA_JOB_LEASE: ${VIZRA_JOB_LEASE:-60s}
+  VIZRA_JOB_TIMEOUT: ${VIZRA_JOB_TIMEOUT:-5m}
+  VIZRA_SHUTDOWN_GRACE: ${VIZRA_SHUTDOWN_GRACE:-20s}
+
+x-core-image: &core-image
+  image: ${VIZRA_IMAGE_REGISTRY:-ghcr.io}/${VIZRA_IMAGE_OWNER:-yegamble}/vizra-core:${VIZRA_CORE_TAG:-dev}
+
+services:
+
+  # ------------------------------------------------------------------------
+  # Datastores. MANAGED by default; docker-compose.external-postgres.yml and
+  # docker-compose.external-redis.yml suppress them.
+  # ------------------------------------------------------------------------
+
+  postgres:
+    # PostgreSQL 18, digest-pinned (ADR-001). Digest resolved 2026-09-21 with
+    # `docker buildx imagetools inspect postgres:18` — an OCI index covering
+    # linux/amd64 among others.
+    image: postgres:18@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+    profiles: ["core"]
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vizra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set for the bundled PostgreSQL}
+      POSTGRES_DB: ${POSTGRES_DB:-vizra}
+      # Deterministic collation for the whole cluster. A locale change between
+      # host and image silently invalidates text indexes.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # -U matters: without it pg_isready probes the `root` role and reports
+      # "accepting connections" from a server that would reject the app's login.
+      test: ["CMD-SHELL", "pg_isready -U \"${POSTGRES_USER:-vizra}\" -d \"${POSTGRES_DB:-vizra}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    # Valkey (Q-004: BSD-3 across the shipped topology). The SERVICE is named
+    # `redis` because docs/META_REPO.md §2 names it that and vizra-core speaks
+    # RESP to `redis://redis:6379/0`; the IMAGE is Valkey. Digest resolved
+    # 2026-09-21 with `docker buildx imagetools inspect valkey/valkey:9.1.2`.
+    image: valkey/valkey:9.1.2@sha256:c123e3715db63d06d4ad6964884037aa0d5d4d703939b9929954112889708e1d
+    profiles: ["core"]
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    # No persistence, and eviction is SAFE here: every durable unit of work
+    # lives in PostgreSQL (ADR-004, transactional outbox). The cache holds rate
+    # limits and derived responses; losing all of it costs latency, never data.
+    # The golden path must pass after FLUSHALL (ADR-001).
+    command:
+      - valkey-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - ${VALKEY_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - allkeys-lru
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ------------------------------------------------------------------------
+  # vizra-core: migrate (one-shot), api, worker. One image, three argv roles.
+  # ------------------------------------------------------------------------
+
+  migrate:
+    <<: [*core-image, *hardening]
+    profiles: ["core"]
+    # A one-shot NEVER restarts. `restart: unless-stopped` here would re-run
+    # migrations in a loop after the first exit.
+    restart: "no"
+    logging: *logging
+    # vizra-core does NOT apply migrations on api/worker boot; the operator CLI
+    # does (vizra-core/cmd/vizra: `vizra migrate`). That is why this service
+    # exists at all, and why api gates on it.
+    command: ["/usr/local/bin/vizra", "migrate"]
+    environment: *core-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # No healthcheck: a process that is supposed to exit cannot be "healthy".
+
+  api:
+    <<: [*core-image, *hardening]
+    profiles: ["core"]
+    restart: unless-stopped
+    logging: *logging
+    command: ["/usr/local/bin/vizra-api"]
+    environment: *core-env
+    volumes:
+      - media_data:/var/lib/vizra/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        # REQUIRED on this host. The api must never serve against a schema the
+        # running image does not know.
+        condition: service_completed_successfully
+    healthcheck:
+      # HONEST LIMIT, recorded here rather than in a report nobody reads:
+      # this proves the vizra-core binary runs. It does NOT prove /readyz is
+      # 200, because the runtime image (debian:13-slim + libvips) ships no
+      # curl and no wget, and vizra-core has no `healthcheck` subcommand — the
+      # vizra-search image has exactly that, and core needs the same before a
+      # compose healthcheck can gate readiness. Requested from the core owner;
+      # not made here (component repositories are out of scope for VZ-ISSUE-002).
+      test: ["CMD", "/usr/local/bin/vizra", "version"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    <<: [*core-image, *hardening]
+    # `core` so a single-host instance always has a worker — an instance
+    # without one accepts uploads and produces no derivatives. `worker` as well,
+    # so a split topology can start this service ALONE on a second host.
+    profiles: ["core", "worker"]
+    restart: unless-stopped
+    logging: *logging
+    command: ["/usr/local/bin/vizra-worker"]
+    # Identical to api's map, by construction. A worker configured differently
+    # from the api that enqueued its jobs is a class of bug the coverage check
+    # exists to make impossible.
+    environment: *core-env
+    volumes:
+      - media_data:/var/lib/vizra/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+        # `required: false` is what makes the split topology renderable.
+        # Compose refuses a project whose depends_on names a service outside the
+        # selected profiles — `service "worker" depends on undefined service
+        # "migrate": invalid compose project` — so on a worker-only host the
+        # edge must be optional. It is NOT a weakening of ordering: when migrate
+        # IS selected, Compose still waits for it to complete.
+        required: false
+    healthcheck:
+      # Same honest limit as api's.
+      test: ["CMD", "/usr/local/bin/vizra", "version"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
+  # ------------------------------------------------------------------------
+  # vizra-user
+  # ------------------------------------------------------------------------
+
+  frontend:
+    image: ${VIZRA_IMAGE_REGISTRY:-ghcr.io}/${VIZRA_IMAGE_OWNER:-yegamble}/vizra-user:${VIZRA_USER_TAG:-dev}
+    profiles: ["frontend"]
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    environment:
+      # In-network only. vizra-user has no business backend and no database
+      # access; everything comes from vizra-core over HTTP.
+      INTERNAL_API_BASE_URL: http://api:8080
+      # THE SECOND ALIAS, and it is the same shape as the HMAC one: vizra-user
+      # reads `PUBLIC_ORIGIN`, vizra-core reads `VIZRA_PUBLIC_ORIGIN`, and they
+      # must hold the same value or links and cookies disagree. One operator
+      # key feeds both. Declared in env/registry/aliases.json and REPORTED — it
+      # wants the same rename ruling the HMAC key got.
+      PUBLIC_ORIGIN: ${VIZRA_PUBLIC_ORIGIN:?VIZRA_PUBLIC_ORIGIN must be the origin browsers use}
+      API_TIMEOUT_MS: ${API_TIMEOUT_MS:-10000}
+      # Bind inside the container only. The container port is never published
+      # by this file; caddy reaches it over the compose network.
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # Matches the image's own probe (vizra-user/Dockerfile). Liveness only:
+      # it says the process renders, not that vizra-core is reachable.
+      test:
+        - "CMD"
+        - "node"
+        - "-e"
+        - "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ------------------------------------------------------------------------
+  # vizra-search — internal only, on its own profile.
+  # ------------------------------------------------------------------------
+
+  search:
+    image: ${VIZRA_IMAGE_REGISTRY:-ghcr.io}/${VIZRA_IMAGE_OWNER:-yegamble}/vizra-search:${VIZRA_SEARCH_TAG:-dev}
+    # PROFILE `search`, NOT `core`, and this is a deliberate deviation from the
+    # profile cell in docs/META_REPO.md §2. Rule 1 of that same section says
+    # "OFF creates no container", and Q-001 makes `off` the default until M3.
+    # A service on the `core` profile starts on every invocation, so `core`
+    # and "OFF creates no container" cannot both hold. The engine adds
+    # `--profile search` when VIZRA_SEARCH_MODE=managed, exactly as it adds
+    # `--profile edge` unless VIZRA_TLS_MODE=external. Reported.
+    profiles: ["search"]
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    environment:
+      # SEARCH'S OWN vocabulary — `production|development`, nothing to do with
+      # core's `off|managed|external`. Set LITERALLY, never from the operator
+      # env file: vizra-search fails closed on an unrecognised mode, so handing
+      # it core's `off` would stop it booting. See the header of this file.
+      VIZRA_SEARCH_MODE: production
+      VIZRA_SEARCH_ADDR: ":8081"
+      # Same single operator value as core's VIZRA_SEARCH_HMAC_KEY above.
+      SEARCH_HMAC_KEY: ${SEARCH_HMAC_KEY:?SEARCH_HMAC_KEY must be set - core and search must hold the same value}
+      MAX_INTERNAL_BODY_BYTES: ${MAX_INTERNAL_BODY_BYTES:-1048576}
+      VIZRA_SEARCH_MAX_CLOCK_SKEW: ${VIZRA_SEARCH_MAX_CLOCK_SKEW:-300s}
+      VIZRA_SEARCH_REQUEST_TIMEOUT: ${VIZRA_SEARCH_REQUEST_TIMEOUT:-5s}
+      VIZRA_SEARCH_SHUTDOWN_GRACE: ${VIZRA_SEARCH_SHUTDOWN_GRACE:-15s}
+    healthcheck:
+      # A real probe: the binary self-requests its own /healthz over HTTP
+      # (vizra-search/cmd/vizra-search/main.go).
+      test: ["CMD", "/usr/local/bin/vizra-search", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # ------------------------------------------------------------------------
+  # Optional components. OFF by default: their profiles are never enabled by
+  # the default shape, so no container exists.
+  # ------------------------------------------------------------------------
+
+  clickhouse:
+    # Digest resolved 2026-09-21 with
+    # `docker buildx imagetools inspect clickhouse/clickhouse-server:25.8`.
+    image: clickhouse/clickhouse-server:25.8@sha256:0152dd511befe6a2c2ef53e930726179669b08116da78500b37c51c96ff5ee77
+    profiles: ["analytics"]
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-vizra}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-vizra}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  ipfs:
+    # Kubo. Digest resolved 2026-09-21 with
+    # `docker buildx imagetools inspect ipfs/kubo:v0.39.0`.
+    image: ipfs/kubo:v0.39.0@sha256:41ad6d8c6ecaa3ba163d808a59679fa63cc44b50547179cef391d27a028d005e
+    profiles: ["ipfs"]
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    environment:
+      IPFS_PROFILE: ${IPFS_PROFILE:-server}
+    volumes:
+      - ipfs_data:/data/ipfs
+    # The swarm port is the ONE optional service port allowed to face the
+    # network, and only from the production overlay — not from here.
+    healthcheck:
+      test: ["CMD", "ipfs", "id"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ------------------------------------------------------------------------
+  # Edge. On the `edge` profile, which the engine adds unless
+  # VIZRA_TLS_MODE=external (VZ-TOPOLOGY-006).
+  # ------------------------------------------------------------------------
+
+  caddy:
+    # Digest resolved 2026-09-21 with
+    # `docker buildx imagetools inspect caddy:2.11.4-alpine`.
+    image: caddy:2.11.4-alpine@sha256:de23def33b17fb5d1290b0f6c2add1d70780e52341896c00a4c8a2a2fe9d355e
+    profiles: ["edge"]
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    volumes:
+      # deploy/Caddyfile.local is GENERATED by `vizra setup` and gitignored.
+      # `create_host_path: false` is not decoration: without it Docker creates a
+      # missing bind source as an empty DIRECTORY and Caddy crash-loops on it
+      # with an error that names neither the file nor the cause.
+      - type: bind
+        source: ./deploy/Caddyfile.local
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        bind:
+          create_host_path: false
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_started
+        required: false
+      frontend:
+        condition: service_started
+        required: false
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data:
+  media_data:
+  clickhouse_data:
+  ipfs_data:
+  caddy_data:
+  caddy_config:

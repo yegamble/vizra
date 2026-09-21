@@ -1,0 +1,50 @@
+# Vizra — EXTERNAL cache. Add to the chain when you run your own RESP server:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#                  -f docker-compose.external-redis.yml …
+#
+# WHAT COUNTS AS EXTERNAL (Q-004, ADR-001): any RESP-compatible server >= 7.2 —
+# Valkey >= 7.2, Redis >= 7.2, or a managed cloud equivalent. Vizra uses only
+# the Redis 7.2 / Valkey 7.2 command set and no modules. `rediss://` is
+# supported by the client and is what a managed provider will hand you.
+#
+# The merge-tag reasoning is identical to docker-compose.external-postgres.yml;
+# read the header there once. `profiles: !override` because profiles is a
+# sequence Compose would otherwise append to; `depends_on: {redis: !reset null}`
+# on every service with an incoming edge, including ones that only render under
+# another profile, because Compose validates every loaded definition.
+#
+# LOSING THE CACHE IS NOT LOSING DATA (VZ-TOPOLOGY-003). Redis is acceleration,
+# not truth: durable work lives in PostgreSQL (ADR-004). Uploads and comments
+# still persist with the cache down, caches rebuild, and eviction under
+# `allkeys-lru` is safe for the same reason. What the cache must NEVER do is
+# fail open on a privacy decision or serve one user's private response to
+# another — that is an authorization invariant in vizra-core, asserted by its
+# tests, and NOT something this compose file can prove. Stated here so the
+# sentence is not read as a guarantee this slice makes.
+#
+# SEARCH KEYSPACE SEPARATION. docs/META_REPO.md §3 and VZ-TOPOLOGY-003 name a
+# second variable, SEARCH_REDIS_URL, on a different logical database. At M0
+# vizra-search reads NO cache variable at all (its whole config registry is
+# SEARCH_HMAC_KEY, MAX_INTERNAL_BODY_BYTES, VIZRA_SEARCH_MODE,
+# VIZRA_SEARCH_ADDR, VIZRA_SEARCH_MAX_CLOCK_SKEW, VIZRA_SEARCH_REQUEST_TIMEOUT,
+# VIZRA_SEARCH_SHUTDOWN_GRACE — checked at 808a549). A variable no service reads
+# is exactly what `scripts/check-config-coverage.py` fails on, so it is NOT
+# added here. It belongs in the slice that gives vizra-search a cache. Reported.
+
+services:
+
+  redis:
+    profiles: !override ["external-disabled"]
+
+  api:
+    depends_on:
+      redis: !reset null
+    environment:
+      VIZRA_CACHE_URL: ${VIZRA_CACHE_URL:?VIZRA_CACHE_URL must name your external RESP server (redis://HOST:6379/0 or rediss://:PASSWORD@HOST:6379/0, Valkey or Redis >= 7.2) because docker-compose.external-redis.yml disabled the bundled cache - the bundled service will NOT be started as a fallback}
+
+  worker:
+    depends_on:
+      redis: !reset null
+    environment:
+      VIZRA_CACHE_URL: ${VIZRA_CACHE_URL:?VIZRA_CACHE_URL must name your external RESP server (redis://HOST:6379/0 or rediss://:PASSWORD@HOST:6379/0, Valkey or Redis >= 7.2) because docker-compose.external-redis.yml disabled the bundled cache - the bundled service will NOT be started as a fallback}
