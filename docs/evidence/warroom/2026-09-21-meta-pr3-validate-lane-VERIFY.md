@@ -627,3 +627,597 @@ PASS is not a merge and does not make any ledger entry VERIFIED — the chair
 records those.
 
 Verified by an independent verifier that did not write this code.
+
+---
+
+# Re-verification at `5dfa75c`
+
+**Verdict: PASS.** Findings 1–4 **all CLOSED**. Four new findings (1 SHOULD,
+3 NIT), none blocking.
+
+| | |
+|---|---|
+| Head SHA verified | `5dfa75ca1453f390cea1da1a7bd9accbfd641cb3` |
+| Head confirmed unmoved | `gh api repos/yegamble/vizra/git/ref/heads/ci%2Fmeta-validate` → `5dfa75ca…` |
+| Previous verdict SHA | `e667b605…` — **confirmed an ancestor** (`git merge-base --is-ancestor` → true): history extended, not rewritten |
+| New commits | `4b22690` close the ledger false green, expand id ranges, harden the lane guard · `cd1188d` do not claim "every one resolves" when a reference could not be read · `dd31782` nine transcripts · `5dfa75c` Linux CI transcripts |
+| Clone | fresh from GitHub into scratch; builder's worktree untouched; no branch switch in the main checkout |
+| Date | 2026-09-21 |
+
+**Ledger invariant holds.** All four quality JSON files byte-identical to
+`origin/chore/m0-meta-baseline`: `features.json` `25231b84…`, `ui-controls.json`
+`7bc463af…`, `release-profiles/core.json` `a86d3b27…`,
+`release-profiles/full.json` `ecef0842…`. The delta since `e667b60` touches only
+`scripts/`, `scripts/testdata/`, `docs/quality/COMMANDS.md` and
+`docs/evidence/meta-validate/`. `.github/`, `docs/evidence/ledger-generator/build.py`,
+`ci-required-select.sh`, `check-workflows.py`, `check-action-pins.py` and
+`check-doc-links.py` are **unchanged since `e667b60`** — so everything I verified
+about them still stands. Zero credential-shaped lines added.
+
+**Nothing weakened.** Failure-exit counts rose (`check-generated-ledger.sh` 6→13,
+`ci-required-guard.sh` 22→32); `check-quality-json.py` keeps all 8 `fail()`
+calls; fixture floors are declared 5 / 6 / 5 with 20 fixtures on disk (6 `wf-*`,
+7 `pin-*`, 7 `lane-*`). No floor lowered, no assertion deleted, no baseline moved.
+
+## Lane at `5dfa75c` (clean clone, Python 3.9.6, PyYAML 6.0.3, no Docker)
+
+| Command | Exit | Reported |
+|---|---|---|
+| `./scripts/check-generated-ledger.sh` | **0** | `locale regression: re-running under LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0` → `generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)` |
+| `./scripts/check-quality-json.py` | **0** | `requirement ids: 191 written reference(s) expanded to 287 id(s), 204 distinct, across 14 document(s); every one resolves` |
+| `./scripts/check-doc-links.py` | **0** | `relative links: none exist yet across 88 markdown file(s) (checked nothing); 6 external URL(s)` |
+| `./scripts/ci-required-guard.sh` | **0** | + `lane integrity: 1 required lane(s) defined by a real job across 2 workflow file(s); no shell override, no conditional step` and `the lane checker rejects … (7 fixtures exercised, floor 7)` |
+
+## FINDING 1 — CLOSED
+
+`check-generated-ledger.sh` now `rm -f`s the declared files before regenerating,
+then requires each to exist, be non-empty and parse before the diff.
+
+| Attack | Exit | Message |
+|---|---|---|
+| **my exact no-op generator** from the `e667b60` report | **1** | `GENERATOR WROTE NOTHING: 'docs/quality/features.json' … It was removed before regeneration, so the generator did not write it.` |
+| writes a zero-byte file | **1** | `GENERATOR WROTE AN EMPTY FILE` |
+| writes truncated/invalid JSON | **1** | `GENERATOR WROTE INVALID JSON` |
+| writes only *some* declared files (2nd file declared, generator writes 1) | **1** | `GENERATOR WROTE NOTHING: 'docs/quality/ui-controls.json'` |
+| writes an **extra undeclared** file (first run) | **1** | `UNDECLARED GENERATED FILE: … 'docs/quality/EXTRA-generated.json'` |
+| **honest regeneration** (source edit + regenerate + commit both) | **0** | still green — a legitimate ledger change is not forbidden |
+
+**`rm -f` cannot destroy a hand-maintained file.** The declared list is exactly
+`docs/quality/features.json`. `build.py` has a single `open(…, "w")` — `sys.argv[1]`
+(line 64) — and no generator source opens `ui-controls.json` or
+`release-profiles/*.json` for writing. Those three siblings are never deleted.
+A residual ergonomic hazard: when the generator fails, the script exits 1 with
+`features.json` **deleted**; it prints `Restore the removed file(s) with:
+git checkout -- docs/quality/features.json` at every such exit. Harmless in CI
+(ephemeral checkout), a footgun locally, and documented.
+
+Residual on the "both directions" claim → FINDING 6.
+
+## FINDING 2 — CLOSED
+
+Ranges (`…`, `...`, `–`, `—`) and slash-lists now expand, and every member
+resolves. `139 distinct` → `191 written references expanded to 287 ids, 204
+distinct`.
+
+Expansion is **exact** (probed against the real `expand_reference`):
+
+```
+VZ-TOPOLOGY-001…003/006/007  -> 001 002 003 006 007          (exactly, as required)
+VZ-FOUND-001…008             -> 001 002 003 004 005 006 007 008
+VZ-CI-001/002/004            -> 001 002 004
+VZ-MEDIA-002/005…010         -> 002 005 006 007 008 009 010
+VZ-STORAGE-002…006/014/015   -> 002 003 004 005 006 014 015
+VZ-AP-001...004 / 001–004 / 001—004  -> 001 002 003 004      (all three separators)
+```
+
+**Not over-eager** on the two cases asked for:
+
+```
+"see VZ-FOUND-001. Next sentence"  -> [VZ-FOUND-001]   (sentence period does not start a range)
+"see VZ-FOUND-001.  5 items"       -> [VZ-FOUND-001]
+"docs/VZ-FOUND-001/notes"          -> [VZ-FOUND-001]   (path slash does not start a range)
+```
+
+In real documents:
+
+| Mutation (digest before → after) | Exit | Message |
+|---|---|---|
+| `VZ-FOUND-001…008` → `…999` (`43be9f00…`→`6c973c26…`) | **1** | `IMPLAUSIBLE RANGE: … names 999 ids … the cap is 200` |
+| `VZ-FOUND-008…001` (descending) | **1** | `UNREADABLE RANGE: … ends at 001 but starts at 008` |
+| `VZ-CI-001/002/004` → `VZ-CI-001/888` | **1** | `VZ-CI-888: not in docs/quality/features.json` |
+| **`VZ-FOUND-005` deleted from the ledger** (the failure invisible at `e667b60`) | **1** | `VZ-FOUND-005: not in … referenced by docs/MILESTONES.md / docs/issues/VZ-ISSUE-001.md` |
+
+**Hand spot-check, five ids that exist only as expanded members** — none is
+written literally anywhere in `docs/MILESTONES.md`, and all five are real ledger
+entries, so the expansion is doing genuine new work: `VZ-FOUND-005`,
+`VZ-TOPOLOGY-002`, `VZ-STORAGE-004`, `VZ-AP-003`, `VZ-SERVICES-004`.
+
+A narrow over-expansion remains → FINDING 8.
+
+### The builder's refusal to widen the scope to `docs/plans/` — facts confirmed, call endorsed
+
+Every fact the builder gives checks out:
+
+- `docs/plans/WARROOM-BOARD.md:48` reads: *"2b | meta: evaluate the security
+  reviewer's four proposed requirement IDs (VZ-SEC-SSR-001, VZ-SEC-HDR-001,
+  VZ-SEC-SSR-002, VZ-SEC-SUPPLY-001) against existing VZ-SECURITY-* / VZ-CI-*
+  entries…"*. All four are in the board and **none** is in `features.json`. They
+  dangle because the row's purpose is to decide whether to create them.
+- The **13 slice plans are clean** — I resolved every `VZ-…` id in
+  `docs/plans/*.md` against the ledger, the issue files and the `VZ-SLICE-`
+  allowlist; the only unresolved ids in the whole directory are those four, all
+  in `WARROOM-BOARD.md`.
+- `docs/evidence/` does quote deliberately-bad ids: `VZ-NOSUCH-999` (×2),
+  `VZ-CI-001/888` (×2), `VZ-FOUND-001…999` (×3). Gating it would make every
+  red/green transcript a lane failure.
+
+**Verdict on the call: the refusal is correct and well-reasoned.** Excluding
+`docs/evidence/` is plainly right — a demonstration must be able to write down
+the id it made dangle. Excluding `docs/plans/` is right *as stated*, because a
+plan proposing a requirement must not turn the gate red. A narrower rule is
+genuinely available — the 13 slice plans are clean today, so gating
+`docs/plans/*.md` while exempting `WARROOM-BOARD.md`, or requiring proposed ids
+to carry a marker, would catch a typo in a slice plan at no cost. But that is a
+**scope addition, not a defect**: the builder measured both exclusions, wrote
+them into the script docstring and into a COMMANDS.md table, and named the
+honest way in ("a marker distinguishing 'proposed' from 'referenced', not a
+wildcard exemption"). That meets the AGENTS.md standard for a recorded decision.
+I would not hold the merge for it; it is a good candidate for the follow-up.
+
+**COMMANDS.md now states exactly which paths are checked and why the rest are
+not** — a four-row table at § "Scope of the id check, and what is deliberately
+excluded", naming both excluded directories, the four proposed ids by name, and
+the sentence "Both exclusions were measured, not assumed."
+
+## FINDING 3 — CLOSED
+
+New `scripts/check-lane-integrity.py`. Run individually, each fixture trips its
+own declared reason:
+
+| Fixture | Exit | Reason |
+|---|---|---|
+| `lane-clean.yml` | 0 | accept |
+| `lane-yaml-extension.yaml` | 0 | accept — **the `.yaml` extension is the point** |
+| `lane-workflow-shell.yml` | 1 | `defaults-shell-override` |
+| `lane-job-shell.yml` | 1 | `defaults-shell-override` |
+| `lane-if-false.yml` | 1 | `constant-false-if` |
+| `lane-if-expression.yml` | 1 | `conditional-step-on-required-lane` |
+| `lane-missing-job.yml` | 1 | `no-such-job` |
+
+Floor declared `expected_lane_fixtures=5` + 2 accept = the `7 fixtures
+exercised, floor 7` the guard prints. Job existence is now parsed from YAML over
+`*.yml` **and** `*.yaml`, replacing the indentation-sensitive grep.
+
+The four probes requested, on the real `validate` lane:
+
+| Probe | Caught | Stated as out of scope |
+|---|---|---|
+| **job-level `if:`** on the required lane | no | **yes** — docstring: *"(Job-level `if:` is left to the fan-in, which already refuses a skipped job.)"* The delegation is sound: I confirmed at `e667b60` that `ci-required-select.sh` exits 1 on a `skipped` conclusion. |
+| **step-level `shell:`** on the ledger-check step | **no** | **no** → FINDING 7 |
+| required lane moved into a **reusable workflow** (`jobs.validate.uses:`) | **no** | no → FINDING 7 |
+| **`runs-on: [self-hosted, attacker-box]`** | **no** | no → FINDING 7 |
+
+## FINDING 4 — CLOSED
+
+The PR body no longer claims the locale failure is unreproducible; it now says
+*"**That was incorrect.**"* and gives the reproduction, crediting PEP 538's
+C-locale coercion as the mask. The hard-coded markdown count is gone from
+COMMANDS.md, which explains *why* no number replaced it: *"A number that goes
+stale on its own is worse than no number in a file whose purpose is that
+recorded figures can be trusted. Run the command for the current value."*
+
+**The locale invocation runs in the lane** — precisely, it is a block inside
+`scripts/check-generated-ledger.sh:167-199`, which the lane's *"the generated
+ledger matches its sources"* step runs. It is not a separate workflow step
+(`.github/` is unchanged since `e667b60`); the PR body's "that exact invocation
+is now a step of the lane" is loose wording for a true fact. Confirmed executing
+in CI at this SHA:
+
+```
+validate | the generated ledger matches its sources   locale regression: re-running under LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0
+validate | the generated ledger matches its sources   generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+```
+
+**With the encoding fix reverted, that step goes RED.** Restoring
+`origin/chore/m0-meta-baseline:build.py` (the bare `open(sys.argv[1],"w")`) and
+running the check on this host: exit **1**, `UnicodeEncodeError: 'ascii' codec
+can't encode character '—' in position 428`, caught as `GENERATOR FAILED`.
+**On Linux, by reading the workflow:** the runner reports `preferred encoding:
+UTF-8` (recorded in the CI log), so the *first* regeneration would succeed — but
+the locale block then re-runs the generator under `LC_ALL=C LANG=POSIX
+PYTHONCOERCECLOCALE=0 PYTHONUTF8=0`, which forces `getpreferredencoding` to
+ASCII on CPython regardless of platform, so the pre-fix `open()` raises there and
+the block's `LOCALE REGRESSION: the generator failed under a C/POSIX locale`
+branch fires. The check is therefore host-independent, which is the point of it.
+
+## Success lines on failing runs
+
+The Finding-5 self-report is closed: a reference that could not be read now
+prints *"191 written reference(s), 280 id(s) expanded and resolved, but at least
+one reference could not be read — see the failure(s) above"* and **never**
+`every one resolves`. The two statements cannot co-occur — confirmed on both the
+descending-range and implausible-range mutations.
+
+Audited all five scripts under forced failure for a leaked overall-success line.
+Clean, with one thing worth naming precisely: `ci-required-guard.sh` prints its
+earlier **per-assertion** lines (`no continue-on-error on any job or step`,
+`every one pinned`, `floor: every non-optional lane is present`) before a later
+sub-check fails. Those are true statements about assertions that genuinely
+passed, each naming its own scope, and the script still exits 1 with no line
+claiming the run succeeded. That is not the Finding-5 defect, which was one
+check contradicting itself about the same object.
+
+## The nine demonstrations, re-run with digests
+
+| # | Mutation | Digest before → after | Exit |
+|---|---|---|---|
+| 1 | hand-edited `features.json`, committed | `25231b8411f7` → `b53449d33c6e` | **1** |
+| 2 | generator source changed, not regenerated, committed | `b7a4927f0551` → `83067fdad4a6` | **1** |
+| 3 | `VZ-NOSUCH-999` + `VZ-ISSUE-404` in an issue file | `2e5f32570e45` → `0ecabc6f80be` | **1** |
+| 4 | broken relative link beside a resolving one | `43be9f00a91e` → `a555814b22ef` | **1** |
+| 5 | floor lane removed / manifest emptied | `37b484721324` → `4c0c0be25382` / `3ecd168c47f2` | **1** / **1** |
+| 6 | `continue-on-error` ×3 spellings | `009fcd15f48b` / `fcba655e5900` / `414b7e9f72e5` | **1** ×3 |
+| 7 | generator wrote nothing / empty / partial / invalid JSON | — | **1** ×4 |
+| 8 | range + slash-list expansion (4 mutations) | `6c973c269b92` etc. | **1** ×4 |
+| 9 | shell override ×2, `if: false`, non-constant `if:`, missing job | — | **1** ×5 |
+
+All four lane scripts green again after every restore; tree clean.
+
+## CI on `5dfa75c`
+
+```
+ci-required   completed  success  00:44:57Z → 00:45:24Z
+validate      completed  success  00:44:57Z → 00:45:03Z
+GitGuardian   completed  success
+35548669403  validate     pull_request  success  ci/meta-validate
+35548669385  ci-required  pull_request  success  ci/meta-validate
+```
+
+One check-run per required name; manifest lists exactly `validate`; nothing
+skipped, cancelled, timed out or missing. Logs confirm the generator ran
+(`OK 191 requirements; core=141`), the locale block ran (quoted above), the id
+expansion ran (`191 written reference(s) expanded to 287 id(s), 204 distinct …
+every one resolves`), the lane-integrity check ran (`lane integrity: 1 required
+lane(s) … no shell override, no conditional step`), and the fan-in genuinely
+polled (`validate: in_progress` → `validate: success` → `ci-required: every
+required check succeeded on 5dfa75ca…`).
+
+---
+
+# New findings at `5dfa75c`
+
+```
+FINDING 5: CI validates the PR MERGE commit, not the head SHA, and the provenance step records the wrong one
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     .github/workflows/validate.yml:45-68 (checkout with no `ref:`; "record the environment")
+             .github/workflows/ci-required.yml:136-141 (HEAD_SHA = pull_request.head.sha)
+             docs/quality/COMMANDS.md; PR #3 body
+  requirements: VZ-CI-001
+
+Observed:
+  The link check reports 88 markdown files and 6 external URLs in a clean clone
+  at 5dfa75c, but 92 and 7 in the CI log for the same SHA. Not an interpreter
+  difference — Python 3.9.6 and 3.13.13 both count 88 on this tree. The CI log
+  settles it:
+
+      [command]/usr/bin/git checkout --progress --force refs/remotes/pull/3/merge
+      HEAD is now at e85e875 Merge 5dfa75ca1453f390cea1da1a7bd9accbfd641cb3 into 5f0cd6631fc5e19d17ab0d25f806df0a68582841
+
+  `actions/checkout` with no `ref:` on a `pull_request` event checks out
+  refs/pull/N/merge. The base branch has advanced four commits since the
+  merge-base (war-room ticks 60-63), adding four markdown files — including this
+  very evidence file — so the merge tree carries 92. Meanwhile:
+
+      validate | record the environment   source SHA: 5dfa75ca1453f390cea1da1a7bd9accbfd641cb3
+
+  printed while standing in tree e85e875. The step designed to record provenance
+  records a SHA that is not the tree it is describing.
+
+  ci-required is unaffected in its polling: HEAD_SHA is
+  `github.event.pull_request.head.sha` = 5dfa75c, which is where the check-runs
+  are attributed, so the fan-in reads the right rows.
+
+Failure:
+  Two concrete consequences.
+
+  (1) The owner's merge rule (AGENTS.md § Merge authorization) reads "ci-required
+  is green on the verified SHA" and "the head has not moved since the verdict".
+  Both are satisfied here — but what `validate` actually executed against is a
+  tree the verifier never verified, and it changes whenever the BASE branch
+  moves, with no change to the PR and no signal to anyone. A war room that ticks
+  the board on every cycle moves that base constantly. Green can become red (or
+  red green) between the verdict and the merge without the head moving at all.
+
+  (2) It already produced a wrong number in the PR body: "At this SHA the command
+  reports 92." At this SHA the command reports 88. 92 is the merge tree's count.
+  This is the third iteration of the same class of error the same round closed as
+  FINDING 4 — a figure read off a corpus that is not the one named.
+
+Perspective:
+  developer, operator, business (the merge rule is what this slice exists to serve)
+
+Recommendation:
+  One line in the "record the environment" step, so the transcript names the tree
+  it tested:
+
+      echo "checked-out tree: $(git rev-parse HEAD)"
+      echo "PR head SHA:      ${{ github.event.pull_request.head.sha || github.sha }}"
+
+  Then one paragraph in COMMANDS.md (and ideally in AGENTS.md § Merge
+  authorization, which is an owner edit and out of scope here) stating that on
+  `pull_request` the lane validates the merge result, so a green ci-required
+  attests to head-merged-into-base-as-of-that-run, not to the head tree alone.
+  Do NOT "fix" this by pinning checkout to the head SHA: testing the merge result
+  is the more useful behaviour. The defect is that it is unrecorded, not that it
+  happens.
+
+Acceptance criteria:
+  - The validate log names both the checked-out tree SHA and the PR head SHA,
+    and they are visibly different on a stacked PR whose base has moved.
+  - COMMANDS.md states which tree the lane validates on `pull_request` and on
+    `merge_group`.
+  - No document quotes a count taken from the merge tree as if it were the head's.
+
+Tests:
+  No harness exists. The smallest check is a transcript recording both SHAs from
+  one real run where they differ — which is every run of this PR right now.
+
+Cross-repo implications:
+  core: none | user: none | search: none
+  meta: every component repo's ci-required inherits this; the chair's merge
+  procedure should record the tree SHA alongside the head SHA in the board tick.
+
+Challenge:
+  This is stock GitHub behaviour that this PR did not introduce, and testing the
+  merge result is what a merge gate SHOULD do — arguably the head-only tree is
+  the less interesting one. Fair. But the lane ships a step whose entire job is
+  to record what was tested, and it records something else; and the discrepancy
+  has already put a wrong number in the PR body, which is how I found it.
+```
+
+```
+FINDING 6: the undeclared-output check is a change detector, so "equal in both directions" is overstated
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/check-generated-ledger.sh:137-158 (before/after `git status --porcelain -- docs/quality`)
+             PR #3 body, FINDING 1 paragraph
+  requirements: VZ-CI-001
+
+Observed:
+  The PR body says: "With the existing undeclared-file check, the declared list
+  and the generator's real output set are asserted equal in **both** directions."
+  The first direction is genuinely asserted — every declared file must exist,
+  be non-empty and parse after regeneration. The second is not: it compares
+  `git status --porcelain -- docs/quality` before and after the run, which sees
+  only files whose status CHANGES during the run.
+
+      A4a  extra undeclared file, first run (file appears)   -> EXIT 1, UNDECLARED GENERATED FILE
+      A4b  same file left over from the previous run         -> EXIT 0, "reproduces byte-for-byte"
+      A4c  same file COMMITTED, tree clean (the CI state)    -> EXIT 0, "reproduces byte-for-byte"
+
+  In A4c the generator writes docs/quality/EXTRA-generated.json on every run, the
+  committed bytes already match, `before == after`, and the file is never named,
+  never diffed and not in the declared list — so it is neither covered by the
+  reproduction assertion nor by the locale re-check. (A subsequent hand-edit of it
+  IS caught, incidentally: the generator then rewrites it, the status changes, and
+  the before/after comparison fires.)
+
+Failure:
+  A second generated file can enter docs/quality/ and sit there permanently
+  outside the gate. Narrow — but the claim in the PR body is what a reviewer
+  would rely on to decide the ledger gate needs no further thought, and it is not
+  true in the steady state that CI actually runs in.
+
+Perspective:
+  developer
+
+Recommendation:
+  Compare content, not status. Before deleting, record a hash for every file
+  under docs/quality/; after regenerating, require that the set of files whose
+  hash or mtime changed is a subset of the declared list. That catches a
+  steady-state rewrite, which the status diff cannot see by construction.
+  Alternatively, soften the PR body sentence to match what the code does.
+
+Acceptance criteria:
+  - An undeclared file that the generator rewrites identically on every run is
+    reported by name, on a clean tree, with the file already committed.
+  - The existing six ledger attacks stay red and honest regeneration stays green.
+
+Tests:
+  A tenth transcript under docs/evidence/meta-validate/ using the A4c state:
+  generator extended to write a second file, that file committed, tree clean,
+  check run.
+
+Cross-repo implications:
+  core: none | user: none | search: none
+  meta: same pattern is intended for the future sqlc/OpenAPI regeneration lanes.
+
+Challenge:
+  Adding a second generated file requires editing build.py — a CODEOWNERS path,
+  visible in the diff — and the first run after adding it IS caught, so the
+  window is "someone adds it, sees it caught, commits it anyway, and nobody reads
+  the diff". Low exposure. The finding is really about the sentence in the PR
+  body, not the code.
+```
+
+```
+FINDING 7: three more ways to neuter a required lane are unchecked, and unlike job-level `if:` they are not stated
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/check-lane-integrity.py (shell_override covers defaults.run.shell only)
+             scripts/check-action-pins.py:walk_uses (local `./` refs exempt from pinning)
+  requirements: VZ-CI-001
+
+Observed:
+  Probed on the real validate lane; each mutation left ci-required-guard.sh at
+  EXIT 0:
+
+  (a) STEP-level `shell:` —
+          - name: the generated ledger matches its sources
+            shell: bash -c "eval \"$@\" || true" --
+            run: ./scripts/check-generated-ledger.sh
+      This is the same neutering the checker exists to refuse, one line, on the
+      exact step, and `defaults.run.shell` is refused at workflow AND job level
+      while the per-step spelling is not mentioned anywhere.
+
+  (b) The required lane moved into a reusable workflow:
+          jobs:
+            validate:
+              uses: ./.github/workflows/reusable.yml
+      The job exists, has no `steps`, so conditional_steps and shell_override
+      both return 0 and the lane passes with nothing about its contents checked.
+      A `./`-prefixed ref is additionally exempt from the pin rule by design.
+
+  (c) `runs-on: [self-hosted, attacker-box]` — nothing inspects `runs-on`.
+
+  Contrast job-level `if:`, which is ALSO uncaught but is explicitly stated:
+  "(Job-level `if:` is left to the fan-in, which already refuses a skipped job.)"
+  I verified that delegation is sound — ci-required-select.sh exits 1 on a
+  `skipped` conclusion. That is the standard the other three do not meet.
+
+Failure:
+  Nothing is wrong at this SHA: no `shell:`, no `uses:` job, no self-hosted
+  label anywhere in either workflow. But the slice's own claim is that
+  FINDING 3 was "closed, not merely stated", and the closure covers one spelling
+  of shell override out of two.
+
+Perspective:
+  developer
+
+Recommendation:
+  Smallest real fix: in check-lane-integrity.py, refuse a step-level `shell:` on
+  a required lane exactly as `defaults.run.shell` is refused (the same
+  `shell_override` message applies), and refuse a required lane whose job has a
+  `uses:` instead of `steps:` unless the called workflow is itself checked.
+  `runs-on` is a policy question — one sentence naming it as unchecked is enough.
+
+Acceptance criteria:
+  - A step-level `shell:` on a required lane exits 1 with a named reason.
+  - A required lane defined by `uses:` is either followed into the called
+    workflow or refused by name.
+  - check-lane-integrity.py's docstring names `runs-on` as deliberately unchecked.
+  - Two new lane-* fixtures, with expected_lane_fixtures moved 5 → 7 in the same
+    commit so the floor is a decision.
+
+Tests:
+  scripts/testdata/lane-step-shell.yml and lane-reusable.yml, each declaring the
+  rule it trips, exercised by ci-required-guard.sh on every run.
+
+Cross-repo implications:
+  core: none | user: none | search: none
+  meta: the component repos' guards should inherit the same rule set.
+
+Challenge:
+  All three require editing the workflow in the PR under test, which is the trust
+  boundary the builder already declares open. An adversary who can edit
+  validate.yml can also edit check-lane-integrity.py. The argument for fixing (a)
+  anyway is that it is the *same rule* the file already enforces, differing only
+  in where the key sits — not a new class of defence.
+```
+
+```
+FINDING 8: range expansion is over-eager on a numeric path segment, and the header's claim about path slashes is too broad
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     scripts/check-quality-json.py:95-99 (CONTINUATION), 117-163 (expand_reference)
+             scripts/check-quality-json.py docstring; docs/quality/COMMANDS.md § ranges
+  requirements: VZ-CI-001
+
+Observed:
+  The docstring says a separator "only counts when digits follow it, so the `.`
+  ending a sentence … and the `/` in a path (`docs/evidence/VZ-FOUND-008/`) end
+  the run instead of extending it." True for the example given. Not true when the
+  next path segment starts with digits:
+
+      "docs/evidence/VZ-FOUND-008/2026-09-21.md"
+        -> ['VZ-FOUND-0008', 'VZ-FOUND-2026']
+
+  Two effects. The `/2026` is read as a list continuation, inventing
+  VZ-FOUND-2026; and `width = max(width, len(digits))` then promotes the width to
+  4, so the REAL id VZ-FOUND-008 is re-rendered as VZ-FOUND-0008 and also fails to
+  resolve. Confirmed end-to-end by appending that path to docs/issues/VZ-ISSUE-001.md
+  (digest 2e5f32570e45 → 37d49d726796): exit 1, both invented ids reported as
+  dangling.
+
+Failure:
+  A date-shaped path written in an issue file — "transcript at
+  docs/evidence/VZ-FOUND-008/2026-09-21.md" is an entirely natural sentence in
+  this repository's idiom — turns the lane red with two ids nobody wrote. It
+  fails CLOSED, so it cannot hide a real problem; it blocks a legitimate document
+  and sends the author hunting for ids that do not exist. No such path exists in
+  the checked corpus today, which is why the lane is green.
+
+Perspective:
+  developer
+
+Recommendation:
+  Two small changes. Require a list continuation's digit run to be the same width
+  as the base id (or at most the base width), which rejects `/2026` after a
+  3-digit id; and stop promoting `width` from continuations, so a malformed
+  continuation can never corrupt the rendering of the ids that were read
+  correctly. Then narrow the docstring sentence to what the code does.
+
+Acceptance criteria:
+  - "docs/evidence/VZ-FOUND-008/2026-09-21.md" in a checked document expands to
+    exactly [VZ-FOUND-008] and the lane stays green.
+  - The nine existing range/slash rows in docs/MILESTONES.md expand unchanged
+    (VZ-TOPOLOGY-001…003/006/007 -> 001,002,003,006,007).
+  - VZ-CI-001/888 stays red.
+
+Tests:
+  Extend demo-8-range-and-slash-list-expansion.txt with the path case, showing it
+  green rather than red.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: none
+
+Challenge:
+  A width rule would reject a legitimate cross-width list such as
+  `VZ-X-008/0012` — but no such id exists, the ledger uses uniform 3-digit
+  suffixes throughout all 191 entries, and "a continuation must match the base
+  width" is a rule the corpus already obeys. The alternative reading is that
+  writing a bare path next to an id is simply bad practice in a checked document
+  and should be wrapped in backticks — except backticked ids ARE checked here, by
+  deliberate design, so that escape does not exist.
+```
+
+---
+
+## Re-verification verdict
+
+**PASS at `5dfa75c`.**
+
+| Original finding | Status |
+|---|---|
+| FINDING 1 — ledger false green | **CLOSED** — no-op, empty, partial and invalid-JSON generators all red by name; honest regeneration still green; `rm -f` provably cannot touch the hand-maintained siblings |
+| FINDING 2 — range expansion | **CLOSED** — 287 ids from 191 written references; mid-range members now caught; descending and implausible ranges are named failures; no over-eagerness on sentence periods or ordinary path slashes; exclusions measured and documented |
+| FINDING 3 — lane neutering | **CLOSED** — `defaults.run.shell` (workflow + job), any step-level `if:`, and parsed job existence over `.yml` and `.yaml`; 7 fixtures, floor 7 |
+| FINDING 4 — doc accuracy | **CLOSED** — PR body corrects itself explicitly; stale count removed and deliberately not replaced; the locale invocation runs in the lane and goes red with the fix reverted |
+| Self-reported: "every one resolves" beside an unreadable range | **CLOSED** — the two statements cannot co-occur |
+
+New: FINDING 5 (SHOULD), FINDINGS 6–8 (NIT). None blocks. FINDING 5 is the one
+the chair should act on before relying on the merge rule, because it changes what
+"ci-required green on the verified SHA" attests to: on a `pull_request` the lane
+validates head-merged-into-base, and this PR's base has moved four commits since
+the verdict. `ci-required` itself polls the correct SHA, both lanes are green, and
+the head has not moved — so the rule's conditions are met as written.
+
+Ledger content byte-identical to base; `e667b60` an ancestor; nothing weakened;
+no secrets; scope confined to `scripts/`, `docs/quality/COMMANDS.md` and
+`docs/evidence/meta-validate/`.
+
+PASS is not a merge and does not make any ledger entry VERIFIED — the chair
+records those.
