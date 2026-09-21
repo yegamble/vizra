@@ -376,9 +376,12 @@ lane_reject_fixtures="lane-workflow-shell.yml|defaults-shell-override
 lane-job-shell.yml|defaults-shell-override
 lane-if-false.yml|constant-false-if
 lane-if-expression.yml|conditional-step-on-required-lane
+lane-step-shell.yml|step-shell-override
+lane-self-hosted.yml|self-hosted-runner
+lane-reusable-workflow.yml|reusable-workflow
 lane-missing-job.yml|no-such-job"
 
-expected_lane_fixtures=5
+expected_lane_fixtures=8
 declared_lane_fixtures="$(printf '%s\n' "$lane_reject_fixtures" | grep -c .)"
 if [ "$declared_lane_fixtures" != "$expected_lane_fixtures" ]; then
   echo "LANE FIXTURE FLOOR CHANGED: $declared_lane_fixtures rule(s) are declared;"
@@ -449,4 +452,4 @@ if [ "$lane_checked" -lt "$lane_floor" ]; then
   echo "only $lane_checked lane fixture(s) were exercised; the floor is $lane_floor"
   exit 1
 fi
-echo "the lane checker rejects every shell-override, conditional-step and missing-job case in $fixtures_dir/ ($lane_checked fixtures exercised, floor $lane_floor)"
+echo "the lane checker rejects every shell-override (workflow/job/step), conditional-step, self-hosted-runner, reusable-workflow and missing-job case in $fixtures_dir/ ($lane_checked fixtures exercised, floor $lane_floor)"

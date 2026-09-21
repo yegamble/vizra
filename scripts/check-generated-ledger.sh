@@ -136,12 +136,25 @@ if ! git diff --exit-code -- "${generated[@]}"; then
   echo "  and commit BOTH the sources and the regenerated file."
 fi
 
-# SET EQUALITY, in the other direction: nothing the generator writes may be
-# outside the declared list. A new generated file that nobody declared would
-# otherwise never be diffed, so it could be hand-edited freely. Combined with
-# the existence check above — which proves every DECLARED file was written —
-# this makes the declared list and the generator's actual output set the same
-# set, rather than one being assumed to cover the other.
+# The other direction, stated precisely: this is a CHANGE DETECTOR, not a set
+# comparison.
+#
+# It compares `git status --porcelain -- docs/quality` before and after the run,
+# so it catches an undeclared file that the generator CREATED or CHANGED. It
+# does NOT catch an undeclared generated file that is already committed and that
+# the run rewrites byte-identically — nothing moves in git status, so nothing is
+# reported. Saying the two sets are "asserted equal in both directions" would be
+# overstating it, and the earlier wording did.
+#
+# What the pair of checks actually gives you:
+#   - the existence/non-empty/parse check above: every DECLARED file was written
+#     by this run;
+#   - this check: no UNDECLARED file under docs/quality was created or changed
+#     by this run.
+# An undeclared, already-committed, deterministically-regenerated file would sit
+# between the two. Nothing like that exists today — build.py writes exactly one
+# file — and the guard against it is that adding a second output means editing
+# build.py, which is a CODEOWNERS path.
 after="$(git status --porcelain -- docs/quality | sort)"
 if [ "$before" != "$after" ]; then
   undeclared="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | awk '{print $2}')"

@@ -24,6 +24,26 @@ repository's own `AGENTS.md` for its lanes.
 No Docker, no database, no browser and no network access is required. The link
 checker deliberately performs **no** network I/O.
 
+## What a green check covers, and which tree it covers
+
+On `pull_request`, `actions/checkout` checks out `refs/pull/N/merge` — the PR
+head **already merged into the current base** — so the lane validates the merge
+result, not the head commit on its own. `ci-required`, however, is reported
+against the **head** SHA, because that is what a status check attaches to.
+
+The practical consequence: a green `ci-required` on a head SHA means "the merge
+of that head into the base *as it stood when the lane ran*" was green. The base
+branch moves — the war-room chair commits the board to it every tick — so the
+tested tree can change while the head SHA does not, and a check that was green
+can stop reflecting the current merge without the head moving. The `validate`
+lane therefore prints the PR head SHA, the base SHA and `git rev-parse HEAD`
+(the merge commit actually tested), each labelled, so no transcript can be read
+as a claim about a tree it did not test. Re-run the lane if the base has moved
+since and you need the guarantee to be current.
+
+This is also how the first version of this file came to record a markdown-file
+count that the head itself does not have: the count came from the merge tree.
+
 CI pins the interpreter to **Python 3.12.14** (`actions/setup-python`, pinned by
 commit SHA). PyYAML is **not** pinned in practice: the `ubuntu-24.04` runner
 image ships it, and the `pyyaml==6.0.3` line in `ci-required.yml` is only a
@@ -58,9 +78,20 @@ It **deletes the declared files before regenerating**. A diff alone cannot tell
 `print("OK 191 requirements; core=141")` used to exit 0 here while the check
 printed a reproduction claim that was false. With the files removed first, a
 generator that writes nothing leaves a deletion, and each declared file must
-then **exist, be non-empty and parse as JSON** before the diff runs. Together
-with the existing undeclared-file check, the declared list and the generator's
-real output set are asserted equal in **both** directions.
+then **exist, be non-empty and parse as JSON** before the diff runs.
+
+A second check compares `git status --porcelain -- docs/quality` before and
+after the run. Precisely what the pair detects:
+
+- a **declared** file that this run did not write, and
+- an **undeclared** file under `docs/quality/` that this run **created or
+  changed**.
+
+It is a change detector, not a set comparison: an undeclared generated file that
+is already committed and that the run rewrites byte-identically moves nothing in
+`git status` and is not reported. Nothing like that exists today — `build.py`
+writes exactly one file — and adding a second output means editing `build.py`,
+which is a CODEOWNERS path.
 
 It then re-runs the generator once under
 `LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0` and requires
@@ -96,9 +127,24 @@ allowlisted by name — and `VZ-ISSUE-NNN` is still resolved against a real
 **Ranges and slash-lists are expanded and every member resolved.** The
 milestone rows write `VZ-FOUND-001…008`, `VZ-CI-001/002/004` and
 `VZ-MEDIA-002/005…010`; resolving only the leading id would validate one
-requirement out of eight. A separator (`…`, `...`, `–`, `—`, `/`) only counts
-when digits follow it, so a sentence-ending `.` and a path `/` end the run. A
-descending or implausibly long range is a **named failure**, not a silent skip.
+requirement out of eight.
+
+A continuation is read only when all three hold, and the run ends quietly at the
+first that does not:
+
+1. digits follow the separator (`…`, `...`, `–`, `—`, `/`) — so a
+   sentence-ending `.` and a trailing path `/` end the run;
+2. those digits are followed by neither a digit nor a hyphen — so
+   `docs/evidence/VZ-FOUND-008/2026-09-21.md`, an ordinary evidence path here,
+   is **not** read as a list. Without this rule the checker invented
+   `VZ-FOUND-0008` and `VZ-FOUND-2026` and went red on a correct document;
+3. the digits are the same width as the id they continue, and that width is one
+   the ledger uses — **derived from `features.json`, not hard-coded**.
+
+Ending the run is not an error: `VZ-FOUND-008` in a path is a correct reference
+to one requirement and resolves as such. Only a reference read **as** a range
+that cannot be made sense of — descending, or implausibly long — is a **named
+failure**, never a silent skip.
 
 Last run: **exit 0** — 4 JSON files parsed, 191 requirement ids in the ledger,
 191 written references expanded to 287 ids (204 distinct) across 14 documents,
@@ -155,12 +201,13 @@ Everything that can be checked about the gate from the checkout itself:
 the floor (`validate` present and non-optional), bare job names, every required
 check defined by a real job, `continue-on-error` refused wherever it appears
 (parsed, not grepped), every action pinned to a 40-hex commit SHA, every
-required lane triggered on `pull_request` with no base-branch filter, no
-`defaults.run.shell` override, no step-level `if:` on a required lane, and all
-three checkers exercised against their negative fixtures.
+required lane triggered on `pull_request` with no base-branch filter, no shell
+override at workflow, job or step level, no step-level `if:`, no self-hosted
+runner, no reusable-workflow call, and all three checkers exercised against
+their negative fixtures.
 
 Last run: **exit 0** — 6 continue-on-error fixtures (floor 6), 7 pin/trigger
-fixtures (floor 7), 7 lane-integrity fixtures (floor 7).
+fixtures (floor 7), 10 lane-integrity fixtures (floor 10).
 
 The three checkers it calls can also be run alone:
 
@@ -173,14 +220,22 @@ The three checkers it calls can also be run alone:
 All three answer three ways, so "rejected" and "could not be evaluated" are
 never confused: `0` clean, `1` VIOLATION, `2` UNEVALUABLE.
 
-`check-lane-integrity.py` covers the two ways to neuter a lane that
-`continue-on-error` does not: a `defaults.run.shell` override — the Actions
-analogue of a Makefile `SHELL := /usr/bin/true`, which makes every `run:` step
-in the job a no-op that still reports success — and a step-level `if:`, since a
-skipped JOB is refused by the fan-in but a skipped STEP leaves the job green. A
-constant false is refused by name; any other condition is refused too, because
-nothing here can evaluate it and a step that might not run is not a gate. It
-also owns job existence, which was previously a grep over `*.yml` only and
+`check-lane-integrity.py` covers five ways to neuter a lane that
+`continue-on-error` does not:
+
+| Refused on a required lane | Why |
+|---|---|
+| `defaults.run.shell` (workflow or job) | the Actions analogue of `SHELL := /usr/bin/true` — every `run:` step becomes a no-op that reports success |
+| a step-level `shell:` | the same rule with the key in a different place |
+| a step-level `if:` | a skipped JOB is refused by the fan-in, but a skipped STEP leaves the job green. A constant false is refused by name; any other condition too, because nothing here can evaluate it and a step that might not run is not a gate |
+| `runs-on` naming `self-hosted` | ADR-009 / Q-027 makes GitHub-hosted `ubuntu-24.04` the qualified target; a self-hosted runner is a machine this repository does not describe or control |
+| a job-level `uses:` (reusable workflow) | the real steps would live where this checker cannot see them, and every rule above would be enforced against an empty job |
+
+A **job-level `if:`** is deliberately not checked: the fan-in already refuses a
+`skipped` conclusion, so a skipped job is visible as a skipped check-run. That
+asymmetry is the whole reason the step case needs its own rule.
+
+It also owns job existence, which was previously a grep over `*.yml` only and
 would have reported a lane defined in a `.yaml` workflow as missing.
 
 The aggregate's row-selection rules run outside Actions too, which is how they

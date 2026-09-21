@@ -2,8 +2,10 @@
 """A required lane must exist, and every step of it must actually run.
 
 `scripts/check-workflows.py` refuses `continue-on-error` in five spellings, on
-the principle that a lane which cannot fail is not a gate. But there are two
-strictly simpler ways to neuter the same lane, and neither involves that key:
+the principle that a lane which cannot fail is not a gate. But that key is not
+the only way to neuter a lane. Five other constructs do it, none of which
+mentions `continue-on-error`; all five are refused here on any workflow that
+defines a required lane. The first two are the simplest:
 
 1. **`defaults.run.shell`**, at workflow or job level, replaces the shell every
    `run:` step is executed with. A shell that swallows non-zero exits —
@@ -21,15 +23,34 @@ strictly simpler ways to neuter the same lane, and neither involves that key:
    `if: false` on the ledger check removes the lane's primary assertion while
    `validate` still reports success.
 
-Both are refused here, on the workflows that define a required lane.
+The other three make a required lane mean less than it appears to:
+
+3. **A step-level `shell:`** — the same rule as 1 with the key in a different
+   place. Refusing it at workflow and job level while allowing it per step
+   would be an arbitrary distinction.
+
+4. **`runs-on` naming a self-hosted runner.** ADR-009 / Q-027 makes
+   GitHub-hosted `ubuntu-24.04` the qualified target. A self-hosted runner is a
+   machine this repository does not describe, cannot reproduce and does not
+   control, so a green check from it does not mean what a green check means.
+
+5. **A job-level `uses:`** (a call to a reusable workflow). What the lane
+   actually runs would then live where this checker cannot see it, and every
+   rule here would be enforced against an empty job while the real steps went
+   unchecked.
 
 On `if:`, the rule is deliberately stricter than "constant false". A literal
 `false` is refused by name, but so is any other step-level condition on a
 required lane, because nothing here can evaluate
 `${{ github.event.repository.owner.login == 'nobody' }}` — and a step that
 *might* not run is not a gate either. A required lane's steps run
-unconditionally or the lane is not required. (Job-level `if:` is left to the
-fan-in, which already refuses a skipped job.)
+unconditionally or the lane is not required.
+
+**Deliberately NOT checked here, and why:** a job-level `if:` is left to the
+fan-in, which already refuses a `skipped` conclusion — a skipped job is visible
+as a skipped check-run, whereas a skipped step leaves the job green and
+invisible. That is the whole reason the step case needs its own rule and the job
+case does not.
 
 Job EXISTENCE is also checked here, by parsing. It was previously a grep:
 
@@ -120,6 +141,71 @@ def shell_override(path, where, node):
     return 1
 
 
+def step_shell(path, job_name, job):
+    """A step-level `shell:` is the workflow/job rule with the key moved."""
+    violations = 0
+    steps = get(job, "steps")
+    if not isinstance(steps, list):
+        return 0
+    for i, step in enumerate(steps):
+        if not isinstance(step, dict):
+            continue
+        shell = get(step, "shell")
+        if shell is None:
+            continue
+        sys.stderr.write(
+            f"VIOLATION {path} reason=step-shell-override lane={job_name} "
+            f"where=jobs.{job_name}.steps[{i}] shell={shell!r}\n"
+            f"  A step-level `shell:` is exactly the `defaults.run.shell` rule with the key\n"
+            f"  in a different place: a shell that swallows non-zero exits makes this step\n"
+            f"  report success whatever the command does.\n"
+        )
+        violations += 1
+    return violations
+
+
+def hosted_runner(path, job_name, job):
+    """A required lane runs on the GitHub-hosted target the contract names."""
+    runs_on = get(job, "runs-on")
+    labels = []
+    if isinstance(runs_on, str):
+        labels = [runs_on]
+    elif isinstance(runs_on, list):
+        labels = [x for x in runs_on if isinstance(x, str)]
+    elif isinstance(runs_on, dict):
+        group = get(runs_on, "group")
+        labels = get(runs_on, "labels") or []
+        if isinstance(labels, str):
+            labels = [labels]
+        if isinstance(group, str):
+            labels = list(labels) + [group]
+    if not any("self-hosted" in str(x).lower() for x in labels):
+        return 0
+    sys.stderr.write(
+        f"VIOLATION {path} reason=self-hosted-runner lane={job_name} runs-on={runs_on!r}\n"
+        f"  A required lane must run on the GitHub-hosted target the contract names\n"
+        f"  (ubuntu-24.04; ADR-009/Q-027). A self-hosted runner is a machine this\n"
+        f"  repository does not describe, cannot reproduce and does not control, so a green\n"
+        f"  check from it does not mean what a green check is supposed to mean.\n"
+    )
+    return 1
+
+
+def reusable_workflow(path, job_name, job):
+    """A required lane's steps must be in this repository, where the diff shows them."""
+    uses = get(job, "uses")
+    if uses is None:
+        return 0
+    sys.stderr.write(
+        f"VIOLATION {path} reason=reusable-workflow lane={job_name} uses={uses!r}\n"
+        f"  This required lane is a call to a reusable workflow, so what it actually runs\n"
+        f"  lives somewhere this checker cannot see: every rule here — shell overrides,\n"
+        f"  conditional steps, action pins — would be enforced against an empty job while\n"
+        f"  the real steps went unchecked.\n"
+    )
+    return 1
+
+
 def conditional_steps(path, job_name, job):
     violations = 0
     steps = get(job, "steps")
@@ -201,6 +287,9 @@ def main(argv):
             found.setdefault(lane, []).append(path)
             job = jobs[lane]
             violations += shell_override(path, f"jobs.{lane}", job)
+            violations += step_shell(path, lane, job)
+            violations += hosted_runner(path, lane, job)
+            violations += reusable_workflow(path, lane, job)
             violations += conditional_steps(path, lane, job)
 
     missing = [lane for lane in lanes if lane not in found]
@@ -216,7 +305,8 @@ def main(argv):
         return 1
     print(
         f"lane integrity: {len(lanes)} required lane(s) defined by a real job across "
-        f"{len(paths)} workflow file(s); no shell override, no conditional step"
+        f"{len(paths)} workflow file(s); GitHub-hosted, steps in this repository, "
+        f"no shell override at workflow/job/step level, no conditional step"
     )
     return 0
 

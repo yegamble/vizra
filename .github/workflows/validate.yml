@@ -58,13 +58,53 @@ jobs:
         with:
           python-version: '3.12.14'
 
-      - name: record the environment
+      # Provenance must name the tree this run actually stands in.
+      #
+      # `actions/checkout` with no `ref:` checks out `refs/pull/N/merge` on a
+      # pull_request event — the PR head already merged into the CURRENT base.
+      # That is the right thing to test, and it is deliberately NOT pinned to the
+      # head. But it means the tested tree is a commit that exists nowhere in
+      # either branch, and it CHANGES WHEN THE BASE MOVES while the head SHA
+      # stays put. This repository's base branch moves often: the war-room chair
+      # commits the board to it every tick.
+      #
+      # Printing only "source SHA: <head>" was therefore misleading — it named a
+      # tree that was not the one being validated. All three are printed now,
+      # labelled, so a transcript can never be read as a claim about the wrong
+      # tree.
+      - name: record the environment and the tree under test
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          MERGE_GROUP_HEAD: ${{ github.event.merge_group.head_sha }}
+          MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
           python3 --version
           python3 -c 'import locale,sys; print("filesystem encoding:", sys.getfilesystemencoding()); print("preferred encoding:", locale.getpreferredencoding(False))'
           git --version
-          echo "source SHA: ${{ github.event.pull_request.head.sha || github.sha }}"
+          echo
+          echo "event: ${GITHUB_EVENT_NAME}"
+          case "${GITHUB_EVENT_NAME}" in
+            pull_request)
+              echo "PR head SHA (what ci-required is reported against): ${PR_HEAD}"
+              echo "PR base SHA (the base this was merged into):        ${PR_BASE}"
+              echo "TREE UNDER TEST (the merge commit actually checked out):"
+              echo "  $(git rev-parse HEAD)"
+              echo "  -> this lane validates the MERGE of head into the current base,"
+              echo "     not the head commit on its own. The base moves, so this tree can"
+              echo "     change while the head SHA does not."
+              ;;
+            merge_group)
+              echo "merge-queue head SHA: ${MERGE_GROUP_HEAD}"
+              echo "merge-queue base SHA: ${MERGE_GROUP_BASE}"
+              echo "TREE UNDER TEST (the queued merge commit): $(git rev-parse HEAD)"
+              ;;
+            *)
+              echo "ref: ${GITHUB_REF}"
+              echo "TREE UNDER TEST: $(git rev-parse HEAD) (checked out directly; no merge)"
+              ;;
+          esac
 
       # (a) The generated ledger reproduces byte-for-byte from its sources.
       - name: the generated ledger matches its sources

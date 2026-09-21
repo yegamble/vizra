@@ -28,11 +28,26 @@ or dropping `VZ-FOUND-005` (exactly the owner-decision violation this check
 exists to catch) would leave the plan pointing at nothing and the lane green.
 
 A range separator is `…`, `...`, `–` or `—`; a list separator is `/`. A
-separator only counts when digits follow it, so the `.` ending a sentence
-(`… see VZ-CI-001.`) and the `/` in a path (`docs/evidence/VZ-FOUND-008/`) end
-the run instead of extending it. A range that cannot be read as a range — end
-before start, or an implausible span — is a NAMED FAILURE, never a silent skip:
-an unreadable reference is not a resolved one.
+continuation is read only when ALL THREE of these hold, and the run ends
+quietly at the first one that does not:
+
+  1. digits follow the separator — so the `.` ending a sentence
+     (`… see VZ-CI-001.`) and the `/` ending a path
+     (`docs/evidence/VZ-FOUND-008/`) end the run;
+  2. those digits are followed by neither a digit nor a hyphen — so
+     `docs/evidence/VZ-FOUND-008/2026-09-21.md`, an ordinary evidence path in
+     this repository, is NOT read as a list. Without this the checker invented
+     `VZ-FOUND-0008` and `VZ-FOUND-2026` and turned the lane red on a correct
+     document;
+  3. the digits are written at the same width as the id they continue, and that
+     width is one the ledger actually uses — derived from features.json, not
+     hard-coded. A four-digit number after a slash is a date or a version, not a
+     sibling requirement.
+
+Ending the run is deliberately NOT an error: `VZ-FOUND-008` in a path is a
+correct reference to one requirement, and the checker resolves it as such.
+Only a reference that was read AS a range and cannot be made sense of — end
+before start, or an implausible span — is a NAMED FAILURE, never a silent skip.
 
 Two `VZ-…` namespaces are deliberately NOT ledger requirement ids:
 
@@ -97,7 +112,15 @@ ID_PATTERN = re.compile(r"\bVZ-[A-Z0-9]+(?:-[A-Z]+)*-\d+\b")
 # A separator only counts when digits follow, so a sentence-ending "." and a
 # path "/" terminate the run rather than extending it. Applied with .match(s, pos),
 # which anchors at pos (Python's re has no \G).
-CONTINUATION = re.compile(r"(?:(…|\.\.\.|–|—)|(/))(\d+)")
+#
+# `(?![\d-])` is the boundary that stops a DATE from being read as a list of
+# requirement ids. This repository names evidence directories after requirement
+# ids, so `docs/evidence/VZ-FOUND-008/2026-09-21.md` is an ordinary path — and
+# without the boundary it parsed as "VZ-FOUND-008, then list member 2026",
+# inventing `VZ-FOUND-0008` and `VZ-FOUND-2026` and turning the lane red on a
+# correct document. A member must be followed by something that is neither a
+# digit nor a hyphen, so `/2026-09-21` does not match at all and the run ends.
+CONTINUATION = re.compile(r"(?:(…|\.\.\.|–|—)|(/))(\d+)(?![\d-])")
 
 # An upper bound on how many ids one range may name. A range is shorthand for a
 # handful of consecutive requirements; anything larger is a typo (VZ-FOUND-001…999
@@ -114,8 +137,15 @@ def fail(messages, text):
     messages.append(text)
 
 
-def expand_reference(text, match, problems, path):
+def expand_reference(text, match, problems, path, widths):
     """Expand one id and any range/list run that follows it.
+
+    `widths` is the set of numeric-suffix widths actually used by the ledger
+    (derived from features.json, not hard-coded). A continuation member must be
+    written at the SAME width as the id it continues, and that width must be one
+    the ledger uses. Anything else ends the run instead of extending it, because
+    a number of a different width is not a sibling requirement — it is a date, a
+    version, or some other digits that happen to follow a slash.
 
     Returns the list of fully-qualified ids the reference names. Appends to
     `problems` (and returns what it could read) when a range is unreadable —
@@ -127,6 +157,12 @@ def expand_reference(text, match, problems, path):
     numbers = [int(first_digits)]
     shorthand = base
 
+    # An id whose own suffix is not a ledger width is left exactly as written.
+    # It is still resolved as a plain id (and will be reported if it names
+    # nothing); it simply does not get to start a range.
+    if width not in widths:
+        return [base]
+
     pos = match.end()
     previous = int(first_digits)
     while True:
@@ -134,9 +170,12 @@ def expand_reference(text, match, problems, path):
         if not cont:
             break
         range_sep, _list_sep, digits = cont.group(1), cont.group(2), cont.group(3)
+        if len(digits) != width:
+            # Not a sibling id: a date, a version, a line number. End the run
+            # rather than inventing an id at a width the ledger never uses.
+            break
         shorthand += cont.group(0)
         value = int(digits)
-        width = max(width, len(digits))
         if range_sep:
             if value < previous:
                 fail(
@@ -222,8 +261,21 @@ def referencing_files(problems):
     return paths
 
 
+def ledger_widths(ids):
+    """The numeric-suffix widths the ledger actually uses.
+
+    Derived, never hard-coded: if the ledger ever adopts a second width this
+    follows it, and if the ledger is empty the caller has already failed.
+    """
+    return {len(one.rsplit("-", 1)[1]) for one in ids if one.rsplit("-", 1)[1].isdigit()}
+
+
 def check_ids(ids, problems):
     problems_before = len(problems)
+    widths = ledger_widths(ids)
+    if not widths:
+        fail(problems, "LEDGER HAS NO NUMERIC IDS: cannot determine the id width")
+        return
     paths = referencing_files(problems)
     known_issue_files = {
         os.path.splitext(os.path.basename(p))[0] for p in glob.glob("docs/issues/*.md")
@@ -245,7 +297,7 @@ def check_ids(ids, problems):
             if not match:
                 break
             written_total += 1
-            ids_here = expand_reference(text, match, problems, path)
+            ids_here = expand_reference(text, match, problems, path, widths)
             expanded_total += len(ids_here)
             for one in ids_here:
                 references.setdefault(one, set()).add(path)
@@ -254,7 +306,7 @@ def check_ids(ids, problems):
             pos = match.end()
             while True:
                 cont = CONTINUATION.match(text, pos)
-                if not cont:
+                if not cont or len(cont.group(3)) != len(match.group(0).rsplit("-", 1)[1]):
                     break
                 pos = cont.end()
 
