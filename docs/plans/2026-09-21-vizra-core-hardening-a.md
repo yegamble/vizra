@@ -96,10 +96,29 @@ All transcripts live INSIDE the repo at `vizra-core/docs/evidence/hardening-a/`
 (README there explains how to read them). Builder's machine, darwin/arm64,
 go1.27.1, GNU Make 3.81 — **not** the ADR-009 acceptance platform.
 
-### Commit
+### Commits
 
-`2ceac77e4cbb30e964335a7adc6cee550fa65485` on `chore/m0-hardening-a`, 82 files,
-+3177/-23. No migration, no `api/openapi.yaml` byte, no `sqlcgen` byte.
+On `chore/m0-hardening-a`, against `main`:
+
+| Commit | What |
+|---|---|
+| `2ceac77e4cbb30e964335a7adc6cee550fa65485` | the slice. **The last commit touching `api/`** — the pin `vizra-user` and `vizra-search` re-vendor from |
+| `f56dc03a06533bf0bbf057eb74f62ffd47aafc50` | the D3 transcript and the integration lanes (`docs/evidence/` only) |
+| round 2 | documentation and comments only, closing the verifier's four disclosure findings |
+
+Deliberately **no file/line counts here**: they moved once already and this plan
+is not the place to keep a number that every commit invalidates. Derive them:
+
+```
+git -C vizra-core diff --shortstat main...HEAD      # size of the slice
+git -C vizra-core diff --stat f56dc03..HEAD         # the docs-only round
+git -C vizra-core log --oneline -1 -- api/          # the re-vendor pin
+```
+
+No migration, no `api/openapi.yaml` byte, no `sqlcgen` byte — assert with
+`git -C vizra-core diff --stat main...HEAD -- migrations/ internal/store/sqlcgen/`
+(empty) and `git -C vizra-core diff --numstat main...HEAD -- api/` (two files,
+one line each).
 
 ### Local lanes
 
@@ -135,6 +154,30 @@ have been reported as a clean red without it.
 `internal/fixtures` under `-race` grew from ~60 s to 102.9 s because
 `TestManifestDetectsEveryClassOfDrift` gained three cases, two of which
 generate the corpus. Not weakened to save time.
+
+### Round 2 — verifier disclosure findings (docs/comments only)
+
+Verifier verdict at `f56dc03`: **PASS**, all four acceptance items CLOSED. The
+chair held the merge under the standing "no false guarantee merges" ruling
+because the PR's residual list read as exhaustive and was not. Addressed without
+touching code, tests, workflows, fixtures or manifests:
+
+| Finding | Sev | Addressed by |
+|---|---|---|
+| F-1 neither guard reads the workflow's own `make` invocation — `run: make -i ci`, `make SHELL=/usr/bin/true ci`, `make MAKEFLAGS=-i ci`, or a step-level `env: MAKEFLAGS: -i`, all leave both guards green while every make-driven lane goes silent | REQUIRED (disclosure) | one bullet naming the evasion, its four spellings and its full blast radius, in all three residual lists. **Closing it is queued for sweep B; not implemented here** |
+| F-2 "a real failing test fails a required lane" is true of the UNIT suite only | SHOULD | scoped to "unit" in `AGENTS.md`, both guard docstrings and the PR body |
+| F-3 the direct lane exits 0 when zero tests run | SHOULD | added to the residual lists; queued for sweep B |
+| F-4 `append-only` is a floor lane with no provenance step | NIT | added to the residual lists; queued |
+| F-5 the PR body named the wrong `api/` pin, and this plan carried stale counts | NIT | pin corrected to `2ceac77`; counts replaced with the commands above |
+
+**Pin check done before editing** (chair's constraint): nothing pins the bytes of
+any file touched. `fixtures/manifest.json`'s `generator.source_files` covers only
+`internal/fixtures/*.go` and `cmd/fixturegen/main.go`, and `SourceDigest` hashes
+exactly that list; `migrations/manifest.sha256` covers migrations; no test reads
+either guard's docstring body (the sole `__doc__` use is `splitlines()[0]`, left
+byte-identical). No re-pin was forced. The one recorded digest that goes stale —
+`D3-make-integrity.txt:9`, the f56dc03 value for the guard — is disclosed in
+`docs/evidence/hardening-a/README.md` rather than rewritten.
 
 ## Blockers and handoff
 
