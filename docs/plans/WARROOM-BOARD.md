@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-21, tick 72 — user PR #7: F12 and F14 closed, but a `beforeAll`-navigation spec passes on a broken page (test-scoped guard attaches after hooks) → fix round 1: worker-scoped listening. In flight: that round, meta compose topology, core hardening sweep A. Owner inbox unchanged. History: "Tick log" at the end of this file.
+Last tick: 2026-09-21, tick 73 — heartbeat reconcile: found ticks 70–72 had not reached the remote (wrong upstream, swallowed push error — chair's mistake, corrected). GitHub state: meta PR #4 (compose topology) open at `b206d51`, builder still working; core hardening branch pushed at `2ceac77`, no PR yet; user PR #7 builder mid-round. Nothing to verify or merge yet. Owner inbox unchanged. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -85,7 +85,7 @@ While verifying vizra-user #2, a nested sub-agent's Bash tool result ended with 
 
 ## Environment note — 2026-09-21
 
-The owner's machine appears to have been restarted mid-tick: the session ended, two background agents (core fixtures builder, user PR #7 verifier) were stopped, free disk rose from 11 GiB to 36 GiB, and the Docker daemon was down. The interrupted tick-69 command had completed (commit `eda49ab` pushed; stale remote branch deleted). The chair restarted Docker Desktop (29.8.0; the pinned PostgreSQL 18 / Valkey / Redis images survived) and resumed both agents from their transcripts. Lesson for verifiers: write the evidence file incrementally — the stopped verifier had recorded nothing.
+The owner's machine appears to have been restarted mid-tick: the session ended, two background agents (core fixtures builder, user PR #7 verifier) were stopped, free disk rose from 11 GiB to 36 GiB, and the Docker daemon was down. The interrupted tick-69 command had completed (commit `eda49ab` pushed; stale remote branch deleted). The chair restarted Docker Desktop (29.8.0; the pinned PostgreSQL 18 / Valkey / Redis images survived) and resumed both agents from their transcripts. Lesson for verifiers: write the evidence file incrementally — the stopped verifier had recorded nothing. **Chair's own error, found at tick 73:** the records branch was created from `origin/main`, so its upstream was `main` and plain `git push` refused; the chair's `| tail -1` swallowed the error, and ticks 70–72 (commits `d455864`…`4db1b69`) sat unpushed for about half an hour while being reported as recorded. Nothing was lost. Upstream corrected; pushes are now checked by exit status and by reading the remote ref back.
 
 ## Blocked
 
@@ -125,6 +125,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 73 (2026-09-21) — reconcile only; records-branch upstream fixed after three ticks went unpushed.
 - Tick 72 (2026-09-21) — user PR #7 verifier FAIL at `7730500` on the early edge (`beforeAll` navigation); chair declined a docs-only remedy; round 1 sent: worker-scoped listening.
 - Tick 71 (2026-09-21) — vizra-core #5 merged (`56920fe` → `c043df7`); compose topology (VZ-ISSUE-002) and core hardening sweep A dispatched; public search contract held for the M1 asset model.
 - Tick 70 (2026-09-21) — resumed after a machine restart; Docker restarted; core PR #5 verifier dispatched; user PR #7 verifier and the fixtures builder resumed.
