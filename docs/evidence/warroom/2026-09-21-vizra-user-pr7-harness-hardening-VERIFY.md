@@ -1042,3 +1042,193 @@ the brand — was caught and named, or correctly refused.
 PASS is not a merge and not VERIFIED — the chair records those.
 
 FINAL VERDICT: PASS — SHA 07f2c6e0d9e083760c316b6b7032b5b0cf2e73ae
+
+---
+
+# Re-confirmation at `f0ee8f1` — 2026-09-21
+
+| | |
+|---|---|
+| Head SHA | `f0ee8f15a002d75e03e9fd9da269dcc841c08ea6` (confirmed by `gh api` at start) |
+| Previous | PASS at `07f2c6e`, held by the chair on my FINDINGS 6, 7, 8 |
+| Clone | fresh `mktemp -d`, `git status --porcelain` empty |
+| Scope | one docs-and-comments commit |
+
+## C1. The change is comments only — proved two ways, not the chair's way
+
+`git diff --numstat 07f2c6e..f0ee8f1` is exactly three files, **+100 −17**:
+`AGENTS.md` (+64/−11), `docs/evidence/VZ-FOUND-008/README.md` (+11/−2),
+`scripts/ci/check-e2e-lane.mjs` (+25/−4).
+
+I did **not** reproduce TypeScript's `removeComments` emit. Instead, using
+`acorn` from the repo's own `node_modules`:
+
+| Method | Old (`07f2c6e`) | New (`f0ee8f1`) | Identical |
+|---|---|---|---|
+| **A — token stream** (comments are not tokens at all) | 2496 tokens | 2496 tokens | **yes** |
+| **B — AST with `start`/`end`/`loc`/`range` stripped, keys sorted** | 112 015 chars of JSON | 112 015 chars | **yes** |
+| raw bytes | 28 781 | 30 056 | no — the comment text, as expected |
+
+**Negative controls, so the proof is not vacuous:**
+
+- changing `const problems = [];` → `[1];` — Method A first differs at token
+  #134 (`]` vs `num 1`), Method B differs. **Detected.**
+- changing text *inside a string literal* (a check's message) — Method A first
+  differs at token #1975, Method B differs. **Detected.**
+
+So a one-character executable change and a string-content change both break the
+proof, and the real diff breaks neither. **Comment-only, confirmed independently.**
+
+## C2. Evidence ledger and lanes
+
+| Check | Result |
+|---|---|
+| `mutation-digests.txt` — 5 distinct pinned files, 14 digest lines | **13/14 match**; the one that does not is the `D15i test.ts MUTATED` line, which is *meant* to differ from the restored tree. Every `BEFORE`/`RESTORED` digest matches. |
+| transcripts moved between the two SHAs | **none** — the only file changed under `docs/evidence/VZ-FOUND-008/` is `README.md`; the directory holds 148 files at both SHAs |
+| is `check-e2e-lane.mjs` itself pinned? | **no** (`grep -c check-e2e-lane mutation-digests.txt` = 0) — so editing its comments cannot stale the ledger. Consistent with the builder's stated reason for *not* editing `worker-guard.ts`, which **is** pinned (sha256 `4fc5c024…`, verified present in the ledger). |
+| `npm run ci` | **exit 0 — 15 files / 355 tests / 0 skipped** |
+| `bash scripts/ci/check-e2e-lane.sh` | exit 0 |
+| `bash scripts/ci/require-checks_test.sh` | exit 0 — 102 cases / 109 assertions / 0 failed |
+| `bash scripts/ci/check-required-floor.sh` | exit 0 |
+| `bash scripts/ci/check-image-pins.sh` | exit 0 — 3 external `FROM` lines `@sha256`-pinned |
+| `npm run check:contract` | exit 0 |
+
+Nothing executable moved, so I did not re-run the demos or the contention runs —
+my step-C1 proof is what licenses that, and it says they would be unchanged.
+
+## C3. Truthfulness of the NEW text
+
+### The `withoutComments` table — reproduced row for row
+
+Mutating the `formatOrphans` orphan assertion in `e2e/harness/test.ts` six ways
+and running `check-e2e-lane.sh` each time:
+
+| Decoy left behind | AGENTS.md says | I measured |
+|---|---|---|
+| nothing | RED | **RED**, names `formatOrphans` |
+| a line comment where `//` starts the line | RED (stripped) | **RED**, named |
+| a block comment / JSDoc naming it | RED (stripped) | **RED**, named |
+| trailing `void 0; // formatOrphans(a, b)` | **GREEN — defeated** | **GREEN** |
+| string literal `const s = "formatOrphans(";` | **GREEN — defeated** | **GREEN** |
+| call-and-discard `void formatOrphans(a, b);` | **GREEN — defeated** | **GREEN** |
+
+All six match. The third defeat (**call-and-discard**) is one I had *not* tested
+at `07f2c6e`; the builder found and disclosed it itself.
+
+### The other claims
+
+| Claim in the new text | My measurement |
+|---|---|
+| for the `afterAll` late edge this grep is the **only** compensating control — the canary cannot exercise it, the out-of-process check does not see it | **true**: under the trailing-comment mutation the canary exits 0 and the floor/stamp check exits 0, while the `afterAll` probe passes |
+| blast radius bounded — records leak forward to a later test in the same worker | **true**, measured at `07f2c6e` (`home.spec.ts` failed with `BEFORE THE TEST BODY`) |
+| eleven checks: **ten** demanding `name(` + **one** demanding `STAMP_ANNOTATION` presence | **exact** — matches my own enumeration |
+| the `globalSetup` residual (exit 0, `3 passed`, no guard message, module provably ran, `check-e2e-lane.sh` also 0, setup **project** by contrast covered with `[response] http 404`, needs a `playwright.config.ts` edit, no such key today) | **every clause matches my measurements verbatim** |
+| both remedies are **queued, not implemented** | **true**: `withoutComments` is still the matcher (no `acorn`/`espree`/tokeniser in the lane guard, 0 hits), there is no `globalSetup` refusal (0 hits), and `require-checks_test.sh` is still 102 cases |
+| the old "this can only make the patterns match LESS, i.e. fail closed" was FALSE | **true**, and the new header says so in those words |
+
+### Attacking the corrected text
+
+I re-grepped `AGENTS.md` for any surviving over-claim (`comments are stripped`,
+`strips comments`, `not silent`, `fail closed`). The only hits are the corrected,
+attributed ones — the phrase "deleting it is not silent" now appears solely as a
+**quotation of the claim being retracted**.
+
+One imprecision worth recording, which is **not** a finding: AGENTS.md says
+"each of the eleven is demonstrated going red against its own controlled
+mutation (D13q)". For the eleventh — the `STAMP_ANNOTATION` *presence* check —
+my own controlled mutation (delete the whole `testInfo.annotations.push({ type:
+STAMP_ANNOTATION, … })` statement) leaves `check-e2e-lane.sh` **green**, because
+the identifier survives on its import line. That is the same import-satisfies-a-
+name defect the other ten were fixed for. It is immaterial, and the text already
+says why: I ran the lane under that mutation and it goes **RED** (`18 passed` but
+exit 1 — the in-process stamp reporter refuses), and
+`check-coverage-floor-ran.mjs` **also exits 1**. So for this symbol the grep
+really is "only an early warning" with two independent runtime controls behind
+it, exactly as the new text frames it. Unlike `formatOrphans`, nothing here rests
+on the grep.
+
+Minor: the correcting comment quotes the per-file diff as `+65/-10`, `+12/-1`,
+`+26/-3`; `git` gives `+64/-11`, `+11/-2`, `+25/-4`. The total `+100/−17` and
+every substantive claim are right; the per-file split is off by one each way.
+
+## C4. The sentence left in `e2e/harness/worker-guard.ts`
+
+The trade is real and I verified both halves of it: `worker-guard.ts` sha256
+`4fc5c024…` **is** pinned by `mutation-digests.txt`, so editing it in a
+docs-only round would invalidate a committed evidence ledger (regenerating the
+digests means re-running the demonstrations, which is not a docs-only round);
+and `check-e2e-lane.mjs`, which the builder *did* edit, is **not** pinned.
+
+**My answer on adequacy: adequate as a record, not adequate at the point of
+use.** Lines 70–71 still read "…so deleting it is not silent", and
+`grep -c "AGENTS.md" e2e/harness/worker-guard.ts` is **0** — that file contains
+no pointer to the Residuals section at all, unlike its sibling
+`creation-guard.ts`, which ends its own limits note with "See … AGENTS.md §
+Residuals". A developer who opens `worker-guard.ts` to reason about the late
+edge — the obvious place to look — reads the retracted sentence with nothing
+telling them it is known wrong. The correction only reaches a reader already in
+AGENTS.md or the PR thread.
+
+This does not change my verdict: it is a comment in a file whose executable
+behaviour I verified, the claim is retracted in two other places, and the chair
+has accepted the trade. Recommendation for the next harness slice: fix that
+sentence in its **first** commit, since that slice regenerates
+`mutation-digests.txt` anyway — and if the chair wants it corrected sooner, the
+honest route is to regenerate the digests in the same commit rather than to edit
+a pinned file and leave the ledger stale.
+
+## C5. PR body and the correcting comment
+
+The body now matches the verified state: `15 files / 355 tests / 0 skipped`,
+`18 passed, floor OK (9/9 9/9), stamp OK (18)`, `123 halves passed, 0 blocked,
+0 failed`, the rounds, the late-edge cost, both residuals named (`globalSetup`,
+`formatOrphans`), and:
+
+> **Artifact privacy (FINDING 13 of the earlier review) is UNTOUCHED.** …
+> **the hard rule stands: no spec may authenticate, fill a credential or touch a
+> signed URL**, asserted by `e2e/harness/no-credentials-in-specs.test.ts`.
+
+The stale round-6 numbers (`341 tests`, `104 halves`, `14 files`) are **gone**.
+**My FINDING 8 is closed.** The correcting comment exists
+(`2026-09-21T07:39:36Z`, "Correction to the round-7 comment above"), does not
+rewrite history, and its three corrections match what I measured.
+
+## C6. CI on `f0ee8f1`
+
+All **8** check-runs `completed` / `success`; `ci-required` finished `07:41:10`,
+**after** `e2e` at `07:41:05`. Manifest `frontend, contract, ?guard,
+?docker-build, e2e` vs what ran: `frontend` ✓ `contract` ✓ `guard` ✓ `e2e` ✓;
+`?docker-build` optional and path-filtered with no Dockerfile touched, while the
+`e2e` lane builds the image itself (`docker build --tag vizra-user:e2e`).
+
+`e2e` log: `18 passed`, `coverage floor: OK (desktop-chromium-1440=9/9
+mobile-chromium-390=9/9)`, `harness stamp: OK (18 succeeding result(s)…`,
+`OK: the harness canary failed all 4 fault-injection fixtures`, **0** orphan
+lines, **0** skipped/cancelled.
+
+## Status of my findings
+
+| # | Finding | At `f0ee8f1` |
+|---|---|---|
+| 6 | `globalSetup` unobserved and unnamed | **disclosed** in AGENTS.md with my measurement verbatim; control **queued**, correctly labelled "Not done here" |
+| 7 | lane greps defeatable; the header claimed fail-closed | **corrected** — the false sentence is retracted in the `.mjs` header, AGENTS.md and the README, with a six-row measured table; control **queued** |
+| 8 | PR body stale | **closed** |
+| — | `worker-guard.ts:70-71` still overstates | accepted trade; disclosure adequate as a record, **not** at the point of use (C4) |
+
+## Verdict
+
+**My PASS carries.** The commit is provably comments-and-docs only by two
+methods neither of which is the chair's, with negative controls; the evidence
+ledger is intact and no transcript moved; every gate lane is green at this SHA
+with 355 tests and 0 skips; every sentence of the new text reproduces against my
+own measurements, including a defeat I had not found; the two remedies are
+honestly marked queued and are demonstrably not implemented; the PR body and the
+correcting comment match the verified state; and CI is green on this SHA with
+the floor, 18 stamps and the four-fixture canary in the log.
+
+Nothing I measured in this round is reachable from an honest-looking, lint-green,
+type-green spec under `e2e/specs/`.
+
+PASS is not a merge and not VERIFIED — the chair records those.
+
+FINAL VERDICT: PASS — SHA f0ee8f15a002d75e03e9fd9da269dcc841c08ea6
