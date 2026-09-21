@@ -874,3 +874,309 @@ my own scratchpad directory removed by path. Nothing named `vidra-*` was touched
 no shared image list or cache was pruned, and the read-only `vizra-search`
 checkout at `/Users/yosefgamble/github/vizra/vizra-search` was cloned from but
 never modified.
+
+---
+
+# Re-confirmation at `1c12fd9` — 2026-09-21
+
+The chair held the PASS at `f56dc03` over FINDING 1's disclosure gap and asked
+for a docs-and-comments-only commit. The head moved to
+`1c12fd9e6eb4b46223a903a004c36d80cb5d8668` (base still `c043df72…`, 83 files,
++3697 −23). This section judges whether the PASS carries. I took nothing on
+trust, including the chair's own characterisation of the commit as docs-only.
+
+Fresh clone in a directory created with `mktemp -d`
+(`…/scratchpad/vzvrc.rB2SWA5U`), never reused and never named `verify/`.
+
+## R1. Is it really docs-and-comments only?
+
+**Scope.** One commit, `1c12fd9 docs: name the workflow-line evasion, scope
+layer (b) to the unit suite, and correct the api/ pin`. Exactly four files, all
+`M`, no renames, no mode changes (`git diff --summary` is empty):
+
+```
+51   9  AGENTS.md
+35   0  docs/evidence/hardening-a/README.md
+26   5  scripts/ci-required-guard.py
+46   1  scripts/make-integrity-guard.py
+```
+
+**Proof that the two Python files changed only in docstrings — my own method,
+not a reading of the diff.** I parsed both revisions of each file with Python's
+`ast`, removed the docstring statement from every Module/Class/Function node
+(comments never reach an AST at all), and compared `ast.dump()`:
+
+```
+scripts/ci-required-guard.py
+   raw bytes:            22113 -> 23355   (differ: True)
+   docstrings stripped:  7 / 7
+   AST identical after stripping docstrings: True
+
+scripts/make-integrity-guard.py
+   raw bytes:            27925 -> 30375   (differ: True)
+   docstrings stripped:  9 / 9
+   AST identical after stripping docstrings: True
+```
+
+Identical ASTs means **no executable statement, no runtime constant, no regex
+pattern and no exit path moved**, and the equal docstring counts (7/7, 9/9) mean
+none was added or removed as a statement.
+
+Independently, I tokenised both revisions and classified every line the diff
+touches:
+
+```
+scripts/ci-required-guard.py    ADDED 26 -> {'string': 26}   REMOVED 5 -> {'string': 5}
+scripts/make-integrity-guard.py ADDED 46 -> {'string': 46}   REMOVED 1 -> {'string': 1}
+any line classified as CODE:  NONE  (in either file)
+```
+
+Every changed line is inside a string literal. Not one is code — and, as it
+happens, not one is even a `#` comment.
+
+**Is any docstring consumed at runtime? Yes — one, and it did not move.**
+`scripts/make-integrity-guard.py:609` reads
+`ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])`, so the
+module docstring's **first line** is a runtime value. I extracted it from both
+revisions via the AST:
+
+```
+BEFORE: make-integrity-guard — refuse a Makefile that has been turned into a no-op.
+AFTER : make-integrity-guard — refuse a Makefile that has been turned into a no-op.
+=> IDENTICAL
+```
+
+`scripts/ci-required-guard.py` does not reference `__doc__` at all. And
+`scripts/scripts_test.go` never invokes `--help`/`-h` (grep count 0) — it passes
+`--workflows`/`--manifest`/`--skip-makefile`/`--root`/`--targets` — so the
+argparse description is not reachable from any test either. **Does not matter,
+and did not change anyway.**
+
+**Nothing pinned, generated or fixed moved:**
+
+```
+fixtures/manifest.json identical:      YES
+migrations/manifest.sha256 identical:  YES
+.github/ identical:                    YES
+internal/ identical:                   YES
+go.mod / go.sum identical:             YES
+scripts/testdata/ identical:           YES
+scripts/scripts_test.go identical:     YES
+api/ , migrations/ : 0 changed files
+```
+
+**Lanes from the clean clone at `1c12fd9`:**
+
+| Command | Exit | Detail |
+|---|---|---|
+| `make ci` | **0** | 10 lanes; test-race **13 ok, 8 `[no test files]`, 0 SKIP, 0 FAIL** — identical to `f56dc03` |
+| — `fixtures-verify` | | `ok — 12 fixtures, 1791508 bytes, generator 1 (4ff582ba6959), toolchain go1.27.1` — byte-identical to the `f56dc03` result |
+| `./scripts/make-integrity-guard.sh` | **0** | `passed (8 gate target(s))` |
+| `./scripts/ci-required-guard.sh` | **0** | `passed (6 required check(s))` |
+| `go test -race -count=1 ./scripts/` | **0** | 7 tests, **55 subtests PASS, 0 FAIL, 0 SKIP** — every guard fixture still red for its own reason |
+
+## R2. Truthfulness of the new text
+
+I checked every new factual claim against what I measured at `f56dc03`.
+
+| New claim | My measurement | Verdict |
+|---|---|---|
+| Four spellings leave both guards at 0: `make -i ci`, `make SHELL=/usr/bin/true ci`, `make MAKEFLAGS=-i ci`, step-level `env: MAKEFLAGS: -i` | exactly those four, each `ci-required-guard EXIT=0` and `make-integrity-guard EXIT=0` | **accurate** |
+| Blast radius: fmt-check, vet, lint-imports, migrate-lint, config-template-check, openapi-verify, sqlc-verify, ci-guard, fixtures-verify, tidy-check, build, both integration lanes incl. both cache-matrix legs; only the unit suite survives | matches the `ci:` prerequisite list and the build-test/cache-matrix-leg steps I read | **accurate** |
+| Layer (b) is UNIT only; no `-tags=integration`; every integration invocation goes through make | confirmed from the workflow and from `check_direct_test_lane` | **accurate** |
+| Zero tests: `go test -race -count=1 ./...` with every `*_test.go` aside exits 0 on `[no test files]` | I measured exactly this (19 files moved aside, exit 0) | **accurate** |
+| `append-only` has no provenance step; "every required workflow FILE is not every required JOB" | confirmed by parsing the workflow: of 4 jobs, only `build-test` and `cache-matrix-leg` have it | **accurate, and the file/job distinction is the right one** |
+| README: `D3-make-integrity.txt:9`'s baseline digest `3421fd3e75d321b7` is correct **for `f56dc03`** and is stale at head, deliberately not rewritten | `f56dc03` → `3421fd3e75d321b7`; `1c12fd9` → `ef211589b094c892` | **accurate** — a self-reported digest drift, disclosed instead of quietly re-run |
+
+**The AGENTS.md assurance-table row was the right thing to narrow.** It now
+reads "A one-line edit to the **Makefile or its includes** cannot turn every
+required lane into a no-op (a one-word edit to a workflow's own `make` line
+still can — see …)". That closes the overstatement risk at its source rather
+than only in a footnote.
+
+**Nothing new is over-claimed.** Every new bullet is scoped, attributes its
+measurement to `f56dc03`, and says "queued for sweep B … deliberately not
+implemented here" rather than implying a fix.
+
+### Attacking "This list is meant to be EXHAUSTIVE"
+
+The sentence appears once in `scripts/make-integrity-guard.py` and once in
+AGENTS.md. I tried three ways to break it.
+
+**Attempt 1 — can a Makefile make the guard's own probe execute code?** The
+guard runs `make -pn TARGET` twice per target, and GNU make executes recipe
+lines containing `$(MAKE)` even under `--dry-run`; the guard refuses a `+`
+prefix for exactly this reason but never mentions `$(MAKE)`. I planted a
+`$(MAKE) -f sub.mk` line in `test-race`'s recipe with an observable side effect
+(`touch`). **Hypothesis disproved:** make propagates `-n` to the sub-make, whose
+recipes therefore do not run. No side effect. The recursion *does* pollute the
+guard's `MAKEFILE_LIST` reading (it then printed "the root Makefile does not
+carry BOTH approved assignments" and "gate target `ci` is not defined", which
+are false statements about the root Makefile) — but the guard **exits 1**, so it
+fails closed. A confusing red is not a hole. **Not a missing residual.**
+
+**Attempt 2 — the `.sh` wrapper.** `scripts/make-integrity-guard.sh` is 16
+lines; neutering it to `exit 0` would satisfy `step_is_the_anchor`, which only
+checks the `run:` text. But `scripts_test.go` drives the **`.sh`**, and its
+fixtures expect non-zero exits, so the neutering is caught — in the direct
+`go test ./...` lane, which needs no make. **Covered**, and the residual list's
+"there is no mechanical control in this repository that a sufficiently
+determined PR cannot also edit" covers the case where the tests are deleted too.
+
+**Attempt 3 — a REQUIRED lane that is not a FLOOR lane. This one lands.** See
+FINDING 6 below. It is the one thing I found that belongs on a list claiming to
+be exhaustive and is not on it.
+
+## R3. FINDING 5 — closed
+
+**PR body**, now:
+
+> …the pin to re-vendor from is **`2ceac77e4cbb30e964335a7adc6cee550fa65485`** —
+> the last commit in this branch that touches `api/`. It is *not* the branch
+> head: every later commit here is documentation and evidence only. (Derive it
+> yourself with `git log --oneline -1 -- api/`.)
+
+Ground truth from my clone: `git log -1 --format=%H -- api/` →
+`2ceac77e4cbb30e964335a7adc6cee550fa65485`. **Matches**, and it now says
+explicitly that it is not the head — which was the actual error.
+
+**Plan document**: the stale counts are gone. It now carries a commit table
+(`2ceac77` = the slice and the `api/` pin; `f56dc03` = the D3 transcript and
+integration lanes; "round 2" = docs and comments only) and states *"Deliberately
+**no file/line counts here**: they moved once already"*, replacing them with
+`git diff --shortstat main...HEAD`, `git diff --stat f56dc03..HEAD` and
+`git log --oneline -1 -- api/`. Nothing left to go stale. **F-5 CLOSED.**
+
+## R4. CI on `1c12fd9`
+
+`build-test` had concluded by the time I read it. Every required lane completed
+and succeeded **on this SHA** — nothing pending, skipped, cancelled or timed out:
+
+```
+append-only    completed  success
+build-test     completed  success      06:43:02 -> 06:54:10  (11m08s of a 20-min timeout)
+cache-matrix   completed  success
+  cache-matrix-leg (valkey)  completed  success
+  cache-matrix-leg (redis)   completed  success
+docker-build   completed  success
+fixtures       completed  success
+govulncheck    completed  success
+ci-required    completed  success
+GitGuardian Security Checks  completed  success
+```
+
+The fan-in read the manifest on this SHA and observed each lane itself — not a
+manifest listing lanes nobody ran:
+
+```
+required checks (6): append-only build-test cache-matrix fixtures govulncheck docker-build
+ci-required-guard: passed (6 required check(s))
+  SUCCESS append-only / build-test / cache-matrix / fixtures / govulncheck / docker-build
+```
+
+Manifest and `FLOOR_LANES` still agree, six and six. Provenance on this SHA is
+correct and mutually consistent:
+
+```
+ref:                              refs/pull/6/merge
+TESTED TREE (git rev-parse HEAD):  e225a8b18cf1fc79d3b2f04243ea4ba015403d02
+base actually merged in (HEAD^1):  c043df72f06cc7b5d7237a12d2be4dac25fa788e
+head actually merged in (HEAD^2):  1c12fd9e6eb4b46223a903a004c36d80cb5d8668
+PR head SHA:                       1c12fd9e6eb4b46223a903a004c36d80cb5d8668
+checked: HEAD^2 == the PR head SHA, so this really is the merge ref.
+```
+
+## Findings carried and added
+
+FINDINGS 1–4 are now **disclosed** rather than closed — that was the point of
+this round, and the disclosure is accurate and in three places. They remain open
+as engineering work, queued by the builder for core hardening sweep B; the chair
+should carry them to that slice's brief rather than treat this round as fixing
+them. FINDING 5 is **CLOSED**. One new finding:
+
+```
+FINDING 6: a lane that is REQUIRED but not in FLOOR_LANES is never anchor-checked,
+           continue-on-error-checked or trigger-checked — and the guard prints `ok`
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     scripts/ci-required-guard.py:406 (floor loop), :434 (the checks 3/4/8 loop),
+             :424 (the `required` loop, which only resolves names)
+             scripts/make-integrity-guard.py, "WHAT IT DOES NOT GUARANTEE"
+             AGENTS.md, "What these two controls do NOT give you"
+  requirements: the slice's acceptance item 2(a)
+
+Observed:
+  Checks 3 (pull_request), 4 (no continue-on-error) and 8 (the anchor) are all
+  looped over FLOOR_LANES. The loop over `required` does one thing only: assert
+  the name resolves to a job. Today required == FLOOR_LANES exactly (6 = 6), so
+  nothing is exposed — this is latent.
+
+  Measured at 1c12fd9. I added a seventh line `extra-lane` to
+  .github/required-checks.txt and a workflow whose job carries BOTH
+  `continue-on-error: true` at job level AND `run: make -i ci` with no anchor
+  step before it:
+
+      ci-required-guard      EXIT=0
+      make-integrity-guard   EXIT=0
+      the only line mentioning it:  "ok  required check 'extra-lane' resolves to a job"
+
+  (Restored; `git status --porcelain` clean.)
+
+Failure:
+  The guard prints a reassuring `ok` for a required lane it has not actually
+  checked — which is the exact failure mode its own opening paragraph exists to
+  prevent: "A guard that reports ok for something it cannot see is the
+  false-positive CI that AGENTS.md names." It fails OPEN, not closed. Widening
+  the gate by adding a line to required-checks.txt looks virtuous and is the
+  low-friction edit most likely to introduce it; the new lane would then be
+  exempt from every structural check the other six get.
+
+  It belongs on a list that says "This list is meant to be EXHAUSTIVE. Something
+  that belongs on it and is not here is a defect in this docstring, not a
+  detail." It is not on it.
+
+Perspective:
+  developer, operator
+
+Recommendation:
+  Two lines: run checks 3, 4 and 8 over `set(FLOOR_LANES) | set(required)`
+  rather than over FLOOR_LANES alone. FLOOR_LANES keeps its separate job — it is
+  the floor that cannot be REMOVED; it should not also be the ceiling on what
+  gets checked. If the chair prefers no code change in a docs round, add the
+  bullet to the three residual lists and take the fix in sweep B with 1–4.
+
+Acceptance criteria:
+  - A lane listed in required-checks.txt but absent from FLOOR_LANES, carrying
+    continue-on-error or an unanchored make step, turns ci-required-guard red by
+    name.
+  - The unmodified tree still exits 0 with `passed (6 required check(s))`.
+
+Tests:
+  scripts/scripts_test.go, with a scripts/testdata/guard/required-not-floor/
+  fixture in the same shape as the twelve already there: a required-checks.txt
+  with an extra name and a workflow whose matching job is unanchored.
+```
+
+## Does the PASS carry?
+
+Yes. The commit is provably documentation and comments only — executable ASTs
+identical, every changed line inside a docstring, the single runtime-consumed
+docstring line byte-identical, and no manifest, fixture, workflow, test or
+pinned digest moved. Every lane I ran at `f56dc03` I re-ran at `1c12fd9` with
+the same results, the guard fixtures still pass (55 subtests, 0 fail, 0 skip),
+and `ci-required` plus all six floor lanes are green on this SHA with the
+manifest matching the jobs that actually ran. The new text is accurate against
+my own measurements and narrows the one row that had been over-broad. FINDING 5
+is closed; FINDINGS 1–4 are now honestly disclosed and queued; FINDING 6 is new,
+latent, and not blocking.
+
+Head re-checked at the end of this section: still
+`1c12fd9e6eb4b46223a903a004c36d80cb5d8668` (`updated_at` 2026-09-21T06:42:56Z).
+
+**PASS is still not a merge and not VERIFIED in the ledger.** The chair records
+those, and should carry FINDINGS 1, 2, 3, 4 and 6 into the sweep B brief.
+
+FINAL VERDICT: PASS — SHA 1c12fd9e6eb4b46223a903a004c36d80cb5d8668
