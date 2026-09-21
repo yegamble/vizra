@@ -1,0 +1,47 @@
+
+########## DEMO 5 — 'validate' deleted from .github/required-checks.txt ##########
+
+BASE SHA: 9da584e117c1b3fd616b7c6e8a251fa787fdc0b1
+
+Two sub-cases, because deleting the only floor lane can leave the manifest
+either EMPTY or non-empty, and each must be a named failure.
+
+########## RED 5a: 'validate' replaced by another real job name (manifest non-empty) ##########
+
+manifest now lists:
+  ci-required
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - ci-required
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+FLOOR VIOLATION: 'validate' is a non-optional lane and must appear in .github/required-checks.txt, but it is absent.
+  A PR may add lanes to the manifest. It may not remove one of the floor lanes,
+  because that would silently stop gating the thing the lane exists to gate.
+EXIT=1
+
+########## RED 5b: 'validate' deleted outright (manifest left with only comments) ##########
+
+manifest now lists:
+  (nothing)
+$ ./scripts/ci-required-guard.sh
+EMPTY MANIFEST: .github/required-checks.txt lists no checks.
+  Every line is blank or a comment, so ci-required would require nothing and
+  pass trivially. A manifest that gates nothing is not a manifest.
+EXIT=1
+
+########## GREEN: manifest restored ##########
+
+manifest lists:
+  validate
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+every required check is defined by a job
+the workflow checker rejects every continue-on-error spelling in scripts/testdata/ (6 fixtures exercised, floor 6)
+the pin checker rejects every unpinned-action and untriggered-lane spelling in scripts/testdata/ (7 fixtures exercised, floor 7)
+EXIT=0

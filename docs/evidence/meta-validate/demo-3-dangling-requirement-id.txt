@@ -1,0 +1,27 @@
+
+########## DEMO 3 — dangling VZ-… id in an issue file ##########
+
+SOURCE SHA: 957f059756fe60868dcc24b71b0ba7e3118e2624
+
+########## RED: reference a requirement that does not exist ##########
+
+appended to docs/issues/VZ-ISSUE-001.md:
+
+- Depends on VZ-NOSUCH-999 and VZ-ISSUE-404.
+$ ./scripts/check-quality-json.py
+DANGLING REQUIREMENT ID(S): 2 id(s) reference nothing:
+  VZ-ISSUE-404: no docs/issues/VZ-ISSUE-404.md exists
+      referenced by docs/issues/VZ-ISSUE-001.md
+  VZ-NOSUCH-999: not in docs/quality/features.json
+      referenced by docs/issues/VZ-ISSUE-001.md
+json parsed: 4 file(s) under docs/quality/
+ledger: 191 requirement id(s) in docs/quality/features.json
+EXIT=1
+
+########## GREEN: restore ##########
+
+$ ./scripts/check-quality-json.py
+json parsed: 4 file(s) under docs/quality/
+ledger: 191 requirement id(s) in docs/quality/features.json
+requirement ids: 139 distinct VZ-… reference(s) across 14 document(s); every one resolves
+EXIT=0

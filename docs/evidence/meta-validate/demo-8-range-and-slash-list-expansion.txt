@@ -1,0 +1,58 @@
+
+########## DEMO 8 — ranges and slash-lists are expanded (verifier FINDING 2) ##########
+
+BASE SHA: cd1188da6045f86475cb9046e58507365f4a6f45
+
+Before this fix only the FIRST id of a range or slash-list was resolved, so
+VZ-FOUND-001…999 and VZ-CI-001/888 both passed green. The M0 row schedules
+VZ-FOUND-001…008 and seven of those eight were never checked.
+
+$ ./scripts/check-quality-json.py
+json parsed: 4 file(s) under docs/quality/
+ledger: 191 requirement id(s) in docs/quality/features.json
+requirement ids: 191 written reference(s) expanded to 287 id(s), 204 distinct, across 14 document(s); every one resolves
+EXIT=0
+
+139 distinct ids before this fix; the line above is after.
+
+########## RED — a range whose end does not exist: VZ-FOUND-001…008 -> VZ-FOUND-001…999 ##########
+
+  sha256(docs/MILESTONES.md) = 43be9f00a91e43d1
+  sha256(docs/MILESTONES.md) = 6c973c269b92f2cf
+$ ./scripts/check-quality-json.py
+IMPLAUSIBLE RANGE: docs/MILESTONES.md: 'VZ-FOUND-001…999' names 999 ids, ending at VZ-FOUND-999; the cap is 200. A range is shorthand for a handful of consecutive requirements, so a span this large is a typo, not a range.
+json parsed: 4 file(s) under docs/quality/
+ledger: 191 requirement id(s) in docs/quality/features.json
+requirement ids: 191 written reference(s), 280 id(s) expanded and resolved, but at least one reference could not be read — see the failure(s) above
+EXIT=1
+
+########## RED — a slash-list with one bad member: VZ-CI-001/002/004 -> VZ-CI-001/888 ##########
+
+  sha256(docs/MILESTONES.md) = 43be9f00a91e43d1
+  sha256(docs/MILESTONES.md) = 40e992501e21e0af
+$ ./scripts/check-quality-json.py
+DANGLING REQUIREMENT ID(S): 1 id(s) reference nothing:
+  VZ-CI-888: not in docs/quality/features.json
+      referenced by docs/MILESTONES.md
+json parsed: 4 file(s) under docs/quality/
+ledger: 191 requirement id(s) in docs/quality/features.json
+EXIT=1
+
+########## RED — an unparseable (descending) range: VZ-FOUND-001…008 -> VZ-FOUND-008…001 ##########
+
+  sha256(docs/MILESTONES.md) = 43be9f00a91e43d1
+  sha256(docs/MILESTONES.md) = ccc853ab691d7f85
+$ ./scripts/check-quality-json.py
+UNREADABLE RANGE: docs/MILESTONES.md: 'VZ-FOUND-008…001' ends at 001 but starts at 008. A range must ascend; this cannot be read as a reference, so it is reported rather than skipped.
+json parsed: 4 file(s) under docs/quality/
+ledger: 191 requirement id(s) in docs/quality/features.json
+requirement ids: 191 written reference(s), 280 id(s) expanded and resolved, but at least one reference could not be read — see the failure(s) above
+EXIT=1
+
+########## GREEN — the nine existing range/slash rows are unchanged and still resolve ##########
+
+$ ./scripts/check-quality-json.py
+json parsed: 4 file(s) under docs/quality/
+ledger: 191 requirement id(s) in docs/quality/features.json
+requirement ids: 191 written reference(s) expanded to 287 id(s), 204 distinct, across 14 document(s); every one resolves
+EXIT=0

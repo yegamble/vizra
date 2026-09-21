@@ -54,5 +54,13 @@ out = {
   "summary": {"total": len(reqs), "core_profile": core_n, "full_profile": len(reqs), "by_area": dict(sorted(by_area.items())), "by_source_kind": dict(sorted(by_kind.items())), "open_questions_referenced": unresolved, "decided_questions_referenced": decided},
   "features": reqs,
 }
-json.dump(out, open(sys.argv[1],"w"), indent=2, ensure_ascii=False)
+# encoding is explicit on purpose. With ensure_ascii=False the output carries
+# non-ASCII characters (§ ° × – — … ← → ↔ ≤ ≥), and a bare open(..., "w") encodes
+# them with locale.getpreferredencoding(False). That is UTF-8 on macOS and on a
+# C.UTF-8 runner, but ASCII under a POSIX/C locale, where this line would raise
+# UnicodeEncodeError instead of writing the ledger. A generated file must not
+# depend on the ambient locale of whoever regenerates it. Output bytes are
+# unchanged; only the guarantee is new.
+with open(sys.argv[1], "w", encoding="utf-8", newline="\n") as fh:
+    json.dump(out, fh, indent=2, ensure_ascii=False)
 print(f"OK {len(reqs)} requirements; core={core_n}; areas={dict(by_area)}; questions={unresolved}; decided={decided}")

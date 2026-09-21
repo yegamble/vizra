@@ -1,0 +1,61 @@
+
+########## DEMO 6 — continue-on-error in three spellings, in the REAL validate lane ##########
+
+SOURCE SHA: 957f059756fe60868dcc24b71b0ba7e3118e2624
+
+The fixtures in scripts/testdata/ prove the CHECKER catches each spelling.
+This demonstration proves the real .github/workflows/validate.yml is
+actually guarded: each spelling is inserted into the live workflow, the
+fan-in guard is run, and the workflow is restored.
+
+########## RED — spelling: continue-on-error: true ##########
+
+inserted on job `validate`: continue-on-error: true
+  44:    continue-on-error: true
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+VIOLATION .github/workflows/validate.yml at=job key=continue-on-error value=literal-true where=.github/workflows/validate.yml:jobs.validate.continue-on-error
+.github/workflows/validate.yml:jobs.validate.continue-on-error: `continue-on-error` is not allowed on a required lane (found with value True; the value is irrelevant — the key makes the lane unable to fail the gate)
+continue-on-error is not allowed on a required lane
+EXIT=1
+
+########## RED — spelling: "continue-on-error": true ##########
+
+inserted on job `validate`: "continue-on-error": true
+  44:    "continue-on-error": true
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+VIOLATION .github/workflows/validate.yml at=job key="continue-on-error" value=literal-true where=.github/workflows/validate.yml:jobs.validate.continue-on-error
+.github/workflows/validate.yml:jobs.validate.continue-on-error: `continue-on-error` is not allowed on a required lane (found with value True; the value is irrelevant — the key makes the lane unable to fail the gate)
+continue-on-error is not allowed on a required lane
+EXIT=1
+
+########## RED — spelling: Continue-On-Error: true ##########
+
+inserted on job `validate`: Continue-On-Error: true
+  44:    Continue-On-Error: true
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+VIOLATION .github/workflows/validate.yml at=job key=Continue-On-Error value=literal-true where=.github/workflows/validate.yml:jobs.validate.Continue-On-Error
+.github/workflows/validate.yml:jobs.validate.Continue-On-Error: `continue-on-error` is not allowed on a required lane (found with value True; the value is irrelevant — the key makes the lane unable to fail the gate)
+continue-on-error is not allowed on a required lane
+EXIT=1
+
+########## GREEN: workflow restored ##########
+
+0
+0 occurrences in validate.yml
+$ ./scripts/ci-required-guard.sh
+required checks:
+  - validate
+workflows parsed: 2; no continue-on-error on any job or step
+workflows parsed: 2; 3 action reference(s), every one pinned to a 40-hex commit SHA; every required lane runs on pull_request for any base branch
+floor: every non-optional lane is present in the manifest
+manifest entries are bare job names
+every required check is defined by a job
+the workflow checker rejects every continue-on-error spelling in scripts/testdata/ (6 fixtures exercised, floor 6)
+the pin checker rejects every unpinned-action and untriggered-lane spelling in scripts/testdata/ (7 fixtures exercised, floor 7)
+EXIT=0
