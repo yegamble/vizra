@@ -1088,3 +1088,84 @@ before re-reading the rule; nothing was changed by it. No further git in the met
 
 **State: BLOCKED (CI refused for billing — owner-only). Local evidence complete. Next: owner restores
 Actions; then CI on 56504c1 (or a re-run) must be green before READY_FOR_REVIEW; then the verifier.**
+
+### Council re-review of 56504c1 — staged, NOT pushed (chair: wait for the verifier's verdict)
+
+- Local commit `94fc68ce5195230474a52712ca52f73265a96e9e` on 56504c1 (one commit, no amend):
+  backend NEW-B floors + security F-2 AGENTS.md row + harness MUT-60/61 + evidence README note.
+- Floors from `--emit-floors` on measured runs at 56504c1+AGENTS prose (unit 1184, integration 1349,
+  0 fail, 0 skip, both report exit 0): internal/integration 40→140 (165), internal/httpapi 26→48 (56)
+  in both suites; min_tests unit 943→1006, integration 981→1147. Generator also proposes cmd/vizra
+  8→10 and internal/config 82→86 — NOT applied (not in the ruling); raised to the chair.
+- MUT-60 (delete owner_claim_test.go + claimtoken_cli_test.go; one alone is a build failure): 45
+  executed vs floor 140 → red on the package floor; green 165. 45 > the OLD floor 40, confirming
+  NEW-B. MUT-61 (delete setup_test.go): 32 vs 48 → red; green 56; 32 > old 26.
+- demonstrate.sh at 94fc68c: 60 scored, 60 passed, 0 failed, 0 harness-fail.
+- Report lanes at 94fc68c, two attempts each at host load ~290-350: 0 failed, 0 skipped, but
+  `internal/fixtures` and `internal/integration` hit the 10-minute default `go test` timeout (integration
+  128 of 165 executed when killed). internal/integration alone also timed out (601 s). The same test
+  code passed in 251 s at lower load in the measurement run. Risk flagged: the -race integration
+  package's runtime (race test 64-174 s, CLI test 61-142 s) leaves little headroom under 10 min.
+- Containers m1close-pg18 / m1close-valkey re-created for this round and still RUNNING for the
+  verdict follow-up.
+- Chair ruling: apply the generator's other proposals too. Second local commit
+  `37601f5f0b3e85582080b1762985743cd04bd2a1` on 94fc68c (no amend): cmd/vizra 8→10 (measured 12),
+  internal/config 82→86 (measured 101), both suites, recorded in `_why`. Every committed per-package
+  floor now equals `--emit-floors` for the measured run (mechanical compare: 17 unit / 18 integration
+  packages, 0 differences). The measured runs judged against the new file: unit report ok (1184,
+  floor 1006), integration report ok (1349, floor 1147). `go test ./scripts/` ok; ci-required-guard 0.
+- Timeout NOT changed (Makefile pin is core #10's; chair records the -race headroom risk). Push held
+  for the verifier's verdict. Containers m1close-pg18/-valkey still running.
+- Verifier PASS at 56504c1 (local; CI BLOCKED) → released. Pushed `56504c1..37601f5` fast-forward;
+  `git ls-remote` shows `refs/heads/feat/m1-owner-claim` = `37601f5f0b3e85582080b1762985743cd04bd2a1`.
+  PR #8 body updated: status line still "BLOCKED on CI", verifier PASS noted, history rows for 94fc68c
+  and 37601f5, and a "Council re-review of 56504c1" section (floors table, MUT-60/61, F-2, local counts,
+  the timed-out report lanes stated as not counted).
+- CI on 37601f5, checked once: every Actions job refused (billing annotation on ci-required); GitGuardian
+  success. Not re-run.
+- Cleanup: `m1close-pg18` and `m1close-valkey` removed with `docker rm -f -v`; large scratch files
+  deleted. **Round done. State: BLOCKED on CI only (owner-only billing).**
+
+### Round 4 — verifier R4-A (limiter refreshed its TTL on every call) — IN_PROGRESS
+
+- Chair ruling: make the limiter a true fixed window. Supported floor confirmed: ADR-001 lines 35-37
+  (Valkey >= 7.2, Redis >= 7.2, 7.2 command set); CI digests Valkey 9.1.2 and Redis 7.2.16. `EXPIRE NX`
+  needs 7.0, so the NX form was chosen (no Lua). go-redis v9.22.0 `ExpireNX`, confirmed in the module
+  source `generic_commands.go:94`.
+- Local commit `085d78b` on 37601f5: `INCR` + `ExpireNX` in a TxPipeline (MULTI/EXEC);
+  `internal/integration/ratelimit_test.go` (4 tests); MUT-62/63; AGENTS limiter row + ceiling row
+  corrected; `allowSetupRequest` comment; evidence README + `09-limiter-red-green.txt`.
+- Red at 37601f5 code, on Valkey AND Redis: 3 of 4 tests red for the stated reason (TTL 9.999s after
+  1.5s; request 3.3s after a 3s window refused; the cache path alone refused at +6.3s/+6.4s in the
+  agreement script). The TTL-less test is green on the old code by construction (it set a TTL
+  every call), and is shown red by MUT-63. Green with the fix, 4/4 on both caches.
+- First version of the agreement test gave a WRONG-REASON red (the cache-down path takes ~1.3 s per call
+  with go-redis retries, so a shared clock drifted); it was rebuilt on per-limiter timelines before any
+  result was used.
+- Callers: internal/httpapi/setup_limits.go only — allowSetupRequest (ceiling.claim 600, ceiling.status
+  3000), consumeClaimFailure (per-origin 10, global 60), claimLimitTransition (audited 1); all
+  claimRateWindow = 15 min. Constructed in cmd/api/main.go. No existing test waits across a window
+  (TestRateLimiterOnTheConnectedServer and the golden path use 1-minute windows inside the minute).
+- Containers m1close-pg18 / -valkey / -redis running. Lanes running (r4.sh).
+- Lanes at 085d78b: unit 1184 / 0 skip / report 0; integration Valkey 1353 / 0 skip / report 0;
+  integration Redis 1353 / 0 skip / report 0 (internal/integration 169; internal/fixtures 42, no timeout
+  this time at load 20-270); demonstrate.sh 62/62, 0 harness-fail (MUT-62, MUT-63 PASS); guards 0/0;
+  scripts ok. MUT-id audit: 67 cited = 62 scored + 5 review-only, 0 dangling.
+- Generator on those runs: internal/integration 144, integration min_tests 1150 → applied in `2ad370e`;
+  re-judged ok; MUT-60 re-run vs 144: red 49, green 169.
+- Evidence commit `385fc51` (01, 02, 06 at 085d78b). Pushed 37601f5..385fc51 fast-forward; remote ref
+  = `385fc51245f34cf8a04ea069c8c3769f7bda5c66`. PR body: round-4 section with caller table.
+- CI on 385fc51, checked once: all Actions jobs refused (billing); GitGuardian success.
+- Containers m1close-pg18 / -valkey / -redis still RUNNING, pending the chair's word that the round is
+  done. **Next: security seat reviews the limiter; verifier re-confirms; CI when billing is restored.**
+- Chair: PASS at 385fc51 (local; CI BLOCKED); security seat no blocker; R4-A closed. Verifier NIT
+  R5-N1 ("the server applies both or neither" is stronger than Redis guarantees) fixed in ONE docs-only
+  commit `66b3f3d50c56499432cbf6174661cbaa6bacbfea` (ratelimit.go comment lines only: 0 non-comment
+  lines; AGENTS.md; evidence README): 3 files, +18 −6. Pushed 385fc51..66b3f3d fast-forward; remote ref
+  confirmed. CI not re-run.
+- Cleanup: m1close-pg18, m1close-valkey, m1close-redis removed with `docker rm -f -v`; scratch event
+  streams deleted. **Round done. State: verified locally, BLOCKED on CI only (owner billing).**
+- Chair: PASS at 66b3f3d (local; CI BLOCKED). Verifier R6-N1 ("a crash applies neither" false for a
+  client dying after EXEC) fixed with the chair's exact sentence at all three sites in ONE docs-only
+  commit (0 non-comment Go lines); pushed as a fast-forward; CI not re-run. Last wording change; merge
+  waits on billing only.
