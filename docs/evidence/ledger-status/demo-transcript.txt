@@ -1,0 +1,67 @@
+# source SHA 94ac3bf8c312ca0c1ab08195293f1ad15170d7ff (branch feat/m0-ledger-status); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
+# command: bash docs/evidence/ledger-status/demo.sh
+# exit: 0
+
+== G0 the committed tree: generator and regeneration check
+  GREEN (as required) G0a generator on the committed records — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+  GREEN (as required) G0b scripts/check-generated-ledger.sh on the committed tree — exit 0: generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+== G1 fixture state: a VERIFIED record that meets every offline rule is admitted
+  GREEN (as required) G1 generator admits the fixture record — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+  GREEN (as required) G1 output carries VERIFIED / VERIFIED_AT_SHA / MERGED / NOT_RELEASED
+== D1a hand-asserted VERIFIED: a record that claims VERIFIED with no evidence file
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/status_records.json: sha256 6ec852bc6259036410b1d2286facd7ca05a7424bcc96ffa37e362d286d01e5ee -> 88621e1e9276faf0bc621cd5dd533c17c6c74ed630e9129da2d8ac0344658eb7
+  RED   (as required) D1a — exit 1, named: VERIFIED with NO EVIDENCE
+        | status record #0 (VZ-FOUND-008): merges[0]: VERIFIED with NO EVIDENCE — every merge of a VERIFIED record needs an evidence_file under docs/evidence/warroom/ whose final line is the verifier's PASS on that merge's verified_head.
+  GREEN (as required) D1a restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+== D1b hand-asserted VERIFIED: a section source sets the status itself
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/s9_ui_design.py: sha256 9ece9f07782914633780cb4e3025b75c1282cd667ea75050f88d0852da11ce1c -> 2cff0aae21f792749441ef94500e5a2f1ccfab008aefbd87a13eaeb549334374
+  RED   (as required) D1b — exit 1, named: HAND-ASSERTED implementation_status 'VERIFIED' in a section source
+        | VZ-CONTROLS-001: HAND-ASSERTED implementation_status 'VERIFIED' in a section source. A status comes only from a record in status_records.json; the DSL must leave every entry PLANNED.
+  GREEN (as required) D1b restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+== D1c hand-asserted VERIFIED: features.json edited by hand and COMMITTED (in a scratch copy)
+  mutation on /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.7P1smkBqgN/copy/docs/quality/features.json: sha256 14dcefb57609704e8c84fb9c042a8a9b3dd500aa881460235690b6b8aac5f510 -> 92a8e5cbd6b621a50db16f71f3d1cb813b4e3a8f4efb5c30d5f8ca566386a18a
+  RED   (as required) D1c — exit 1, named: GENERATED FILE IS NOT REPRODUCIBLE
+        | GENERATED FILE IS NOT REPRODUCIBLE. The following generated file(s) changed when
+  GREEN (as required) D1c restored — exit 0: generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+== D2 evidence whose verdict SHA does not match the verified head
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md: sha256 e6aa7b40f18b47e444c80b4e2da1826ebccab75ccaeaa139421263ec75951f94 -> f0eecd6743927168d4b808e3331c9823f27029fbf196c644acc23d4689c0cb0e
+  RED   (as required) D2a verdict names another SHA — exit 1, named: VERDICT SHA MISMATCH
+        | status record #0 (VZ-FOUND-008): merges[0]: VERDICT SHA MISMATCH — docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md ends with a PASS on cf053a3f003b251df4c3405edda91560502c458e, but the record's verified_head is c2ff4454b28d3b7887d19fdf2f44742ffb7f55da. The verdict must name the exact head that was merged.
+  GREEN (as required) D2a restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md: sha256 e6aa7b40f18b47e444c80b4e2da1826ebccab75ccaeaa139421263ec75951f94 -> d33c0ad8b61a5ea8886dfaed6e3e87939e49960e47c590adc70d222876eb59ad
+  RED   (as required) D2b a later FAIL is the final line — exit 1, named: does not END with a PASS verdict
+        | status record #0 (VZ-FOUND-008): merges[0]: docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md does not END with a PASS verdict. Its final non-empty line is 'FINAL VERDICT: FAIL — SHA c2ff4454b28d3b7887d19fdf2f44742ffb7f55da'; required 'FINAL VERDICT: PASS[ (…)] — SHA <40-hex>'. A verdict anywhere else in the file, a FAIL, or an abbreviated SHA does not count.
+  GREEN (as required) D2b restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/status_records.json: sha256 6ec852bc6259036410b1d2286facd7ca05a7424bcc96ffa37e362d286d01e5ee -> 34f77c6c0c5212efc868762cd0d563e0a47a7dec71c70199469d16f8f7c7206e
+  RED   (as required) D2c evidence file missing — exit 1, named: MISSING EVIDENCE FILE
+        | status record #0 (VZ-FOUND-008): merges[0]: MISSING EVIDENCE FILE docs/evidence/warroom/NO-SUCH-VERIFY.md; a verdict that is not in the tree is not evidence
+  GREEN (as required) D2c restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+== D3 an IMPLEMENTED whose merge SHA is not on main (online, gh api)
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/status_records.json: sha256 6ec852bc6259036410b1d2286facd7ca05a7424bcc96ffa37e362d286d01e5ee -> 82c19ac6446fae02ac5f631e00a88591f2863f603710dbb85f175191570e85da
+  GREEN (as required) D3 baseline: IMPLEMENTED on the true merge commit — exit 0: OK: 1 status record(s) proved against GitHub
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/status_records.json: sha256 82c19ac6446fae02ac5f631e00a88591f2863f603710dbb85f175191570e85da -> deec225660ce6f5fdb7e0f68b22c1168bd60b2b217682089cd29b95508c2243b
+  RED   (as required) D3 — exit 1, named: is NOT on yegamble/vizra-user main
+        | status record #0 (VZ-FOUND-008 IMPLEMENTED): merges[0] vizra-user#8: merge commit cf053a3f003b251df4c3405edda91560502c458e is NOT on yegamble/vizra-user main (compare cf053a3f003b...main: diverged, behind_by 25)
+  GREEN (as required) D3 restored — exit 0: OK: 1 status record(s) proved against GitHub
+== D4 an unknown status
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/status_records.json: sha256 6ec852bc6259036410b1d2286facd7ca05a7424bcc96ffa37e362d286d01e5ee -> 492e73fedfbb0cae98684b27dcd98a71303aea59bffc9dbe1550600e38150bcd
+  RED   (as required) D4 status DONE — exit 1, named: status 'DONE' is REFUSED
+        | status record #0 (VZ-FOUND-008): status 'DONE' is REFUSED. A record may claim only IMPLEMENTED or VERIFIED; anything else is refused by name.
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/status_records.json: sha256 6ec852bc6259036410b1d2286facd7ca05a7424bcc96ffa37e362d286d01e5ee -> 186856ac451857c0af0f94de8cf9a361118e61f646b71eb2732a401a4fd581cc
+  RED   (as required) D4 status IN_PROGRESS — exit 1, named: status 'IN_PROGRESS' is REFUSED
+        | status record #0 (VZ-FOUND-008): status 'IN_PROGRESS' is REFUSED. A record may claim only IMPLEMENTED or VERIFIED; anything else is refused by name.
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/status_records.json: sha256 6ec852bc6259036410b1d2286facd7ca05a7424bcc96ffa37e362d286d01e5ee -> ebf0c0bbf5fdca8a9e0502db54fa8c2a73435e061553ea963c39f4c60d15e8d2
+  RED   (as required) D4 status VERIFIED_AT_SHA — exit 1, named: status 'VERIFIED_AT_SHA' is REFUSED
+        | status record #0 (VZ-FOUND-008): status 'VERIFIED_AT_SHA' is REFUSED. A record may claim only IMPLEMENTED or VERIFIED; anything else is refused by name.
+  GREEN (as required) D4 restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+== D5 floors: a component half is not the requirement
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/status_records.json: sha256 6ec852bc6259036410b1d2286facd7ca05a7424bcc96ffa37e362d286d01e5ee -> 34ba6b183bc9a22b45c44af93952546ddea563cf54d649224dbf3fd92efb611e
+  RED   (as required) D5a ui surface with no vizra-user merge — exit 1, named: names no vizra-user merge
+        | status record #0 (VZ-INSTALL-003): VZ-INSTALL-003 has ui surface(s) ['/setup/claim'] but the record names no vizra-user merge; a component half is not the requirement
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/status_records.json: sha256 6ec852bc6259036410b1d2286facd7ca05a7424bcc96ffa37e362d286d01e5ee -> b32f18f41d8cc8957b2858112f41bb80beaca6aaacfd4ad46af42d30a11fd05a
+  RED   (as required) D5b a second issue schedules the requirement — exit 1, named: docs/issues/VZ-ISSUE-006.md schedules VZ-FOUND-007
+        | status record #0 (VZ-FOUND-007): docs/issues/VZ-ISSUE-006.md schedules VZ-FOUND-007 (its Ledger IDs line names it) and the record cites none of its acceptance bullets. A requirement split across issues is not complete after the first one.
+  GREEN (as required) D5 restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+== cleanup
+  tree restored: git status identical to the start
+demo: 26 passed, 0 failed
