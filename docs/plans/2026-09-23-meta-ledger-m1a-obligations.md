@@ -62,3 +62,11 @@ Findings (pre-existing, not fixed here, out of scope):
 ## Blockers and handoff
 - CI: BLOCKED (billing) — no Actions run is expected for this PR. Evidence is local only.
 - For the chair: `VZ-ADMIN-USERS-001` notes record an interpretation of ADR-003 ("owner is single and cannot be demoted" read as "no other actor demotes the owner; the owner's own transfer is the only way the role moves"), to be confirmed at the implementing slice's plan review.
+
+## Round 1 (verifier PASS at `cd4c0f2`, local; chair-directed corrections)
+Verifier evidence: `docs/evidence/warroom/2026-09-23-meta-pr5-ledger-m1a-VERIFY.md` (chair's records branch). One commit on top, generator sources only, then regenerated:
+- F1: `VZ-ADMIN-USERS-001` notes now say the ADR-003 reading is pending owner ratification (owner inbox 8d); an Accepted ADR is amended only by the owner. Cases kept.
+- F2: `VZ-AUDIT-001` erasure names the prerequisite (`users.email` is NOT NULL in 0005, so an additive `ALTER TABLE users ALTER COLUMN email DROP NOT NULL` comes first; that statement does not match migrate-lint's destructive pattern, checked with `grep -nEi` against the pattern at core `56504c1`, exit 1 = no match) and replaces `users.username` with a handle satisfying `users_username_shape`; the privacy case scrubs `users.username` itself because `actor_user_id` still joins to it.
+- F3: the "no allow-destructive annotation" claim is qualified: only if the new migration never contains the bare word TRUNCATE.
+- F4: PR body rewritten with `gh pr edit`.
+Counts unchanged: 192 requirements, core 142; `VZ-INSTALL-003` recovery still `['Restart re-mints; old token invalid']`.
