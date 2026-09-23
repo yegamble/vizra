@@ -2,7 +2,19 @@
 
 `docs/quality/features.json` can now carry `IMPLEMENTED` or `VERIFIED`, but only when a record in
 [`status_records.json`](../ledger-generator/status_records.json) admits it and the `validate` lane
-proves that record. Nobody can write a status by hand. Release state is never set.
+proves that record. Release state is never set.
+
+**How far this is enforced, as measured.** A status in the committed `features.json` that no
+committed record admits turns the lane red, and this holds however the status was produced:
+- a hand edit;
+- a section source assignment;
+- an extra key;
+- a `str` subclass;
+- a generator monkeypatched in-process.
+
+The out-of-process output check enforces that (fix round 1, meta PR #6 verify FINDING 1). **Not
+defended:** a pull request that edits the checkers themselves (`status.py`, the three `scripts/`
+checkers, `validate.yml`). That change is visible in the diff and owner-reviewed under CODEOWNERS.
 
 ## Why a committed record proved online
 
@@ -13,14 +25,17 @@ lane. So the rule is split in two, and both halves read the record through the s
 
 | Half | Where | Proves |
 |---|---|---|
-| offline | [`status.py`](../ledger-generator/status.py), run by `build.py` inside step (a) | no section source sets a status; the record's shape; status is `IMPLEMENTED` or `VERIFIED` (anything else is refused by name); full 40-hex SHAs; for `VERIFIED`, each merge's evidence file under `docs/evidence/warroom/` **ends** with `FINAL VERDICT: PASS[ (…)] — SHA <40-hex>` naming that merge's `verified_head`; the floors below |
+| output (out of process) | [`scripts/check-ledger-status-output.py`](../../../scripts/check-ledger-status-output.py), step (a2), first | parses the COMMITTED `features.json` as plain JSON in a process that imports no section source; the tree matches HEAD for the ledger, records, issues and war-room evidence; every entry has exactly the keys `core.req` emits; the ids carrying any non-default status or evidence EQUAL the record ids; every entry, re-derived from defaults plus the committed records, equals the committed entry; the summary counts match |
+| offline | [`status.py`](../ledger-generator/status.py), run by `build.py` inside step (a) | a first line against honest mistakes (a section source can defeat in-process checks; the output check is the guarantee): no section source sets a status, compared with `type(...) is str`; the record's shape; status is `IMPLEMENTED` or `VERIFIED` (anything else is refused by name); full 40-hex SHAs; for `VERIFIED`, each merge's evidence file under `docs/evidence/warroom/` **ends** with `FINAL VERDICT: PASS — SHA <40-hex>` or `FINAL VERDICT: PASS (local; CI BLOCKED) — SHA <40-hex>` (the qualifier is an allowlist; any other is refused by name) naming that merge's `verified_head`; the floors below |
 | online | [`scripts/check-ledger-status-remote.py`](../../../scripts/check-ledger-status-remote.py), step (a2) | per merge: the PR is merged into `main`; GitHub's head for it is `verified_head`; GitHub's merge commit is `merge_commit`; `compare/<merge_commit>...main` is `ahead`/`identical` (on main now); for `VERIFIED`, the latest GitHub Actions `ci-required` check-run on `verified_head` is `completed/success` |
 
-A hand-edited `features.json` is still caught by the regeneration diff (demonstration D1c).
+A hand-edited `features.json` is caught by the regeneration diff (demonstration D1c). The output
+check catches it too.
 
-Because the record is committed, a reviewer sees it in the PR diff. Because the online half runs
-again on every PR, a record that was true when it was written and stops being true later (a
-force-pushed main, a PR re-opened) turns the lane red instead of staying green.
+A reviewer sees a committed record in the PR diff. The online half runs again on every meta pull
+request and merge-queue entry, not on `main` after a merge. So a record that was true when written
+and later stops being true (for example, a force-pushed component `main` that drops the merge
+commit) turns the lane red at the next meta PR, not at once.
 
 **VERIFIED requires `ci-required` green on the verified head.** A verifier's
 `PASS (local; CI BLOCKED)` passes the offline verdict check only because the online half then asks
@@ -32,7 +47,8 @@ minimum and do not prove the requirement is complete:
 - a requirement with a `ui` surface needs a `vizra-user` merge;
 - a requirement with an `api` surface needs a `vizra-core` merge;
 - every `docs/issues/*.md` whose `**Ledger IDs:**` line names the requirement must be cited, with at
-  least one bullet quoted verbatim from its `## Acceptance` section.
+  least one bullet quoted verbatim from its `## Acceptance` section. Where that section tags its
+  bullets with ids (VZ-ISSUE-001 does), the cited bullet must name this requirement.
 
 Whether the merges deliver the **whole ledger outcome** is still a judgement, written in the
 record's `rationale` and reviewed by a person.

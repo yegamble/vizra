@@ -257,6 +257,38 @@
           }
         ]
       }
+    },
+    {
+      "name": "merged-into-a-non-main-branch",
+      "why": "meta#3 merged from f9b8553 as 4920786 into the stacked base chore/m0-meta-baseline. That merge commit reached main later (compare: ahead), so every OTHER rule holds: only the base check refuses it (meta PR #6 verify, FINDING 2)",
+      "expect": [
+        "targets 'chore/m0-meta-baseline', not main"
+      ],
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "IMPLEMENTED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra",
+                "pr": 3,
+                "verified_head": "f9b85537fa1f596b6d01556bd868e280e27c3570",
+                "merge_commit": "4920786599f40cb2dad0193b7828612e2c24581a"
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

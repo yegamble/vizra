@@ -138,6 +138,7 @@ back_to_fixture() { cp "$SCRATCH/records.fixture" "$ROOT/$REC"; cp "$SCRATCH/evi
 echo "== G0 the committed tree: generator and regeneration check"
 green "G0a generator on the committed records" -- build
 green "G0b scripts/check-generated-ledger.sh on the committed tree" -- ./scripts/check-generated-ledger.sh
+green "G0c scripts/check-ledger-status-output.py on the committed tree" -- ./scripts/check-ledger-status-output.py
 
 echo "== G1 fixture state: a VERIFIED record that meets every offline rule is admitted"
 write_fixture_state; cp_fixture
@@ -167,8 +168,10 @@ git ls-files -z | (cd "$ROOT" && xargs -0 tar -cf -) | tar -xf - -C "$copy"
 ) || { echo "  FAIL  could not make the scratch copy"; FAILED=$((FAILED + 1)); }
 mutate "$copy/docs/quality/features.json" 'import sys; p=sys.argv[1]; s=open(p,encoding="utf-8").read(); i=s.index("\"id\": \"VZ-FOUND-008\""); j=s.index("\"implementation_status\": \"PLANNED\"", i); s=s[:j]+"\"implementation_status\": \"VERIFIED\""+s[j+len("\"implementation_status\": \"PLANNED\""):]; open(p,"w",encoding="utf-8").write(s)' \
   && (cd "$copy" && git -c user.name=demo -c user.email=demo@invalid commit -qam "hand-assert VERIFIED") \
-  && red "D1c" "GENERATED FILE IS NOT REPRODUCIBLE" -- bash -c "cd '$copy' && ./scripts/check-generated-ledger.sh"
-(cd "$copy" && git reset -q --hard HEAD~1) && green "D1c restored" -- bash -c "cd '$copy' && ./scripts/check-generated-ledger.sh"
+  && red "D1c" "GENERATED FILE IS NOT REPRODUCIBLE" -- bash -c "cd '$copy' && ./scripts/check-generated-ledger.sh" \
+  && red "D1c output check" "VZ-FOUND-008: STATUS WITHOUT A RECORD" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
+(cd "$copy" && git reset -q --hard HEAD~1) && green "D1c restored" -- bash -c "cd '$copy' && ./scripts/check-generated-ledger.sh" \
+  && green "D1c output check restored" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
 back_to_fixture
 
 echo "== D2 evidence whose verdict SHA does not match the verified head"
@@ -212,6 +215,68 @@ back_to_fixture
 mutate "$ROOT/$REC" "import json,sys; p=sys.argv[1]; d=json.load(open(p)); r=d['records'][0]; r['id']='VZ-FOUND-007'; r['acceptance']=[{'issue':'docs/issues/VZ-ISSUE-001.md','bullet':'''$BULLET_007'''}]; json.dump(d,open(p,'w'),indent=2)" \
   && red "D5b a second issue schedules the requirement" "docs/issues/VZ-ISSUE-006.md schedules VZ-FOUND-007" -- build
 back_to_fixture; green "D5 restored" -- build
+
+echo "== D6 the three in-process escapes (meta PR #6 verify probes 2c, 2d, 2e), each in the scratch copy"
+# Each escape is appended to the LAST section source (s9), the generator is run
+# in the copy, and the result is COMMITTED — exactly what a PR carrying the
+# escape would present to the lane. Where the generator still writes the
+# ledger, the regeneration check is shown to be blind to it (the output is
+# reproducible from the tampered sources), and the out-of-process output check
+# must go red. Then the copy is reset to its base commit and must be green again.
+S9_COPY="$copy/$GEN/s9_ui_design.py"
+escape() {  # escape NAME BUILD_EXPECT(0|1) BUILD_NEEDLE OUTPUT_NEEDLE ; section code in $ESCAPE_CODE
+  local name="$1" build_expect="$2" build_needle="$3" output_needle="$4"
+  mutate "$S9_COPY" 'import os,sys; open(sys.argv[1],"a",encoding="utf-8").write("\n"+os.environ["ESCAPE_CODE"]+"\n")' || return
+  if [ "$build_expect" = "1" ]; then
+    red "$name: the generator refuses it in-process" "$build_needle" -- bash -c "cd '$copy/$GEN' && python3 build.py ../../quality/features.json"
+  else
+    green "$name: the generator is defeated in-process (build exits 0)" -- bash -c "cd '$copy/$GEN' && python3 build.py ../../quality/features.json"
+    (cd "$copy" && git -c user.name=demo -c user.email=demo@invalid commit -qam "escape $name") \
+      || { echo "  FAIL  $name: nothing to commit — the escape did not change the ledger"; FAILED=$((FAILED + 1)); }
+    green "$name: the regeneration check is blind to it (reproducible from the tampered source)" -- bash -c "cd '$copy' && ./scripts/check-generated-ledger.sh"
+    red "$name: the out-of-process output check refuses it" "$output_needle" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
+  fi
+  (cd "$copy" && git reset -q --hard base-commit)
+  green "$name restored" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
+}
+(cd "$copy" && git tag -f base-commit >/dev/null)
+
+export ESCAPE_CODE='REQS[-1]["status"] = "VERIFIED"
+REQS[-1]["verified"] = True'
+escape "D6a (2c) extra keys" 0 "" "VZ-CONTROLS-001: KEY SET differs from what core.req emits; extra ['status', 'verified']"
+
+export ESCAPE_CODE='class _S(str):
+    def __ne__(self, other):
+        return False
+REQS[-1]["implementation_status"] = _S("VERIFIED")'
+escape "D6b-i (2d) str subclass alone" 1 "VZ-CONTROLS-001: HAND-ASSERTED implementation_status 'VERIFIED'" ""
+
+export ESCAPE_CODE='import status as _st
+_orig = _st.check_dsl_defaults
+_st.check_dsl_defaults = lambda reqs: [e for e in _orig(reqs) if not e.startswith("VZ-CONTROLS-001:")]
+class _S(str):
+    def __ne__(self, other):
+        return False
+REQS[-1]["implementation_status"] = _S("VERIFIED")'
+escape "D6b-ii (2d) str subclass with the in-process check wrapped away" 0 "" "VZ-CONTROLS-001: STATUS WITHOUT A RECORD"
+
+export ESCAPE_CODE='import status as _st
+_orig = _st.check_dsl_defaults
+_st.check_dsl_defaults = lambda reqs: [e for e in _orig(reqs) if not e.startswith("VZ-CONTROLS-001:")]
+REQS[-1]["implementation_status"] = "VERIFIED"
+REQS[-1]["verification_status"] = "VERIFIED_AT_SHA"'
+escape "D6c (2e) wrapper around check_dsl_defaults" 0 "" "VZ-CONTROLS-001: STATUS WITHOUT A RECORD"
+
+echo "== D7 a free-text verdict qualifier (meta PR #6 verify FINDING 4)"
+back_to_fixture
+mutate "$ROOT/$FIX_EVID" "import sys; p=sys.argv[1]; s=open(p,encoding='utf-8').read(); open(p,'w',encoding='utf-8').write(s.replace('PASS (local; CI BLOCKED)','PASS (superseded — FAIL on re-run)'))" \
+  && red "D7 PASS (superseded — FAIL on re-run)" "is NOT ALLOWLISTED" -- build
+back_to_fixture; green "D7 restored" -- build
+
+echo "== D8 a bullet tagged for another requirement (meta PR #6 verify NIT 2)"
+mutate "$ROOT/$REC" 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["records"][0]["id"]="VZ-FOUND-007"; json.dump(d,open(p,"w"),indent=2)' \
+  && red "D8 VZ-FOUND-007 citing the VZ-FOUND-008 bullet" "the cited bullet does not name VZ-FOUND-007" -- build
+back_to_fixture; green "D8 restored" -- build
 
 echo "== cleanup"
 cleanup; trap - EXIT

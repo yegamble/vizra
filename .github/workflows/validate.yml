@@ -24,12 +24,18 @@
 #
 # Since queue 2i the ledger can carry a status, so a fifth failure is gated:
 #
-#   (e) an entry claims IMPLEMENTED or VERIFIED without the evidence for it —
-#       written into a section source or the JSON by hand, claimed with a
-#       status outside the two recordable ones, backed by a verdict that does
-#       not name the merged head, or naming a merge that is not on the
-#       component repo's main or a head on which ci-required is not green.
-#       Steps (a) and (a2).
+#   (e) an entry of the committed ledger carries a status that no committed
+#       record admits. Step (a2), the output check, catches this whatever
+#       produced it — a hand edit, a section source, or a generator tampered
+#       with in-process. It parses the committed JSON in a separate process.
+#       The same steps refuse a record that claims a status outside the two
+#       recordable ones, rests on a verdict that does not name the merged head,
+#       or names a merge that is not on the component repo's main or a head
+#       where ci-required is not green.
+#       Not covered: a pull request that edits these checkers. That change is
+#       visible in the diff and owner-reviewed under CODEOWNERS. This lane runs
+#       on pull requests and merge-queue entries only, so a record that becomes
+#       false AFTER it merged is caught at the next meta PR, not at once.
 #
 # META_REPO.md §7 names two further target lanes for this repo, `bundle` and
 # `boot`. Neither is built here. There is now a compose topology, but there is
@@ -154,8 +160,20 @@ jobs:
       # The component repositories are public: a read token is enough, and
       # `checks: read` / `pull-requests: read` are granted to this job for the
       # meta repo's own PRs and check-runs.
+      # Out of process, on the OUTPUT. The generator's own status checks run
+      # inside the process that imported every section source, so a section
+      # source can defeat them (meta PR #6 verify, probes 2c/2d/2e). This step
+      # parses the COMMITTED features.json as plain JSON and imports no
+      # section source. It requires the exact key set, and it re-derives every
+      # status from the committed records.
+      - name: every status in the committed ledger is admitted by a committed record
+        run: ./scripts/check-ledger-status-output.py
+
       - name: the ledger-status rules hold (unit tests)
-        run: cd docs/evidence/ledger-generator && python3 -m unittest -v test_status
+        run: |
+          set -euo pipefail
+          (cd docs/evidence/ledger-generator && python3 -m unittest -v test_status)
+          python3 scripts/test_ledger_status_remote.py -v
 
       - name: every recorded ledger status is proved against GitHub
         env:

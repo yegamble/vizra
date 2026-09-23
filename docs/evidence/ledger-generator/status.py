@@ -16,12 +16,24 @@ shape, the verdict line in a committed evidence file, the acceptance bullets it
 cites — and the remote checker proves the facts only GitHub knows. The lane runs
 both; neither alone admits a status.
 
-THE RULES (default-deny: anything not explicitly admitted below is refused by
-name):
+WHAT THIS MODULE CAN AND CANNOT ENFORCE. It runs INSIDE the generator process,
+after every section source has been imported, so a section source that is
+written to defeat it can: it can monkeypatch these functions, set a status with
+a `str` subclass, or add keys this module never inspects. A fix-round probe did
+all three (meta PR #6 verify, probes 2c/2d/2e). The in-process checks here are
+therefore a first line that names honest mistakes early. The GUARANTEE that a
+status in `docs/quality/features.json` comes only from a record is made
+OUT OF PROCESS by `scripts/check-ledger-status-output.py`. That script parses the
+COMMITTED JSON as plain data, never imports a section source, requires the exact
+key set `core.req` emits, and re-derives every entry's status from the committed
+records. It is a separate step in the `validate` lane.
 
-1. A section source can never set a status. Every requirement must leave the
-   DSL (`core.req`) as PLANNED / UNVERIFIED / NOT_STARTED / NOT_RELEASED with an
-   empty `evidence` list. Anything else is a hand assertion and is refused.
+THE RULES. A record that breaks any of them is refused by name:
+
+1. A section source must leave every requirement as PLANNED / UNVERIFIED /
+   NOT_STARTED / NOT_RELEASED, as exact `str` values, with an empty `evidence`
+   list. In-process this catches an honest assignment. The out-of-process
+   output check catches the adversarial ones listed above.
 2. A status comes from exactly one place: a record in `status_records.json`.
    A record may claim `IMPLEMENTED` or `VERIFIED`. Every other value — including
    the other members of the ledger's own vocabulary, such as `IN_PROGRESS` — is
@@ -32,19 +44,25 @@ name):
 4. `VERIFIED`: every merge carries `evidence_file`, a committed regular file
    under `docs/evidence/warroom/`, whose final non-empty line is
        FINAL VERDICT: PASS — SHA <40-hex>
-   or  FINAL VERDICT: PASS (<qualifier>) — SHA <40-hex>
-   and whose SHA equals THAT merge's `verified_head`. A qualifier such as
-   "(local; CI BLOCKED)" is accepted here only because the remote half then
-   requires `ci-required` green on the same SHA — a local PASS never proves CI.
+   or  FINAL VERDICT: PASS (local; CI BLOCKED) — SHA <40-hex>
+   and whose SHA equals THAT merge's `verified_head`. The qualifier is an
+   ALLOWLIST (`VERDICT_QUALIFIERS`), not free text: "PASS (superseded — FAIL on
+   re-run)" is refused. "(local; CI BLOCKED)" is admitted only because the remote
+   half then requires `ci-required` green on the same SHA — a local PASS never
+   proves CI.
 5. Floors that stop a component half being recorded as the whole requirement:
    - a requirement with a `ui` surface needs a `vizra-user` merge;
    - a requirement with an `api` surface needs a `vizra-core` merge;
    - every `docs/issues/*.md` whose `**Ledger IDs:**` line names the requirement
      must be cited by at least one acceptance bullet from that issue's
-     `## Acceptance` section, quoted exactly.
+     `## Acceptance` section, quoted exactly. When that section tags its
+     bullets with ids (for example "Fixture corpus (VZ-FOUND-007): …"), the cited
+     bullet must name THIS requirement, so one requirement's bullet cannot stand
+     in for another's.
    These are FLOORS, not a proof of completeness: whether the merges deliver the
    whole ledger outcome is still a reviewed judgement, written in `rationale`.
-6. Release state is never set here, by anything.
+6. The generator never sets release state. The output check refuses any entry
+   whose release_status is not NOT_RELEASED.
 """
 import json
 import os
@@ -61,7 +79,10 @@ SCHEMA = 1
 EVIDENCE_DIR = "docs/evidence/warroom/"
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-VERDICT_RE = re.compile(r"^FINAL VERDICT: PASS(?: \([^()\n]*\))? — SHA ([0-9a-f]{40})$")
+# The verdict line. The qualifier is captured and then checked against an
+# allowlist of the exact qualifiers in use; anything else is refused by name.
+VERDICT_RE = re.compile(r"^FINAL VERDICT: PASS(?: \(([^()\n]*)\))? — SHA ([0-9a-f]{40})$")
+VERDICT_QUALIFIERS = ("local; CI BLOCKED",)
 OWNER_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 
 # The DSL's defaults. Anything else leaving core.req is a hand assertion.
@@ -82,12 +103,15 @@ def check_dsl_defaults(reqs):
     for r in reqs:
         for key, want in DSL_DEFAULTS.items():
             got = r.get(key)
-            if got != want:
+            # `type(...) is str`, not `!=`: a str subclass can override __ne__
+            # to compare equal to anything (meta PR #6 verify, probe 2d).
+            if not (type(got) is str and str.__eq__(got, want)):
                 errors.append(
                     f"{r['id']}: HAND-ASSERTED {key} {got!r} in a section source. "
                     f"A status comes only from a record in status_records.json; the DSL "
                     f"must leave every entry {want}.")
-        if r.get("evidence") != []:
+        ev = r.get("evidence")
+        if not (type(ev) is list and len(ev) == 0):
             errors.append(
                 f"{r['id']}: HAND-ASSERTED evidence in a section source. Evidence is "
                 f"written only from a checked record in status_records.json.")
@@ -243,8 +267,12 @@ def check_evidence_file(where, rel, head, root):
         return [f"{where}: {rel} does not END with a PASS verdict. Its final non-empty line is "
                 f"{line[:160]!r}; required 'FINAL VERDICT: PASS[ (…)] — SHA <40-hex>'. "
                 f"A verdict anywhere else in the file, a FAIL, or an abbreviated SHA does not count."], None
-    if m.group(1) != head:
-        return [f"{where}: VERDICT SHA MISMATCH — {rel} ends with a PASS on {m.group(1)}, but the "
+    if m.group(1) is not None and m.group(1) not in VERDICT_QUALIFIERS:
+        return [f"{where}: {rel} ends with a PASS whose qualifier ({m.group(1)}) is NOT ALLOWLISTED; "
+                f"admitted qualifiers: none, or {', '.join('(' + q + ')' for q in VERDICT_QUALIFIERS)}. "
+                f"A free-text qualifier can negate the PASS it decorates."], None
+    if m.group(2) != head:
+        return [f"{where}: VERDICT SHA MISMATCH — {rel} ends with a PASS on {m.group(2)}, but the "
                 f"record's verified_head is {head}. The verdict must name the exact head that was merged."], None
     return [], line
 
@@ -271,6 +299,10 @@ def issue_ledger_ids(text):
                         ids.add(f"{prefix}-{n:03d}")
                 prev, pos = val, c.end()
     return ids
+
+
+def bullet_ids(bullet):
+    return {f"{m.group(1)}-{m.group(2)}" for m in ID_RE.finditer(bullet)}
 
 
 def acceptance_bullets(text):
@@ -326,6 +358,12 @@ def apply_records(reqs, doc, root):
             if a["bullet"] not in entry[1]:
                 errors.append(f"{label}: acceptance bullet not found verbatim in the '## Acceptance' "
                               f"section of {a['issue']}: {a['bullet'][:120]!r}")
+                continue
+            tagged = any(bullet_ids(b) for b in entry[1])
+            if tagged and rec["id"] not in bullet_ids(a["bullet"]):
+                errors.append(f"{label}: {a['issue']} tags its acceptance bullets with requirement ids, and "
+                              f"the cited bullet does not name {rec['id']}: {a['bullet'][:120]!r}. One "
+                              f"requirement's bullet cannot stand in for another's.")
                 continue
             cited[a["issue"]] = True
         for path, (ids, _b) in issues.items():

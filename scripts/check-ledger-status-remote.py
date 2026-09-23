@@ -75,6 +75,24 @@ def gh_api(path):
         return None, f"gh api {path}: reply is not JSON"
 
 
+def prove_auth():
+    """Refuse to run unauthenticated, even with nothing to check.
+
+    An unauthenticated `gh api` still reads public repositories, at 60 requests
+    an hour per IP. The run would then fail later, on the rate limit, or it would
+    pass only because there was nothing to ask. `rate_limit` does not count
+    against the limit, and it reports 60 for an anonymous caller.
+    """
+    rl, err = gh_api("rate_limit")
+    if err:
+        return f"NOT AUTHENTICATED: {err}"
+    limit = ((rl.get("resources") or {}).get("core") or {}).get("limit")
+    if not isinstance(limit, int) or limit <= 60:
+        return (f"NOT AUTHENTICATED: gh api rate_limit reports a core limit of {limit!r}, which is the "
+                f"anonymous limit. Set GH_TOKEN (in CI: GH_TOKEN=${{{{ github.token }}}}).")
+    return None
+
+
 def check_merge(owner, rec_status, m, where):
     errors, notes = [], []
     repo = f"{owner}/{m['repo']}"
@@ -210,6 +228,10 @@ def main(argv):
     args = ap.parse_args(argv)
     if shutil.which("gh") is None:
         print("BLOCKED: `gh` is not installed; the merge facts cannot be proved, and an unproved status is refused.")
+        return 2
+    auth = prove_auth()
+    if auth:
+        print(auth)
         return 2
     return run_self_test() if args.self_test else run_records(args.records)
 

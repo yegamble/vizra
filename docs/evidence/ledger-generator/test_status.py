@@ -91,6 +91,37 @@ class DslDefaults(Tree):
         r = req("VZ-TEST-001"); r["implementation_status"] = "VERIFIED"
         self.assertRefused(status.check_dsl_defaults([r]), "HAND-ASSERTED implementation_status 'VERIFIED'")
 
+    def test_str_subclass_that_compares_equal_is_refused(self):
+        # meta PR #6 verify, probe 2d: `!=` is overridable; the check must not use it.
+        class _S(str):
+            def __ne__(self, other):
+                return False
+
+            def __eq__(self, other):
+                return True
+        r = req("VZ-TEST-001"); r["implementation_status"] = _S("VERIFIED")
+        self.assertRefused(status.check_dsl_defaults([r]), "HAND-ASSERTED implementation_status")
+
+    def test_core_req_keys_equal_the_output_checks_allowlist(self):
+        # The out-of-process output check hard-codes the key set core.req emits;
+        # this keeps the two in step so neither can drift silently.
+        import importlib.util
+        import core
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "scripts",
+                            "check-ledger-status-output.py")
+        spec = importlib.util.spec_from_file_location("output_check", path)
+        out = importlib.util.module_from_spec(spec); spec.loader.exec_module(out)
+        before = len(core.REQS)
+        core.req("VZ-KEYSET-999", "t", "o", "a", core.SAFE, [], success=["s"], evidence=["e"])
+        try:
+            emitted = core.REQS[-1]
+            self.assertEqual(tuple(emitted), out.FEATURE_KEYS)
+            self.assertEqual(tuple(emitted["cases"]), out.CASES_KEYS)
+            self.assertEqual(tuple(emitted["surfaces"]), out.SURFACES_KEYS)
+        finally:
+            del core.REQS[before:]
+            core.SEEN.discard("VZ-KEYSET-999")
+
     def test_hand_asserted_release_status_is_refused(self):
         r = req("VZ-TEST-001"); r["release_status"] = "RELEASED"
         self.assertRefused(status.check_dsl_defaults([r]), "HAND-ASSERTED release_status")
@@ -176,6 +207,18 @@ class Evidence(Tree):
         _, errors = self.run_all([record("VERIFIED")])
         self.assertRefused(errors, "does not END with a PASS verdict")
 
+    def test_free_text_qualifier_is_refused(self):
+        # meta PR #6 verify, FINDING 4: a qualifier can negate the PASS it decorates.
+        for q in ("superseded \u2014 FAIL on re-run", "NOT; retracted", "local; CI green", "local"):
+            self.write(EVID, "FINAL VERDICT: PASS (" + q + ") \u2014 SHA " + HEAD + "\n")
+            _, errors = self.run_all([record("VERIFIED")])
+            self.assertRefused(errors, "is NOT ALLOWLISTED")
+
+    def test_unqualified_pass_is_admitted(self):
+        self.write(EVID, "FINAL VERDICT: PASS \u2014 SHA " + HEAD + "\n")
+        _, errors = self.run_all([record("VERIFIED")])
+        self.assertEqual(errors, [])
+
     def test_hyphen_instead_of_em_dash_is_refused(self):
         self.write(EVID, "FINAL VERDICT: PASS - SHA " + HEAD + "\n")
         _, errors = self.run_all([record("VERIFIED")])
@@ -217,6 +260,17 @@ class Floors(Tree):
         self.write("docs/issues/VZ-ISSUE-901.md", "**Ledger IDs:** VZ-TEST-001\n\n## Acceptance (observable)\n- later part\n")
         _, errors = self.run_all([record()])
         self.assertRefused(errors, "docs/issues/VZ-ISSUE-901.md schedules VZ-TEST-001")
+
+    def test_tagged_bullet_must_name_this_requirement(self):
+        self.write("docs/issues/VZ-ISSUE-902.md", "**Ledger IDs:** VZ-TEST-002\n\n## Acceptance (observable)\n"
+                   "- Part one (VZ-TEST-001): not this one\n- Part two (VZ-TEST-002): this one\n")
+        rec = record(rid="VZ-TEST-002")
+        rec["acceptance"] = [{"issue": "docs/issues/VZ-ISSUE-902.md", "bullet": "Part one (VZ-TEST-001): not this one"}]
+        _, errors = self.run_all([rec])
+        self.assertRefused(errors, "the cited bullet does not name VZ-TEST-002")
+        rec["acceptance"][0]["bullet"] = "Part two (VZ-TEST-002): this one"
+        _, errors = self.run_all([rec])
+        self.assertEqual(errors, [])
 
     def test_bullet_must_be_verbatim_and_in_acceptance(self):
         rec = record(); rec["acceptance"][0]["bullet"] = "not an acceptance bullet"
