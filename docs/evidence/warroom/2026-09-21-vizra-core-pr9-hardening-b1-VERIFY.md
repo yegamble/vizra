@@ -982,3 +982,566 @@ copy or reverted with a verified-clean `git diff`, checked after each one.
 ---
 
 FINAL VERDICT: FAIL — SHA e710c3cff18bd63c87a692937b608fa762627d99
+
+---
+---
+
+# Re-verification at 6b65eff — 2026-09-22
+
+- **Head verified:** `6b65eff6ee29e99e1b93b01242b4c97d90a57267` (fix round 1 of 2). Commits on top of
+  my FAIL at `e710c3c`: `8fa04b1` (redesign — pin, don't parse), `6b65eff` (evidence). No force-push:
+  `e710c3c` is an ancestor. `git ls-remote` at start: `6b65eff…`, unmoved.
+- **Clone:** fresh `mktemp -d …/scratchpad/vzv-core-pr9r1-XXXXXX` (the machine was restarted since round
+  one; none of my `vzv9pr9-*` containers survived, so there was nothing of mine to remove).
+  Containers of others present at start and left alone: `vzv10-*`, `vizra-m1a-*`, `vidra-ipfs-071-*`.
+  My own services this round: prefix `vzv9r1-`, ports 55919/63919.
+- **Environment:** as round one — darwin/arm64, go1.27.1, python3 3.9.6 + PyYAML 6.0.3, host GNU Make
+  3.81; GNU Make 4.3 exercised in a throwaway `ubuntu:24.04` container named `vzv9r1-make43`.
+- **Harness:** my OWN (`h.py`, written fresh in scratch — it copies `.github/` to a temp dir, applies a
+  text mutation to `build-test.yml`, asserts the digest moved, and runs
+  `ci-required-guard.py --workflows … --manifest … --pins …`). The builder's `evasion-table.py` was read,
+  not relied on. Control (comment-only edit): **GREEN** — the harness does not fail open.
+
+## R1. Frozen paths and baseline
+
+```
+git diff --stat 5eb2829..6b65eff -- migrations/ api/ internal/ cmd/ sqlcgen/ Makefile .github/required-checks.txt
+(empty)
+FLOOR_LANES: unchanged
+./scripts/make-integrity-guard.sh        exit 0   passed (8 gate target(s)); both new runtime ok lines
+./scripts/ci-required-guard.sh           exit 0   passed (6 required check(s)), 49 ok lines
+go test -race -count=1 ./scripts/        exit 0   ok … 29.349s
+scripts/testdata/guard                   65 fixture dirs (claimed 65 ✔)
+```
+
+## R2. My 45 round-one rows, re-run with my own harness
+
+Every row substituted into the real `build-test.yml`'s `make ci` step, the anchor kept in place:
+
+| rows | result |
+|---|---|
+| B1–B10, A1–A18b, A20–A34 (44 rows) | **all RED** — flag/override/indirection rows by check 8b ("mentions `make` but its `run:` is not byte-equal to any entry in `.github/pinned-steps.yml`"), key rows (`env:`, `shell:`, `working-directory:`, `if:`, `continue-on-error:`) by the name/run/id rule, and the no-`make`-token rows (`M=make; $M -i ci`, `${MAKE:-make}`, the wrapper script replacing `make ci`) by **check 8c** ("does not run required invocation(s) ['make ci']") |
+| A19 `$GITHUB_ENV` write in an earlier step | **GREEN at the static guard** — as the builder states; defended only at runtime by the anchor. See R4. |
+
+**The builder's claim "your 45 rows all red by named rule, R3 `$GITHUB_ENV` green at the static
+guard" reproduces with my harness.** The round-one FINDINGS 1–4 (tokeniser holes) are closed *as
+spellings*.
+
+## R3. Attacking the NEW control — static guard (my harness)
+
+| # | Mutation of `build-test.yml` | Guard | Runtime effect | Verdict |
+|---|---|---|---|---|
+| **N1** | the anchor step immediately before `make ci` becomes `run: ./scripts/make-integrity-guard.sh && echo "MAKEFLAGS=-i" >> "$GITHUB_ENV"` | **GREEN** | anchor passes, THEN poisons the next step; `make ci` runs with `MAKEFLAGS=-i` (simulated, R4) | **green — UNLISTED** |
+| **N2** | real anchor kept, then a second step `run: \| : make-integrity-guard / echo "MAKEFLAGS=-i" >> "$GITHUB_ENV"`, then `make ci` | **GREEN** | same | **green — UNLISTED** |
+| **N3** | earlier step writes `MAKEFLAGS=-i` to `$GITHUB_ENV`; the adjacent "anchor" is `run: ': make-integrity-guard'` | **GREEN** | the real anchor never runs before `make ci` | **green — UNLISTED** |
+| **N4** | compound anchor writes a stub dir to `$GITHUB_PATH` | **GREEN** | a stub `make` resolves first for `make ci` | **green — UNLISTED** |
+| N5 | compound anchor writes `MAKELEVEL=1` + `MAKEFLAGS=n` | GREEN | as N1 | (same class as N1) |
+| N6 | an `id:`-only step between anchor and `make ci` | RED | — | red (adjacency) |
+| P1 | `run: 'make ci '` (trailing space) | RED | — | red |
+| P2/P3/P5 | `\|-`, `\|`, folded `>` around `make ci` | GREEN | the parsed string is exactly `make ci` (+1 newline) — identical command | correct |
+| P4 | `\|+` with two trailing newlines | RED | — | red (only one newline trimmed) |
+| P6 | `run: "make ci\n"` | GREEN | identical string | correct |
+| P7 | whole file CRLF | GREEN | YAML normalises line breaks; identical string | correct |
+| P8 | `run: "make ci\r"` | RED | — | red |
+| **P9** | duplicate key: `run: make -i ci` then `run: make ci` | **GREEN** | PyYAML keeps the LAST value; if GitHub's parser kept the first, `make -i ci` would run. UNVERIFIED on a live runner — I believe GitHub rejects duplicate keys (the workflow would then not run and the fan-in would be red), but the guard does not assert that. | see FINDING R-4 |
+| P10 | duplicate key, `make ci` first, `make -i ci` last | RED | — | red |
+| P11 | Cyrillic `mаke -i ci` as an extra step | GREEN | `mаke: command not found`, the step fails — fails closed at runtime | correct |
+| P12/P13 | zero-width joiner / NBSP inside `make ci` | RED | — | red |
+| P14 | merge key `<<: {if: …}` on the pinned step | RED | — | red (the merged key is seen) |
+| P15 | a second YAML document in the workflow file | RED | — | red |
+| P16 | `run: !!str make ci` | GREEN | identical string | correct |
+| U1 | local composite `uses: ./.github/actions/x` before the anchor | GREEN | whatever the action does to the machine | green — LISTED ("any OTHER step … `uses:` actions") |
+| U2 | composite action replacing the anchor | RED | — | red (adjacency) |
+| U3 | SHA-pinned `actions/github-script` exporting MAKEFLAGS before the anchor | GREEN | the anchor refuses MAKEFLAGS at runtime — *unless* MAKELEVEL is also exported (R4) | listed class; defeated by R4 |
+| J1 | job-level `if: ${{ false }}` on `build-test` | GREEN | job skipped → `ci-required` treats `skipped` as FAILED (`ci-required.yml:86-92`) | correct (fails closed at fan-in) |
+| J2 | job-level `if: ${{ false }}` on `cache-matrix-leg` | GREEN | leg skipped → aggregator's `result != success` exits 1 | correct |
+| J3 | the `cache-matrix` aggregator's body replaced by `'true'` | GREEN | legs become non-blocking | outside the stated scope ("make steps and direct test steps … That is the whole claim"); covered by "everything here can be edited". Observation. |
+| J4 | job-level `env: MAKELEVEL: '1'` | GREEN | arms R4's fallback | see FINDING R-2 |
+| J5 | job-level `continue-on-error: true` on `cache-matrix-leg` | GREEN | check 4 is applied to `cache-matrix`, not to the jobs it `needs` | observation — pre-existing, and the aggregator reads `needs.*.result`; UNVERIFIED what GitHub reports there for a continue-on-error job |
+
+**Why N1–N4 pass:** `step_is_the_anchor()` (`scripts/ci-required-guard.py:284`) is
+`MAKE_INTEGRITY_GUARD in run and not MAKE_INVOCATION.search(run)` — a SUBSTRING test. The anchor's
+body is **not pinned** (it is not in `.github/pinned-steps.yml`), so any step whose text contains
+`make-integrity-guard` and no bare `make` token satisfies "IMMEDIATELY preceded by the anchor",
+including one that runs the real guard and then writes `$GITHUB_ENV`, or one that is `: make-integrity-guard`.
+
+## R4. The anchor's runtime checks (the chair's priority question)
+
+`check_environment()` (`scripts/make-integrity-guard.py`, new in `8fa04b1`):
+
+```python
+inside_make = os.environ.get("MAKELEVEL") is not None
+...
+if not inside_make:
+    g.fail(... "Out of make these must be unset" ...)      # default-deny
+    continue
+words = value.split()
+cluster = words[0] if words and not words[0].startswith("-") and "=" not in words[0] else ""
+hits = sorted(set(cluster) & set("iktq"))
+hits += [w for w in words if w in DANGEROUS_FLAG_WORDS or w in ("-i", "-k", "-t", "-q")]
+```
+
+**Answer: yes, `MAKELEVEL` set by an earlier `$GITHUB_ENV` write (or a job-level `env:`, which the
+static guard allows — J4) switches the workflow anchor to the weaker blacklist, and that blacklist
+passes values that neuter make.** Nothing checks that the process really is a child of make: the
+variable's mere presence decides, and an EMPTY `MAKELEVEL=` counts.
+
+The real anchor, measured on **GNU Make 4.3 / ubuntu:24.04** (repo mounted read-only) and on the host's 3.81:
+
+```
+control                                        anchor exit=0
+MAKEFLAGS=-ki (no MAKELEVEL)                   anchor exit=1   FAIL the environment sets MAKEFLAGS='-ki' …
+MAKELEVEL=1 MAKEFLAGS=-ki                      anchor exit=0   <- a dash-cluster: only the bare words -i/-k/-t/-q are matched
+MAKELEVEL=1 MAKEFLAGS=n                        anchor exit=0   <- 'n' is not in "iktq", and the per-target check
+                                                                  treats 'p' and 'n' as the guard's own (-pn)
+MAKELEVEL= MAKEFLAGS=--ign                     anchor exit=0   <- EMPTY MAKELEVEL counts; long abbreviation not matched
+MAKELEVEL=1 GNUMAKEFLAGS=-ki                   anchor exit=0
+MAKELEVEL=1 MAKEFLAGS=e                        anchor exit=0
+```
+
+and what GNU Make 4.3 does with each, against a Makefile whose `ci` recipe is `@echo RECIPE RAN; exit 7`:
+
+```
+MAKELEVEL=1 MAKEFLAGS=-ki make ci       exit=0
+MAKELEVEL=1 MAKEFLAGS=n make ci         exit=0
+MAKELEVEL= MAKEFLAGS=--ign make ci      exit=0
+MAKELEVEL=1 GNUMAKEFLAGS=-ki make ci    exit=0
+```
+
+So A19 — the one row the builder states is green at the static guard and "red at the anchor at
+runtime" — is green at BOTH when the `$GITHUB_ENV` write carries two lines instead of one:
+
+```
+- run: printf 'MAKELEVEL=1\nMAKEFLAGS=-ki\n' >> "$GITHUB_ENV"     # any earlier step; static guard GREEN
+- name: Refuse a neutered Makefile
+  run: ./scripts/make-integrity-guard.sh                            # anchor exit 0 (measured above)
+- name: make ci
+  run: make ci                                                      # pinned, byte-equal; neutered
+```
+
+The builder's R2 transcript (`docs/evidence/hardening-b1/R2-anchor-environment.txt`) never tests an
+injected MAKELEVEL; its only MAKELEVEL rows are `make ci-guard`, where make sets it legitimately.
+
+### N1 end-to-end, with GitHub's `$GITHUB_ENV` semantics simulated (ubuntu:24.04, Make 4.3)
+
+```
+### N1: the anchor step, compound, VERBATIM as a run: body (GHA runs bash -e {0})
+  anchor step exit=0  (make-integrity-guard: passed (8 gate target(s)))
+  GITHUB_ENV now: MAKEFLAGS=-i
+### next step (pinned: make ci) runs with GITHUB_ENV applied, as GitHub does for LATER steps
+RECIPE RAN
+make: [Makefile:2: ci] Error 7 (ignored)
+  make ci step exit=0
+```
+
+UNVERIFIED on a live runner: the carry-over of `$GITHUB_ENV` to later steps is GitHub's documented
+behaviour and the premise of the builder's own adjacency design; I simulated it, I did not push a workflow.
+
+### `make` identity
+
+- `/usr/local/bin/make -> /bin/true` (a symlink ahead of `/usr/bin`): anchor **RED** — but by accident:
+  `make -pn` through `true` yields an empty `MAKEFILE_LIST`. The identity check itself would have passed
+  (`realpath` is `/usr/bin/true`, an approved directory).
+- A forwarding stub — a real FILE `/usr/local/bin/make` that `exec`s `/usr/bin/make` for `-pn` and
+  `exit 0`s otherwise: anchor **exit 0**, printing
+  `ok  'make' is a real program at /usr/local/bin/make (type -t: file), not a function, alias or PATH stub`;
+  `make ci` exit 0. This requires an earlier step to write to the machine, which AGENTS.md lists
+  ("anything at all before the anchor runs"), so it is a listed residual — but the `ok` line's words
+  "not … a PATH stub" claim more than the check establishes. See FINDING R-5 (NIT).
+- `hash -p` / functions / aliases cannot cross a step boundary; `BASH_ENV`/`ENV` are refused in both modes
+  (they are NOT behind the MAKELEVEL switch). Correct.
+
+### The anchor-accepted environment on the REAL repository (host, GNU Make 3.81)
+
+A planted gofmt violation (`internal/site/zz_vzv_fmt.go`), then reverted (`git diff --quiet` clean):
+
+```
+control (clean env)             make fmt-check exit=2
+MAKELEVEL=1 MAKEFLAGS=-ki       make fmt-check exit=0
+MAKELEVEL= MAKEFLAGS=--ign      make fmt-check exit=0
+MAKELEVEL=1 MAKEFLAGS=e         make fmt-check exit=2    (not neutering here — harmless for this target)
+MAKELEVEL=1 MAKEFLAGS=n         make ci        exit=0    (the WHOLE gate, dry-run)
+```
+
+(A full `make ci` with a planted failing test under each env was started first; on a host loaded by other
+agents' test runs it had not finished after ~10 minutes, so I stopped my own processes by exact PID —
+verified by `lsof` cwd inside my scratch clone — and used the faster gate above. Not a pass for anything.)
+
+## R5. Round-one findings 5–8
+
+| round-one finding | status at 6b65eff | evidence (mine) |
+|---|---|---|
+| **5 — D6 not reproducible** | **CLOSED.** D6 now says main's step exits **125** against `broken` and adds `fakedocker/broken-probes-1-3` | extracted main's step from `5eb2829` with a YAML parser: `broken` → **125**, `broken-probes-1-3` → **0**; new script **1** on both |
+| **6 — report line deletable (regression)** | **CLOSED.** Direct bodies are pinned; each ends `\|\| exit 1` on the report and `exit "$rc"` last | my harness: report call deleted → RED; `exit "$rc"` deleted → RED; `\|\| exit 1` removed → RED; `if: always()` added → RED |
+| **7 — only one package floored** | **CLOSED.** 14 unit + 15 integration package floors; an unfloored package that ran tests is refused | real `go test -json` runs: emptying `internal/obs` → **1054 ≥ 910 but RED** (`internal/obs executed 0 test(s); its recorded floor is 14`); deleting `internal/healthcheck` → RED (build failure in `cmd/vizra` + floor); a NEW package with one test → RED (`no recorded floor`); a rename (stream-level) → RED on both counts; a NEW package with **zero** tests → green (nothing to lose; consistent with the doc's wording "a package that **runs** with no recorded floor is refused") |
+| **8 — stale `_why` counts** | **CLOSED** — `_why` reads 1071 / 1116 / 45 | matches my runs and CI |
+
+Incidentally measured: when something outside my run SIGTERM'd a background `go test`, the report
+failed it correctly — "`go test` exited 143 but no test or package event reports a failure … It is not a
+pass." Fail-closed on a signal.
+
+## R6. Lanes from the clean clone, and CI on 6b65eff
+
+Local, verbatim bodies extracted from `.github/pinned-steps.yml`, on my own `vzv9r1-pg` (PostgreSQL 18,
+:55919) and `vzv9r1-cache` (Valkey 9.1.2, :63919):
+
+```
+direct step 0 (unit)                 EXIT=0   1071 executed (floor 910), skipped 0, 14 packages
+direct step 1 (integration)          EXIT=0   1116 executed (floor 949), skipped 0; internal/integration 45 (floor 40)
+direct step 2 (integration shuffled) EXIT=0   1116 executed (floor 949), skipped 0; internal/integration 45 (floor 40)
+```
+
+Zero skips is **measured** from the `-json` stream in all three.
+
+CI on `6b65eff` (runs 35805827409 build-test, 35805827266 ci-required, 35805827280 image-scan):
+
+| check | conclusion | note |
+|---|---|---|
+| `ci-required` | **success** | `ci-required-guard: passed (6 required check(s))`; fan-in prints `SUCCESS` for all six manifest names |
+| `append-only`, `build-test`, `cache-matrix` (+ both legs), `fixtures`, `govulncheck`, `docker-build` | **success** | all six FLOOR_LANES ran on this SHA; manifest and jobs agree; nothing skipped/cancelled |
+| `image-scan` | failure | **not required**; `48 finding(s) at or above ['CRITICAL','HIGH']`, **exit 1** (findings), not 3 |
+
+build-test log: unit **1071**/910, integration **1116**/949 twice, `internal/integration` **45**/40,
+`skipped: 0` in each; every anchor prints both new runtime `ok` lines; provenance names the tested merge
+tree `fa15bca…` with `HEAD^2 == 6b65eff…`. Duration **01:19:42 → 01:30:59 = 11m17s** of a 20-minute
+timeout (claimed 11m17s ✔; +14s over round one).
+
+## R7. Truthfulness at 6b65eff
+
+| claim | verdict |
+|---|---|
+| "EXHAUSTIVE" / "the whole remaining residual" deleted everywhere | **TRUE** — the only remaining uses say a blacklist *cannot* be exhaustive, or that the list is *not* called exhaustive |
+| no change under api/, internal/, cmd/, migrations/, Makefile; manifest and FLOOR_LANES identical | **TRUE** |
+| 65 guard fixtures; counts 1071 / 1116 / 45; 0 skips; build-test 11m17s | **TRUE** — all reproduced |
+| "45 attack rows, all RED, each by a named rule" | **TRUE of those 45 rows** (R2), except that A19/A19b are only red when the writing step is a *separate* step — see next row |
+| PR body: "A19 / A19b `$GITHUB_ENV` / `$GITHUB_PATH` write by the preceding step → RED — 8b adjacency (and the anchor at runtime)" | **FALSE when the preceding step is the anchor or looks like it** — FINDING R-1 |
+| PR body/R2: "R3 … an arbitrary early step writing MAKEFLAGS to `$GITHUB_ENV` … RED at the anchor at runtime" | **FALSE when that step also writes MAKELEVEL** — FINDING R-2 |
+| AGENTS.md:59 "MAKEFLAGS/GNUMAKEFLAGS/MFLAGS are unset (not merely free of flags it recognises)" | **FALSE under an injected MAKELEVEL**, which AGENTS.md never mentions — FINDING R-3 |
+| AGENTS.md:70 / guard docstring:96 "Every one of the thirteen fails this by construction" (the thirteen include the `$GITHUB_ENV`/`$GITHUB_PATH` write) | **FALSE** — the builder's own counter-row R3 is green at 8b — FINDING R-3 |
+| `check_environment` docstring: "the flag test still refuses -i/-k/-t/-q, and the workflow anchor … never runs under make" | **FALSE** — `-ki` passes; "under make" is an env var — FINDING R-2 |
+| D6 corrected | **TRUE** |
+| review-only residuals (another step's effect on the machine; wrapper/composite; reusable workflow; committed pins/floors editable; CODEOWNERS advisory) | **TRUE and honestly stated** — U1, U3 (absent MAKELEVEL), J3, the forwarding `make` stub all fall inside them |
+
+## Findings at 6b65eff
+
+```
+FINDING R-1: the "anchor immediately before make" is recognised by SUBSTRING and its
+             body is not pinned — the anchor step itself can poison the pinned make step
+Severity:    REQUIRED
+Confidence:  high (static guard: measured; GitHub $GITHUB_ENV carry-over: simulated, not run live)
+
+Affected:
+  repo:      vizra-core
+  files:     scripts/ci-required-guard.py:284 (step_is_the_anchor),
+             :575-603 (the adjacency test in check_pinned_make_steps),
+             .github/pinned-steps.yml (no entry for the anchor body),
+             AGENTS.md:55-64, PR body § anchor and the A19/A19b row
+  requirements: none yet — propose VZ-OPS-CI-00x (a floor lane's make step cannot be no-opped)
+
+Observed:
+      def step_is_the_anchor(step):
+          run = step.get("run")
+          return isinstance(run, str) and MAKE_INTEGRITY_GUARD in run and not MAKE_INVOCATION.search(run)
+  "The anchor" is any step whose text CONTAINS `make-integrity-guard` and no bare
+  `make` token. Its body is never compared to anything. Each of these, substituted
+  into the real build-test.yml, leaves ci-required-guard.py GREEN, exit 0:
+    N1  - name: Refuse a neutered Makefile
+          run: ./scripts/make-integrity-guard.sh && echo "MAKEFLAGS=-i" >> "$GITHUB_ENV"
+        - name: make ci
+          run: make ci
+    N2  real anchor, then a second step `: make-integrity-guard` + the same write, then make ci
+    N3  an earlier step writes MAKEFLAGS=-i; the adjacent "anchor" is `run: ': make-integrity-guard'`
+    N4  the compound anchor writes a stub directory to $GITHUB_PATH
+  N1 end-to-end on ubuntu:24.04 / GNU Make 4.3, the anchor body run as `bash -e`,
+  then the next step run with the $GITHUB_ENV file applied (GitHub's documented
+  semantics for LATER steps):
+      anchor step exit=0  (make-integrity-guard: passed (8 gate target(s)))
+      GITHUB_ENV now: MAKEFLAGS=-i
+      RECIPE RAN
+      make: [Makefile:2: ci] Error 7 (ignored)
+      make ci step exit=0
+
+Failure:
+  The redesign's stated premise — "Adjacency is what gives this teeth: a write to
+  $GITHUB_ENV or $GITHUB_PATH only applies to later steps, so it reaches the anchor's
+  process exactly as it would reach make's" — holds only if the adjacent step IS the
+  anchor. A write made BY that step, after the guard exits, reaches make and not the
+  guard. One edited line on the anchor, or a fake anchor, silences every pinned make
+  step with both guards green. The AGENTS.md residual ("what any OTHER step does …
+  before the anchor runs") does not cover the anchor step itself or a step that only
+  looks like one.
+
+Perspective:
+  developer, operator
+
+Recommendation:
+  Pin the anchor exactly like the make steps: add `./scripts/make-integrity-guard.sh`
+  as an `anchor_step` literal in .github/pinned-steps.yml and make step_is_the_anchor
+  mean "byte-equal to that literal, keys ⊆ {name, run, id}". A step that merely
+  contains the string is then neither an anchor nor exempt from 8b.
+
+Acceptance criteria:
+  N1, N2, N3 and N4 each turn ci-required-guard.py red with a named reason; the
+  committed workflows (whose anchors are all exactly `./scripts/make-integrity-guard.sh`)
+  still pass.
+
+Tests:
+  scripts/scripts_test.go TestCIRequiredGuardFixtures — fixtures anchor-compound-github-env/,
+  anchor-fake-noop/, anchor-then-lookalike/, anchor-compound-github-path/, each one
+  change from `good`.
+
+Cross-repo implications:
+  core: this guard. user/search: if the pinned-step design is ported, pin the anchor
+  there from the start. meta: none.
+
+Challenge:
+  `&& echo … >> $GITHUB_ENV` on the anchor is conspicuous in a diff. So was
+  `make -i ci`; the whole slice exists because conspicuous is not a control.
+```
+
+```
+FINDING R-2: MAKELEVEL in the environment switches the workflow anchor to a flag
+             blacklist, and that blacklist passes `-ki`, `n` and `--ign`
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     scripts/make-integrity-guard.py:574-650 check_environment() (`inside_make = …` at :593
+             and the fallback `hits` at :611); :284-306 (per-target MAKEFLAGS check treats p/n as its own);
+             scripts/ci-required-guard.py DANGEROUS_ENV_NAMES (MAKELEVEL absent)
+  requirements: none yet
+
+Observed:
+  The mode is chosen by the PRESENCE of MAKELEVEL, which any earlier step can set
+  through $GITHUB_ENV and a job-level `env:` can set outright (the static guard
+  passes `env: MAKELEVEL: '1'` — row J4). An EMPTY MAKELEVEL counts. In that mode the
+  test is: a leading dash-less word's letters ∩ {i,k,t,q}, or a whole word equal to
+  -i/-k/-t/-q or one of nine long spellings. So a dash CLUSTER (`-ki`), `n`, and a long
+  ABBREVIATION (`--ign`) pass; `n` is also invisible to the per-target check, which
+  treats `p` and `n` as the guard's own `-pn`.
+  The real anchor, GNU Make 4.3 on ubuntu:24.04 (repo mounted read-only):
+      MAKEFLAGS=-ki (no MAKELEVEL)       anchor exit=1
+      MAKELEVEL=1 MAKEFLAGS=-ki          anchor exit=0
+      MAKELEVEL=1 MAKEFLAGS=n            anchor exit=0
+      MAKELEVEL= MAKEFLAGS=--ign         anchor exit=0
+      MAKELEVEL=1 GNUMAKEFLAGS=-ki       anchor exit=0
+  and what make does under each, with a failing `ci` recipe: exit 0, 0, 0, 0.
+  On the real repository (host, planted gofmt violation):
+      control                            make fmt-check exit=2
+      MAKELEVEL=1 MAKEFLAGS=-ki          make fmt-check exit=0
+      MAKELEVEL= MAKEFLAGS=--ign         make fmt-check exit=0
+      MAKELEVEL=1 MAKEFLAGS=n            make ci        exit=0   (the whole gate)
+  The builder's R2 transcript never injects MAKELEVEL; its only MAKELEVEL rows are
+  `make ci-guard`, where make sets it legitimately.
+
+Failure:
+  Row R3/A19 — "an arbitrary early step writing MAKEFLAGS to $GITHUB_ENV: green at the
+  guard; RED at the anchor at runtime" — is green at both when that step writes two
+  lines, `MAKELEVEL=1` and `MAKEFLAGS=-ki`. The pinned, byte-equal `make ci` then runs
+  with -k -i and exits 0. The function's own docstring says "That path is not a hole:
+  the flag test still refuses -i/-k/-t/-q, and the workflow anchor … never runs under
+  make" — `-ki` is refused by neither half, and "never runs under make" is decided by
+  an environment variable the attacker controls.
+
+Perspective:
+  developer, operator
+
+Recommendation:
+  Choose strict mode from something the workflow controls and the environment cannot:
+  the workflow anchor is already about to be pinned byte-equal (FINDING R-1), so pin it
+  as `./scripts/make-integrity-guard.sh --workflow` and in that mode refuse any
+  non-empty MAKEFLAGS/GNUMAKEFLAGS/MFLAGS AND any MAKELEVEL, unconditionally. Keep the
+  lenient path only for the `make ci-guard` recipe (which is not a control anyway).
+  Belt and braces: add MAKELEVEL to DANGEROUS_ENV_NAMES, and make the lenient path an
+  ALLOWLIST (empty, `-j…`, `--jobserver-…`, `--no-print-directory`, `w`, `s`) rather
+  than a letter blacklist.
+
+Acceptance criteria:
+  The anchor, invoked as the workflow invokes it, exits 1 for every row above including
+  MAKELEVEL=1 MAKEFLAGS=-ki, MAKELEVEL=1 MAKEFLAGS=n and an empty MAKELEVEL; `make
+  ci-guard` locally still passes; `env: MAKELEVEL:` at job or workflow level is red.
+
+Tests:
+  scripts/scripts_test.go — a TestMakeIntegrityGuardEnvironment table driving the
+  script with each env row (no workflow needed), plus a guard fixture job-env-makelevel/.
+
+Cross-repo implications:
+  core only today; vizra-search carries the anchor's lineage.
+
+Challenge:
+  Someone who can write $GITHUB_ENV in a floor lane can do anything (the stated
+  "machine" residual). True for effects the anchor does not claim to see — but MAKEFLAGS
+  in the anchor's own environment is precisely what it claims to see, "unset, not merely
+  free of flags it recognises", and it is the sole runtime defence the PR body cites for
+  the R3 row.
+```
+
+```
+FINDING R-3: the docs and PR body state the anchor and adjacency controls at a strength
+             they do not have
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     AGENTS.md:55-72 (controls 1 and 2; :59 and :70 quoted), scripts/ci-required-guard.py:96 docstring
+             ("8b … Every one of the thirteen fails this by construction"),
+             scripts/make-integrity-guard.py check_environment docstring,
+             PR body (anchor row; the A19/A19b row; the R3 row)
+
+Observed:
+  - AGENTS.md control 1: "MAKEFLAGS/GNUMAKEFLAGS/MFLAGS are unset (not merely free of
+    flags it recognises)". The MAKELEVEL fallback is not mentioned anywhere in AGENTS.md;
+    under it they are merely free of flags it recognises, and it does not recognise -ki.
+  - AGENTS.md and the ci-required-guard docstring both list "a `$GITHUB_ENV` or
+    `$GITHUB_PATH` write by an earlier step" among the thirteen, then say "Every one of
+    the thirteen fails this by construction, because every one changes the bytes or adds
+    a key." That write changes neither; the builder's own table lists it as GREEN at the
+    static guard (counter-row R3).
+  - PR body: "A19 / A19b | `$GITHUB_ENV` / `$GITHUB_PATH` write by the preceding step |
+    RED — 8b adjacency (and the anchor at runtime)" — green when the preceding step is
+    the anchor itself or a look-alike (R-1); "R3 … RED at the anchor at runtime" — green
+    with MAKELEVEL (R-2).
+  - check_environment docstring: "the flag test still refuses -i/-k/-t/-q, and the
+    workflow anchor … never runs under make" — both measured false.
+
+Failure:
+  The chair's standing rule: text stronger than its control holds the PR. These are the
+  sentences a reviewer reads to decide that the $GITHUB_ENV class is closed.
+
+Perspective:
+  developer
+
+Recommendation:
+  Fix R-1 and R-2, after which most sentences become true. Independently: drop "every
+  one of the thirteen" (say which ones 8b catches and which the anchor catches at
+  runtime), and state the MAKELEVEL behaviour — whatever it becomes — in AGENTS.md.
+
+Acceptance criteria:
+  Each sentence above names the control that makes it true, and a fixture or transcript
+  exists for it.
+
+Tests:
+  review; the fixtures of R-1 and R-2.
+
+Cross-repo implications:
+  meta: the war-room board quotes AGENTS.md.
+
+Challenge:
+  "Adjacency" is true of every real anchor in the committed workflows. Yes; the claim is
+  about what the guard enforces, and it enforces a substring.
+```
+
+```
+FINDING R-4: duplicate YAML keys are resolved last-wins by the guard, silently
+Severity:    SHOULD
+Confidence:  medium (the guard's behaviour is measured; GitHub's is UNVERIFIED)
+
+Affected:
+  repo:      vizra-core
+  files:     scripts/ci-required-guard.py load_workflows() (yaml.safe_load)
+
+Observed:
+  A make step with `run: make -i ci` followed by `run: make ci` (same mapping) is GREEN:
+  PyYAML keeps the last value. The reverse order is RED. I did not push a workflow to
+  learn which value GitHub's parser uses; I believe it rejects the file ("'run' is
+  already defined"), in which case no job runs and the fan-in is red — but the guard
+  neither knows nor asserts that.
+
+Failure:
+  If GitHub's parser keeps the FIRST value, `make -i ci` runs under a green guard.
+  Either way the guard's verdict rests on a parser disagreement nobody has measured.
+
+Perspective:
+  developer
+
+Recommendation:
+  Load workflows and pinned-steps.yml with a SafeLoader subclass whose construct_mapping
+  raises on a duplicate key; report it as a FAILURE. Ten lines.
+
+Acceptance criteria:
+  A fixture with a duplicate `run:` (either order) is red, naming the key.
+
+Tests:
+  scripts/scripts_test.go, fixture duplicate-run-key/.
+
+Cross-repo implications:
+  none.
+
+Challenge:
+  GitHub almost certainly rejects duplicates, so this can never fire. Then the loader
+  change costs nothing and removes the "almost".
+```
+
+```
+FINDING R-5: the anchor's `make` identity `ok` line says "not … a PATH stub" but checks
+             only the directory
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     scripts/make-integrity-guard.py:656 check_make_resolves_to_a_real_program()
+
+Observed:
+  A real file at /usr/local/bin/make that execs /usr/bin/make for `-pn` and `exit 0`s
+  otherwise: anchor exit 0, printing "`make` is a real program at /usr/local/bin/make
+  (type -t: file), not a function, alias or PATH stub"; `make ci` then exits 0. (A
+  symlink to /bin/true IS red — but only because `make -pn` returns an empty
+  MAKEFILE_LIST, not because of this check; realpath /usr/bin/true is in an approved dir.)
+  Planting it needs an earlier step writing to the machine, which AGENTS.md lists as
+  review-only — so this is a wording defect, not an unlisted hole.
+
+Recommendation:
+  Say what is checked: "`make` resolves to a file in a system directory". Optionally
+  compare `make --version`'s first line to `GNU Make` and require realpath basename
+  `make`/`gmake`.
+
+Acceptance criteria / Tests:
+  The ok line states only what the check establishes.
+
+Cross-repo implications:  none.
+Challenge:  cosmetic. It is the line a reader takes as proof.
+```
+
+## Cross-PR note for the chair (reported, not acted on) — core PR #8 at `59a19c5`, whichever merges second
+
+1. **#8 adds three new tested packages** — `internal/audit`, `internal/credential`, `internal/ownerclaim`
+   (none exists on main or on #9). #9's report now REFUSES any package that runs tests with no recorded
+   floor (measured: FL3). So **the first `build-test` run after both land goes red** on all three direct
+   steps — `N package(s) executed tests with no recorded floor` — until floors for those three are added
+   to BOTH suites in `scripts/test-floors.json` (the `--emit-floors` generator prints them). Intended
+   behaviour, but it must be done in the second PR, not discovered on main.
+2. **#8's Makefile edit** renames one `-run` alternative in `openapi-verify`
+   (`TestM0ContractIsTheFourProbes` → `TestPublicContractIsTheProbesPlusTheSetupOperations`). It does not
+   touch any step pinned in `.github/pinned-steps.yml` (those are `make <target>` bodies; the recipe body is
+   free), and check 5's "every -run selection is non-empty" still holds. No pin or floor conflict from it.
+   `make-integrity-guard` would only object if the merge duplicated a gate target.
+3. **#8 raises counts** (new tests in `internal/httpapi`, `internal/config`, `cmd/vizra`,
+   `internal/integration`), so no existing floor can trip; per-package floors do not need raising, only
+   ADDING for the three new packages.
+4. **Skips:** `allowed_skips` is empty in both suites; any `t.Skip` among #8's tests fails the lane by name.
+5. **If #8 changes any workflow step** (e.g. new `env:` on a test step), the job-level-env and pinned-body
+   rules apply: a step-level `env:` on a pinned step is now refused (name/run/id only).
+
+## Cleanup (round two)
+
+`vzv9r1-pg`, `vzv9r1-cache` removed by exact name; `ubuntu:24.04` (pulled by me this round — absent at
+start) removed by exact name; `vzv9r1-make43` ran with `--rm`. My four stopped processes were mine by
+`lsof` cwd. Scratch clone deleted. Nothing belonging to `vzv10-*`, `vizra-m1a-*` or `vidra-*` touched;
+the builder's checkout and the core-#8 worktree were never opened for writing.
+
+## Verdict at 6b65eff
+
+The redesign is real progress and most of it holds: all 45 round-one rows are red with my harness,
+round-one findings 5–8 are closed and reproduced, the lanes and counts reproduce locally and in CI, and
+the "exhaustive" language is gone. It fails on the control the redesign itself depends on: the
+**anchor** that must sit "immediately before" each pinned make step is recognised by substring and its
+body is unpinned (R-1), and its runtime default-deny collapses to a leaky blacklist whenever `MAKELEVEL`
+is present in the environment, which an earlier step or a job-level `env:` can arrange (R-2). Either
+alone lets a byte-pinned `make ci` run neutered with both guards green; the docs and PR body claim both
+paths are closed (R-3). Fixes are small (pin the anchor body; choose strict mode by argv, not env; refuse
+MAKELEVEL at job/workflow level) — this is round 1 of 2.
+
+FINAL VERDICT: FAIL — SHA 6b65eff6ee29e99e1b93b01242b4c97d90a57267
