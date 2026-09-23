@@ -3494,3 +3494,54 @@ Runs 4–10 are from a fresh clone made after the restart.
 | 6 | post-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
 | 7 | post-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
 | 8 | post-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
+| 9 | post-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
+| 10 | post-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
+
+**10 of 10 runs clean.** Every run: exit 0, `95 assertion(s) passed, 0 failed,
+across 50 case(s)`, zero `Broken pipe`, the tree byte-identical afterwards. For
+runs 4–10, where the per-run files exist, I also checked each one: 0 `FAIL`
+lines, 50 `CASE` headers printed. That is the same RESULT line CI printed for
+this SHA (run `35582443280`). With `grep -c '| grep -q' demo.sh` = 0, the race is
+gone by construction, and the loop shows it is gone in practice. **S-4 is CLOSED.**
+
+At 9c4b5d3 the same harness gave me 72/73 once, with a
+`printf: write error: Broken pipe` and the contradictory
+`FAIL: expected exit 1 …, got 1`. Nothing like that appeared in any of these ten
+runs.
+
+## Verdict
+
+Head still `cf9e4c86b077335fcad8cf8050c8fe57a50431c2` when the loop finished;
+`validate` and `ci-required` success on it; GitGuardian red for `a96f188` alone
+and not in the manifest.
+
+**Every blocking finding from 9c4b5d3 is closed, and my own mutations confirm
+it:** S-1 (both directions, distinct rule ids), S-2 (a structural tokeniser
+that survived 15 attacks; the greens are correct behaviour or the documented
+`pg_isready --version` residual), S-3, S-4 (10/10), S-5, S-7. S-6 is stated
+rather than fixed, as agreed. **All three VZ-ISSUE-002 acceptance bullets are
+MET** from my own renderer over 13 shapes. The rendered compose models are
+identical to `9c4b5d3` apart from the random bundle-tree name. Scope is clean.
+The CI artifact for this SHA holds no secret value.
+
+**On T-1…T-5 and the standing "no false guarantee merges" ruling:** all five are
+class (a). None is a defect in anything the acceptance bullets depend on, and
+**I consider none of them blocking.**
+
+- **T-2 is the only one that touches the ruling.** CLAIMS.md's header says "a
+  stale row is a failed run". The generator does refuse a missing anchor, an
+  ambiguous anchor and a hand edit; I measured all three. It does not tie the
+  claim text or the Red-when cell to the source. I rule it non-blocking because
+  the sentence is about the audit file, not about a control an operator or the
+  topology relies on. Its own tail also scopes it to line numbers ("not a
+  quietly wrong number"). If the chair reads it as a false guarantee under the
+  ruling, the remedy is one sentence of wording: *"a line number is never
+  quietly wrong; the claim text and the cited cases are hand-written — read the
+  anchored sentence."* No code change is needed to make it true.
+- **T-1 is not a false claim by the builder.** No artifact says
+  `claims.py --check` runs in the lane; only the brief I was given did. It
+  should become a lane step in a PR allowed to touch the workflow.
+- **T-3, T-4 and T-5 are completeness or publication gaps.** Every sentence
+  involved is true, and I verified each one.
+
+FINAL VERDICT: PASS — SHA cf9e4c86b077335fcad8cf8050c8fe57a50431c2
