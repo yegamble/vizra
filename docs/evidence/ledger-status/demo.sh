@@ -168,8 +168,11 @@ git ls-files -z | (cd "$ROOT" && xargs -0 tar -cf -) | tar -xf - -C "$copy"
 ) || { echo "  FAIL  could not make the scratch copy"; FAILED=$((FAILED + 1)); }
 mutate "$copy/docs/quality/features.json" 'import sys; p=sys.argv[1]; s=open(p,encoding="utf-8").read(); i=s.index("\"id\": \"VZ-FOUND-008\""); j=s.index("\"implementation_status\": \"PLANNED\"", i); s=s[:j]+"\"implementation_status\": \"VERIFIED\""+s[j+len("\"implementation_status\": \"PLANNED\""):]; open(p,"w",encoding="utf-8").write(s)' \
   && (cd "$copy" && git -c user.name=demo -c user.email=demo@invalid commit -qam "hand-assert VERIFIED") \
-  && red "D1c" "GENERATED FILE IS NOT REPRODUCIBLE" -- bash -c "cd '$copy' && ./scripts/check-generated-ledger.sh" \
-  && red "D1c output check" "VZ-FOUND-008: STATUS WITHOUT A RECORD" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
+  && red "D1c output check" "VZ-FOUND-008: STATUS WITHOUT A RECORD" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py" \
+  && red "D1c" "GENERATED FILE IS NOT REPRODUCIBLE" -- bash -c "cd '$copy' && ./scripts/check-generated-ledger.sh"
+# The output check runs FIRST: the regeneration check leaves the regenerated
+# (correct) file in the tree on failure, and the output check would then report
+# that the tree differs from HEAD instead of the status it exists to refuse.
 (cd "$copy" && git reset -q --hard HEAD~1) && green "D1c restored" -- bash -c "cd '$copy' && ./scripts/check-generated-ledger.sh" \
   && green "D1c output check restored" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
 back_to_fixture
