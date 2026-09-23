@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 231 — **meta #6 MERGED** `e4c7be8` → `e4f625e` (ledger status only from committed records, checked by an out-of-process output check with exact keys, duplicate-key refusal, canonical bytes and evidence-on-main byte identity, plus online GitHub facts and `ci-required`; final re-verification PASS after two fix rounds; 15 new escape attempts caught). **Merged today: 11.** Dispatched 2u (records onto main via a path-limited import + the CODEOWNERS wording sweep) to builder `a2e0c4efc60a7a6be`. In flight: user #10 last round, core test stability, core 2t, meta 2u. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 232 — core 2t READY_FOR_REVIEW as **core #14** at `75e0a95` (S-0002…S-0007, S-0009, S-0010 fixed test-first, each red on `a6bc77d`; migration 0006 adds a `NOT VALID` CHECK for `token_generation`; M1–M16; unit 1575, integration 1769 on both caches; CI pending) → fresh verifier + `vizra-sentinel-pr` (migration PR; post: no). user #10 last round at `b68294b` (pinned upload gate refuses image/video/screencast by name, member and magic bytes; runtime check plain-values only; D24 16 halves; CI 8/8) → re-verifying. In flight: verifier + sentinel-pr on core #14, verifier on user #10, core test stability, meta 2u. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -175,6 +175,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 232 (2026-09-23) — core #14 (2t) → verifier + sentinel-pr; user #10 last round → re-verifying.
 - Tick 231 (2026-09-23) — meta #6 merged (`e4f625e`); 11 merges today; 2u dispatched.
 - Tick 230 (2026-09-23) — quiet.
 - Tick 229 (2026-09-23) — core #12 merged (`a6bc77d`); 10 merges today; user #10 FAIL (runtime check fooled) → last round: gate pixels at upload.
