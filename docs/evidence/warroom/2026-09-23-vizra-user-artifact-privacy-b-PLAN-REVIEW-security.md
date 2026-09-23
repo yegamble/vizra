@@ -200,3 +200,43 @@ Status stays UNVERIFIED, as the plan says.
 - **Q-r2-3:** a distinct exit code plus the fixed plain line is enough. An annotation is optional, and if added is built only from the fixed lists.
 
 **Chair ruling (tick 208):** C1–C6 and both NITs are accepted, and Q-r2-1…3 are answered as the seat recommends. After the builder amends the plan to revision 3, the seat checks only C1–C4, and phase 2 may then start once user #10 has merged.
+
+## Seat check of plan revision 3, C1–C4 (tick 209) — recorded by the chair
+
+**Result per item:**
+- C1 and C4: confirmed.
+- C2: confirmed except R3-1.
+- C3: confirmed except R3-2.
+
+**Findings:**
+
+- **R3-1 (REQUIRED).** In Lane B, a spec can still supply its own browser through the `browser`/`context` fixture.
+  - Before the guard is armed, it can call `chromium.launch({ proxy, args })` or `launchPersistentContext(dir, { recordHar, recordVideo, proxy, serviceWorkers })`. Those options are never screened.
+  - (creation-guard.ts on main:32-44 treats an overridden fixture as "sanctioned", and `launch` is refused only while armed.)
+  - **Fix:** in Lane B, refuse `launch`/`launchPersistentContext`/`launchServer` at ANY time after configuration load, as `connect` already is. Lane A's D13g is unchanged.
+  - **Tests:** D21h is extended with fixture-override specs, including a "Lane-B launch refusal off" mutation.
+
+- **R3-2 (REQUIRED).** `worker-end` counts signal records WRITTEN, so a failed write (unhandled inside an async listener) disappears from both sides of the comparison.
+  - **Fix:**
+    - N counts signals OBSERVED, incremented synchronously BEFORE the write;
+    - write failures are counted in `worker-end`;
+    - the scanner withholds if N differs from the records on disk, or the failure count is above zero;
+    - every `signal` record carries the worker's token;
+    - a read that rejects counts like an unresolved one.
+  - **Test:** a third D20h half (a forced write failure, red under the "written count" mutation).
+
+**NITs:**
+- **NIT 1:** bind the C1 outcome record to the run's inventory nonce.
+- **NIT 2:** `markerTitle` reads the canary-minted marker from `.vizra-e2e/secret/` and never mints its own.
+- **NIT 3:** add `routeFromHAR(…, { update: true })` to the Lane-B lint list.
+- **NIT 4:** state whether Lane-B and canary workers also write start/end pairs.
+
+**Q-r3-1: no benign-header list; this is O-1's expiry.**
+- A CSRF scheme brings a response `Set-Cookie`, which taints Lane A anyway.
+- A list would be the first fail-open exception in this control.
+- At M1, Lane A becomes summary-only.
+- Record this in AGENTS.md § Residuals and in the ADR-003 notes.
+
+**SEAT VERDICT: CHANGES STILL REQUIRED** (R3-1, R3-2 only). The seat states that the chair may confirm both by checking the text, with no further seat pass.
+
+**Chair ruling (tick 209):** R3-1, R3-2 and NITs 1–4 are accepted, and Q-r3-1 is adopted as the seat answered it. The builder amends the plan to revision 4, and the chair confirms R3-1 and R3-2 in the text. Phase 2 starts after that and after user #10 merges.
