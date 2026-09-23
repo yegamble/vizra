@@ -1,6 +1,5 @@
-# source SHA 94ac3bf8c312ca0c1ab08195293f1ad15170d7ff (branch feat/m0-ledger-status); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
-# command: ./scripts/check-ledger-status-remote.py --self-test ; ./scripts/check-ledger-status-remote.py
-# exit: 0 ; 0
+# source SHA 19ba5671869184ec313db47b10329d6ea450b0f0 (branch feat/m0-ledger-status, fix round 1); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
+# commands: ./scripts/check-ledger-status-remote.py --self-test ; ./scripts/check-ledger-status-remote.py ; ./scripts/check-ledger-status-output.py
 
 SELF-TEST core8-implemented-true-facts: expected pass, got pass
 SELF-TEST core8-verified-true-facts: expected pass, got pass
@@ -22,7 +21,13 @@ SELF-TEST pr-never-merged: expected red naming ['was NOT MERGED']; red, every re
 SELF-TEST merge-commit-does-not-exist: expected red naming ['could not place merge commit 0000000000000000000000000000000000000001']; red, every reason named
     status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra-core#8: yegamble/vizra-core#8 merge_commit_sha is f1972e8226e42a2bf837bd45e12f5f447dd3a92f, but the record says 0000000000000000000000000000000000000001
     status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra-core#8: could not place merge commit 0000000000000000000000000000000000000001 relative to yegamble/vizra-core main: gh api repos/yegamble/vizra-core/compare/0000000000000000000000000000000000000001...main: exit 1: {"message":"Not Found","documentation_url":"https://docs.github.com/rest/commits/commits#compare-two-commits","status":"404"}
-self-test: 8/8 cases behaved as expected
+SELF-TEST merged-into-a-non-main-branch: expected red naming ["targets 'chore/m0-meta-baseline', not main"]; red, every reason named
+    status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra#3: yegamble/vizra#3 targets 'chore/m0-meta-baseline', not main
+self-test: 9/9 cases behaved as expected
+exit=0
 
---- committed records:
 0 status records in docs/evidence/ledger-generator/status_records.json: no entry claims IMPLEMENTED or VERIFIED, so there is no merge to prove. (The self-test step exercises this checker.)
+exit=0
+
+ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from the committed records in a fresh process
+exit=0

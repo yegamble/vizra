@@ -1,0 +1,29 @@
+# source SHA 19ba5671869184ec313db47b10329d6ea450b0f0; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23. Each mutation applied alone to a copy of the file under test, the named test run, the file restored.
+
+## online checker (scripts/check-ledger-status-remote.py)
+== mutation base-guard-deleted: sha256 eb80e8a088a3 -> 15a950166a14
+   unit tests exit=1
+   FAIL: test_base_other_than_main_is_refused (__main__.RemoteGuards)
+   self-test exit=1
+   SELF-TEST merged-into-a-non-main-branch: expected red naming ["targets 'chore/m0-meta-baseline', not main"]; MISSING ["targets 'chore/m0-meta-baseline', not main"] in []
+   self-test: 8/9 cases behaved as expected
+== mutation actions-app-filter-deleted: sha256 eb80e8a088a3 -> 40f4c2d59e96
+   unit tests exit=1
+   FAIL: test_ci_required_from_a_non_actions_app_is_refused (__main__.RemoteGuards)
+   FAIL: test_non_actions_success_does_not_mask_an_actions_failure (__main__.RemoteGuards)
+== mutation auth-proof-deleted: sha256 eb80e8a088a3 -> 5bb427712217
+   unit tests exit=1
+   FAIL: test_anonymous_gh_is_refused (__main__.RemoteGuards)
+== restored: unit OK; self-test: 9/9 cases behaved as expected
+
+## offline rules (docs/evidence/ledger-generator/status.py), new in round 1
+== mutation type-check-reverted-to-ne: sha256 59d899d439ef -> 53bf407fb8b1
+   unit tests exit=1
+   FAIL: test_str_subclass_that_compares_equal_is_refused (test_status.DslDefaults)
+== mutation qualifier-allowlist-deleted: sha256 59d899d439ef -> 3ea7e32d717d
+   unit tests exit=1
+   FAIL: test_free_text_qualifier_is_refused (test_status.Evidence)
+== mutation tagged-bullet-check-deleted: sha256 59d899d439ef -> c8ef4e841797
+   unit tests exit=1
+   FAIL: test_tagged_bullet_must_name_this_requirement (test_status.Floors)
+== restored: OK

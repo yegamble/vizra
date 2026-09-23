@@ -1,26 +1,30 @@
-# source SHA 94ac3bf8c312ca0c1ab08195293f1ad15170d7ff (branch feat/m0-ledger-status); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
-# command: (cd docs/evidence/ledger-generator && python3 -m unittest -v test_status)
-# exit: 0
+# source SHA 19ba5671869184ec313db47b10329d6ea450b0f0 (branch feat/m0-ledger-status, fix round 1); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
+# commands: (cd docs/evidence/ledger-generator && python3 -m unittest -v test_status) ; python3 scripts/test_ledger_status_remote.py -v
 
 test_clean_dsl_passes (test_status.DslDefaults) ... ok
+test_core_req_keys_equal_the_output_checks_allowlist (test_status.DslDefaults) ... ok
 test_hand_asserted_evidence_is_refused (test_status.DslDefaults) ... ok
 test_hand_asserted_release_status_is_refused (test_status.DslDefaults) ... ok
 test_hand_asserted_verified_in_a_section_is_refused (test_status.DslDefaults) ... ok
+test_str_subclass_that_compares_equal_is_refused (test_status.DslDefaults) ... ok
 test_abbreviated_verdict_sha_is_refused (test_status.Evidence) ... ok
 test_evidence_outside_warroom_is_refused (test_status.Evidence) ... ok
 test_fail_as_final_line_is_refused (test_status.Evidence) ... ok
+test_free_text_qualifier_is_refused (test_status.Evidence) ... ok
 test_hyphen_instead_of_em_dash_is_refused (test_status.Evidence) ... ok
 test_implemented_passes_and_is_written (test_status.Evidence) ... ok
 test_missing_evidence_file_is_refused (test_status.Evidence) ... ok
 test_nothing_is_written_when_any_record_fails (test_status.Evidence) ... ok
 test_pass_not_on_the_final_line_is_refused (test_status.Evidence) ... ok
 test_symlinked_evidence_is_refused (test_status.Evidence) ... ok
+test_unqualified_pass_is_admitted (test_status.Evidence) ... ok
 test_verdict_sha_mismatch_is_refused (test_status.Evidence) ... ok
 test_verified_passes_and_is_written (test_status.Evidence) ... ok
 test_api_surface_needs_a_core_merge (test_status.Floors) ... ok
 test_bullet_must_be_verbatim_and_in_acceptance (test_status.Floors) ... ok
 test_every_scheduling_issue_must_be_cited (test_status.Floors) ... ok
 test_ledger_ids_ranges_expand (test_status.Floors) ... ok
+test_tagged_bullet_must_name_this_requirement (test_status.Floors) ... ok
 test_ui_surface_needs_a_user_merge (test_status.Floors) ... ok
 test_unknown_requirement_is_refused (test_status.Floors) ... ok
 test_abbreviated_sha_is_refused (test_status.RecordShape) ... ok
@@ -34,6 +38,23 @@ test_unknown_status_is_refused_by_name (test_status.RecordShape) ... ok
 test_verified_with_no_evidence_is_refused (test_status.RecordShape) ... ok
 
 ----------------------------------------------------------------------
-Ran 30 tests in 0.041s
+Ran 35 tests in 0.314s
 
 OK
+exit=0
+
+test_anonymous_gh_is_refused (__main__.RemoteGuards) ... ok
+test_base_other_than_main_is_refused (__main__.RemoteGuards) ... ok
+test_ci_required_from_a_non_actions_app_is_refused (__main__.RemoteGuards) ... ok
+test_implemented_does_not_ask_for_ci (__main__.RemoteGuards) ... ok
+test_in_progress_is_not_success (__main__.RemoteGuards) ... ok
+test_latest_actions_run_decides (__main__.RemoteGuards) ... ok
+test_merge_commit_not_on_main_is_refused (__main__.RemoteGuards) ... ok
+test_non_actions_success_does_not_mask_an_actions_failure (__main__.RemoteGuards) ... ok
+test_true_facts_pass (__main__.RemoteGuards) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.001s
+
+OK
+exit=0

@@ -117,3 +117,40 @@ Candidates: `candidates.txt`, with the decision table in `docs/evidence/ledger-s
   branch `chore/warroom-records-2026-09-21` at `b331f63` with `git show`, into a scratch copy only.
   This PR adds and edits no evidence file written by another agent. A future VERIFIED record needs
   its evidence file on `main` first, which means the records branch must land.
+
+## Fix round 1 (verifier FAIL at 36913d2, `docs/evidence/warroom/2026-09-23-meta-pr6-ledger-status-VERIFY.md` on the chair's records branch)
+
+The verifier upheld all three candidate refusals and reproduced every lane and D1–D5. Its findings and what closed each:
+
+- **REQUIRED 1** (probes 2c extra key, 2d `str` subclass, 2e wrapper: each a status with zero
+  records and the lane green). This slice guarded the INPUT path in-process. The fix guards the
+  OUTPUT, out of process: `scripts/check-ledger-status-output.py`, its own `validate` step. It
+  - parses the committed `features.json` as plain JSON and imports no section source;
+  - requires the tree to match HEAD for the ledger, records, issues and war-room evidence;
+  - requires the exact `core.req` key set, pinned to `core.req` by a unit test;
+  - requires the ids with a non-default status or evidence to equal the record ids;
+  - re-derives every entry from defaults plus the committed records and compares the whole entry;
+  - requires the summary counts to match.
+
+  The DSL check now requires `type(got) is str`. Demonstrations D6a / D6b-i / D6b-ii / D6c: for each
+  escape, the generator and the regeneration check are green (the escape is real), and the output
+  check is red naming it. After a reset it is green (`demo-transcript.txt`). `output-mutations.txt`:
+  the key-set check is load-bearing for 2c; set-equality and re-derivation are redundant for 2d/2e.
+- **REQUIRED 2**:
+  - self-test case `merged-into-a-non-main-branch` (vizra#3: head `f9b85537`, merge `4920786`);
+  - `scripts/test_ledger_status_remote.py` (9 tests, injected `gh_api`), covering the non-Actions
+    `ci-required`, the base branch, the latest run deciding, in-progress, and anonymous auth.
+
+  `guard-mutations.txt`: deleting the base guard turns the unit test and the self-test case red;
+  deleting the app filter turns 2 unit tests red.
+- **REQUIRED 3**: narrowed the README, the `status.py` header and rule 1, the `features.json`
+  notice (regenerated) and `validate.yml` clause (e) to what is measured. Each now says a PR that
+  edits the checkers is not defended, and that the lane runs on PRs and merge-queue entries only.
+- **SHOULD 4**: the verdict qualifier is an allowlist (`(local; CI BLOCKED)` only). D7 shows
+  `PASS (superseded — FAIL on re-run)` red.
+- **NIT 1**: README wording fixed. **NIT 2**: where an issue tags its bullets with ids, the cited
+  bullet must name the record's requirement (D8). **NIT 3**: the remote checker proves `gh` is
+  authenticated (`rate_limit` core limit above 60) even with zero records; it exits 2 otherwise.
+
+Round-1 local evidence at `19ba567` (tests, demo, mutations): unit 35 + 9, self-test 9/9, output
+check 0, demo 47 passed / 0 failed. The full-lane table for the pushed head follows.

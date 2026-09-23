@@ -1,10 +1,11 @@
-# source SHA 94ac3bf8c312ca0c1ab08195293f1ad15170d7ff (branch feat/m0-ledger-status); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
+# source SHA 19ba5671869184ec313db47b10329d6ea450b0f0 (branch feat/m0-ledger-status, fix round 1); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
 # command: bash docs/evidence/ledger-status/demo.sh
 # exit: 0
 
 == G0 the committed tree: generator and regeneration check
   GREEN (as required) G0a generator on the committed records — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
   GREEN (as required) G0b scripts/check-generated-ledger.sh on the committed tree — exit 0: generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+  GREEN (as required) G0c scripts/check-ledger-status-output.py on the committed tree — exit 0: ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from the committed records in a fr
 == G1 fixture state: a VERIFIED record that meets every offline rule is admitted
   GREEN (as required) G1 generator admits the fixture record — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
   GREEN (as required) G1 output carries VERIFIED / VERIFIED_AT_SHA / MERGED / NOT_RELEASED
@@ -19,10 +20,13 @@
         | VZ-CONTROLS-001: HAND-ASSERTED implementation_status 'VERIFIED' in a section source. A status comes only from a record in status_records.json; the DSL must leave every entry PLANNED.
   GREEN (as required) D1b restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
 == D1c hand-asserted VERIFIED: features.json edited by hand and COMMITTED (in a scratch copy)
-  mutation on /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.7P1smkBqgN/copy/docs/quality/features.json: sha256 14dcefb57609704e8c84fb9c042a8a9b3dd500aa881460235690b6b8aac5f510 -> 92a8e5cbd6b621a50db16f71f3d1cb813b4e3a8f4efb5c30d5f8ca566386a18a
+  mutation on /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.Srjw0XXGx1/copy/docs/quality/features.json: sha256 ad48a10df20e2ef4a27ffbf67f997c4c84c2b758bcd8b8fed92cdf19fae55223 -> 4728abc64197a7a4bd624cdf808d13c9d1d996ead75074eb7de76a14d16b2d5d
+  RED   (as required) D1c output check — exit 1, named: VZ-FOUND-008: STATUS WITHOUT A RECORD
+        | VZ-FOUND-008: STATUS WITHOUT A RECORD — features.json carries {'implementation_status': 'VERIFIED', 'verification_status': 'UNVERIFIED', 'merge_status': 'NOT_STARTED', 'release_status': 'NOT_RELEASED'}, and status_records.json has no record for it
   RED   (as required) D1c — exit 1, named: GENERATED FILE IS NOT REPRODUCIBLE
         | GENERATED FILE IS NOT REPRODUCIBLE. The following generated file(s) changed when
   GREEN (as required) D1c restored — exit 0: generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+  GREEN (as required) D1c output check restored — exit 0: ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from the committed records in a fr
 == D2 evidence whose verdict SHA does not match the verified head
   mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md: sha256 e6aa7b40f18b47e444c80b4e2da1826ebccab75ccaeaa139421263ec75951f94 -> f0eecd6743927168d4b808e3331c9823f27029fbf196c644acc23d4689c0cb0e
   RED   (as required) D2a verdict names another SHA — exit 1, named: VERDICT SHA MISMATCH
@@ -62,6 +66,39 @@
   RED   (as required) D5b a second issue schedules the requirement — exit 1, named: docs/issues/VZ-ISSUE-006.md schedules VZ-FOUND-007
         | status record #0 (VZ-FOUND-007): docs/issues/VZ-ISSUE-006.md schedules VZ-FOUND-007 (its Ledger IDs line names it) and the record cites none of its acceptance bullets. A requirement split across issues is not complete after the first one.
   GREEN (as required) D5 restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+== D6 the three in-process escapes (meta PR #6 verify probes 2c, 2d, 2e), each in the scratch copy
+  mutation on /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.Srjw0XXGx1/copy/docs/evidence/ledger-generator/s9_ui_design.py: sha256 9ece9f07782914633780cb4e3025b75c1282cd667ea75050f88d0852da11ce1c -> 039a78d8d22113e6530abbe938624c44f54c3c37f44c6cca456b2f77132a76f1
+  GREEN (as required) D6a (2c) extra keys: the generator is defeated in-process (build exits 0) — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+  GREEN (as required) D6a (2c) extra keys: the regeneration check is blind to it (reproducible from the tampered source) — exit 0: generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+  RED   (as required) D6a (2c) extra keys: the out-of-process output check refuses it — exit 1, named: VZ-CONTROLS-001: KEY SET differs from what core.req emits; extra ['status', 'verified']
+        | VZ-CONTROLS-001: KEY SET differs from what core.req emits; extra ['status', 'verified']
+  GREEN (as required) D6a (2c) extra keys restored — exit 0: ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from the committed records in a fr
+  mutation on /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.Srjw0XXGx1/copy/docs/evidence/ledger-generator/s9_ui_design.py: sha256 9ece9f07782914633780cb4e3025b75c1282cd667ea75050f88d0852da11ce1c -> 2c6926529fb5d5f3ff74fea03ee7a2cee3c9287d2e0b2471bfd4701a8894a00a
+  RED   (as required) D6b-i (2d) str subclass alone: the generator refuses it in-process — exit 1, named: VZ-CONTROLS-001: HAND-ASSERTED implementation_status 'VERIFIED'
+        | VZ-CONTROLS-001: HAND-ASSERTED implementation_status 'VERIFIED' in a section source. A status comes only from a record in status_records.json; the DSL must leave every entry PLANNED.
+  GREEN (as required) D6b-i (2d) str subclass alone restored — exit 0: ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from the committed records in a fr
+  mutation on /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.Srjw0XXGx1/copy/docs/evidence/ledger-generator/s9_ui_design.py: sha256 9ece9f07782914633780cb4e3025b75c1282cd667ea75050f88d0852da11ce1c -> 59d1b2c72169e19d1ac5d5712f1d7a706f00aed006fab9ae699a2253f5fe5ec9
+  GREEN (as required) D6b-ii (2d) str subclass with the in-process check wrapped away: the generator is defeated in-process (build exits 0) — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+  GREEN (as required) D6b-ii (2d) str subclass with the in-process check wrapped away: the regeneration check is blind to it (reproducible from the tampered source) — exit 0: generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+  RED   (as required) D6b-ii (2d) str subclass with the in-process check wrapped away: the out-of-process output check refuses it — exit 1, named: VZ-CONTROLS-001: STATUS WITHOUT A RECORD
+        | VZ-CONTROLS-001: STATUS WITHOUT A RECORD — features.json carries {'implementation_status': 'VERIFIED', 'verification_status': 'UNVERIFIED', 'merge_status': 'NOT_STARTED', 'release_status': 'NOT_RELEASED'}, and status_records.json has no record for it
+  GREEN (as required) D6b-ii (2d) str subclass with the in-process check wrapped away restored — exit 0: ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from the committed records in a fr
+  mutation on /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.Srjw0XXGx1/copy/docs/evidence/ledger-generator/s9_ui_design.py: sha256 9ece9f07782914633780cb4e3025b75c1282cd667ea75050f88d0852da11ce1c -> d8622d409d72ea410ad89f8e53b7712e3372a75a846f8002765298a53200496f
+  GREEN (as required) D6c (2e) wrapper around check_dsl_defaults: the generator is defeated in-process (build exits 0) — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+  GREEN (as required) D6c (2e) wrapper around check_dsl_defaults: the regeneration check is blind to it (reproducible from the tampered source) — exit 0: generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+  RED   (as required) D6c (2e) wrapper around check_dsl_defaults: the out-of-process output check refuses it — exit 1, named: VZ-CONTROLS-001: STATUS WITHOUT A RECORD
+        | VZ-CONTROLS-001: STATUS WITHOUT A RECORD — features.json carries {'implementation_status': 'VERIFIED', 'verification_status': 'VERIFIED_AT_SHA', 'merge_status': 'NOT_STARTED', 'release_status': 'NOT_RELEASED'}, and status_records.json has no record for it
+  GREEN (as required) D6c (2e) wrapper around check_dsl_defaults restored — exit 0: ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from the committed records in a fr
+== D7 a free-text verdict qualifier (meta PR #6 verify FINDING 4)
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md: sha256 e6aa7b40f18b47e444c80b4e2da1826ebccab75ccaeaa139421263ec75951f94 -> eae261328af29893d34cd9d9ce315d2bc10102e186e4a3275c0ee44038560504
+  RED   (as required) D7 PASS (superseded — FAIL on re-run) — exit 1, named: is NOT ALLOWLISTED
+        | status record #0 (VZ-FOUND-008): merges[0]: docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md ends with a PASS whose qualifier (superseded — FAIL on re-run) is NOT ALLOWLISTED; admitted qualifiers: none, or (local; CI BLOCKED). A free-text qualifier can negate the PASS it decorates.
+  GREEN (as required) D7 restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
+== D8 a bullet tagged for another requirement (meta PR #6 verify NIT 2)
+  mutation on /Users/yosefgamble/github/vizra/.claude/worktrees/meta-ledger-status/docs/evidence/ledger-generator/status_records.json: sha256 6ec852bc6259036410b1d2286facd7ca05a7424bcc96ffa37e362d286d01e5ee -> 5c2d34fd9eace2c5d9920c6d16fab474d1ef85b62c8cee158edc06a3cf49c116
+  RED   (as required) D8 VZ-FOUND-007 citing the VZ-FOUND-008 bullet — exit 1, named: the cited bullet does not name VZ-FOUND-007
+        | status record #0 (VZ-FOUND-007): docs/issues/VZ-ISSUE-001.md tags its acceptance bullets with requirement ids, and the cited bullet does not name VZ-FOUND-007: 'Browser-test environment (VZ-FOUND-008): the Playwright harness runs in CI against the production build image on desktop'. One requirement's bullet cannot stand in for another's.
+  GREEN (as required) D8 restored — exit 0: OK 192 requirements; core=142; areas={'foundation': 8, 'ci': 5, 'install': 4, 'topology': 8, 'operations': 8, 'backup': 4, 'upgrade': 2, 'identity': 1
 == cleanup
   tree restored: git status identical to the start
-demo: 26 passed, 0 failed
+demo: 47 passed, 0 failed

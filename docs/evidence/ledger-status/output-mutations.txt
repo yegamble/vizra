@@ -1,0 +1,27 @@
+# source SHA 19ba5671869184ec313db47b10329d6ea450b0f0; scratch copy committed as 'base' plus one branch per escape (2c extra keys, 2d str subclass + wrapper, 2e wrapper), each regenerated with the tampered source and committed; Python 3.9.6; 2026-09-23
+# for each mutation of scripts/check-ledger-status-output.py, the mutated checker is run on base and on each escape branch
+== unmutated checker
+   base  exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from
+   e2c   exit 1  VZ-CONTROLS-001: KEY SET differs from what core.req emits; extra ['status', 'verified']
+   e2d   exit 1  VZ-CONTROLS-001: STATUS WITHOUT A RECORD — features.json carries {'implementation_status': 'VERIFIED', 'verification_sta
+   e2e   exit 1  VZ-CONTROLS-001: STATUS WITHOUT A RECORD — features.json carries {'implementation_status': 'VERIFIED', 'verification_sta
+== mutation key-set-check-deleted: sha256 747239020ddf -> abcd081cbb37
+   base  exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from
+   e2c   exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from
+   e2d   exit 1  VZ-CONTROLS-001: STATUS WITHOUT A RECORD — features.json carries {'implementation_status': 'VERIFIED', 'verification_sta
+   e2e   exit 1  VZ-CONTROLS-001: STATUS WITHOUT A RECORD — features.json carries {'implementation_status': 'VERIFIED', 'verification_sta
+== mutation set-equality-deleted: sha256 747239020ddf -> bf7be7fed4a1
+   base  exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from
+   e2c   exit 1  VZ-CONTROLS-001: KEY SET differs from what core.req emits; extra ['status', 'verified']
+   e2d   exit 1  VZ-CONTROLS-001: RE-DERIVATION MISMATCH in ['implementation_status'] — the committed entry is not what the committed rec
+   e2e   exit 1  VZ-CONTROLS-001: RE-DERIVATION MISMATCH in ['implementation_status', 'verification_status'] — the committed entry is not
+== mutation re-derivation-deleted: sha256 747239020ddf -> a1c1b46d7e0d
+   base  exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from
+   e2c   exit 1  VZ-CONTROLS-001: KEY SET differs from what core.req emits; extra ['status', 'verified']
+   e2d   exit 1  VZ-CONTROLS-001: STATUS WITHOUT A RECORD — features.json carries {'implementation_status': 'VERIFIED', 'verification_sta
+   e2e   exit 1  VZ-CONTROLS-001: STATUS WITHOUT A RECORD — features.json carries {'implementation_status': 'VERIFIED', 'verification_sta
+== mutation set-equality AND re-derivation deleted: sha256 -> 5111c88c3eca
+   base  exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from
+   e2c   exit 1  VZ-CONTROLS-001: KEY SET differs from what core.req emits; extra ['status', 'verified']
+   e2d   exit 0  ledger status output: 192 entries, exact key set; 1 carry a status, 0 record(s), sets equal; every entry re-derived from
+   e2e   exit 0  ledger status output: 192 entries, exact key set; 1 carry a status, 0 record(s), sets equal; every entry re-derived from

@@ -141,21 +141,27 @@ The generator in check 1 also refuses a status written anywhere except a checked
 right after it:
 
 ```
+./scripts/check-ledger-status-output.py
 (cd docs/evidence/ledger-generator && python3 -m unittest -v test_status)
+python3 scripts/test_ledger_status_remote.py -v
 GH_TOKEN=… ./scripts/check-ledger-status-remote.py --self-test
 GH_TOKEN=… ./scripts/check-ledger-status-remote.py
 GH_TOKEN=… bash docs/evidence/ledger-status/demo.sh
 ```
 
-These need `gh`. Locally an authenticated `gh` works without `GH_TOKEN`. Without `gh`, the remote
-checker exits 2 (BLOCKED, never a pass). The rules, the reason for the split, and today's decisions
+`check-ledger-status-output.py` reads the COMMITTED ledger. It refuses to run while
+`features.json`, the records, `docs/issues` or `docs/evidence/warroom` differ from HEAD, so commit
+first. The remote commands need `gh`. Locally an authenticated `gh` works without `GH_TOKEN`. The
+remote checker exits 2 (BLOCKED, never a pass) without `gh`, and exits 2 when `gh` is anonymous
+(`rate_limit` core limit 60), even with zero records. The rules, the reason for the split, and today's decisions
 on the candidate entries are in `docs/evidence/ledger-status/README.md`.
 
-Last run (2026-09-23, local, macOS arm64, Python 3.9.6, gh 2.98.0):
-- unit tests: exit 0, 30 tests;
-- self-test: exit 0, 8/8 cases;
-- remote check: exit 0, 0 records;
-- demo: exit 0, 26 passed / 0 failed.
+Last run (2026-09-23, fix round 1, local, macOS arm64, Python 3.9.6, gh 2.98.0), every command exit 0:
+- output check: 192 entries, 0 statuses, 0 records;
+- unit tests: 35 offline plus 9 online;
+- self-test: 9/9;
+- remote check: 0 records;
+- demo: 47 passed / 0 failed.
 
 ### 2. Quality JSON parses and every requirement id resolves
 

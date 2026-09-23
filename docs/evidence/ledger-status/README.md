@@ -81,7 +81,7 @@ end. Transcript: [`demo-transcript.txt`](demo-transcript.txt).
 |---|---|---|---|
 | D1a | VERIFIED record, evidence file removed | `VERIFIED with NO EVIDENCE` | restored fixture record admitted |
 | D1b | a section source sets `implementation_status = "VERIFIED"` | `HAND-ASSERTED implementation_status 'VERIFIED' in a section source` | source restored |
-| D1c | `features.json` hand-edited to VERIFIED and committed (scratch copy) | `GENERATED FILE IS NOT REPRODUCIBLE` | commit reverted |
+| D1c | `features.json` hand-edited to VERIFIED and committed (scratch copy) | output check `VZ-FOUND-008: STATUS WITHOUT A RECORD`; regeneration `GENERATED FILE IS NOT REPRODUCIBLE` | commit reverted |
 | D2a | verdict line names another head of the same PR | `VERDICT SHA MISMATCH` | restored |
 | D2b | a later `FINAL VERDICT: FAIL` becomes the final line | `does not END with a PASS verdict` | restored |
 | D2c | evidence file path that does not exist | `MISSING EVIDENCE FILE` | restored |
@@ -89,9 +89,31 @@ end. Transcript: [`demo-transcript.txt`](demo-transcript.txt).
 | D4 | status `DONE`, `IN_PROGRESS`, `VERIFIED_AT_SHA` | `status '<x>' is REFUSED` | restored |
 | D5a | VZ-INSTALL-003 with only a core merge | `names no vizra-user merge` | restored |
 | D5b | VZ-FOUND-007 citing only VZ-ISSUE-001 | `docs/issues/VZ-ISSUE-006.md schedules VZ-FOUND-007` | restored |
+| D6a | probe 2c: a section source adds `status`/`verified` keys; regenerated and committed (scratch copy). The generator and the regeneration check both stay green, which shows the escape is real | output check `KEY SET differs from what core.req emits; extra ['status', 'verified']` | reset to base: output check green |
+| D6b-i | probe 2d: a `str` subclass whose `__ne__` returns False | the generator now refuses it in-process: `HAND-ASSERTED implementation_status 'VERIFIED'` | reset |
+| D6b-ii | 2d plus a wrapper that hides it from the in-process check; generator and regeneration check green | output check `VZ-CONTROLS-001: STATUS WITHOUT A RECORD` | reset: green |
+| D6c | probe 2e: a wrapper around `status.check_dsl_defaults`, then VERIFIED / VERIFIED_AT_SHA; generator and regeneration check green | output check `VZ-CONTROLS-001: STATUS WITHOUT A RECORD` | reset: green |
+| D7 | `FINAL VERDICT: PASS (superseded — FAIL on re-run) — SHA …` | `is NOT ALLOWLISTED` | restored |
+| D8 | VZ-FOUND-007 citing VZ-ISSUE-001's VZ-FOUND-008 bullet | `the cited bullet does not name VZ-FOUND-007` | restored |
 
 The checkers are themselves mutation-tested:
-- [`unit-mutations.txt`](unit-mutations.txt): five mutations of `status.py`, and each turns a named unit test red.
-- [`remote-mutations.txt`](remote-mutations.txt): four mutations of the online checker, and each turns a named self-test case red.
+- [`unit-mutations.txt`](unit-mutations.txt) (first round, at `94ac3bf`): five mutations of
+  `status.py`, and each turns a named unit test red.
+- [`remote-mutations.txt`](remote-mutations.txt) (first round): four mutations of the online checker,
+  and each turns a named self-test case red.
+- [`guard-mutations.txt`](guard-mutations.txt) (fix round 1): the guards the verifier found untested.
+  - Deleting the `base == main` check turns `test_base_other_than_main_is_refused` red, and the
+    self-test case for vizra#3 red.
+  - Deleting the GitHub-Actions app filter turns `test_ci_required_from_a_non_actions_app_is_refused`
+    red, with a second test.
+  - Deleting the auth proof turns `test_anonymous_gh_is_refused` red.
+  - Reverting the `type(...) is str` check, deleting the qualifier allowlist, or deleting the
+    tagged-bullet check each turns its named unit test red.
+- [`output-mutations.txt`](output-mutations.txt) (fix round 1): the output checker, run on the
+  three committed escapes.
+  - Deleting the key-set check lets 2c through, so that check is load-bearing.
+  - Deleting only the set-equality check, or only the re-derivation, still refuses 2d and 2e, by
+    the other one. Deleting both lets 2d and 2e through. The two checks are deliberately redundant.
 
-Unit tests: [`unit-tests.txt`](unit-tests.txt). Self-test: [`remote-self-test.txt`](remote-self-test.txt).
+Unit tests: [`unit-tests.txt`](unit-tests.txt): 35 offline tests plus 9 online tests with an
+injected `gh_api`. Self-test and output check: [`remote-self-test.txt`](remote-self-test.txt): 9/9.
