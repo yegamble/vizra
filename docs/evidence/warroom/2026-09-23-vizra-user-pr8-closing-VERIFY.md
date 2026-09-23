@@ -777,3 +777,178 @@ Under the chair's "no false-guarantee merges" rule this is a FAIL. The fix is th
 sentences, and it needs no code change. Also open: V-D2 (NIT).
 
 FINAL VERDICT: FAIL — SHA f6d245f6076b8641cf360ae30a7af1cc8ce00c03
+
+---
+
+# Re-verification at `cf053a3` (2026-09-23) — closing slice, fix round 2 of 2 (last)
+
+- **SHA verified:** `cf053a3f003b251df4c3405edda91560502c458e` (`gh pr view 8 … headRefOid`
+  at start). One commit on `f6d245f`; `git merge-base --is-ancestor f6d245f HEAD` holds.
+- **Environment:** as above. A NEW private clone under
+  `…/scratchpad/vzv-vizra-user-pr8r6-sTTLHS/repo`; `npm ci` exit 0; load 1/5/15 at start
+  5 / 22 / 67. No classifier stop.
+
+## R6-1. Scope: comments, docs and the digest ledger only
+
+`git diff --stat f6d245f HEAD` lists six files: AGENTS.md, `mutation-digests.txt`,
+`ci-environment.test.ts`, `ci-environment.ts`, `check-e2e-lane.mjs`, `demonstrate.sh`.
+
+- **Every changed line in the four code files is a comment.** I filtered the diff of
+  `e2e/` and `scripts/` for `+`/`-` lines that do not start with `*`, `//` or `#`: zero lines.
+- No control, assertion, `half` command or matcher changed.
+- **Ledger.** Three D17d lines changed, BEFORE/MUTATED/RESTORED for `ci-environment.ts`.
+  I recomputed `sha256(git show HEAD:e2e/harness/ci-environment.ts)` = `cc700a6f…2dab`,
+  which equals the new BEFORE and RESTORED. The old value `9bac8461…ad85` equals
+  `sha256` of f6d245f's copy. So the recomputation is correct, and the hygiene check
+  (R6-2) agrees.
+
+## R6-2. Lanes
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run ci` | 0 | lint 0; tsc 0; **19 files / 627 tests / 0 skipped**; build ok; hygiene `OK: 308 text source(s) … 17 mutation-digest line(s) match this tree` |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **233 cases, 240 assertions, 0 failed** |
+| `DEMO_PROD_PORT=3291 DEMO_DEV_PORT=3292 DEMO_IMAGE=vzv-pr8r6:demonstrate … npm run e2e:demos` (after a production build, `PUBLIC_ORIGIN=http://127.0.0.1:3291`) | 0 | **149 passed / 0 blocked / 0 failed**, 12:14:16Z → 12:29:55Z UTC, load 6/18/61 → 19/42/56. Included: d16c ×4 (the `CI`-emptied-under-`GITHUB_ACTIONS` half among them), D17b, and D17d ×3 (the halves that mutate `ci-environment.ts` and write its digests) |
+
+**The ledger `e2e:demos` wrote is byte-identical to the committed one**
+(`git diff --quiet -- docs/evidence/VZ-FOUND-008/mutation-digests.txt` → identical). So the
+three recomputed D17d lines are exactly what the suite produces at this head.
+
+## R6-3. The eight transcripts whose code-frame line numbers are stale
+
+`grep -oE 'ci-environment\.ts:[0-9]+:[0-9]+'` over the committed transcripts gives
+`ci-environment.ts:264:34` (133 occurrences, in d16b, d16c ×3 plus the new d16c half, d17b, and
+d17e ×3). My regenerated set gives `:268:34`. The throwing line is now 4 lines lower because
+the header comment grew.
+
+I diffed each of the eight, committed against regenerated. I normalised only the
+run-volatile fields:
+- the `ci-environment.ts:<line>` references and the code-frame gutter numbers;
+- my ports (3291/3292) against the builder's (3211/3212);
+- the runtime-minted `vz…` markers;
+- durations.
+
+**Residual difference: 0 lines in all eight.** So the mismatch is ONLY the line numbers,
+plus the fields every run changes.
+
+The other 71 regenerated files that differ do so only in run-volatile fields: attachment
+hashes, `mktemp` paths, image names, ports, Next build IDs, the dev server's chunk URLs, a
+file count in a sweep (22 against 21) that no matcher reads, and `environment.txt`'s head
+SHA (committed `4db7dce`, mine `cf053a3`).
+
+**Do the stale numbers make an evidence claim false? No.**
+- The committed transcripts say where they were produced. `environment.txt` reads
+  `head sha: 4db7dce…`, and commit `f6d245f` is titled "demonstration transcripts at 4db7dce".
+  At 4db7dce, line 264 of `ci-environment.ts` IS the `throw` (`git show 4db7dce:… | sed -n 264p`).
+- Between 4db7dce and cf053a3 the file changed only in comments (R6-1), so the code those
+  transcripts exercised is the code at this head.
+- No `half` matcher, no AGENTS.md sentence, and no evidence README cites a
+  `ci-environment.ts` line number (grep: none).
+- The ledger — the one artifact the hygiene check ties to THIS tree — is current.
+
+A reader following `:264` at cf053a3 lands 4 lines above the `throw`. That is cosmetic.
+**NIT**, disclosed by the builder.
+
+## R6-4. Sentences
+
+I read the builder's eight entries in `sentences-r2.md`, the full `git diff f6d245f HEAD`, and
+a repo-wide grep for the strong forms (`whatever route`, `by any route`, `cannot switch`,
+`cannot be overwritten`, `in-process route`, `not readable from a spec`, `a spec cannot read`,
+`no running spec`, `caught by the runtime`).
+
+| Sentence (cf053a3) | Verdict |
+|---|---|
+| AGENTS.md layer 2: "So a DIRECT `env:` or `$GITHUB_ENV` assignment of `CI` or `GITHUB_ACTIONS` itself cannot switch the policy off (D16c's "`CI` emptied" half, simulated)" | **accurate** — GitHub's pages (R5-3) and D16c, re-run |
+| AGENTS.md layer 2: "Anything that runs code before the configuration loads CAN remove both anchors, and then this layer is silent — layer 3 is the control that holds regardless. Three such routes, named: … an IN-PROCESS preload …; a `BASH_ENV` written to `$GITHUB_ENV` … sourced by the lane step's own default `bash -e {0}` …; and `$GITHUB_PATH` … These three were reasoned from GitHub's pages and the Bash manual (`BASH_ENV`), not built" | **accurate and labelled as reasoned.** It matches what I cited in V-A2: the workflow-commands page lists `NODE_OPTIONS` as the one blocked name; the workflow-syntax page gives the `bash -e {0}` default; `man bash` documents `BASH_ENV`; the `$GITHUB_PATH` wording is from the same page. The general sentence comes first, so "three" names examples rather than bounding the class |
+| AGENTS.md § Residuals, helper-script bullet: "a DIRECT `$GITHUB_ENV` assignment of `CI` or `GITHUB_ACTIONS` itself cannot make it say otherwise … A helper's write can still silence layer 2 INDIRECTLY: … `BASH_ENV` … `$GITHUB_PATH` … as can an in-process preload. Then the pinned redaction step's page-snapshot gate (layer 3) is what holds. Reasoned …, not built." | **accurate and labelled** |
+| AGENTS.md:459 "a test cannot pass without the harness — subject to the main-process note above, which is NOT CLOSED —" | **accurate** (V-D2 closed) |
+| `ci-environment.ts` header, the new V-A2 paragraph | **accurate and labelled** — the same content as AGENTS.md |
+| `check-e2e-lane.mjs` .npmrc comment and effective-value comment ("while the capture says CI … regardless") | **accurate** |
+| `ci-environment.test.ts` comment ("by a DIRECT … assignment (a `BASH_ENV` or `$GITHUB_PATH` route can still remove it; AGENTS.md)") | **accurate** |
+| `demonstrate.sh` D16c comment | **accurate** |
+| **NOT changed, not on the list:** `ci-environment.ts:226-229`, inside `pageSnapshotProblem`: "`GITHUB_ACTIONS` is the anchor a job **cannot take away** … An in-process route that runs before the configuration loads can still delete both." | **still the V-A2 partition** in a four-line inline comment. A job CAN take it away by the `BASH_ENV`/`$GITHUB_PATH` routes the header now names. It defers "(see the header)", and the header 100 lines above is correct → **R6-FINDING V-A3, SHOULD** |
+| **NOT changed:** `demonstrate.sh:824` "under a per-run key a spec cannot read" | V-D class in a script comment. AGENTS.md and `stamp.ts` now carry the NOT CLOSED qualification → **NIT** |
+| `stamp.ts:49`, `stamp-verify.mjs:12` "no running spec can read **this run's** key" / "could have read it" | about the key FILE on disk (written in `onEnd`), and accurate in that context. The main-process note sits above it in `stamp.ts`. Not a finding |
+| `browser-errors.ts:437-439`, `creation-guard.ts:68` "any route" / "whatever route" | about context creation, outside this slice, from the earlier verified rounds. Not a finding |
+
+## R6-5. Findings at cf053a3
+
+```
+R6-FINDING V-A3: one inline comment still states the V-A2 partition
+Severity:    SHOULD
+Confidence:  high
+Affected: vizra-user; e2e/harness/ci-environment.ts:226-229 (inside `pageSnapshotProblem`):
+  "`GITHUB_ACTIONS` is the anchor a job cannot take away … An in-process route that runs
+  before the configuration loads can still delete both."
+Observed: unchanged since 4db7dce, and not on the builder's list. The same file's header
+  (lines ~110-122) and AGENTS.md now say correctly that a `BASH_ENV` via `$GITHUB_ENV`, or a
+  `$GITHUB_PATH` entry, can also remove both anchors.
+Failure: a reader of the function alone gets the old, stronger claim. The comment itself says
+  "(see the header)", and the header is right.
+Why SHOULD, not REQUIRED: the guarantee surfaces a reviewer relies on — AGENTS.md § Artifact
+  privacy, § Residuals, and this file's header — are accurate and labelled. This is an
+  internal pointer that is stale, not the published statement of the control. The chair may
+  weigh it differently under "no false-guarantee merges"; I state it so the choice is theirs.
+Recommendation: "the anchor a DIRECT `env:`/`$GITHUB_ENV` assignment cannot take away … an
+  in-process preload, a `BASH_ENV` or a `$GITHUB_PATH` route can still remove both (see the
+  header)". Comment only.
+```
+
+```
+R6-NIT 1: scripts/e2e/demonstrate.sh:824 "a per-run key a spec cannot read" — add "in a
+  worker", matching AGENTS.md:418.
+R6-NIT 2: eight committed d16/d17 transcripts show `ci-environment.ts:264` for a `throw` that
+  is at :268 at this head (comment growth). Disclosed by the builder; no claim depends on it
+  (R6-3). Regenerate with the next transcript refresh.
+```
+
+Carried, unchanged and correctly stated as NOT CLOSED: **V-D**, the stamp key in the main
+process during collection. It is queued for PR B and is not this PR's to block.
+
+## R6-6. CI, head, cleanup
+
+- **CI on cf053a3** (read with `gh api`, not re-run): every Actions check is
+  `completed/failure` with "The job was not started because recent account payments have
+  failed…". GitGuardian: success. **BLOCKED.**
+- **Head at end:** `gh pr view … headRefOid` and `git ls-remote … refs/heads/fix/m0-artifact-privacy-a`
+  both report `cf053a3f003b251df4c3405edda91560502c458e`. Unmoved.
+- **Cleanup:** removed image `vzv-pr8r6:demonstrate` (the suite removes the mutant itself).
+  No container of mine remains. The scratch directory `vzv-vizra-user-pr8r6-sTTLHS` is
+  deleted by exact path. Nothing was pushed, merged or approved. No instruction-shaped text
+  appeared in any tool output.
+
+## Not verified in this round
+
+- GitHub CI (BLOCKED by billing). Local evidence cannot substitute for `ci-required`.
+- The `BASH_ENV` and `$GITHUB_PATH` routes on Actions. They are reasoned and labelled as such,
+  and by the chair's constraint no route was built.
+- The four reasoned rows of the prevents/detects table (unchanged since my f0f702e round).
+- Any platform other than macOS arm64.
+
+## Verdict at cf053a3
+
+The commit does exactly what it says: comments, docs and the digest ledger, with no control or
+assertion touched (0 non-comment lines changed in code files).
+
+- **Lanes reproduce:** `npm run ci` 627/0 with hygiene OK; require-checks 233/240;
+  `e2e:demos` 149/0/0 with a ledger byte-identical to the committed one.
+- **The stale line numbers are the only content difference** in the eight transcripts
+  concerned, and they falsify no claim.
+- **V-A2 is closed.** Every published statement of layer 2 now makes the general
+  "anything that runs before the configuration loads" statement. It names `BASH_ENV` via
+  `$GITHUB_ENV` and `$GITHUB_PATH` accurately against GitHub's pages and the Bash manual,
+  labels them "reasoned, not built", and places the guarantee on layer 3 — which is pinned
+  and was measured in every round.
+- **V-D2 is closed.**
+
+What remains is one stale inline code comment (V-A3, SHOULD) and two NITs. None of them is a
+published guarantee stronger than its control.
+
+Across this closing slice, every finding from the four rounds is closed at its control and
+stated at its measured strength: H, I, J, K, V-A, V-A2, V-B, V-C, V-D (as NOT CLOSED, queued),
+V-E and V-F.
+
+PASS is a verifier verdict, not a merge. The merge rule also requires `ci-required` green on
+this SHA, and CI is BLOCKED by billing.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA cf053a3f003b251df4c3405edda91560502c458e
