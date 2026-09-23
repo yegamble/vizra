@@ -70,6 +70,19 @@ are copied to `docs/evidence/ledger-status/`):
 | d | `bash docs/evidence/compose-topology/demo.sh` | 1 | same cause as (c): its baseline runs doc-links, and it found the untracked transcripts being written during the run. Re-run on the final head below |
 | ci-required | `./scripts/ci-required-guard.sh` | 0 | validate.yml edit accepted (pins, lane integrity, no continue-on-error) |
 
+**Re-run of the full lane on `81da01e`** (the head with transcripts, local, load average ~100):
+every step exits 0.
+- ledger: reproduces byte-for-byte.
+- unit: 30 tests, 0 skipped.
+- self-test: 8/8.
+- remote: 0 records.
+- ledger demo: 26 passed / 0 failed.
+- quality-json: 204 ids.
+- doc-links: 0.
+- render, topology (27 rules, 0 violations), config coverage, template claims: 0.
+- compose demo: 95 assertions passed, 0 failed, tree clean.
+- ci-required-guard: 0.
+
 Generator output is byte-identical under Python 3.9.6, 3.10.20 and 3.13.13.
 
 Demonstrations (red, then green on restore): `docs/evidence/ledger-status/demo-transcript.txt`.
@@ -100,6 +113,7 @@ Candidates: `candidates.txt`, with the decision table in `docs/evidence/ledger-s
   2. The VZ-FOUND-008 issue bullet is narrower than its ledger outcome.
   3. Two evidence files need a `FINAL VERDICT` line (board follow-up F3), written by their verifiers:
      core #5 and user #3.
-- The status records in this PR's evidence were copied from the chair's records branch
-  `chore/warroom-records-2026-09-21` at `b331f63`, read-only, into a scratch copy only. No evidence
-  file written by another agent is added or edited by this PR.
+- The candidate attempts (`candidates.txt`) read three evidence files from the chair's records
+  branch `chore/warroom-records-2026-09-21` at `b331f63` with `git show`, into a scratch copy only.
+  This PR adds and edits no evidence file written by another agent. A future VERIFIED record needs
+  its evidence file on `main` first, which means the records branch must land.
