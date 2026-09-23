@@ -272,3 +272,13 @@ So any screen over the call's ARGUMENTS passes the runner's launch unconditional
 **SEAT VERDICT: CHANGES STILL REQUIRED** (R4-1, R4-2 are text amendments). The chair may confirm them in the text with no further seat pass.
 
 **Chair ruling (tick 211):** accepted. The chair's deep-equality proposal is superseded by R4-1, which applies deep equality to the EFFECTIVE options. The builder amends the plan to revision 5, and the chair confirms R4-1, R4-2 and the NIT in the text.
+
+## Chair confirmation of plan revision 5 (tick 212)
+
+As the seat permitted, the chair read the r5 text.
+
+- **R4-1 is confirmed** (plan §"Launches in Lane B", lines ~561–597). The patched `launch` computes `{ ...this._playwright._defaultLaunchOptions, ...args }` and deep-equals the exact literal: `handleSIGINT: false`, `artifactsDir`/`tracesDir` derived from the project outputDir and workerIndex, and a boolean `headless`. `channel` is absent and the user part is `{}`. It fails closed on a new key. The slot is consumed before calling through, per worker process, shared across browser types. D21h (iii)/(iv) and the "screen reads call arguments only" mutation are present.
+- **R4-2 is confirmed** (§"Effective-option assertion in Lane B"). The listed option fixtures must deep-equal the resolved `testInfo.project.use`; a difference throws before the test body and is recorded. It applies in Lane B only. There is a lint early warning, and D21i with its "fixture assertion off" mutation.
+- **The schema NIT is confirmed** (the record fields list).
+
+**PLAN APPROVED for phase 2.** Phase 2 starts after vizra-user #10 (Lane A pixel channels off) merges, because the two overlap. Item 1 (V-D) remains in owner inbox 10, and Lane B's gate stays closed until V-D is closed and D18 is green.

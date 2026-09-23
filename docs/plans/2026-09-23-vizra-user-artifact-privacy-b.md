@@ -1,6 +1,6 @@
 # Execution plan: VZ-FOUND-008 artifact privacy II, PR B — the authenticated lane
 
-**State: PLANNED (phase 1 — plan only), REVISION 4.** The `vizra-security` seat reviewed revision 1
+**State: PLANNED (phase 1 — plan only), REVISION 5.** The `vizra-security` seat reviewed revision 1
 (`docs/evidence/warroom/2026-09-23-vizra-user-artifact-privacy-b-PLAN-REVIEW-security.md`) and
 returned **PLAN APPROVED WITH REQUIRED CHANGES**. The chair's tick-204 rulings accept F1–F11 in
 full, F12–F14 and NITs 1–2 into PR B, and the seat's Q1–Q7 answers. This revision applies all of
@@ -19,9 +19,22 @@ carry **[AMENDED r4: …]** or **[NEW r4: …]**. **R3-1 is written in a form th
 literal wording, for a measured reason; see § Deviation for the chair (R3-1).** Still no code;
 phase 2 waits for the chair's go and for user #10 to merge.
 
+**Revision 5** applies the seat's check of revision 4 (tick 211, "Seat check of plan revision 4"
+in the review file). The seat **accepted** the R3-1 deviation (one screened launch per worker) on
+three conditions, and **confirmed** R3-2. R4-1, R4-2 and the schema NIT are applied here. Sections
+changed in r5 carry **[AMENDED r5: …]** or **[NEW r5: …]**. The chair confirms them in the text.
+
 **Lane B's gate stays CLOSED until V-D is closed and D18 is green** (ruling 4). No authenticated
 spec with a real credential runs before then. PR B builds and proves the lane's machinery against
 a loopback fixture, using runtime-minted synthetic markers only (§ The gate).
+
+## Revision 5 — change log **[NEW r5]**
+
+| Item | Severity | Where it is applied |
+|---|---|---|
+| R4-1 — the launch screen must read the EFFECTIVE merged options, not the call's arguments | REQUIRED | § Egress, launches in Lane B (superseding r4's key screen); § Deviation (the seat's three conditions); D21h |
+| R4-2 — spec-level `test.use` is a second options surface | REQUIRED | § Effective-option assertion (new); § Lint early warnings; D21i |
+| NIT — the record schema | accepted | § Taint records, the field list |
 
 ## Revision 4 — change log **[NEW r4]**
 
@@ -545,9 +558,37 @@ and `_` removed.
   launch with options no one screens. In Lane B, from configuration load onward:
   - `BrowserType.launchPersistentContext` and `launchServer` are **refused** (throw and record) at
     any time. Playwright's built-in fixtures never call either;
-  - `BrowserType.launch` is allowed **exactly once per worker**, and only when its options pass the
-    screen: `proxy` absent, and every key in the set Playwright's built-in `browser` fixture passes
-    in 1.63.0. That set is measured at phase 2 with a probe that logs option **keys** only;
+  - `BrowserType.launch` is allowed **exactly once per worker**, and only when its **effective**
+    options pass the screen. **[AMENDED r5: R4-1; supersedes r4's key screen and the chair's
+    deep-equality-on-arguments proposal]**
+    - **Why effective, not arguments.** The runner's built-in `browser` fixture calls `launch()`
+      with **no arguments**. Its options travel in `playwright._defaultLaunchOptions`, which the
+      `_browserOptions` auto fixture sets (`playwright/lib/index.js:196-205, :231`), and
+      `BrowserType.launch` merges them itself: `options = { ...this._playwright._defaultLaunchOptions, ...options }`
+      (`playwright-core/lib/coreBundle.js:63301`, read in the installed 1.63.0;
+      `launchServer` :63317 and `launchPersistentContext` :63323 do the same). A screen over the
+      arguments would pass the runner's launch unconditionally, and with it a spec's
+      `test.use({ launchOptions: { proxy, args } })`.
+    - **The screen.** The patched `launch` computes
+      `{ ...this._playwright._defaultLaunchOptions, ...args }` exactly as the original does, and
+      requires it to **deep-equal** this literal:
+
+      ```
+      { handleSIGINT: false,
+        artifactsDir: path.join(<project outputDir>, ".playwright-artifacts-" + workerIndex),
+        tracesDir: path.join(<artifactsDir>, "traces"),
+        headless: <boolean> }
+      ```
+
+      The sources are `runner/index.js:5466` and `workerProcessEntry.js:530`. Only `headless`
+      varies (either boolean is accepted). `channel` must be **absent**. The user part
+      (`use.launchOptions` and the call's own arguments) must contribute **nothing**: `{}`. A key
+      added by a future Playwright version fails the deep equality, so the screen **fails
+      closed** on a version bump, and the pin is re-measured then.
+    - **The slot.** The once-per-worker slot is **consumed before** calling through, so a throwing
+      or rejected launch cannot be retried. It is held **per worker process** (module state) and
+      **shared across browser types** (`chromium`, `firefox`, `webkit` share one prototype, as
+      measured for PR #7).
   - any second `launch` in the worker, or a first one that fails the screen, is refused, recorded
     and thrown;
   - the one allowed launch supplies the worker's browser, whether the built-in fixture or a spec's
@@ -555,6 +596,27 @@ and `_` removed.
     above;
   - Lane A is **unchanged**: D13g's sanctioned override keeps working there.
 - **`serviceWorkers: "block"`** is a literal asserted in the auth config (RC-8).
+
+### Effective-option assertion in Lane B **[NEW r5: R4-2]**
+
+**The gap.** Spec-level `test.use({ … })` is a second options surface that the configuration's
+`use` key allowlist (C2c) never sees.
+
+**The assertion.** The Lane-B harness fixtures read the **effective** value of each option
+fixture and require it to **deep-equal** the value the project configures. Any difference throws
+before the test body and is recorded, so `try/catch` cannot hide it. The fixtures checked are:
+- `trace`, `screenshot`, `video`;
+- `launchOptions`, `connectOptions`, `contextOptions`, `proxy`, `serviceWorkers`;
+- `baseURL`, `storageState`, `httpCredentials`, `extraHTTPHeaders`, `ignoreHTTPSErrors`.
+
+**Where the configured values come from.** They are read from the resolved `testInfo.project.use`,
+so the assertion needs no second copy of the configuration. The configuration itself is held to
+its literals by the lane guard.
+
+**Scope.** This applies in Lane B only; in Lane A, `test.use` for a viewport or locale stays
+legitimate.
+
+**Early warning.** `test.use(` in `e2e/authenticated/**` is a lint warning.
 
 ### Deviation for the chair (R3-1) **[NEW r4]**
 
@@ -576,6 +638,13 @@ and `_` removed.
 - **The chair confirms or rejects this form** when checking R3-1 in the text. If rejected, the
   alternative needs a way for Lane B to obtain its browser that does not go through `launch`, and
   this plan has not found one.
+- **[AMENDED r5] ACCEPTED by the seat (tick 211), on three conditions, all applied above:**
+  1. the screen reads the **effective** merged options (R4-1);
+  2. the slot is consumed **before** calling through;
+  3. the slot is **per worker process** and **shared across browser types**.
+
+  The seat also notes that a `browser` override which runs first gains nothing under R4-1, because
+  its launch meets the same screen.
 
 ### Taint records **[AMENDED r2: F1, F2] [AMENDED r4: R3-2, NIT 4]**
 
@@ -585,8 +654,11 @@ overwritten**. A record is JSON with these fields:
 - `outputDir`;
 - `lane`;
 - `pid`;
-- `kind`: `start`, `signal` or `end`;
-- `stems`: allowlisted stems only;
+- **[AMENDED r5: NIT]** `kind`: `start` \| `end` (per invocation) \| `worker-start` \| `worker-end` (per worker) \| `signal`;
+- **[NEW r5: NIT]** `token`: the worker's random token, on `worker-start`, `worker-end` and every `signal`;
+- **[NEW r5: NIT]** `signal` records only: `readKind`, one of `header`, `body`, `cookie-api`, `storage-state`, `api-request`, `unresolved-read`, `failed-read`;
+- **[NEW r5: NIT]** `worker-end` only: `signals` (N observed) and `writeFailures` (F);
+- `stems`: allowlisted names or stems only;
 - `at`.
 
 **Writers.**
@@ -738,6 +810,8 @@ malformed bytes carry markers, and assert that the output holds none.
 - `page.screenshot`, `tracing.start` and `fs`/`node:fs` imports (F4);
 - **[NEW r4: NIT 3]** `routeFromHAR(…, { update: true })`, and any `routeFromHAR` whose `update`
   option is not the literal `false` or absent, since that writes a HAR of live traffic;
+- **[NEW r5: R4-2]** `test.use(`, as an early warning. The control is the runtime
+  effective-option assertion;
 - `node:net`, `node:http(s)`, `node:dgram`, `node:child_process` and `fetch` (F3/R-11);
 - a test title that is not a string literal (F13).
 
@@ -775,7 +849,8 @@ malformed bytes carry markers, and assert that the output holds none.
 | **D21e [NEW r2: F3]** | `route.fetch()` to a foreign host | mutation: `_innerFetch` unpatched → passes | fails |
 | **D21f [NEW r3: C2b]** | Lane B `context.unroute("**")` and `context.unrouteAll()`, then a foreign request | mutation: `unroute`/`unrouteAll` unpatched → the guard's route is gone and the request passes | refused and recorded; the foreign request still aborts |
 | **D21g [NEW r3: C2a]** | a Lane-B page opens `new WebSocket("ws://<foreign host>")` inside `try/catch` | mutation: the guard's `routeWebSocket` not installed → the connection is attempted and nothing is recorded | closed by the guard and recorded; the test fails |
-| **D21h [NEW r3: C2c] [AMENDED r4: R3-1]** | Lane B `browser.newContext({ proxy: … })`, `({ recordHar: … })`, `({ serviceWorkers: "allow" })`, and `browserType().connect(…)` during a hook. **r4 adds two fixture-override specs:** (i) a `browser` fixture override that calls `playwright.chromium.launch({ proxy: … })`; (ii) a `context` fixture override that calls `launchPersistentContext(dir, { recordHar: …, serviceWorkers: "allow" })`. **Inverse control:** a `browser` override calling `launch()` with no options is allowed once and guarded, the Lane-B analogue of D13g | mutation: the option refusals off → each is accepted; **mutation "Lane-B launch refusal off"** → both override specs are accepted | each refused, recorded, and the test or run fails; the inverse control stays green. Unit cases in `creation-guard.test.ts` as well |
+| **D21h [NEW r3: C2c] [AMENDED r4: R3-1]** | Lane B `browser.newContext({ proxy: … })`, `({ recordHar: … })`, `({ serviceWorkers: "allow" })`, and `browserType().connect(…)` during a hook. **r4 adds two fixture-override specs:** (i) a `browser` fixture override that calls `playwright.chromium.launch({ proxy: … })`; (ii) a `context` fixture override that calls `launchPersistentContext(dir, { recordHar: …, serviceWorkers: "allow" })`. **Inverse control:** a `browser` override calling `launch()` with no options is allowed once and guarded, the Lane-B analogue of D13g. **[AMENDED r5: R4-1] r5 adds two cases with NO fixture override:** (iii) `test.use({ launchOptions: { proxy: … } })`; (iv) `test.use({ launchOptions: { args: [<a proxy-server switch>] } })`. Both reach the runner's own no-argument `launch()` through `_defaultLaunchOptions` | mutation: the option refusals off → each is accepted; **mutation "Lane-B launch refusal off"** → both override specs are accepted; **mutation "screen reads call arguments only" [NEW r5]** → (iii) and (iv) are both accepted, which is the defect R4-1 names | each refused, recorded, and the test or run fails; the inverse control stays green. Unit cases in `creation-guard.test.ts` as well, including one per effective-option key added or changed |
+| **D21i [NEW r5: R4-2]** | a Lane-B spec with `test.use({ trace: "on" })`, and one with `test.use({ extraHTTPHeaders: { … } })` | mutation "fixture assertion off" → both run, and the first records a trace | both refused before the body, naming the fixture and never its value |
 | D22 | the scanner's failure table in the workflow shape | mutation per row | fails closed |
 | T-ls | the tripwire: a third authenticating file; a tracked `*-snapshots/` file or `*.aria.yml` under `e2e/` | the first is refused on `main`; the snapshot case is **not** refused on `main` | both refused |
 | **U-C6 [NEW r3: C6]** | Lane B run with `--update-snapshots` locally (`npx playwright test --config=playwright.auth.config.ts -u`) | on the mutation "no runtime assertion" the test runs | refused at fixture setup, naming the setting; a unit test pins the assertion |
@@ -905,10 +980,14 @@ product code.
   R3-2, NITs 1–4 and the answer to Q-r3-1. R3-1 is written as "launch once, screened" rather
   than "launch refused at any time", because the runner's own browser launch goes through the
   same patched method (`creation-guard.ts:82-83, :297-299` on `main`); see § Deviation.
+- 2026-09-23, revision 5: the seat's check of r4 (tick 211) applied. The deviation was accepted on
+  three conditions; R3-2 was confirmed. R4-1 (the effective-option screen) is applied, with
+  `coreBundle.js:63301` re-read in the installed 1.63.0 and quoted. R4-2 (the effective-option
+  assertion) and the schema NIT are applied.
 
 ## Blockers and handoff
 
 - **Item 1:** owner inbox 10. The gate stays closed until V-D is closed and D18 is green.
 - **F8's verbatim text:** supplied at tick 207 and placed in § Item 4 (Q-r2-4 closed).
-- **Next action [AMENDED r4]:** the chair confirms R3-1 (including § Deviation) and R3-2 in this
-  text. Phase 2 starts only after that **and** after user #10 merges, on the chair's word.
+- **Next action [AMENDED r5]:** the chair confirms R4-1, R4-2 and the schema NIT in this text.
+  Phase 2 starts only after that **and** after user #10 merges, on the chair's word.
