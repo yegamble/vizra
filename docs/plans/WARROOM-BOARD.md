@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 204 — **user #9 MERGED** `760cc8f` → `783483f` (visibility docs; verifier PASS after one fix round; 7/7 checks). User PR B plan: security seat **APPROVED WITH REQUIRED CHANGES** (`docs/evidence/warroom/2026-09-23-vizra-user-artifact-privacy-b-PLAN-REVIEW-security.md`): BLOCKER F1 (request-side credential fails the test → its trace is published; every guard signal must taint), REQUIRED F2–F11 (per-invocation taint, egress-allowlist idiom bypasses, manual screenshots, snapshot baselines T18, log leaks via JSON.parse errors, R-1 wording, ledger text, positive control, trace-format detectors, secrets backstop). Rulings: all accepted; Q3 (Lane A pixel channels off) ships NOW as its own small PR; Q6 repo-wide env-strictness → queue 2r. Merged today: 7. In flight: core #11 re-confirmation + CI, core B3, meta 2i, user Q3 PR + PR B plan amendment. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 205 — **core #11 MERGED** `238a9ca` → `96d19b3` (re-confirmation on main PASS: merge = main + #11 by patch-id on the true fork `398ac4f`; R2-1 red/green; 62 fixtures 60/2 on 3.81 and 4.3; CI: six required checks + `ci-required` green, integration 1497/0 twice; `image-scan` pre-existing red). Both B5/B5b branches deleted. **Merged today: 8** (meta #4, #5; user #8, #9; search #5; core #8, #10, #11). Dispatched core 2p (allowlist grammar + one line reader ported from search `4810048`) to builder `a6838af8c94145b13`. In flight: core 2p, core B3, meta 2i, user Q3 pixel-channels PR + PR B plan amendment. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -139,6 +139,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-09-23 | vizra-core | #11 hardening B5b: `.IGNORE`/`.DEFAULT`/`.EXTRA_PREREQS`/`.POSIX`, inline/multi-target/computed rules refused; fail-closed database scan + closure equality | `238a9ca` → `96d19b3` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-core-pr11-b5b-special-targets-VERIFY.md`: `29387da` PASS, cross-check GAP X-1, `5488eb0` FAIL, `0243f2e` PASS, on-main `238a9ca` PASS); six required checks + `ci-required` green on `238a9ca`. | CI control; no ledger item. |
 | 2026-09-23 | vizra-user | #9 public-repo visibility docs (artifact 3-day / supply-chain 30-day / log 90-day retention; PR A guarantees at measured strength) | `760cc8f` → `783483f` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-user-pr9-visibility-VERIFY.md`: FAIL at `f9f9478` on the retention sentence, PASS at `760cc8f`); 7/7 check-runs success. Follow-ups → 2q. | Docs; no ledger item. |
 | 2026-09-23 | vizra (meta) | #4 compose topology (VZ-ISSUE-002) | `8e2a867` → `b2c5b96` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-21-meta-pr4-compose-topology-VERIFY.md`: PASS at `cf9e4c8`, FAIL at `ddec39c` on a line-number over-claim, PASS at `8e2a867`); infrastructure seat review on file; `validate` + `ci-required` success on `8e2a867`; GitGuardian red = fake marker in historical `a96f188` (not required). O-1/O-2 nits → 2l. | Ledger status via 2i. |
 | 2026-09-23 | vizra-core | #10 hardening B5: anchor never runs make on unreviewed Makefile bytes (digest pin, one `make -q` over pinned files, pre-make refusals) | `33b951a` → `36a72df` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-core-pr10-makefile-digest-VERIFY.md`: rounds at `62d16aa` FAIL, `08a59a9` FAIL, `398ac4f` PASS, merge-of-main + re-pin at `33b951a` PASS); all six required checks + `ci-required` success on `33b951a`; `image-scan` pre-existing red (inbox 9). Follow-ups: #11 (B5b), queue 2p (allowlist grammar), 2o. | CI control; no ledger item. |
@@ -166,6 +167,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 205 (2026-09-23) — core #11 merged (`96d19b3`); 8 merges today; core 2p dispatched.
 - Tick 204 (2026-09-23) — user #9 merged (`783483f`); PR B plan approved with required changes (F1 blocker); Q3 pixel-channels PR now; queue 2r.
 - Tick 203 (2026-09-23) — meta #4 merged (`b2c5b96`); meta 2i dispatched.
 - Tick 202 (2026-09-23) — core #11 on main at `238a9ca` → re-confirming; user #9 FAIL (retention sentence) → docs fix; queue 2q.

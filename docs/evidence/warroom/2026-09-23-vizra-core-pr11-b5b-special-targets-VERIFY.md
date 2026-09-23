@@ -498,3 +498,93 @@ The new "every recipe of every target in make's own closure" claim holds for eve
 **This PR is a draft stacked on #10. After #10 merges and #11 is rebased, the rebased SHA must be re-confirmed** (at least the fixture sweep, the probe and `ci-required` once Actions runs) before merge.
 
 FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 0243f2ebf4b97d047acf8e3967924a8dd5c5d748
+
+---
+
+# Re-confirmation on main at 238a9ca
+
+- **Head:** `gh pr view 11` → `238a9cafc6c8658e4022e4f5925d218e2ecfc471` (OPEN, not a draft, base `main`, MERGEABLE) at start and at end.
+- **Graph:** `0243f2e` (my PASS) → `bc8df3a` (R2-1) → `f7b6956` (merge, parents `bc8df3a` and `36a72df` = origin/main, #10's squash) → `238a9ca` (evidence only).
+- **Clone:** fresh, in `mktemp -d …/vzv-core-pr11rc-XXXXXX`. Host 3.81 / go1.27.1, with 22 GiB free.
+- **4.3:** my own `vzvpr11rc-make43-<pid>` container. `ubuntu:24.04` was absent, so this run pulled it; it was removed afterwards, since no container used it.
+
+## RC-1. The merge is exactly main plus #11
+
+- `36a72df^{tree}` = `33b951a^{tree}` = `800a0f5c…`. Main's squash carries exactly #10's verified head.
+- git's own merge base of `bc8df3a` and `36a72df` is `eeeea06`, because the squash hides `398ac4f`, as the builder said.
+- **A three-way merge on the true fork point**, `git merge-tree --write-tree --merge-base=398ac4f bc8df3a 36a72df`, exits 0 (no conflicts on that base) with tree `ada3d4f7…`. **That is identical to `f7b6956^{tree}`**, so the committed merge has no hand edits.
+- **Patch equivalence:**
+
+  | Diff | patch-id |
+  |---|---|
+  | `bc8df3a..f7b6956` | `cc9c82d1…` |
+  | `398ac4f..36a72df` (main's side since the fork) | `cc9c82d1…` |
+  | `36a72df..f7b6956` | `cd7236ee…` |
+  | `398ac4f..bc8df3a` (#11's own diff) | `cd7236ee…` |
+
+  Both pairs are **equal**.
+- `f7b6956..238a9ca`: only `docs/` (35 transcripts under `b5b/on-main-36a72df/` plus COMMANDS.md).
+- **Against main:**
+  - the Makefile is **byte-identical** to main's;
+  - `.github/pinned-makefiles.yml` is identical to main's (`ad681247…`, equal to `shasum -a 256 Makefile`);
+  - no change under `.github/`, the Makefile, `api/`, `internal/`, `cmd/` or `migrations/`;
+  - everything else is in `scripts/`, `docs/`, AGENTS.md or README.md.
+
+## RC-2. R2-1: the invalid escape is fixed and guarded
+
+- `bc8df3a` changes the one docstring line to `` four `\\`-continued ``.
+- `python3 -W error::SyntaxWarning -W error::DeprecationWarning` compiles the guard cleanly on 3.9.6 and on 3.12.3 in the container.
+- The anchor output on 4.3 contains 0 `SyntaxWarning` lines; the CI log has none either.
+- **Mutation:** a scratch script re-introduced the single backslash (through `mutate.sh`; sha `57ea87a3…` → `66fe31f6…`).
+  - `TestEveryPythonScriptCompilesWithWarningsAsErrors` goes **red**: go test exit 1, "scripts/make-integrity-guard.py does not compile with warnings as errors … SyntaxError: invalid escape sequence \`".
+  - Restored byte-identical, it is **green**: "7 of 7 Python file(s) compile with -W error".
+
+## RC-3. Lanes on the merged tree
+
+| Lane | 3.81 host | 4.3 container |
+|---|---|---|
+| anchor `--workflow` / lenient | 0 / 0, 18 make processes (recorder) | 0 / 0, 18 make starts (wrapper) |
+| `ci-required-guard.sh` | 0 | 0 (PyYAML installed) |
+| `db-scan-probe.py` | all 15 rows as expected | all 15 rows as expected |
+| `b5b/demo.sh` | full run, exit 0, tree clean afterwards: 13 D rows HELD + probe; C15–C32 red, then green | `DEMO_ONLY=D`, exit 0: 13 D rows HELD + probe; C15/C15b, C22–C25, C27–C32 BROKEN, then HELD |
+| 62 makeguard fixtures | — | **60 red / 2 green**, recorder = wrapper on every one; same counts as at `0243f2e` |
+| `make ci` | **0**, "make ci: all lanes passed", tree clean (21 GiB free afterwards) | — |
+
+## RC-4. CI on 238a9ca
+
+`gh api …/commits/238a9ca…/check-runs` returns 11 runs, all completed:
+
+| Check run | Conclusion |
+|---|---|
+| **ci-required** | **success** (17:47:37 → 17:58:18Z; run 35898029241, event `pull_request`, headSha `238a9ca…`) |
+| build-test | success |
+| cache-matrix | success |
+| cache-matrix-leg (redis) | success |
+| cache-matrix-leg (valkey) | success |
+| fixtures | success |
+| govulncheck | success |
+| docker-build | success |
+| append-only | success |
+| GitGuardian Security Checks | success |
+| image-scan | failure (known red on main, base-image CVEs, not required; reported only) |
+
+**ci-required fan-in:** SUCCESS for all six manifest lanes (append-only, build-test, cache-matrix, fixtures, govulncheck, docker-build). The guard step reports "all 6 floor lane(s) are present and non-optional" and check 11 ok, and ci-required checked `HEAD^2 ==` the PR head SHA.
+
+**build-test log** (run 35898029251), on the ubuntu-24.04 runner (GNU Make 4.3):
+- 8 anchor steps each print `passed (… only on the pinned bytes of Makefile)`;
+- each prints "make's own database: each of the 17 gate closure target(s) has ONE readable entry whose 62 recipe line(s) equal the pinned rule's" and "the gate closure make reports from its database equals the text closure (17 target(s))";
+- `make ci: all lanes passed`;
+- direct unit suite **1328 executed, 0 skipped** (floor 1006);
+- integration and shuffled integration **1497 executed, 0 skipped** each (floor 1150).
+
+## Verdict
+
+- The merge is exactly main plus #11, confirmed three ways: tree identity with a three-way merge on the true fork point, and both patch-id equalities.
+- The Makefile and pin are identical to main's.
+- R2-1 is fixed, and a test guards it (red then green).
+- Every lane passes locally on 3.81 and 4.3.
+- **`ci-required` is green on `238a9ca`**, with every required lane run and succeeded, the database and closure checks passing on the CI runner, and the integration suites passing.
+- `image-scan` is the only red: known, and not required.
+- The remaining NITs (R2-2, R2-3) stand as recorded.
+
+FINAL VERDICT: PASS — SHA 238a9cafc6c8658e4022e4f5925d218e2ecfc471
