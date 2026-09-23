@@ -2215,3 +2215,26 @@ Under RDB there is no half-transaction to lose. EXEC runs uninterrupted on the m
 The commit is docs-only: 0 non-comment Go lines, build and vet green. It removes the R5-N1 over-claim and states the guarantee at close to its measured strength. One wording NIT remains, R6-N1: "a crash applies neither" should read "never one without the other", because a client crash after EXEC applies both. It is benign, and whether it warrants another docs commit is the chair's call. No lanes needed re-running (no code change since 385fc51, whose lanes passed in R5). CI is blocked, so `ci-required` on this SHA is **not obtained**, and the merge waits for the owner and a green `ci-required`.
 
 FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 66b3f3d50c56499432cbf6174661cbaa6bacbfea
+
+---
+---
+
+# Re-confirmation at 0cc906e (docs-only, applies R6-N1) — 2026-09-23
+
+- **SHA:** `0cc906ed35b804b18acac5dc74f0c9f2fda57e94`. PR head at start = `0cc906e…` (15 commits) and at end = `0cc906ed35b804b18acac5dc74f0c9f2fda57e94`. `compare 66b3f3d...0cc906e` = ahead 1 / behind 0 (`0cc906ed` "docs: correct the limiter's crash statement (verifier R6-N1)").
+- **CI BLOCKED by billing** — not re-run. Local verdict only.
+
+**R7-1. Scope, build, vet.** `git diff --stat 66b3f3d 0cc906e`: `AGENTS.md` (2 +-), `docs/evidence/m1a-owner-claim/README.md` (+1 −2), `internal/cache/ratelimit.go` (+4 −2). Non-comment Go lines changed: **none**. `go build ./...` **ok**; `go vet ./internal/cache/` **ok**.
+
+**R7-2. The replacement sentence against my AOF measurement (R6-2).** All three sites now read: "a crash never leaves one applied without the other (client crash before EXEC: neither; after EXEC: both; a half-written AOF tail is truncated on load)". Sites: AGENTS.md:287, README.md:236, ratelimit.go:77-79. Each clause matches what I measured on Redis 7.2.16 and Valkey 9.1.2:
+- before `EXEC` → `EXISTS 0`;
+- after `EXEC` → `EXISTS 1`, TTL 899;
+- a half-written AOF tail → "Truncating the AOF … at offset 235 … loaded anyway", with the partial transaction's key absent.
+
+**Accurate at all three sites.** The adjacent clauses (not interleaved; a queue-time error discards both; runtime errors not rolled back; TTL-less keys healed) are unchanged and were verified in R5-2a.
+
+**R7-3. Sweep.** `grep -rn -iE 'applies neither|crash applies'` over `*.go` and `*.md` returns **nothing**. The only other "crash" in those three files is the unrelated AGENTS.md:257 row about crash-looping jobs. The only remaining "both or neither" text is the correct negation at ratelimit.go:79 ("It is NOT 'both or neither' for a runtime error") and the historical quotation in the README.
+
+**Verdict.** R6-N1 is closed with the exact measured wording. The commit is docs-only, with build and vet green. No code has changed since 385fc51, whose full lanes passed (R5). CI is blocked, so `ci-required` on this SHA is **not obtained**, and the merge waits for the owner and a green `ci-required`.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 0cc906ed35b804b18acac5dc74f0c9f2fda57e94
