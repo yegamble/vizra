@@ -877,3 +877,51 @@ Recommendation: word the sentence as "every use of split('\n')/rsplit, splitline
 This PASS is local. It is not a merge and not VERIFIED; `ci-required` must still pass on this SHA once billing is fixed.
 
 FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 6646ccde99f466d6c52f2c8ef43571c24abc875f
+
+---
+
+# Re-confirmation at 1d28281 (FINDING 17, docs and comments only)
+
+- **SHA:** `1d28281a9e5f639306d4c7b5702e7f791a3df80a`, one commit on `6646ccd`.
+- **Head:** at start and at end, `gh pr view 5 --json headRefOid` and `git ls-remote` (`refs/heads/chore/m0-ci-hardening`, `refs/pull/5/head`) both gave `1d28281a9e5f639306d4c7b5702e7f791a3df80a`.
+- **Clone:** my own `mktemp -d …/vzv-search-pr5-1d28-XXXXXX`, removed by exact path when done.
+
+## Diff scope
+- `git diff --stat 6646ccd 1d28281` touches 4 files: AGENTS.md, `scripts/makegate.py`, and two transcripts (`closing/replan/go-meta-tests-verbose-f17.txt`, `make-ci-local-f17.txt`).
+- `scripts/makegate.py` has **0 changed non-comment lines** (`git diff -U0`, excluding `#` lines).
+- `scripts/scripts_test.go` is unchanged, so the tests these sentences describe are exactly those I verified at 6646ccd.
+- The Makefile (sha256 `e9d7c58e…`, equal to its pin), `.github/` and `api/` are unchanged.
+
+## The wording against the code
+- **READERS** (makegate comment) against the probe's `forbidden` list at scripts_test.go:2280-2281. Both hold the same 8 entries:
+  - `split("\n")`;
+  - `.splitlines(`;
+  - `.read_text(`;
+  - `open(` not after a word character or `.`;
+  - `.decode(`;
+  - `re.M`;
+  - `re.MULTILINE`;
+  - `.readlines(`.
+
+  **Match.** The code's `split` regex also allows whitespace and either quote, and `re.M` is `\bre\.M\b`. The comment is a faithful summary.
+- **FILES** (makegate comment, and the AGENTS.md bullet list) against `text_reads` and `TEXT_ATTRS` at scripts_test.go:2301-2325. **Match.**
+  - an attribute in {splitlines, readlines, read_text, read_bytes, decode, open}, called or not;
+  - the bare name `open`;
+  - an import alias whose name is in that set, or is `M` or `MULTILINE`;
+  - an attribute `MULTILINE`, or `M` on the name `re`;
+  - a str constant matching `\(\?[aiLmsux]*m[aiLmsux]*[):]`;
+  - a `.split`/`.rsplit` call whose first argument is the constant `"\n"`, `b"\n"` or `"\r\n"`.
+- **"Review's to catch"** (AGENTS.md and makegate). It names my four FINDING 17 examples: `re.split(r"\n", t)`, `t.split(NL)`, `io.StringIO(t)` iteration and `subprocess.check_output(["cat","Makefile"])`. It also names the two earlier not-seen cases: a makefile read inside a named function with its allowed spelling, and a name built at run time (getattr, exec). **Present.**
+- **No sentence claims more than the listed spellings.** AGENTS.md now says the test scans "for exactly these spellings" and that "any other way to read or split Makefile text is review's to catch, not the test's". The makegate comment says "checks three things, and no more than these". **FINDING 17 closed.**
+
+## Test run
+`go test -count=1 -v ./scripts/` exits **0**: `ok scripts 33.5s`, **422 PASS, 0 FAIL, 0 SKIP**. That includes `TestEveryMakefileReaderConsumesTheOneLineReader` and `TestTheOneReaderSourceCheckRefusesAPlantedReader`. The builder's `make-ci-local-f17.txt` records 809 tests and 0 skips. I did not re-run `make ci`, because the commit changes no code.
+
+**GitHub CI on 1d28281:** 12 jobs failed and GitGuardian succeeded (billing, as before). **BLOCKED**, not re-run.
+
+## Verdict
+The commit is docs and comments only. The narrowed sentences match the committed checks exactly, the not-seen list names every case I raised, and the scripts tests pass with 0 skips. FINDING 17 is closed. No finding remains open from my rounds.
+
+This PASS is local. It is not a merge and not VERIFIED; `ci-required` must still pass on this SHA once billing is fixed.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 1d28281a9e5f639306d4c7b5702e7f791a3df80a
