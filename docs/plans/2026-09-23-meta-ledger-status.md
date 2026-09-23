@@ -166,3 +166,43 @@ check 0, demo 47 passed / 0 failed. The full-lane table for the pushed head foll
 - compose render / topology (27 rules, 0 violations) / config coverage / template claims;
 - compose demo: tree clean;
 - `ci-required-guard.sh`.
+
+## Fix round 2 (verifier FAIL at b694813, the last round; "Re-verification at b694813" in the same VERIFY file)
+
+- **R-1 (REQUIRED).** Removed every claim this PR made that CODEOWNERS review is enforced, in:
+  - `build.py` notice (regenerated);
+  - `README.md`;
+  - `validate.yml` clause (e);
+  - `check-ledger-status-output.py` docstring.
+
+  They now say: a PR that edits the checkers is visible in its diff and nothing else guards it.
+  CODEOWNERS is advisory (branch protection 404, rulesets `[]`), so the war room's verifier-gated
+  merge is the only review. The older wording in `validate.yml:213`, `COMMANDS.md:116` and three
+  gate scripts predates this PR and is left for the chair (verifier's note).
+- **R-2 (REQUIRED).** The output check parses both JSON files with an `object_pairs_hook` that
+  refuses a DUPLICATE KEY at any level, naming the key and the entry. It also requires the bytes of
+  `features.json` to equal `json.dumps(parsed, indent=2, ensure_ascii=False)`, the generator's own
+  settings (NON-CANONICAL BYTES). `status.load_records` refuses duplicate keys too.
+  - D9: a replaced `json.dump` emits duplicate status keys → red `DUPLICATE KEY 'implementation_status' in entry VZ-CONTROLS-001`, green after reset.
+  - D9b: the byte guard on its own (`indent=1`) → red `NON-CANONICAL BYTES`.
+- **R-3 (SHOULD, done).** Each evidence file a VERIFIED record cites must be on meta `main`,
+  byte-identical. It is checked twice:
+  - offline, by the output check, against `origin/main`, which CI fetches first; it fails closed if
+    the ref is absent;
+  - online, by the remote check, via `contents/<path>?ref=main`, comparing git blob SHAs.
+
+  Demonstrations:
+  - D10a (offline): red, then green once the file is on the copy's `origin/main`;
+  - D10b (online): red, then green with the record removed;
+  - self-test case `evidence-not-on-meta-main`.
+
+  The README states that queue 2u is now a prerequisite for any VERIFIED record.
+- **NITs.**
+  - `test_ids` is pinned to `[]`, both in-process and in the output check.
+  - New unit tests catch deleting the `prove_auth()` call site and deleting the one-page
+    check-run cap.
+  - D11 shows the summary check (red, then green).
+  - A list-subclass `evidence` test was added.
+
+Mutations: `guard-mutations-round2.txt` and `output-mutations-round2.txt`. Every new guard is
+load-bearing or redundantly backed, as stated in the README.

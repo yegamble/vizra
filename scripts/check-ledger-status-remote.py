@@ -18,6 +18,10 @@ merge in every record of `docs/evidence/ledger-generator/status_records.json`:
     5. the latest `ci-required` check-run on `verified_head`, created by the
        GitHub Actions app, is `completed` / `success`. A verifier's
        "PASS (local; CI BLOCKED)" never stands in for this: VERIFIED requires CI.
+    6. the merge's `evidence_file` is on the META repo's `main` with the same git
+       blob SHA as the file in this tree (`contents/<path>?ref=main`), so a PR
+       cannot cite a verdict it introduces itself. The output check makes the
+       same comparison offline against origin/main.
 
 Why a committed record checked online, rather than the generator calling git or
 the API: the generator must be reproducible offline and byte-identical under two
@@ -44,11 +48,13 @@ Needs `gh` authenticated (in CI: GH_TOKEN=${{ github.token }}; the component
 repositories are public, so read access is enough).
 """
 import argparse
+import hashlib
 import json
 import os
 import shutil
 import subprocess
 import sys
+import urllib.parse
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 sys.path.insert(0, os.path.join(ROOT, "docs", "evidence", "ledger-generator"))
@@ -148,14 +154,38 @@ def check_merge(owner, rec_status, m, where):
     return errors, notes
 
 
+def git_blob_sha(path):
+    with open(path, "rb") as fh:
+        data = fh.read()
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def check_evidence_on_main(owner, rel, where):
+    """Rule 6: the evidence file is on meta main, byte-identical to this tree's copy."""
+    got, err = gh_api(f"repos/{owner}/vizra/contents/{urllib.parse.quote(rel, safe='/')}?ref=main")
+    if err:
+        return [f"{where}: EVIDENCE NOT ON META MAIN — {rel} could not be read from {owner}/vizra main ({err}). "
+                f"Evidence must be merged before a status can cite it"]
+    local = os.path.join(ROOT, rel)
+    if not os.path.isfile(local):
+        return [f"{where}: {rel} is on meta main but missing from this tree"]
+    if got.get("sha") != git_blob_sha(local):
+        return [f"{where}: EVIDENCE DIFFERS FROM META MAIN — {rel}: main has blob {got.get('sha')}, this tree has "
+                f"{git_blob_sha(local)}"]
+    return []
+
+
 def check_doc(doc):
     errors, notes = [], []
     owner = doc["github_owner"]
     for i, rec in enumerate(doc["records"]):
         label = f"status record #{i} ({rec['id']} {rec['status']})"
         for j, m in enumerate(rec["merges"]):
-            e, n = check_merge(owner, rec["status"], m, f"{label}: merges[{j}] {m['repo']}#{m['pr']}")
+            where = f"{label}: merges[{j}] {m['repo']}#{m['pr']}"
+            e, n = check_merge(owner, rec["status"], m, where)
             errors += e
+            if rec["status"] == "VERIFIED":
+                errors += check_evidence_on_main(owner, m["evidence_file"], where)
             notes += [f"{label}: {x}" for x in n]
     return errors, notes
 

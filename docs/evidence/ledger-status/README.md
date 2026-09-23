@@ -10,11 +10,19 @@ committed record admits turns the lane red, and this holds however the status wa
 - a section source assignment;
 - an extra key;
 - a `str` subclass;
-- a generator monkeypatched in-process.
+- a generator monkeypatched in-process;
+- a replaced `json.dump` that writes a duplicate status key before the real one (round 2: duplicate
+  keys are refused at every level, and the bytes must equal the generator's own serialisation).
+
+Free-text fields (`notes`, `title`, …) are not status fields. A status word written there is not
+refused. `test_ids` is pinned to `[]`.
 
 The out-of-process output check enforces that (fix round 1, meta PR #6 verify FINDING 1). **Not
 defended:** a pull request that edits the checkers themselves (`status.py`, the three `scripts/`
-checkers, `validate.yml`). That change is visible in the diff and owner-reviewed under CODEOWNERS.
+checkers, `validate.yml`). That change is visible in the PR diff, and nothing else guards it today. CODEOWNERS
+names the owner for these paths, but the file itself says it is advisory: `main` has no branch
+protection (the API returns 404) and no ruleset (`[]`). The war room's verifier-gated merge is the
+only review such a change gets.
 
 ## Why a committed record proved online
 
@@ -36,6 +44,17 @@ A reviewer sees a committed record in the PR diff. The online half runs again on
 request and merge-queue entry, not on `main` after a merge. So a record that was true when written
 and later stops being true (for example, a force-pushed component `main` that drops the merge
 commit) turns the lane red at the next meta PR, not at once.
+
+**VERIFIED requires the evidence to be on meta `main` first (fix round 2, R-3).** Each evidence
+file a VERIFIED record cites must be on meta `main`, byte-identical. It is checked twice:
+- offline, by the output check, against `origin/main` (CI fetches `main` before the step);
+- online, by the remote check, through `contents/<path>?ref=main`, comparing git blob SHAs.
+
+So a pull request cannot cite a verdict it introduces itself: the verdict has to be merged through
+the chair's records path before any record can rest on it. This makes **war-room queue 2u a
+prerequisite for any VERIFIED record**. Today the verifier files for core #8 and user #8 exist only
+on `chore/warroom-records-2026-09-21`, not on `main`. The checks do not establish who wrote an
+evidence file, only that it landed on `main` before the record.
 
 **VERIFIED requires `ci-required` green on the verified head.** A verifier's
 `PASS (local; CI BLOCKED)` passes the offline verdict check only because the online half then asks
@@ -95,6 +114,11 @@ end. Transcript: [`demo-transcript.txt`](demo-transcript.txt).
 | D6c | probe 2e: a wrapper around `status.check_dsl_defaults`, then VERIFIED / VERIFIED_AT_SHA; generator and regeneration check green | output check `VZ-CONTROLS-001: STATUS WITHOUT A RECORD` | reset: green |
 | D7 | `FINAL VERDICT: PASS (superseded — FAIL on re-run) — SHA …` | `is NOT ALLOWLISTED` | restored |
 | D8 | VZ-FOUND-007 citing VZ-ISSUE-001's VZ-FOUND-008 bullet | `the cited bullet does not name VZ-FOUND-007` | restored |
+| D9 | round-1 probe N3: a section source replaces `json.dump` to write `"implementation_status": "VERIFIED"` / `"verification_status": "VERIFIED_AT_SHA"` before VZ-CONTROLS-001's real keys. The generator and the regeneration check stay green | output check `DUPLICATE KEY 'implementation_status' in entry VZ-CONTROLS-001` | reset: green |
+| D9b | the same route, writing `indent=1` instead of 2 (no duplicate, nothing a parser reads differently) | output check `NON-CANONICAL BYTES` (the byte guard is live on its own) | reset: green |
+| D10a | a VERIFIED record plus the evidence file it cites, committed together; the copy's `origin/main` lacks the file | output check `EVIDENCE NOT ON META MAIN` | `origin/main` moved to include the file: green |
+| D10b | the same record, online | `EVIDENCE NOT ON META MAIN` (contents API 404 on real `main`) | record removed: green |
+| D11 | `summary.by_implementation_status` tampered and committed | `summary.by_implementation_status is {'PLANNED': 191, 'VERIFIED': 1} but the features count {'PLANNED': 192}` | reset: green |
 
 The checkers are themselves mutation-tested:
 - [`unit-mutations.txt`](unit-mutations.txt) (first round, at `94ac3bf`): five mutations of
@@ -115,5 +139,21 @@ The checkers are themselves mutation-tested:
   - Deleting only the set-equality check, or only the re-derivation, still refuses 2d and 2e, by
     the other one. Deleting both lets 2d and 2e through. The two checks are deliberately redundant.
 
-Unit tests: [`unit-tests.txt`](unit-tests.txt): 35 offline tests plus 9 online tests with an
-injected `gh_api`. Self-test and output check: [`remote-self-test.txt`](remote-self-test.txt): 9/9.
+- [`guard-mutations-round2.txt`](guard-mutations-round2.txt) (fix round 2): each of these turns
+  its named test red:
+  - deleting the `prove_auth()` call in `main()`;
+  - deleting the one-page check-run cap;
+  - deleting the online evidence-on-main call (the self-test goes 9/10 too);
+  - reverting the evidence check to `ev != []`;
+  - deleting the `test_ids` DSL check;
+  - deleting the records file's duplicate-key hook.
+- [`output-mutations-round2.txt`](output-mutations-round2.txt) (fix round 2): the output checker on
+  committed routes e-dup (D9), e-canon (D9b), e-tid, e-sum (D11) and e-ev (D10a).
+  - The `test_ids` pin, the summary check and the evidence-on-main check are each load-bearing
+    for their route.
+  - The duplicate-key hook and the canonical-bytes check back each other up on e-dup. Deleting
+    both lets it through.
+  - Deleting the canonical check lets e-canon through.
+
+Unit tests: [`unit-tests.txt`](unit-tests.txt): 38 offline tests plus 13 online tests with an
+injected `gh_api`. Self-test and output check: [`remote-self-test.txt`](remote-self-test.txt): 10/10.

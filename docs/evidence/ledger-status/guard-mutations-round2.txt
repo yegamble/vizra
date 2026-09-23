@@ -1,0 +1,28 @@
+# source SHA f0369a0b4535cad52abe5ac1cbccd5797d8de005 (round-2 tree); Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23. Each mutation applied alone, the named tests run, the file restored.
+
+## online checker
+== mutation prove_auth-call-deleted: sha256 f37cff7d1a4d -> cce2a731ad0c
+   unit tests exit=1
+   FAIL: test_main_proves_auth_even_with_zero_records (__main__.RemoteGuards)
+== mutation one-page-cap-deleted: sha256 f37cff7d1a4d -> 8640d7892de2
+   unit tests exit=1
+   FAIL: test_more_than_one_page_of_check_runs_is_refused (__main__.RemoteGuards)
+== mutation evidence-on-main-call-deleted: sha256 f37cff7d1a4d -> 041a0ed05a95
+   unit tests exit=1
+   FAIL: test_verified_record_consults_the_evidence_check (__main__.RemoteGuards)
+   self-test exit=1
+   SELF-TEST evidence-not-on-meta-main: expected red naming ['EVIDENCE NOT ON META MAIN — docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md']; MISSIN
+   self-test: 9/10 cases behaved as expected
+== restored: unit OK; self-test: 10/10 cases behaved as expected
+
+## offline rules (status.py)
+== mutation evidence-check-reverted-to-ne: sha256 4c0c51aa77f2 -> 709b49a2a067
+   unit tests exit=1
+   FAIL: test_list_subclass_evidence_is_refused (test_status.DslDefaults)
+== mutation test_ids-check-deleted: sha256 4c0c51aa77f2 -> e8aaa919fa7e
+   unit tests exit=1
+   FAIL: test_hand_asserted_test_ids_are_refused (test_status.DslDefaults)
+== mutation records-duplicate-hook-deleted: sha256 4c0c51aa77f2 -> 9a4e595524c5
+   unit tests exit=1
+   FAIL: test_duplicate_keys_in_the_records_file_are_refused (test_status.DslDefaults)
+== restored: OK

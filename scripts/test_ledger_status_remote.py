@@ -10,7 +10,9 @@ exercised on its own and a deleted guard turns a named test red.
 Run from the repository root:  python3 scripts/test_ledger_status_remote.py -v
 """
 import importlib.util
+import json
 import os
+import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -29,13 +31,15 @@ def run(slug, conclusion="success", started="2026-09-23T17:00:00Z", rid=1, statu
 
 
 class Stub:
-    def __init__(self, base="main", runs=None, compare="ahead", rate_limit=5000):
+    def __init__(self, base="main", runs=None, compare="ahead", rate_limit=5000, total=None, contents=None):
         self.pull = {"merged": True, "state": "closed", "base": {"ref": base}, "head": {"sha": HEAD},
                      "merge_commit_sha": MERGE}
         self.runs = runs if runs is not None else [run("github-actions")]
         self.compare = {"status": compare, "behind_by": 0 if compare in ("ahead", "identical") else 3,
                         "ahead_by": 1}
         self.rate_limit = rate_limit
+        self.total = total
+        self.contents = contents  # None -> 404; else the blob sha main reports
 
     def __call__(self, path):
         if path.endswith("/pulls/8"):
@@ -43,7 +47,12 @@ class Stub:
         if "/compare/" in path:
             return self.compare, None
         if "/check-runs" in path:
-            return {"total_count": len(self.runs), "check_runs": self.runs}, None
+            return {"total_count": self.total if self.total is not None else len(self.runs),
+                    "check_runs": self.runs}, None
+        if "/contents/" in path:
+            if self.contents is None:
+                return None, "gh api contents: exit 1: HTTP 404"
+            return {"sha": self.contents}, None
         if path == "rate_limit":
             if self.rate_limit is None:
                 return None, "gh api rate_limit: exit 1: HTTP 401"
@@ -97,6 +106,44 @@ class RemoteGuards(unittest.TestCase):
 
     def test_implemented_does_not_ask_for_ci(self):
         self.assertEqual(self.check(Stub(runs=[]), status="IMPLEMENTED"), [])
+
+    def test_more_than_one_page_of_check_runs_is_refused(self):
+        errors = self.check(Stub(total=150))
+        self.assertNamed(errors, "more than one page; refused")
+
+    def test_evidence_must_be_on_meta_main_byte_identical(self):
+        rel = "docs/evidence/warroom/2026-09-21-meta-pr3-validate-lane-VERIFY.md"
+        blob = remote.git_blob_sha(os.path.join(remote.ROOT, rel))
+        remote.gh_api = Stub(contents=None)
+        self.assertTrue(any("EVIDENCE NOT ON META MAIN" in e for e in remote.check_evidence_on_main("yegamble", rel, "t")))
+        remote.gh_api = Stub(contents="0" * 40)
+        self.assertTrue(any("EVIDENCE DIFFERS FROM META MAIN" in e for e in remote.check_evidence_on_main("yegamble", rel, "t")))
+        remote.gh_api = Stub(contents=blob)
+        self.assertEqual(remote.check_evidence_on_main("yegamble", rel, "t"), [])
+
+    def test_verified_record_consults_the_evidence_check(self):
+        doc = {"schema": 1, "github_owner": "yegamble", "records": [{
+            "id": "VZ-X-001", "status": "VERIFIED", "rationale": "r",
+            "acceptance": [{"issue": "i", "bullet": "b"}],
+            "merges": [dict(MERGE_ENTRY, evidence_file="docs/evidence/warroom/nope-VERIFY.md")]}]}
+        remote.gh_api = Stub(contents=None)
+        errors, _ = remote.check_doc(doc)
+        self.assertTrue(any("EVIDENCE NOT ON META MAIN" in e for e in errors), errors)
+
+    def test_main_proves_auth_even_with_zero_records(self):
+        # deleting the prove_auth() CALL in main() (not just the function) must be caught
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tf:
+            json.dump({"schema": 1, "github_owner": "yegamble", "records": []}, tf)
+        orig_which = remote.shutil.which
+        remote.shutil.which = lambda name: "/stub/gh"
+        try:
+            remote.gh_api = Stub(rate_limit=60)
+            self.assertEqual(remote.main(["--records", tf.name]), 2)
+            remote.gh_api = Stub(rate_limit=5000)
+            self.assertEqual(remote.main(["--records", tf.name]), 0)
+        finally:
+            remote.shutil.which = orig_which
+            os.unlink(tf.name)
 
     def test_anonymous_gh_is_refused(self):
         remote.gh_api = Stub(rate_limit=60)

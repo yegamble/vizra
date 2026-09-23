@@ -156,12 +156,16 @@ remote checker exits 2 (BLOCKED, never a pass) without `gh`, and exits 2 when `g
 (`rate_limit` core limit 60), even with zero records. The rules, the reason for the split, and today's decisions
 on the candidate entries are in `docs/evidence/ledger-status/README.md`.
 
-Last run (2026-09-23, fix round 1, local, macOS arm64, Python 3.9.6, gh 2.98.0), every command exit 0:
+The output check needs `refs/remotes/origin/main` whenever a VERIFIED record exists (every cited
+evidence file must be on meta `main`, byte-identical). CI fetches it with
+`git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main`.
+
+Last run (2026-09-23, fix round 2, local, macOS arm64, Python 3.9.6, gh 2.98.0), every command exit 0:
 - output check: 192 entries, 0 statuses, 0 records;
-- unit tests: 35 offline plus 9 online;
-- self-test: 9/9;
+- unit tests: 38 offline plus 13 online;
+- self-test: 10/10;
 - remote check: 0 records;
-- demo: 47 passed / 0 failed.
+- demo: 61 passed / 0 failed.
 
 ### 2. Quality JSON parses and every requirement id resolves
 

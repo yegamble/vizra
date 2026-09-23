@@ -281,6 +281,53 @@ mutate "$ROOT/$REC" 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["re
   && red "D8 VZ-FOUND-007 citing the VZ-FOUND-008 bullet" "the cited bullet does not name VZ-FOUND-007" -- build
 back_to_fixture; green "D8 restored" -- build
 
+echo "== D9 a replaced json.dump writes a duplicate status key before the real one (verify round 1, probe N3)"
+export ESCAPE_CODE='import json as _j
+def _dup(obj, fh, **kw):
+    text = _j.dumps(obj, **kw)
+    i = text.rindex("\"implementation_status\": \"PLANNED\"")
+    fh.write(text[:i] + "\"implementation_status\": \"VERIFIED\",\n      \"verification_status\": \"VERIFIED_AT_SHA\",\n      " + text[i:])
+_j.dump = _dup'
+escape "D9 duplicate status keys" 0 "" "DUPLICATE KEY 'implementation_status' in entry VZ-CONTROLS-001"
+
+# D9b: the byte guard on its own. No duplicate key and nothing a parser would
+# read differently, only bytes that are not the generator's serialisation. It
+# shows the NON-CANONICAL BYTES check is live independently of the duplicate
+# check (which fires first in D9).
+export ESCAPE_CODE='import json as _j
+_j.dump = lambda obj, fh, **kw: fh.write(_j.dumps(obj, indent=1, ensure_ascii=False))'
+escape "D9b non-canonical serialisation" 0 "" "NON-CANONICAL BYTES"
+
+echo "== D10 a VERIFIED record citing an evidence file the same change introduces (verify round 1, R-3)"
+back_to_fixture
+(cd "$copy" && git reset -q --hard base-commit)
+cp "$ROOT/$REC" "$copy/$REC"; cp "$ROOT/$FIX_EVID" "$copy/$FIX_EVID"
+if ( cd "$copy/$GEN" && python3 build.py ../../quality/features.json >/dev/null ) \
+   && (cd "$copy" && git add -A && git -c user.name=demo -c user.email=demo@invalid commit -qm "record + its own evidence") \
+   && (cd "$copy" && git update-ref refs/remotes/origin/main base-commit); then
+  red "D10a offline: evidence not on (the copy's) origin/main" "EVIDENCE NOT ON META MAIN" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
+  (cd "$copy" && git update-ref refs/remotes/origin/main HEAD)
+  green "D10a the same evidence once it is on origin/main" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
+else
+  echo "  FAIL  D10a could not build the scratch state"; FAILED=$((FAILED + 1))
+fi
+(cd "$copy" && git update-ref -d refs/remotes/origin/main; git reset -q --hard base-commit)
+if command -v gh >/dev/null 2>&1; then
+  red "D10b online: the fixture evidence is not on yegamble/vizra main" "EVIDENCE NOT ON META MAIN" -- ./scripts/check-ledger-status-remote.py --records "$ROOT/$REC"
+  cp "$SCRATCH/records.orig" "$ROOT/$REC"
+  green "D10b restored (no record)" -- ./scripts/check-ledger-status-remote.py --records "$ROOT/$REC"
+else
+  echo "  BLOCKED D10b — gh is not installed; counted as a FAIL"; FAILED=$((FAILED + 1))
+fi
+back_to_fixture
+
+echo "== D11 the summary counts disagree with the features (verify round 1, NIT 3)"
+mutate "$copy/docs/quality/features.json" 'import json,sys; p=sys.argv[1]; d=json.load(open(p,encoding="utf-8")); d["summary"]["by_implementation_status"]={"PLANNED":191,"VERIFIED":1}; open(p,"w",encoding="utf-8",newline="\n").write(json.dumps(d,indent=2,ensure_ascii=False))' \
+  && (cd "$copy" && git -c user.name=demo -c user.email=demo@invalid commit -qam "tamper summary") \
+  && red "D11" "summary.by_implementation_status is {'PLANNED': 191, 'VERIFIED': 1} but the features count {'PLANNED': 192}" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
+(cd "$copy" && git reset -q --hard base-commit)
+green "D11 restored" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
+
 echo "== cleanup"
 cleanup; trap - EXIT
 status_after="$(git status --porcelain)"

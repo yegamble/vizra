@@ -33,7 +33,9 @@
 #       or names a merge that is not on the component repo's main or a head
 #       where ci-required is not green.
 #       Not covered: a pull request that edits these checkers. That change is
-#       visible in the diff and owner-reviewed under CODEOWNERS. This lane runs
+#       visible in the diff and nothing else guards it: CODEOWNERS is advisory
+#       (no branch protection, no ruleset), so the war room's verifier-gated
+#       merge is the only review. This lane runs
 #       on pull requests and merge-queue entries only, so a record that becomes
 #       false AFTER it merged is caught at the next meta PR, not at once.
 #
@@ -166,8 +168,14 @@ jobs:
       # parses the COMMITTED features.json as plain JSON and imports no
       # section source. It requires the exact key set, and it re-derives every
       # status from the committed records.
+      # It also requires every evidence file a VERIFIED record cites to be on
+      # meta `main` with identical bytes (fix round 2, R-3), so `main` is
+      # fetched first: the checkout above is the PR merge ref at depth 1.
       - name: every status in the committed ledger is admitted by a committed record
-        run: ./scripts/check-ledger-status-output.py
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          ./scripts/check-ledger-status-output.py
 
       - name: the ledger-status rules hold (unit tests)
         run: |

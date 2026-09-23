@@ -37,7 +37,7 @@ ISSUE = """# VZ-ISSUE-900: test
 def req(rid, ui=(), api=()):
     return {"id": rid, "surfaces": {"api": list(api), "ui": list(ui), "cli": []},
             "implementation_status": "PLANNED", "verification_status": "UNVERIFIED",
-            "merge_status": "NOT_STARTED", "release_status": "NOT_RELEASED", "evidence": []}
+            "merge_status": "NOT_STARTED", "release_status": "NOT_RELEASED", "evidence": [], "test_ids": []}
 
 
 def record(status_="IMPLEMENTED", rid="VZ-TEST-001", **merge_over):
@@ -125,6 +125,25 @@ class DslDefaults(Tree):
     def test_hand_asserted_release_status_is_refused(self):
         r = req("VZ-TEST-001"); r["release_status"] = "RELEASED"
         self.assertRefused(status.check_dsl_defaults([r]), "HAND-ASSERTED release_status")
+
+    def test_list_subclass_evidence_is_refused(self):
+        # the `ev != []` form is overridable exactly like the str case
+        class _L(list):
+            def __ne__(self, other):
+                return False
+        r = req("VZ-TEST-001"); r["evidence"] = _L([{"x": 1}])
+        self.assertRefused(status.check_dsl_defaults([r]), "HAND-ASSERTED evidence")
+
+    def test_hand_asserted_test_ids_are_refused(self):
+        r = req("VZ-TEST-001"); r["test_ids"] = ["VERIFIED"]
+        self.assertRefused(status.check_dsl_defaults([r]), "HAND-ASSERTED test_ids")
+
+    def test_duplicate_keys_in_the_records_file_are_refused(self):
+        path = os.path.join(self.root, "dup.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write('{"schema": 1, "github_owner": "yegamble", "records": [], "records": []}')
+        _, errors = status.load_records(path)
+        self.assertRefused(errors, "duplicate key(s) ['records']")
 
     def test_hand_asserted_evidence_is_refused(self):
         r = req("VZ-TEST-001"); r["evidence"] = [{"x": 1}]

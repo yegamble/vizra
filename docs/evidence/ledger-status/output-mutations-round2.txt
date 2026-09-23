@@ -1,0 +1,51 @@
+# source: tree of f0369a0b4535cad52abe5ac1cbccd5797d8de005 (round-2 changes); scratch copy committed as 'base' plus one branch per route; refs/remotes/origin/main = base; Python 3.9.6; 2026-09-23
+# e-dup: json.dump replaced to emit duplicate status keys (D9); e-canon: indent=1 (D9b); e-tid: wrapper + test_ids=['VERIFIED']; e-sum: summary tampered (D11); e-ev: VERIFIED record + its own evidence, not on origin/main (D10a)
+== unmutated output checker
+   base     exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-dup    exit 1  docs/quality/features.json: DUPLICATE KEY 'implementation_status' in entry VZ-CONTROLS-001 — a parser keeps on
+   e-canon  exit 1  docs/quality/features.json: NON-CANONICAL BYTES — the file differs from the generator's serialisation of its o
+   e-tid    exit 1  VZ-CONTROLS-001: test_ids is ['VERIFIED']; core.req always emits []
+   e-sum    exit 1  summary.by_implementation_status is {'PLANNED': 191, 'VERIFIED': 1} but the features count {'PLANNED': 192}
+   e-ev     exit 1  VZ-FOUND-008: EVIDENCE NOT ON META MAIN — docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md does not 
+== mutation duplicate-hook-deleted: sha256 7a7fe8d6a7c9 -> 043506ce9a18
+   base     exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-dup    exit 1  docs/quality/features.json: NON-CANONICAL BYTES — the file differs from the generator's serialisation of its o
+   e-canon  exit 1  docs/quality/features.json: NON-CANONICAL BYTES — the file differs from the generator's serialisation of its o
+   e-tid    exit 1  VZ-CONTROLS-001: test_ids is ['VERIFIED']; core.req always emits []
+   e-sum    exit 1  summary.by_implementation_status is {'PLANNED': 191, 'VERIFIED': 1} but the features count {'PLANNED': 192}
+   e-ev     exit 1  VZ-FOUND-008: EVIDENCE NOT ON META MAIN — docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md does not 
+== mutation canonical-bytes-deleted: sha256 7a7fe8d6a7c9 -> 8484dcb5c937
+   base     exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-dup    exit 1  docs/quality/features.json: DUPLICATE KEY 'implementation_status' in entry VZ-CONTROLS-001 — a parser keeps on
+   e-canon  exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-tid    exit 1  VZ-CONTROLS-001: test_ids is ['VERIFIED']; core.req always emits []
+   e-sum    exit 1  summary.by_implementation_status is {'PLANNED': 191, 'VERIFIED': 1} but the features count {'PLANNED': 192}
+   e-ev     exit 1  VZ-FOUND-008: EVIDENCE NOT ON META MAIN — docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md does not 
+== mutation duplicate-hook-AND-canonical-deleted: sha256 7a7fe8d6a7c9 -> 88b65bf9cfce
+   base     exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-dup    exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-canon  exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-tid    exit 1  VZ-CONTROLS-001: test_ids is ['VERIFIED']; core.req always emits []
+   e-sum    exit 1  summary.by_implementation_status is {'PLANNED': 191, 'VERIFIED': 1} but the features count {'PLANNED': 192}
+   e-ev     exit 1  VZ-FOUND-008: EVIDENCE NOT ON META MAIN — docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md does not 
+== mutation test_ids-pin-deleted: sha256 7a7fe8d6a7c9 -> 11ee091c79dd
+   base     exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-dup    exit 1  docs/quality/features.json: DUPLICATE KEY 'implementation_status' in entry VZ-CONTROLS-001 — a parser keeps on
+   e-canon  exit 1  docs/quality/features.json: NON-CANONICAL BYTES — the file differs from the generator's serialisation of its o
+   e-tid    exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-sum    exit 1  summary.by_implementation_status is {'PLANNED': 191, 'VERIFIED': 1} but the features count {'PLANNED': 192}
+   e-ev     exit 1  VZ-FOUND-008: EVIDENCE NOT ON META MAIN — docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md does not 
+== mutation summary-check-deleted: sha256 7a7fe8d6a7c9 -> d2f1a1297bf7
+   base     exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-dup    exit 1  docs/quality/features.json: DUPLICATE KEY 'implementation_status' in entry VZ-CONTROLS-001 — a parser keeps on
+   e-canon  exit 1  docs/quality/features.json: NON-CANONICAL BYTES — the file differs from the generator's serialisation of its o
+   e-tid    exit 1  VZ-CONTROLS-001: test_ids is ['VERIFIED']; core.req always emits []
+   e-sum    exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-ev     exit 1  VZ-FOUND-008: EVIDENCE NOT ON META MAIN — docs/evidence/warroom/DEMO-FIXTURE-ledger-status-VERIFY.md does not 
+== mutation evidence-on-main-deleted: sha256 7a7fe8d6a7c9 -> f5b667583b2a
+   base     exit 0  ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-de
+   e-dup    exit 1  docs/quality/features.json: DUPLICATE KEY 'implementation_status' in entry VZ-CONTROLS-001 — a parser keeps on
+   e-canon  exit 1  docs/quality/features.json: NON-CANONICAL BYTES — the file differs from the generator's serialisation of its o
+   e-tid    exit 1  VZ-CONTROLS-001: test_ids is ['VERIFIED']; core.req always emits []
+   e-sum    exit 1  summary.by_implementation_status is {'PLANNED': 191, 'VERIFIED': 1} but the features count {'PLANNED': 192}
+   e-ev     exit 0  ledger status output: 192 entries, exact key set; 1 carry a status, 1 record(s), sets equal; every entry re-de

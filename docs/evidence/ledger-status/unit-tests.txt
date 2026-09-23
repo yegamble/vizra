@@ -1,11 +1,13 @@
-# source SHA 19ba5671869184ec313db47b10329d6ea450b0f0 (branch feat/m0-ledger-status, fix round 1); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
-# commands: (cd docs/evidence/ledger-generator && python3 -m unittest -v test_status) ; python3 scripts/test_ledger_status_remote.py -v
+# tree: pre-amend commit f0369a0b4535cad52abe5ac1cbccd5797d8de005 (fix round 2; the pushed commit adds only these transcripts and docs to it); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
 
 test_clean_dsl_passes (test_status.DslDefaults) ... ok
 test_core_req_keys_equal_the_output_checks_allowlist (test_status.DslDefaults) ... ok
+test_duplicate_keys_in_the_records_file_are_refused (test_status.DslDefaults) ... ok
 test_hand_asserted_evidence_is_refused (test_status.DslDefaults) ... ok
 test_hand_asserted_release_status_is_refused (test_status.DslDefaults) ... ok
+test_hand_asserted_test_ids_are_refused (test_status.DslDefaults) ... ok
 test_hand_asserted_verified_in_a_section_is_refused (test_status.DslDefaults) ... ok
+test_list_subclass_evidence_is_refused (test_status.DslDefaults) ... ok
 test_str_subclass_that_compares_equal_is_refused (test_status.DslDefaults) ... ok
 test_abbreviated_verdict_sha_is_refused (test_status.Evidence) ... ok
 test_evidence_outside_warroom_is_refused (test_status.Evidence) ... ok
@@ -38,7 +40,7 @@ test_unknown_status_is_refused_by_name (test_status.RecordShape) ... ok
 test_verified_with_no_evidence_is_refused (test_status.RecordShape) ... ok
 
 ----------------------------------------------------------------------
-Ran 35 tests in 0.314s
+Ran 38 tests in 0.064s
 
 OK
 exit=0
@@ -46,15 +48,21 @@ exit=0
 test_anonymous_gh_is_refused (__main__.RemoteGuards) ... ok
 test_base_other_than_main_is_refused (__main__.RemoteGuards) ... ok
 test_ci_required_from_a_non_actions_app_is_refused (__main__.RemoteGuards) ... ok
+test_evidence_must_be_on_meta_main_byte_identical (__main__.RemoteGuards) ... ok
 test_implemented_does_not_ask_for_ci (__main__.RemoteGuards) ... ok
 test_in_progress_is_not_success (__main__.RemoteGuards) ... ok
 test_latest_actions_run_decides (__main__.RemoteGuards) ... ok
+test_main_proves_auth_even_with_zero_records (__main__.RemoteGuards) ... ok
 test_merge_commit_not_on_main_is_refused (__main__.RemoteGuards) ... ok
+test_more_than_one_page_of_check_runs_is_refused (__main__.RemoteGuards) ... ok
 test_non_actions_success_does_not_mask_an_actions_failure (__main__.RemoteGuards) ... ok
 test_true_facts_pass (__main__.RemoteGuards) ... ok
+test_verified_record_consults_the_evidence_check (__main__.RemoteGuards) ... ok
 
 ----------------------------------------------------------------------
-Ran 9 tests in 0.001s
+Ran 13 tests in 0.002s
 
 OK
+NOT AUTHENTICATED: gh api rate_limit reports a core limit of 60, which is the anonymous limit. Set GH_TOKEN (in CI: GH_TOKEN=${{ github.token }}).
+0 status records in ../../../../../../../var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp6uxlgno9.json: no entry claims IMPLEMENTED or VERIFIED, so there is no merge to prove. (The self-test step exercises this checker.)
 exit=0

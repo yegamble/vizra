@@ -111,6 +111,9 @@ def check_dsl_defaults(reqs):
                     f"A status comes only from a record in status_records.json; the DSL "
                     f"must leave every entry {want}.")
         ev = r.get("evidence")
+        tids = r.get("test_ids")
+        if not (type(tids) is list and len(tids) == 0):
+            errors.append(f"{r['id']}: HAND-ASSERTED test_ids in a section source; core.req always emits [].")
         if not (type(ev) is list and len(ev) == 0):
             errors.append(
                 f"{r['id']}: HAND-ASSERTED evidence in a section source. Evidence is "
@@ -125,9 +128,15 @@ def load_records(path):
     halves read one definition of a record.
     """
     errors = []
+    def no_duplicates(pairs):
+        keys = [k for k, _ in pairs]
+        dup = sorted({k for k in keys if keys.count(k) > 1})
+        if dup:
+            raise ValueError(f"duplicate key(s) {dup}; refused")
+        return dict(pairs)
     try:
         with open(path, encoding="utf-8") as fh:
-            doc = json.load(fh)
+            doc = json.load(fh, object_pairs_hook=no_duplicates)
     except FileNotFoundError:
         return None, [f"MISSING STATUS RECORDS: {path} does not exist. It must exist, even "
                       f"when empty, so that its absence cannot be mistaken for 'no claims'."]

@@ -33,7 +33,7 @@
     },
     {
       "name": "core8-verified-true-facts",
-      "why": "as above, and ci-required on 0cc906e is completed/success",
+      "why": "as above, ci-required on 0cc906e is completed/success, and the cited evidence file is on meta main with identical bytes (any file on main serves: this checker does not read verdict lines, the generator does)",
       "expect": "pass",
       "records_doc": {
         "schema": 1,
@@ -55,7 +55,7 @@
                 "pr": 8,
                 "verified_head": "0cc906ed35b804b18acac5dc74f0c9f2fda57e94",
                 "merge_commit": "f1972e8226e42a2bf837bd45e12f5f447dd3a92f",
-                "evidence_file": "docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md"
+                "evidence_file": "docs/evidence/warroom/2026-09-21-meta-pr3-validate-lane-VERIFY.md"
               }
             ]
           }
@@ -284,6 +284,39 @@
                 "pr": 3,
                 "verified_head": "f9b85537fa1f596b6d01556bd868e280e27c3570",
                 "merge_commit": "4920786599f40cb2dad0193b7828612e2c24581a"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "evidence-not-on-meta-main",
+      "why": "true merge and CI facts, but the evidence file exists only on the chair's records branch, not on meta main (fix round 2, R-3)",
+      "expect": [
+        "EVIDENCE NOT ON META MAIN — docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md"
+      ],
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "VERIFIED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra-core",
+                "pr": 8,
+                "verified_head": "0cc906ed35b804b18acac5dc74f0c9f2fda57e94",
+                "merge_commit": "f1972e8226e42a2bf837bd45e12f5f447dd3a92f",
+                "evidence_file": "docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md"
               }
             ]
           }
