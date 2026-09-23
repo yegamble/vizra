@@ -962,9 +962,41 @@ new sweep (decode-then-recurse)                                     :  5 members
    by any test — `tsc`, `eslint` and `vitest` were all green on it. Replaced with
    source-level escapes; the file is now ASCII apart from the prose em-dashes.
 
+### Phase 2 — PR A, fix round 2 of 2 (after verifier FAIL at `4158b10`)
+
+Blocker R2-E (a committed `.npmrc` `node-options` line blanked
+`PLAYWRIGHT_NO_COPY_PROMPT` inside the Playwright process with both static guards
+green) was treated as a class: three layers — static refusal of parser-readable
+routes (`.npmrc` default-deny, `NODE_OPTIONS`/`npm_config_*`/`CI` in any env map,
+`$GITHUB_ENV`/`$GITHUB_PATH`/`$GITHUB_STEP_SUMMARY` in run text and env values,
+YAML merge keys), a RUNTIME assertion in the Playwright worker
+(`e2e/harness/ci-environment.ts`), and an upload-gate refusal of any
+`# Page snapshot` in `redact-artifacts.sh`. R2-C: both redactors read one
+`redaction-patterns.json`; a 27-entry shared corpus pins both byte for byte (the
+round-1 shell redactor fails 26/95). Found while building it: Go's `\u0026`
+escaping of `&` also defeated the old query match. R2-A/B/D/G and 9(b) closed;
+details in the PR body and commit messages.
+
+| Commit | `npm run ci` on the commit's own tree (rest stashed) |
+|---|---|
+| `8cc6984` | exit 0 — 17 files / 518 tests / 0 skipped |
+| `38f22f3` | exit 0 — 18 files / 526 tests / 0 skipped |
+| `b998d72` | exit 0 — 18 files / 527 tests / 0 skipped |
+| `11f8975` | exit 0 — 18 files / 527 tests / 0 skipped |
+
+At `11f8975`: `require-checks_test.sh` 182/189/0; `npm run e2e:demos` 133 passed /
+0 blocked / 0 failed at load averages 260–450; corpus 95/95; hygiene 289 sources /
+13 ledger lines; ESLint 0 warnings; shellcheck clean.
+
+Own-process findings this round, recorded: the upload gate refused D9's real
+trace on the first run (the gate working — D9 now runs as CI does); placing the
+hygiene check first in `npm run ci` broke d8 (moved last); the Write tool's JSON
+turned a `\u0026` in the PR body into `&` (fixed before report; commit messages
+and AGENTS.md verified unaffected).
+
 ### Status
 
-PR A: IN_PROGRESS. PR B: PLANNED, blocked on PR A being verified and merged.
+PR A: READY_FOR_REVIEW at `11f8975` (fix round 2 of 2). PR B: PLANNED, blocked on PR A being verified and merged.
 Nothing is VERIFIED — that is an independent verifier's word, not mine.
 
 ---
