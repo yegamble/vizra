@@ -227,3 +227,219 @@ The slice's own goal was "every gate sentence claims no more than its control", 
 Both can be fixed by rewording alone. CI remains BLOCKED by billing.
 
 FINAL VERDICT: FAIL — SHA 617c6d92b34c1acb68556f5f02a5b12793344cf5
+
+---
+
+# Re-verification at 888a51b (closing slice, fix round 1 of 2)
+
+- **SHA under test:** `888a51b872f15fa5fa0ca9d323f4d06a9b12d166` (one commit on `617c6d9`).
+- **Head at start:** `gh pr view 5 --json headRefOid` = `888a51b872f15fa5fa0ca9d323f4d06a9b12d166`; `git ls-remote` `refs/heads/chore/m0-ci-hardening` and `refs/pull/5/head` = the same. State OPEN.
+- **Clone:** fresh clone in my own `mktemp -d …/scratchpad/vzv-search-pr5-888a-XXXXXX`, detached at the SHA.
+- **Host:** the same as above (darwin/arm64, go1.27.1, GNU Make 3.81, Python 3.9.6). **Nothing ran on GNU Make 4.3.**
+- **Scope:** `git diff --stat 617c6d9 888a51b -- Makefile api/ .github/` is empty. The Makefile's sha256 is `e9d7c58e…`, equal to its pin. The changed files are AGENTS.md, the evidence README, `closing/round1/` (7 transcripts), `ci-hardening-demo.py`, `ci-required-guard.py` (docstring only), `make-integrity-guard.py`, `makegate.py` and `scripts_test.go`.
+
+## R1. Lanes (run by me at 888a51b)
+
+| command | exit | counts / result |
+|---|---|---|
+| `make ci` (MAKEFLAGS, VERSION unset) | **0** | contract-drift 365 / 0 failures / none deselected; test-noskip **689 tests / 7 packages / 0 skipped / 0 failed**, every package at or above its floor; selftest 17/17 |
+| `go test -count=1 -v ./scripts/ ./internal/httpapi/` | **0** | **448 PASS / 0 FAIL / 0 SKIP**. The inventory test has 38 matched, 13 not-matched and 2 fails-closed subtests. The named-construct test has 41 subtests. `TestMakeIntegrityGuardStillRefusesKnownShapesInReviewedBytes` has 10. The M-4 test is 2/2, and each run logs 2 make processes, neither of which received any of the 12 planted names. The inventory's sites are `scripts/makegate.py:545` (a `("make", "gmake")` membership tuple, which the argv-literal rule matches) and `:636` (run_make). |
+| `env -i … bash scripts/ci-required-guard.sh` | **0** | 11 required checks |
+| `env -i … ./scripts/make-integrity-guard.sh --workflow` | **0** | make ran 21 times, and the final `make -q` ran |
+| `env -i … python3 scripts/vendor-contract.py --check` | **0** | OK |
+
+The builder's local numbers reproduce: 689/0 skips, 448 PASS, guards 0. The demo result is in R3.
+
+## R2. The new tests against 617c6d9's gate files, then restored
+
+This is a worktree at 888a51b with `git checkout 617c6d9 -- scripts/makegate.py scripts/make-integrity-guard.py scripts/ci-required-guard.py`. The command is `go test -count=1 -v -run 'TestNamedMakefileConstructsAreRefusedBeforeMake|TestMakeIntegrityGuardStillRefusesKnownShapesInReviewedBytes|TestEnvironmentTakenVariablesNeverReachMake' ./scripts/`.
+
+| state | exit | result |
+|---|---|---|
+| 617c6d9 gate files + 888a51b tests | **1** | **20 FAIL / 36 PASS / 0 SKIP.** 13 new pre-make rows fail with `want "<refusal>" refused with 0 make processes started`: inline `;` ×3, two targets, `&:`, a non-first special target, `$(I)ORE:`, whitespace, backslash, computed name global/target-specific, `define`, `$(call eval,…)`. Both new anchor rows fail with `exit 0, want a refusal naming …`: the conditional within the test recipe, and the ci line whose comment holds `=`. Both M-4 callers fail: the make processes received `VZ_M4_SUBST,Q,VZ_M4_ORIGIN,VZ_M4_VALUE,VZ_M4_EARLY,VZ_M4_IFDEF`. Each row is red for its stated reason. |
+| restored (`git checkout 888a51b -- scripts/`, status clean) | **0** | 56 PASS / 0 FAIL / 0 SKIP |
+
+**Inventory BEFORE:** in a worktree at 617c6d9 with only the new demo copied in, I ran `ci-hardening-demo.py --only R11` … `R16`. Every row gave `MUTATED : exit 0 -> *** NOT RED AS DECLARED` and `RESTORED: exit 0 -> GREEN`, and the harness exited 1. This matches `closing/round1/inventory-planted-forms-at-617c6d9-BEFORE.txt`.
+
+## R3. Demo, rows R01–R16
+`python3 scripts/ci-hardening-demo.py` at 888a51b exited **0** with **70/70 rows behaved as declared**. In R01–R16 every row gave `MUTATED : exit 1 -> RED as declared`, was restored byte-identical (16/16), and gave `RESTORED: exit 0 -> GREEN`. The output has no `NOT RED`, `NOT IDENTICAL` or `STILL RED` anywhere. **16/16 reproduced.**
+
+**GitHub CI on 888a51b** (`gh api …/check-runs`, not re-run): 12 jobs failed and GitGuardian succeeded. The `ci-required` annotation reads "The job was not started because recent account payments have failed …". **CI: BLOCKED (billing).**
+
+## R4. The committed functions on inert strings (no Makefile written, none run)
+`makegate.reviewed_bytes_problems("Makefile", s)`, number of problems:
+
+| refused (≥1) | NOT refused (0) |
+|---|---|
+| `t: ; +true`, `t: ; $@x`, `test: ; -true`, `t:;-true`, `t : ; -true`, `t:: ; -true`, `lint foo:⏎⇥-true`, `a b: ; x` (2), `a &: b`, `x .IGNORE:`, `$(T): ; -true` (2), ` t: ; -true` (2), `t: \⏎ ; -true` (2), `$(M)AKEFLAGS += -i`, `test: $(S)HELL = x`, `define $(X)`, `ifeq (a,b)⏎foo: ; -true⏎endif` | **`test: ; -go test -run=Foo ./...`**, **`test: dep ; -false X=1`**, **`test: ; @echo a=b`**, **`private foo: ; -true`**, **`override foo: ; -true`**, **`private foo:⏎⇥-true`**, **`override a b:`**, **`private a b &: ; -true`**, **`undefine foo: ; -true`**, **`load foo: ; -true`**; and, correctly not refused: `test: X = 1`, `test: X = a;b`, `test: X=1 ; -true` (a target-specific value), `export foo: ; -true`, `unexport foo: ; -true`, `vpath foo: ; -true` |
+
+`makegate._MANUFACTURES_DIRECTIVES_RE`:
+- It matches `$(call eval,…)`, `$(call guile,…)`, `$(call $(F),…)`, `${call eval,…}`, `$(call  eval,…)`, `$(call $F,…)` and `$(foreach f,eval,$(call $f,x))`.
+- It does not match `$(call ev$(A)al,x)`.
+- It correctly does not match `X := $(call foo,eval)`.
+
+`make-integrity-guard.logical_recipe_lines(lines, 1)`:
+- A plain conditional inside a recipe (`test:`, `⇥go test`, `ifeq (a,b)`, `⇥-false`, `else`, `⇥true`, `endif`, `⇥-x`) returns all four TAB lines, which is correct.
+- **`test:`, `⇥go test`, `ifeq (a,b)`, `X := 1`, `endif`, `⇥-false` returns `[(2, 'go test')]`.** The same happens with `foo:` in place of `X := 1`. The reader stops at the first non-TAB line inside the branch, so `-false` after `endif` is not read.
+
+## R5. By reading
+- **Is KEEP_ENV safe? Acceptable, and disclosed.**
+  - Of the kept names, `SHELL` is the only one the Makefile mentions. Make never takes SHELL from the environment (GNU Make manual §5.3.2), and the Makefile assigns it at :25.
+  - KEEP_ENV subtracts only from `environment_words`, not from `environment_taken`. A kept name referenced as `$(NAME)` and never assigned (a future `$(HOME)`) is therefore still dropped from gate make processes, and the `--workflow` anchor would refuse it. That fails closed.
+  - The remaining reach is a future reviewed Makefile that reads a kept name another way (`$(HOME:a=b)`, `ifdef TERM`, `$(origin TZ)`), combined with an earlier step setting it. That is the declared "earlier step" and "variables outside the named set" residual. The sentence names the keep-list.
+- **Does conditional stepping match make? No, in one case (FINDING 10).**
+  - make ignores every line of a false branch, including assignments and rule lines. In read.c the `ignoring` check comes before an assignment ends the rule context. So a recipe continues after `endif`.
+  - The reader continues only over TAB lines and conditional keywords. The branch-stepping itself is right: R08 reproduces, and both branches are read.
+- **Is the anchor's narrower refusal stated accurately? Yes, with one misleading word (FINDING 13).**
+  - AGENTS.md:500-508 says `$(NAME)`/`${NAME}` only. The anchor docstring (:61-64), the `check_environment_overrides` message and ci-required-guard's docstring all say the same.
+  - The word "instead" at AGENTS.md:506 is the problem: "every make process the gate starts runs without it instead". The lane's own pinned `make` step is not a gate process.
+
+## R6. Changed sentences under "no false-guarantee merges"
+
+| sentence | verdict |
+|---|---|
+| FINDING 6: AGENTS.md:524-549 and scripts_test.go:1276-1311. They cover a flag with one argument, a Go dot-import, Python star-imports, and argv literals anywhere. The review-only list adds `nice`, `env -S`, `getattr`, `importlib` and concatenation. | **Accurate**, backed by R11–R16 and the matched and not-matched rows. The argv-literal rule over-matches in the safe direction: the `("make", "gmake")` membership tuple at makegate.py:545 is a site. |
+| FINDING 7: AGENTS.md:589-596 and makegate docstring step 3. Every word except the keep-list is dropped; a name assembled from parts is not. | **Accurate** (R10, and R2 for the M-4 rows). |
+| FINDING 8: README "restores the form e068e07 matched" | **Accurate** (R16). |
+| Anchor env refusal: AGENTS.md:500-508, anchor docstring :61-64, ci-required-guard docstring | Accurate except "instead" (FINDING 13, SHOULD). |
+| M-2: "a variable name that is an expansion in any assignment … or `define` … refused outright"; "a rule target that is an expansion" | **Accurate** for the evaluated forms. |
+| `$(eval …)` "refused directly and through `$(call eval,…)`, `$(call guile,…)` or `$(call $(F),…)`" (AGENTS.md:569-571, makegate:33-34) | Accurate as a list of spellings. The README's reason, "because `call` runs the built-in of that name", also applies to `$(call ev$(A)al,…)`, which is not matched (FINDING 12, SHOULD). |
+| **FINDING 5 fix:** "any rule line naming more than one target", "a rule with an inline `;` recipe (`t: ; -true`) … refused", "every recipe line is a TAB line" (AGENTS.md:575-580); makegate docstring :42-47 and :400-404; anchor docstring :44-47, :93-97 and :411-414 ("makegate has already refused, before make, every rule line the reading could misattribute"); README:9-10 | **OVERCLAIMS.** Two cases are missed: an inline recipe whose text contains `=` (FINDING 9), and a rule line whose first word is `private`/`override` (and `undefine`/`load` on 3.81) (FINDING 11). |
+| "recipe lines read through conditional directives" (AGENTS.md:627); "the TAB lines of EVERY branch are read" (anchor :469-471); "steps over conditional directives, as make does" (README:21) | **OVERCLAIMS**: a non-TAB line inside a branch ends the reading (FINDING 10). |
+| Closure "read with comments stripped" | **Accurate** (R09). |
+| NITs from 617c6d9 | Closed: README "above"; the go1.26.2 header explained; the M-4 `t.Logf` now guarded by `!t.Failed()`. |
+
+## R7. Scope and deleted-line audit (`617c6d9..888a51b`)
+- The Makefile, its pin, `.github/` and `api/` are unchanged.
+- **Assertions:**
+  - The only deleted assertion is the M-4 `t.Errorf`, re-added with "can read" wording.
+  - The anchor's `RULE_RE` was replaced by makegate's `_rule_parts`. No `g.fail` was removed.
+  - The M-4 test now runs on a re-pinned copy: the real Makefile plus an inert block. It still plants VERSION, COMMIT, CORE and GOFLAGS, adds 8 names, and still asserts each make process.
+- No `t.Skip` was added. 0 skips in every run. **No weakened assertion found.**
+
+## Findings (fix round 1)
+
+```
+FINDING 9: an inline `;` recipe whose command text contains `=` is not refused
+Severity:    REQUIRED  (the FINDING 5 fix is incomplete, and its sentences say this shape is refused)
+Confidence:  high for the code path (evaluated). make's parse, read by me from GNU make's read.c and not measured: the
+             rule line is cut at the first unquoted `;` BEFORE make tests for a target-specific assignment, and only
+             the text before the `;` can make it one.
+Affected:
+  repo:      vizra-search
+  files:     scripts/makegate.py:417 (`if "=" not in bare_rest and ";" in bare_rest:`), where `=` ANYWHERE in the rest
+             suppresses the refusal; scripts/make-integrity-guard.py:444-446 (the closure skips such a rest as an
+             assignment); sentences AGENTS.md:578-580, makegate.py:45-46 and :402, make-integrity-guard.py:45-47, :96,
+             :413, README:9
+  requirements: VZ-CI-ANCHOR-DIGEST (proposed)
+Observed:    reviewed_bytes_problems gives 0 problems for `test: ; -go test -run=Foo ./...`, for `test: dep ; -false X=1`
+             and for `test: ; @echo a=b`, and 1 problem for `test: ; -true`.
+Failure:     A pinned `test: ; -go test -race -count=1 $(PKG) -run=.` (any flag written `-x=y`) passes makegate. The anchor
+             reads only the TAB lines after `test:`, so it sees no recipe, and the dry-run prints the command without
+             the `-`. The lane's failure is ignored. This needs reviewed bytes.
+Recommendation: follow make: cut `rest` at its first `;` outside expansions, and treat the rule as a target-specific
+             assignment only if the text BEFORE the `;` has a bare `=`; otherwise refuse the inline recipe. Apply the same
+             cut in prerequisite_closure.
+Acceptance criteria: the three spellings above are red before make with 0 make processes; `test: X = a;b` and
+             `test: X=1 ; y` (target-specific values) stay green.
+Tests:       rows in TestNamedMakefileConstructsAreRefusedBeforeMake, plus a control row for `test: X = a;b`.
+Cross-repo:  core: unexamined. user/meta: none.
+Challenge:   the builder may say `=` after `;` is ambiguous. It is not: make decides from the text before the `;`.
+```
+
+```
+FINDING 10: the recipe reader stops at a non-TAB line inside a conditional branch make ignores
+Severity:    REQUIRED  (the sentences say every branch is read)
+Confidence:  high for the code path (evaluated). make semantics per GNU Make manual §7.2 (the false branch's text is
+             ignored) and read.c (in an ignored branch an assignment or rule line does not end the rule context). Not
+             measured.
+Affected:    scripts/make-integrity-guard.py:480-484 (conditional keywords are stepped over; any other non-TAB line
+             `break`s); sentences AGENTS.md:627, make-integrity-guard.py:44-45 and :469-471, README:21
+Observed:    logical_recipe_lines(["test:","\tgo test","ifeq (a,b)","X := 1","endif","\t-false"], 1) gives
+             [(2, 'go test')]. The same happens with `foo:` in place of `X := 1`.
+Failure:     In a pinned Makefile, `test:` followed by `⇥go test …`, `ifeq (a,b)`, any non-TAB line, `endif` and
+             `⇥-false`: make runs `-false` as part of test's recipe, and the anchor never reads it.
+Recommendation: while inside a conditional opened within the recipe (depth > 0), skip non-TAB lines instead of
+             stopping. Stop only at depth 0. Reading TAB lines that make would give a different rule is over-scanning,
+             which fails safe.
+Acceptance criteria: the fixture above is red ("prefixed `-`"), and the clean Makefile stays green.
+Tests:       a row next to "- prefix inside a conditional within the test recipe" in reviewedBytesEvasions.
+Cross-repo:  core: unexamined.
+Challenge:   a non-TAB line inside a recipe's conditional is unusual. So is everything this list refuses; the sentence
+             says "EVERY branch".
+```
+
+```
+FINDING 11: rule lines whose first word is `private` or `override` (and, on GNU Make 3.81, `undefine` or `load`) are exempt
+Severity:    REQUIRED  (the sentences say every multi-target and inline-`;` rule line is refused)
+Confidence:  medium. The code path is certain (evaluated). How make parses these lines comes from its source as I read it,
+             and I did not measure it:
+               - 3.81 has no `private`, `undefine` or `load` keyword (they arrived in 3.82 and 4.0), so
+                 `private foo: ; -true` is a two-target rule there;
+               - in 4.x, parse_var_assignment returns a non-assignment line unchanged, and no directive handles a
+                 leading `private` or `override`, so the line is parsed as a rule.
+Affected:    scripts/makegate.py:293-294 (`_DIRECTIVES` includes private, override, undefine, load) and :406-408
+             (such a first word returns []); the same sentences as FINDING 9
+Observed:    0 problems for `private foo: ; -true`, `override foo: ; -true`, `private foo:⏎⇥-true`,
+             `override a b:`, `private a b &: ; -true`, `undefine foo: ; -true` and `load foo: ; -true`.
+             `export` and `unexport` lines are correctly exempt, because make handles them as export directives.
+Failure:     For a closure prerequisite `foo` written as `private foo:`, the anchor's `^foo\s*:` finds no definition, so
+             foo is only a "note" and its recipe (TAB or inline) is not read. A gate SEED written that way is red ("not
+             defined"), so the exposure is non-seed closure targets.
+Recommendation: exempt only lines that are assignments, which `_rule_parts` already detects. For `private`, `override`,
+             `undefine` and `load` lines that are not assignments, apply the rule checks, or refuse such a line outright.
+Acceptance criteria: the evaluated spellings are red before make; `override X := 1` and `private X = 1` stay green.
+Tests:       rows in TestNamedMakefileConstructsAreRefusedBeforeMake.
+Cross-repo:  none known.
+Challenge:   make 4.x might reject `override foo:` differently from how I read it. If so, the row is red either way and costs
+             nothing.
+```
+
+```
+FINDING 12: `$(call ev$(A)al,…)` is not matched
+Severity: SHOULD   Confidence: high (evaluated)
+Affected: makegate.py:108 (_MANUFACTURES_DIRECTIVES_RE); README:14 ("because `call` runs the built-in of that name")
+The listed spellings are accurate. A partly computed function name in `call` is not listed and not matched. Either refuse
+`$(call` whose first argument contains `$` anywhere before the comma, or list it as not refused.
+```
+
+```
+FINDING 13: "every make process the gate starts runs without it instead" can read as covering the lane's own make step
+Severity: SHOULD   Confidence: high (reading)
+Affected: AGENTS.md:505-507
+The pinned workflow `make` step is not a gate process. A name the Makefile reads as `$V`, `ifdef V` and so on, if planted
+by an earlier step, reaches that make: the anchor does not refuse it, and nothing drops it. Today's Makefile has no such
+read. Add "the pinned workflow make step still receives it".
+```
+
+## What did not run (fix round 1)
+- **GitHub CI:** BLOCKED (billing).
+- **GNU Make 4.3:** nothing ran on it.
+- **Live make behaviour of FINDINGS 9–11:** not measured, because the brief forbids authoring or running Makefiles. The code paths were evaluated; the make semantics come from the manual and my reading of make's source.
+- **Safety classifier:** no stop occurred.
+
+## Instruction-shaped text
+None observed in any tool output.
+
+## Cleanup (fix round 1)
+My worktrees (`wt-mix`, `wt-617`) and my `mktemp -d` directory are removed by exact path (see below). The demo removed its own temp copy.
+
+## Verdict at 888a51b
+**What holds:**
+- Every lane is green locally, and the builder's numbers reproduce: 689/0 skips, 448 PASS, demo 70/70, guards and vendor check 0.
+- Every new test goes red on 617c6d9's gate files for its stated reason (20 FAIL), and green when restored.
+- R01–R16 reproduce, and R11–R16 are missed by 617c6d9's inventory.
+- FINDINGS 6, 7 and 8 and the 3 NITs are closed.
+- The Makefile, its pin, `.github/` and `api/` are unchanged, and no assertion was weakened.
+
+**What fails:** the FINDING 5 fix is incomplete in three places. Its sentences say these shapes are refused or read, and they are not:
+- FINDING 9: an inline `;` recipe containing `=`.
+- FINDING 10: a non-TAB line inside a recipe's conditional ends the reading.
+- FINDING 11: `private`/`override` rule lines are exempt.
+
+These three are REQUIRED under the "no false-guarantee merges" rule; FINDINGS 12 and 13 are SHOULD. CI remains BLOCKED by billing.
+
+
+**Head at end (888a51b):** `gh pr view 5 --json headRefOid` = `888a51b872f15fa5fa0ca9d323f4d06a9b12d166`; `git ls-remote` `refs/heads/chore/m0-ci-hardening` and `refs/pull/5/head` = the same. The head did not move. The scratch clone `vzv-search-pr5-888a-QqaK84` and its two worktrees were removed by exact path.
+
+FINAL VERDICT: FAIL — SHA 888a51b872f15fa5fa0ca9d323f4d06a9b12d166
