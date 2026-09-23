@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 206 — core B3 READY_FOR_REVIEW as **core #12** at `6edaf83` (N-7/F-1 500-path redaction + all httpapi log sites through `obs.Redact`; AST log-site coverage test with a pinned site count and 16 planted shapes; L-2 cancelled ctx no longer flips the limiter to degraded; floors raised; M1–M7; CI `ci-required` green, `image-scan` pre-existing red) → fresh verifier. Chair removed 168 leaked `vizra-healthcheck-bin-*` temp dirs (6.1 GB; this project's own test output) → 30 GiB free; the leak itself queued as 2s. In flight: verifier on core #12, core 2p, meta 2i, user Q3 PR + PR B plan amendment. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 210 — user PR B plan: seat confirmed C1/C4 of r3; R3-1 (Lane B must not let a fixture-supplied browser bring unscreened launch options) and R3-2 (count signals observed, not written; write failures; tokens) → plan r4. The builder deviated from R3-1's literal "refuse launch at any time" because Playwright launches the worker's own browser through the same patched `launch` (creation-guard.ts:82-83, :297-298) — r4 allows one screened launch per worker; chair proposes the single launch must deep-equal the Lane-B config's `launchOptions` (a key allowlist admitting `args` would admit `--proxy-server`) → seat checking. Q-r3-1: no benign-header list (O-1 expiry; residual R-13). In flight: verifiers on core #12 and user #10, core 2p, meta 2i, seat check of r4. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -168,6 +168,8 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 210 (2026-09-23) — PR B plan r4 (R3-1 deviation: one screened launch per worker; chair proposes deep-equality) → seat check.
+- Tick 207–209 (2026-09-23) — PR B plan r2/r3 seat passes; F8 verbatim text recorded; user #10 (pixels off) → verifier.
 - Tick 206 (2026-09-23) — core #12 (B3) ready at `6edaf83` → verifier; leaked test temp dirs removed (6.1 GB); queue 2s.
 - Tick 205 (2026-09-23) — core #11 merged (`96d19b3`); 8 merges today; core 2p dispatched.
 - Tick 204 (2026-09-23) — user #9 merged (`783483f`); PR B plan approved with required changes (F1 blocker); Q3 pixel-channels PR now; queue 2r.
