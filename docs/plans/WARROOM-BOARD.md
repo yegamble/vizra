@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 239 — **meta #7 MERGED** `939b32d` → `608ffbf` (war-room records on main + CODEOWNERS wording sweep; verifier PASS, `ci-required` green on the verified SHA, head unmoved, the body NIT corrected without a commit). **Merged today: 12.** Chair records now go by short PRs against main (branch `chore/warroom-records-2026-09-23b`); the old records branch is retired. Sentinel-pr on core #15 at `96b8999`: nothing blocks; 5 NIT (F-1/F-2 R1 `-timeout 8m` doc claims, F-3 non-unix compile break in `internal/testtmp`, F-4 floors not raised for the new leak tests, F-5 absolute temp path in evidence) + Q-1…Q-3; to be batched with the verifier's verdict. Core #14 fix-round builder had stopped before pushing; resumed. In flight: core #14 fix, core #15 verifier, user #10 re-plan builder, meta 2j (builder `a2e0c4efc60a7a6be`). History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 240 — meta #7's merge made meta #6's self-test fixture `evidence-not-on-meta-main` false: it names a real evidence file that 2u landed on main, so `validate` is red for EVERY meta PR (#8, #9) → queue **2x** (reserved never-committed fixture path, remote-cases.json only) dispatched to `a2e0c4efc60a7a6be`; #8 (2j, `3572218`, required-checks.txt comments) is sequenced after 2x. Rule R24 added (fixtures must not depend on mutable facts). User #10 at `03baf75` (3 more gate refusals, G3 scope wording, CI 8/8) held for one R1 comment at `e2e/harness/recorders.ts:44` + its ledger lines, then a fresh verifier + sentinel-pr. Meta #7 merged earlier this tick (`608ffbf`); 12 merges today. In flight: core #14 fix, core #15 verifier, user #10 comment fix, meta 2x. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -176,6 +176,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 240 (2026-09-23) — meta self-test fixture broken by #7's merge → 2x; R24; user #10 READY at `03baf75`, held for recorders.ts:44 (R1).
 - Tick 239 (2026-09-23) — meta #7 merged (`608ffbf`); 12 merges today; sentinel-pr core #15: 5 NIT, none blocking; core #14 fix builder resumed.
 - Tick 238 (2026-09-23) — core #14 verifier PASS; sentinel findings consolidated into fix round 1 of 2.
 - Tick 237 (2026-09-23) — core #15 (test stability) → verifier + sentinel-pr.
