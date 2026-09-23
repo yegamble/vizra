@@ -137,3 +137,20 @@ Measurement tests that pass on both:
 - the live-request DeadlineExceeded case, which exists to catch V1;
 - `TestTheRequestsOwnCancellation…`;
 - `TestTheEmailValidatorRefusesInvalidUTF8`.
+
+Fix round 1 results. Head **`1d57ad88cb653917a0c70b4e4b4a2a9e1c4b4cd3`**: one commit, a fast-forward from 75e0a95. `66ec2bb` was amended to add only the floors.
+
+| Command | Rev | Exit | Result |
+|---|---|---|---|
+| `./docs/evidence/m1a-owner-claim/demonstrate.sh` (Valkey, PostgreSQL 18.6) | 66ec2bb | 0 | **passed 62, failed 0, harness-fail 0** (`r1/demonstrate.txt`) |
+| `make ci` | 66ec2bb, 1d57ad8 | 0, 0 | all lanes passed |
+| unit `go test -race -count=1 -json ./...` + report | 66ec2bb | 0/0 | 1585 executed, 0 skips |
+| integration Valkey 9.1.2 plain / shuffled | 66ec2bb | 0/0, 0/0 | 1782 / 1782 |
+| integration Redis 7.2.16 plain / shuffled | 66ec2bb | 0/0, 0/0 | 1782 / 1782 |
+| `--emit-floors` | 66ec2bb | — | httpapi 86→93, ownerclaim 18→20, integration 165→167, min_tests 1347 / 1515; applied in 1d57ad8; all five streams re-judged: ok |
+
+Mutations (`r1/mut-*.txt`):
+- V1 (the verifier's): RED.
+- R1: RED.
+- R2 and R2b: RED.
+- R3: RED.
