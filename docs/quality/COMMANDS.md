@@ -113,7 +113,7 @@ It is a change detector, not a set comparison: an undeclared generated file that
 is already committed and that the run rewrites byte-identically moves nothing in
 `git status` and is not reported. Nothing like that exists today — `build.py`
 writes exactly one file — and adding a second output means editing `build.py`,
-which is a CODEOWNERS path.
+a change visible in the PR diff. CODEOWNERS is advisory; the war room's verifier-gated merge is the only review.
 
 It then re-runs the generator once under
 `LC_ALL=C LANG=POSIX PYTHONCOERCECLOCALE=0 PYTHONUTF8=0` and requires

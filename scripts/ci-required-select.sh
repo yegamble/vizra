@@ -9,7 +9,8 @@
 # exits 0 only when every required check completed with `success`.
 #
 # It is a script rather than an inline workflow step so it can be run and
-# demonstrated outside GitHub Actions. CODEOWNERS puts it under owner review.
+# demonstrated outside GitHub Actions. CODEOWNERS names the owner for
+# it, but CODEOWNERS is advisory; the war room's verifier-gated merge is the only review.
 #
 # Duplicate names. A SHA can carry more than one check-run with the same name —
 # a re-run, or two workflows defining the same job name. The previous version

@@ -88,3 +88,21 @@ binding the moment that repo exists.
   mantra is: *"Implemented in Go" is not the same thing as "Vizra has this
   feature"* — and whose second job is catching scope that quietly vanished
   from the ledger.
+
+## The sentinel team (proactive, Greptile-style)
+
+Four agents under `.claude/agents/sentinel/` hunt for broken things that nobody has asked about. They confirm every finding by execution, never fix anything themselves, and route what they find through the war room.
+
+| Agent | Finds |
+|---|---|
+| `vizra-sentinel-workflows` | Documented operator, developer and CI workflows that do not work as written. It runs them on current `main`, following the catalogue in `docs/sentinel/WORKFLOWS.md`. |
+| `vizra-sentinel-bugs` | Bugs in merged code. It maps an area's call paths across repos, interrogates the failure paths, and confirms each bug with a failing test. |
+| `vizra-sentinel-contracts` | Drift between OpenAPI, handlers, clients, vendored copies, config names, CI manifests, and doc or ledger claims. |
+| `vizra-sentinel-pr` | Blast-radius review of an open PR against the whole codebase, alongside the verifier. It posts nothing publicly unless asked. |
+
+Run a sweep with `/sentinel` (see `.claude/commands/sentinel.md`); `/warroom` also schedules sweeps when builder slots are free.
+- Learned rules: `docs/sentinel/RULES.md`.
+- Findings register: `docs/sentinel/FINDINGS.md` (the chair edits it).
+- Sweep outputs: `docs/sentinel/sweeps/` and `docs/sentinel/pr/`.
+
+New agent definitions register at session start. Until then, dispatch `general-purpose` agents told to follow the role file.
