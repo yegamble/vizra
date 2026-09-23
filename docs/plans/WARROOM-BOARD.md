@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 220 — sentinel MAJOR spot-check (fresh verifier): all four reproduced; S-0013 (getting-started does not boot; the template test substitutes a DSN — a false-positive CI test) and S-0014 (`/setup/claim` leads nowhere; only a raw `POST /api/v1/setup/claim-owner` works) CONFIRMED MAJOR; S-0011 and S-0012 lowered to MINOR (no documented single-namespace deployment; degraded text only). Workflow sentinel's role now requires citing the doc line that puts a failing workflow on a documented path before BLOCKER/MAJOR. Sentinel totals: 19 confirmed (2 MAJOR, 13 MINOR, 4 NIT), 0 false positives, 2 severity corrections. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 221 — meta #6 (ledger status gate) **FAIL at `36913d2`**: builder's refusals confirmed correct and all lanes reproduced, but a status reaches `features.json` from a section source with every lane green (extra `"status"` key; `str` subclass; wrapped DSL check); two online guards (non-main base, non-Actions `ci-required`) untested; four sentences overclaim; free-text verdict qualifiers admitted. Ruling (R5/R7): an out-of-process check over the generated `features.json` (exact keys; status/evidence ids == record ids), tests for the two guards, docs narrowed, qualifier allowlist → round 1 of 2. In flight: fixes on meta #6, core #12, user #10; core 2p. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -171,6 +171,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 221 (2026-09-23) — meta #6 FAIL at `36913d2` (status reaches the output from a section source); output-side check ruled, round 1 of 2.
 - Tick 220 (2026-09-23) — sentinel spot-check: 2 MAJOR confirmed, 2 lowered to MINOR; workflow sentinel severity rule tightened.
 - Tick 219 (2026-09-23) — quiet.
 - Tick 218 (2026-09-23) — sentinel workflows sweep: 10 confirmed (4 MAJOR) → 2v; rules R19–R21; MAJOR spot-check dispatched.
