@@ -26,3 +26,14 @@ Non-goals: queue 2o, S-0021, anything outside test timing/cleanup.
 
 ## Blockers and handoff
 None. State: READY_FOR_REVIEW. Next: independent verifier on #15.
+
+## Fix round 1 (verifier FAIL at 96b8999 + PR sentinel)
+- One commit `434abe5dd4332e7291820f0f8555b9d33e4d2bbc`, fast-forward from 96b8999 (21 files, +215/-103).
+- T4 compiling variant; red `testtmp_test.go:74` (was `[build failed]`); T1-T4 re-recorded, none a build failure; paths scrubbed.
+- `-timeout 8m` on fixtures.yml:136 (not pinned; guard green) and README; lanes.sh runs pinned bodies.
+- `testtmp_other.go` (!unix); GOOS=windows vet fixtures and integration: exit 1 at 96b8999, exit 0 now.
+- Floors fixtures 36->37 (both), integration 144->145 (generator on the final run); generator's other proposals (scripts 419, min_tests 1331/1476) left for the floor owner.
+- Limits stated in COMMANDS.md + testtmp doc. Evidence numbers corrected (75 fixtures; 143.5s; 7.8-10.8 / 4.5-5.8 min).
+- Lanes on 8f96cd6 (= fix tree minus floors/evidence): make ci 0, fixtures-verify 0, unit 1566/0/0, integration valkey/redis plain+shuffled 1737/0/0 each, 0 leftovers; raised floors judged against those events: 5x exit 0.
+- CI on 434abe5: ci-required, build-test, cache-matrix + legs, fixtures (step ran with -timeout 8m), govulncheck, append-only, docker-build, GitGuardian pass; image-scan fail (not required, as on main).
+- State READY_FOR_REVIEW; not merged.
