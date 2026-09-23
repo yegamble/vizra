@@ -292,9 +292,9 @@
     },
     {
       "name": "evidence-not-on-meta-main",
-      "why": "true merge and CI facts, but the evidence file exists only on the chair's records branch, not on meta main (fix round 2, R-3)",
+      "why": "true merge and CI facts, but the evidence path is reserved for this fixture and must never be committed anywhere, so it is never on meta main. The first version named a real records-branch file, which went stale when queue 2u landed it on main (meta #7).",
       "expect": [
-        "EVIDENCE NOT ON META MAIN — docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md"
+        "EVIDENCE NOT ON META MAIN — docs/evidence/warroom/SELF-TEST-FIXTURE-NEVER-ON-MAIN-VERIFY.md"
       ],
       "records_doc": {
         "schema": 1,
@@ -316,7 +316,7 @@
                 "pr": 8,
                 "verified_head": "0cc906ed35b804b18acac5dc74f0c9f2fda57e94",
                 "merge_commit": "f1972e8226e42a2bf837bd45e12f5f447dd3a92f",
-                "evidence_file": "docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md"
+                "evidence_file": "docs/evidence/warroom/SELF-TEST-FIXTURE-NEVER-ON-MAIN-VERIFY.md"
               }
             ]
           }
