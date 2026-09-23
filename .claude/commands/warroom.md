@@ -25,6 +25,8 @@ On FAIL, send the findings to the same builder with SendMessage. Two rounds at m
 ## 4. Dispatch
 Pick the next dependency-ready slices in milestone order. One writer per repo. At most three builders at once (disk and attention are both finite). `vizra-core`'s builder is the single owner of `api/openapi.yaml` and migrations for the slice; others consume a recorded SHA. Each dispatch carries a slice brief: repo, checkout path, branch, acceptance IDs, the plan section and ADRs to read, the demonstrations required, what is out of scope, and why the slice matters to what comes next. Dispatch independent slices in one message so they run concurrently; do not wait on them.
 
+**Proactive sweep:** when a builder slot is free and fewer than two sentinel hunters are running, and at least four hours have passed since the last sweep (or a batch of three or more merges just landed), run `/sentinel sweep`. It counts against the three-agent cap. Its confirmed findings enter the queue by severity like any other slice, so the war room fixes what is broken on `main`, not only what is on the plan.
+
 Design-dependent UI slices need an accepted design. Mockups under `docs/design/claude-design/` are exploration input; the approved Figma components and tokens mirrored in the repo are the source (docs/DESIGN_BRIEF.md). Where a page has no design, the design track produces it in Figma and the owner accepts it before the UI slice is dispatched.
 
 ## 5. Record
