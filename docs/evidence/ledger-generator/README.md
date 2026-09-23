@@ -6,4 +6,4 @@
 python3 build.py ../../quality/features.json
 ```
 
-Last run 2026-09-15 (after the open-questions ratification): `OK 190 requirements; core=141` (exit 0). This is documentation tooling, not application code. Edit the sources, regenerate, and commit both; do not hand-edit the JSON. A CI check that reruns the validator belongs to milestone M0 (VZ-CI-001).
+Last run 2026-09-23 (after VZ-AUDIT-001 was added): `OK 192 requirements; core=142` (exit 0). Earlier: 2026-09-15, after the open-questions ratification, `OK 190 requirements; core=141`. This is documentation tooling, not application code. Edit the sources, regenerate, and commit both; do not hand-edit the JSON. A CI check that reruns the validator belongs to milestone M0 (VZ-CI-001).

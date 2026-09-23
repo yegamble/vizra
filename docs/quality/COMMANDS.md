@@ -101,8 +101,8 @@ leaves a truncated `features.json`; PEP 538's C-locale coercion is what
 normally masks it, which is why both variables are needed to see it.
 
 Last run: **exit 0**, `generated ledger reproduces byte-for-byte:
-docs/quality/features.json (UTF-8 and C/POSIX locales)` (191 requirements,
-core=141).
+docs/quality/features.json (UTF-8 and C/POSIX locales)` (192 requirements,
+core=142; 2026-09-23, after VZ-AUDIT-001 was added).
 
 To regenerate after editing a generator source — and you must commit both:
 
@@ -110,7 +110,7 @@ To regenerate after editing a generator source — and you must commit both:
 (cd docs/evidence/ledger-generator && python3 build.py ../../quality/features.json)
 ```
 
-Last run: **exit 0**, `OK 191 requirements; core=141`.
+Last run: **exit 0**, `OK 192 requirements; core=142` (2026-09-23).
 
 ### 2. Quality JSON parses and every requirement id resolves
 
@@ -146,7 +146,7 @@ to one requirement and resolves as such. Only a reference read **as** a range
 that cannot be made sense of — descending, or implausibly long — is a **named
 failure**, never a silent skip.
 
-Last run: **exit 0** — 4 JSON files parsed, 191 requirement ids in the ledger,
+Last run: **exit 0** — 4 JSON files parsed, 192 requirement ids in the ledger,
 191 written references expanded to 287 ids (204 distinct) across 14 documents,
 every one resolving.
 

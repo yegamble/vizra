@@ -37,9 +37,9 @@
     "meta_repo_parity_with_vidra": "mechanism mirrored from the Vidra meta repo by owner direction"
   },
   "summary": {
-    "total": 191,
-    "core_profile": 141,
-    "full_profile": 191,
+    "total": 192,
+    "core_profile": 142,
+    "full_profile": 192,
     "by_area": {
       "activitypub": 4,
       "admin": 26,
@@ -49,7 +49,7 @@
       "community": 19,
       "design": 4,
       "foundation": 8,
-      "identity": 14,
+      "identity": 15,
       "import": 4,
       "install": 4,
       "ipfs": 2,
@@ -68,7 +68,7 @@
       "flickr_workflow": 27,
       "meta_repo_parity_with_vidra": 19,
       "operator_requirement": 5,
-      "recommended_safeguard": 19,
+      "recommended_safeguard": 20,
       "requested_integration": 10
     },
     "open_questions_referenced": [
@@ -984,12 +984,15 @@
       },
       "surfaces": {
         "api": [
-          "POST /api/v1/setup/claim-owner"
+          "POST /api/v1/setup/claim-owner",
+          "GET /api/v1/setup/claim-status"
         ],
         "ui": [
           "/setup/claim"
         ],
-        "cli": []
+        "cli": [
+          "vizra claim-token"
+        ]
       },
       "evidence_required": [
         "integration test on real PostgreSQL/Redis with exit code and counts",
@@ -1000,7 +1003,7 @@
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
       "decided": [],
-      "notes": null,
+      "notes": "Surfaces added 2026-09-23 by the war-room chair's M1-A plan rulings (docs/evidence/warroom/2026-09-21-vizra-core-m1a-owner-claim-PLAN-RULINGS.md): GET /api/v1/setup/claim-status returns one bit, claimed or not (OQ-3); `vizra claim-token` mints a claim token and always supersedes the previous one, and refuses non-zero when any user exists (OQ-9, S-12). The recovery case 'Restart re-mints; old token invalid' and the outcome's 'mints a one-time token at boot, prints it to its log' are deliberately UNCHANGED pending owner ratification (owner inbox 8a, docs/plans/WARROOM-BOARD.md). Chair's interim ruling (rulings row 2 / OQ-11, reversible in code, no schema impact): boot mints only when VIZRA_OWNER_CLAIM_ANNOUNCE=stderr and no live token exists; the announce default is off (row 3 / OQ-2), so boot prints the command, not a credential; `vizra claim-token` is the deliberate re-mint that keeps a lost token recoverable.",
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
       "merge_status": "NOT_STARTED",
@@ -3083,7 +3086,7 @@
       "id": "VZ-ADMIN-USERS-001",
       "title": "Operator user management",
       "area": "identity",
-      "outcome": "Owner/admin: list/search users, create users, suspend/restore, change role, reset password, delete with content handling, view quota usage and storage location.",
+      "outcome": "Owner/admin: list/search users, create users, suspend/restore, change role, reset password, delete with content handling, view quota usage and storage location. Owner: transfers the single owner role to another live user; an instance whose only owner account is tombstoned is recoverable and never left ownerless.",
       "source_kind": "chevereto_parity",
       "provenance": [
         {
@@ -3102,13 +3105,21 @@
       ],
       "cases": {
         "success": [
-          "Each action audited; suspended user cannot sign in"
+          "Each action audited; suspended user cannot sign in",
+          "Owner transfer: the owner, after step-up re-authentication, hands the owner role to a live, non-disabled user in ONE transaction; afterwards exactly one live owner exists, the previous owner holds the role the transfer names, and one audit row records both usernames",
+          "Tombstoned-owner recovery: when the only owner account is tombstoned, an operator-side, host-authenticated, audited path assigns the owner role to a live user; the claim endpoint stays closed throughout (its gate is EXISTS(users), not the owner index)"
         ],
         "negative": [
-          "Cannot demote the last owner"
+          "Cannot demote the last owner",
+          "'Cannot demote the last owner' is enforced APPLICATION-SIDE: the users_one_owner partial unique index (WHERE role = 'owner' AND tombstoned_at IS NULL, vizra-core migration 0005) permits at most one LIVE owner — it refuses a second, never zero — so a named test proves the application refuses demoting the only live owner outside the transfer path, and a controlled mutation removing that check turns it red",
+          "A transfer requested by anyone other than the owner is refused; a transfer to a tombstoned, disabled or unknown user is refused with no role change; two concurrent transfers leave exactly one live owner (the index decides, 23505 maps to 409, never 5xx)"
         ],
-        "privacy": [],
-        "recovery": []
+        "privacy": [
+          "Owner transfer and owner recovery audit rows carry usernames only, never an email (VZ-AUDIT-001)"
+        ],
+        "recovery": [
+          "A transfer that fails mid-transaction leaves the previous owner in place; the tombstoned-owner recovery path is idempotent when re-run"
+        ]
       },
       "surfaces": {
         "api": [
@@ -3129,7 +3140,81 @@
       "competitor_mechanism_vs_equivalent": null,
       "unresolved": [],
       "decided": [],
-      "notes": null,
+      "notes": "Owner-transfer and tombstoned-owner recovery obligations added 2026-09-23 from the war-room chair's M1-A plan rulings (docs/evidence/warroom/2026-09-21-vizra-core-m1a-owner-claim-PLAN-RULINGS.md, row 1: 'Owner transfer stays a later slice'). The users_one_owner predicate counts only live owners so a tombstoned owner does not brick the instance. ADR-003 (Accepted) says the owner 'is single and cannot be demoted' (also docs/PRODUCT_SPEC.md § 3 Actors and roles); the owner-transfer cases read that as 'no other actor demotes the owner' and the owner's own transfer as the only way the role moves. That reading is pending owner ratification (owner inbox 8d); an Accepted ADR is amended only by the owner, so no slice implementing owner transfer proceeds before the owner answers. The operator recovery surface (CLI or other) is chosen by that slice and is not named here.",
+      "implementation_status": "PLANNED",
+      "verification_status": "UNVERIFIED",
+      "merge_status": "NOT_STARTED",
+      "release_status": "NOT_RELEASED",
+      "test_ids": [],
+      "evidence": []
+    },
+    {
+      "id": "VZ-AUDIT-001",
+      "title": "Audit-trail retention and actor anonymisation; user erasure by scrub-and-tombstone",
+      "area": "identity",
+      "outcome": "Owner/operator: audit_events rows are retained for a bounded period and then removed or anonymised, and an erased user's identity is anonymised in the rows that name them, only through one reviewed, audited path; erasure scrubs and tombstones the users row and never deletes it; audit rows never carry PII beyond the username.",
+      "source_kind": "recommended_safeguard",
+      "provenance": [
+        {
+          "source": "AGENTS",
+          "note": "never log credentials, private signed URLs, or raw private metadata; append-only migrations; explicit retry/recovery"
+        },
+        {
+          "source": "CATALOG-F1",
+          "note": "account settings/export/deletion; operator account management"
+        }
+      ],
+      "reference_edition": null,
+      "profiles": [
+        "core",
+        "full"
+      ],
+      "dependencies": [
+        "VZ-ACCOUNT-002"
+      ],
+      "cases": {
+        "success": [
+          "The retention/anonymisation path is added ADDITIVELY: a later migration widens audit_events_append_only() with CREATE OR REPLACE FUNCTION, which migrate-lint's destructive pattern does not match, so the migration needs no -- allow-destructive: annotation provided it never contains the bare word TRUNCATE (migrate-lint greps every line, comments and function bodies included, so a widened body that names TG_OP = 'TRUNCATE' must instead refuse by default, or carry the annotation); the row trigger and statement-level TRUNCATE trigger stay in place",
+          "A retention sweep removes or anonymises rows older than the retention window only through that path, in batches, and writes one audit row per run naming the window and the count, never row contents",
+          "Account erasure (VZ-ACCOUNT-002) scrubs and tombstones the users row — email NULLed (users.email is NOT NULL in vizra-core migration 0005, so this first needs an additive ALTER TABLE users ALTER COLUMN email DROP NOT NULL, which migrate-lint does not flag and 0005 anticipates), username replaced with a non-identifying handle that satisfies users_username_shape, credentials removed, tombstoned_at set — and anonymises that user's username in the audit rows that name them; actor_user_id still references the tombstoned row, so the audit chain stays intact"
+        ],
+        "negative": [
+          "Every UPDATE or DELETE on audit_events other than the retention/anonymisation shape is still refused by the trigger, and TRUNCATE is still refused; a controlled mutation that widens the function to accept any UPDATE turns a named test red",
+          "DELETE FROM users for a user named by an audit row fails (audit_events_actor_user_fk is ON DELETE RESTRICT, 23503); the erasure path never issues DELETE on users, and a test asserts it",
+          "No API route exposes arbitrary audit mutation; the retention and erasure jobs are the only callers of the anonymisation path"
+        ],
+        "privacy": [
+          "audit before, after and actor_label never carry an email address or any PII beyond the username; a test scans every audit kind the suite writes for email-shaped values and fails on any",
+          "Because actor_user_id still joins audit rows to users, erasure scrubs or replaces users.username itself, not only the username copied into audit rows; anonymisation also clears ip_prefix; after erasure the user's original username, email and credentials are not reachable from the audit read surface (directly or through the actor_user_id join), exports or logs; an erasure test asserts users.email, users.username and credentials hold no original value"
+        ],
+        "recovery": [
+          "The erasure job is resumable and idempotent: a crash between scrub and tombstone re-runs to the same end state, and re-running on a tombstoned user is a no-op",
+          "An interrupted retention sweep resumes without skipping or double-counting; each batch and its audit row commit in one transaction",
+          "Tombstoning the owner leaves the instance recoverable (users_one_owner counts only live owners; recovery path under VZ-ADMIN-USERS-001)"
+        ]
+      },
+      "surfaces": {
+        "api": [
+          "DELETE /api/v1/me",
+          "GET /api/v1/admin/audit"
+        ],
+        "ui": [
+          "/admin/audit"
+        ],
+        "cli": []
+      },
+      "evidence_required": [
+        "integration test on real PostgreSQL/Redis with exit code and counts",
+        "OpenAPI operation present and drift-checked",
+        "negative/permission test that fails against a controlled mutation",
+        "migration test on real PostgreSQL: the widened function still refuses every non-retention UPDATE/DELETE and TRUNCATE",
+        "migrate-lint transcript showing the widening is not classed destructive",
+        "audit PII scan test output"
+      ],
+      "competitor_mechanism_vs_equivalent": null,
+      "unresolved": [],
+      "decided": [],
+      "notes": "Owed by the war-room chair's M1-A plan rulings (docs/evidence/warroom/2026-09-21-vizra-core-m1a-owner-claim-PLAN-RULINGS.md, row 4 and OQ-7). vizra-core migration 0005_users_credentials_owner_claim.up.sql lands the strict audit_events_append_only() trigger (UPDATE, DELETE and TRUNCATE refused) and audit_events_actor_user_fk ON DELETE RESTRICT, and says the audited retention/anonymisation path 'carries its own ledger ID' — this entry. 0003_audit_events deferred the trigger and the retention path as a pair. ADR-007 § audit_events.",
       "implementation_status": "PLANNED",
       "verification_status": "UNVERIFIED",
       "merge_status": "NOT_STARTED",

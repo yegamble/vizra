@@ -1,0 +1,67 @@
+BUILDER CLAIM (not a verifier verdict). Branch docs/m1a-ledger-obligations, ledger commit dd7955e6c5c346a7675c70c6c24aa1f991f9283d, base 6b8158c.
+Environment: macOS arm64 (Darwin 25.5.0), /usr/bin/python3 3.9.6, PyYAML 6.0.3, git 2.50.1. Run in a scratch clone of the branch; no mutation was committed to the branch.
+Scratch root: $SCRATCH = a mktemp -d directory under the session scratchpad (meta-ledger-m1a.IDlA), deleted after the run.
+
+Demo A adds the line 'Demo reference: VZ-AUDIT-001.' to docs/issues/README.md (a gated path) and runs ./scripts/check-quality-json.py.
+### DEMO A: a VZ-AUDIT-001 reference in an issue file, against the BASE ledger (6b8158c)
+HEAD=6b8158c3280ecd17a32efbb009ab06d04da42260
+DANGLING REQUIREMENT ID(S): 1 id(s) reference nothing:
+  VZ-AUDIT-001: not in docs/quality/features.json
+      referenced by docs/issues/README.md
+json parsed: 4 file(s) under docs/quality/
+ledger: 191 requirement id(s) in docs/quality/features.json
+exit=1
+### DEMO A: same reference against the HEAD ledger (dd7955e)
+HEAD=dd7955e6c5c346a7675c70c6c24aa1f991f9283d
+json parsed: 4 file(s) under docs/quality/
+ledger: 192 requirement id(s) in docs/quality/features.json
+requirement ids: 192 written reference(s) expanded to 288 id(s), 205 distinct, across 14 document(s); every one resolves
+exit=0
+
+env: PYTHONDONTWRITEBYTECODE=1 (Apple python3 3.9.6 otherwise caches .pyc under ~/Library/Caches/com.apple.python; a same-size edit within one second reused stale bytecode in the first attempt)
+HEAD=dd7955e6c5c346a7675c70c6c24aa1f991f9283d
+### DEMO B (red): VZ-AUDIT-001 dependency mutated to nonexistent VZ-ACCOUNT-999
+# Note: build.py exits non-zero, but through an unhandled StopIteration in its core-closure loop (line 27),
+# which runs before the collected 'unknown dependency' error is printed. Pre-existing; reported, not fixed here.
+-    deps=["VZ-ACCOUNT-002"],
++    deps=["VZ-ACCOUNT-999"],
+Traceback (most recent call last):
+  File "$SCRATCH/demo/docs/evidence/ledger-generator/build.py", line 27, in <module>
+    dep = next(x for x in reqs if x["id"]==d)
+StopIteration
+exit=1
+### DEMO B (green): restored
+OK 192 requirements; core=142; areas={'f
+exit=0
+restored output byte-identical to committed features.json
+### DEMO C (red): VZ-AUDIT-001 implementation_status hand-edited to IMPLEMENTED in the generated JSON and committed
+HEAD=6f90a5131dacdf2144d4104b9c6e4207bcbdc5bc
+regenerating with: Python 3.9.6
+diff --git a/docs/quality/features.json b/docs/quality/features.json
+index 290b30f..a1e7af4 100644
+--- a/docs/quality/features.json
++++ b/docs/quality/features.json
+@@ -3215,7 +3215,7 @@
+       "unresolved": [],
+       "decided": [],
+       "notes": "Owed by the war-room chair's M1-A plan rulings (docs/evidence/warroom/2026-09-21-vizra-core-m1a-owner-claim-PLAN-RULINGS.md, row 4 and OQ-7). vizra-core migration 0005_users_credentials_owner_claim.up.sql lands the strict audit_events_append_only() trigger (UPDATE, DELETE and TRUNCATE refused) and audit_events_actor_user_fk ON DELETE RESTRICT, and says the audited retention/anonymisation path 'carries its own ledger ID' — this entry. 0003_audit_events deferred the trigger and the retention path as a pair. ADR-007 § audit_events.",
+-      "implementation_status": "IMPLEMENTED",
++      "implementation_status": "PLANNED",
+       "verification_status": "UNVERIFIED",
+       "merge_status": "NOT_STARTED",
+       "release_status": "NOT_RELEASED",
+
+GENERATED FILE IS NOT REPRODUCIBLE. The following generated file(s) changed when
+the generator was re-run, which means the committed copy does not match its sources:
+  - docs/quality/features.json
+
+  Either the file was hand-edited (AGENTS.md forbids it), or a generator source
+  under docs/evidence/ledger-generator was changed without regenerating.
+  Fix: edit the sources, run
+      (cd docs/evidence/ledger-generator && python3 build.py ../../quality/features.json)
+  and commit BOTH the sources and the regenerated file.
+exit=1
+### DEMO C (green): mutation commit dropped
+HEAD=dd7955e6c5c346a7675c70c6c24aa1f991f9283d
+generated ledger reproduces byte-for-byte: docs/quality/features.json (UTF-8 and C/POSIX locales)
+exit=0
