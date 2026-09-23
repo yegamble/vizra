@@ -1,0 +1,29 @@
+# Vizra — EXTERNAL IPFS (a remote Kubo node or a pinning service).
+# PLACEHOLDER OVERLAY: it renders the IPFS component OFF and wires nothing.
+#
+# What it does today, completely:
+#   the bundled `ipfs` container is suppressed, so enabling the `ipfs` profile
+#   with this overlay in the chain starts NO container — and, because the
+#   container is gone, the swarm port docker-compose.prod.yml publishes for it
+#   is gone with it. That is the one observable safety property this file has
+#   today and `scripts/check-compose-topology.py` asserts it (the
+#   `prod-external-ipfs` shape forbids the service and allows no port).
+#
+# What it deliberately does NOT do, and why:
+#   it sets no IPFS_API_URL and no IPFS_PINNING_* on any service. No Vizra
+#   service reads one at M0, and a key no process reads is what
+#   `scripts/check-config-coverage.py` fails on. The wiring lands with
+#   VZ-FEDERATION-* / the IPFS publication slice.
+#
+# THE PRIVACY RULE THIS FILE DOES NOT ENFORCE, stated so nobody reads it as
+# enforced: AGENTS.md requires that private media never reach public IPFS. That
+# is a decision made in vizra-core before anything is offered to a node. Turning
+# the node off here removes one publication path; it is not the control.
+#
+# `profiles: !override` rather than `!reset`: see the header of
+# docker-compose.external-postgres.yml.
+
+services:
+
+  ipfs:
+    profiles: !override ["external-disabled"]

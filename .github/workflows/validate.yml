@@ -12,11 +12,25 @@
 #       schedule work by a `VZ-…` id that names no requirement.
 #   (c) a relative markdown link points at a file that does not exist.
 #
+# Since VZ-ISSUE-002 this repository also carries a deployment topology, so a
+# fourth failure is worth a gate here:
+#
+#   (d) the rendered compose model opens a port, loses a restart policy or a
+#       log cap, reintroduces a `build:` into a production shape, runs an
+#       unpinned image, or drifts from the component configuration registries.
+#       None of that is visible in review — a datastore can be published by an
+#       overlay three files away from the one being read — and all of it is
+#       visible in `docker compose config --format json`.
+#
 # META_REPO.md §7 names two further target lanes for this repo, `bundle` and
-# `boot`. Neither is built here: there is no compose file, no installer, no
-# bundle and no image to boot yet, so there is nothing for them to run against.
-# They are deliberately absent from .github/required-checks.txt rather than
-# present and empty — see that file.
+# `boot`. Neither is built here. There is now a compose topology, but there is
+# still no installer, no bundle builder and no booted stack — `validate` renders
+# the production shapes and asserts them, and has never started a container.
+# `bundle` and `boot` are therefore still deliberately absent from
+# .github/required-checks.txt rather than present and empty; see that file. Its
+# comment block still says "there is no compose file", which this PR does not
+# edit: AGENTS.md forbids changing the required-check manifest in the same PR
+# as the thing it guards. That stale sentence is REPORTED, not silently fixed.
 #
 # The trigger deliberately carries NO base-branch filter. This lane's own pull
 # request is STACKED on `chore/m0-meta-baseline`, not on `main`, and a
@@ -118,3 +132,105 @@ jobs:
       # recorded and never fetched.
       - name: relative documentation links resolve
         run: ./scripts/check-doc-links.py
+
+      # ---------------------------------------------------------------------
+      # (d) THE COMPOSE TOPOLOGY (VZ-ISSUE-002: VZ-TOPOLOGY-001/-002/-003/-006/
+      #     -007, VZ-CI-002, VZ-OPS-008).
+      #
+      # These steps are added to the EXISTING `validate` job rather than to a
+      # new lane, deliberately. A new lane would have to be added to
+      # `.github/required-checks.txt` and to the floor in
+      # `scripts/ci-required-guard.sh` — both owner-reviewed under CODEOWNERS,
+      # and AGENTS.md says a manifest must not be edited in the same PR as the
+      # thing it guards. `validate` is already the floor lane and already
+      # required, so extending it gates the new checks with no manifest change
+      # at all. Neither file is touched by this PR.
+      #
+      # Nothing here pulls or builds an image. `docker compose config` resolves
+      # the model from the files and the environment; it never contacts a
+      # registry, so the lane needs no credentials and no network beyond the
+      # checkout.
+      # ---------------------------------------------------------------------
+
+      # The interpreter this lane runs on is `actions/setup-python` 3.12.14, NOT
+      # the runner's system python — and PyYAML is preinstalled on the latter
+      # only. The first CI run of this lane failed here with
+      # `ModuleNotFoundError: No module named 'yaml'`, which is why this step
+      # exists and why the claim "the runner ships PyYAML" was wrong about the
+      # interpreter that actually executes these scripts.
+      #
+      # Same shape and same pin as .github/workflows/ci-required.yml: install
+      # only if absent, so the lane fails on a real violation rather than on a
+      # missing library, and pinned so it is not a moving dependency.
+      - name: ensure a YAML parser is available
+        run: |
+          set -euo pipefail
+          python3 -c 'import yaml' 2>/dev/null \
+            || python3 -m pip install --quiet --break-system-packages 'pyyaml==6.0.3'
+          python3 -c 'import yaml; print("PyYAML", yaml.__version__)'
+
+      - name: record the container toolchain this lane renders with
+        run: |
+          set -euo pipefail
+          docker --version
+          docker compose version
+          docker compose version --short
+          echo
+          echo "The Compose FLOOR (>= 2.24.4, ruling Q-017) is enforced by"
+          echo "scripts/compose-render.py, which fails closed on a version string it"
+          echo "cannot parse. It is printed here as well so a transcript records"
+          echo "which Compose produced the models below."
+
+      # Render first, upload second, assert third. The order is deliberate: a
+      # step-level `if: always()` on the upload would be refused by
+      # scripts/check-lane-integrity.py (a conditional step on a required lane
+      # is not a gate), so the artifact is produced BEFORE anything can fail.
+      # A render that fails produces no model to upload anyway.
+      - name: render every declared compose shape
+        run: |
+          set -euo pipefail
+          ./scripts/compose-render.py --list
+          echo
+          ./scripts/compose-render.py --all --out build/compose-models
+          mkdir -p ci-report
+          cp -R build/compose-models ci-report/compose-models
+
+      - name: upload the rendered compose models
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: meta-validate-compose-models
+          path: ci-report/
+          retention-days: 14
+          if-no-files-found: error
+
+      # Port closure, edge profile, restart policies, log caps, healthchecks,
+      # one-shot/production build, image pinning, Docker-socket absence,
+      # production mode and development-hatch absence — every one asserted from
+      # `docker compose config --format json` parsed as JSON, never from the
+      # YAML sources.
+      - name: the rendered topology is closed, capped and pinned
+        run: ./scripts/check-compose-topology.py build/compose-models
+
+      # Both directions: a key a component reads with nothing delivering it,
+      # and a template key nothing consumes. Also refuses a key a component has
+      # RETIRED: core rejects a retired name in production ON PRESENCE, so a
+      # compose map that still sends it is a guaranteed boot refusal naming a
+      # variable that appears nowhere in the operator's env file.
+      - name: configuration-key coverage in both directions
+        run: ./scripts/check-config-coverage.py build/compose-models
+
+      # An operator-facing file may not name a command that does not exist.
+      # The sentence this exists to refuse shipped in env/production.env.example
+      # and invited an operator to permanently destroy every stored MFA secret.
+      - name: no template claims a command that does not exist
+        run: ./scripts/check-template-claims.py
+
+      # The guards are exercised against controlled mutations on every run, not
+      # only in a one-off demonstration. This is the same rule
+      # scripts/ci-required-guard.sh applies to its negative fixtures: a checker
+      # that silently stopped catching something would otherwise stay green.
+      # The script prints a sha256 either side of each mutation and refuses to
+      # score a case whose mutation did not apply, and it fails if the tree is
+      # not byte-identical afterwards.
+      - name: every compose guard still fails against a controlled mutation
+        run: bash docs/evidence/compose-topology/demo.sh

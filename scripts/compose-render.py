@@ -1,0 +1,663 @@
+#!/usr/bin/env python3
+"""Render every declared compose shape to JSON, safely.
+
+This is the entry point the `validate` lane uses and the one an operator should
+use to see what a chain actually resolves to. It does four things a bare
+`docker compose config` does not:
+
+1. **Refuses below the Compose floor.** Q-017 requires >= 2.24.4, the documented
+   minimum for `!override`. An older Compose does not error on the merge tags —
+   it IGNORES them — which would leave the developer ports published and
+   `build:` in place while every render still said "ok". The parser fails closed
+   on a version string it cannot read and accepts a major above 2 (Compose is at
+   5.x; the 2.x line ended at 2.40.3).
+
+2. **Validates external DSNs before rendering**, so an invalid one fails with a
+   message that names the VARIABLE and never echoes the value. Compose's own
+   `${VAR:?msg}` covers missing and empty; it cannot tell `postgres://…` from
+   `hunter2`, and a DSN that renders fine and fails at boot is the failure this
+   check exists to move earlier.
+
+3. **Redacts declared secret values out of every model it writes, and proves
+   it on the bytes it wrote.** The models are uploaded as CI artifacts, and an
+   artifact is a published file. Nothing asserted by
+   `scripts/check-compose-topology.py` or `scripts/check-config-coverage.py`
+   reads a secret VALUE — they read keys, images, ports, policies — so the
+   redacted model and the real model are identical for every purpose those
+   checkers have.
+
+   **Where the secret names come from.** Both sets are DERIVED, primarily from
+   the component registries: every key any `env/registry/*.json` marks
+   `"secret": true`. That derivation is the durable half. Hand-maintaining one
+   list meant a key could be added the fully correct way — declared to the
+   component as secret, documented in the template, delivered by compose — and
+   still be written raw into all thirteen models under a
+   `secret_values_redacted: true` stamp with every lane checker green. A control
+   that protects only the secrets someone remembered to enumerate protects
+   nothing about the next one.
+
+   On top of that derivation, two explicit manifest lists are unioned, and they
+   are separate from each other on purpose because one guards the other:
+
+   * `redact_keys` feeds the REDACTION. Values are replaced by key, and their
+     exact strings are substituted wherever they appear inside another value —
+     `DATABASE_URL` is assembled from `POSTGRES_PASSWORD` in
+     docker-compose.yml, so a by-key replacement alone would leave the password
+     inside the DSN. The list also carries secrets that are not component keys
+     at all (`POSTGRES_PASSWORD` belongs to the bundled datastore).
+   * `secret_keys` feeds the LEAK CHECK, which runs on the object about to be
+     serialised. Because the two manifest lists are independent, deleting a name
+     from `redact_keys` stops redacting it and does NOT stop looking for it, so
+     the renderer FAILS instead of writing a file that is less redacted than its
+     own stamp claims.
+
+   The effective sets are recorded in each model's `x-vizra-shape` as
+   `redacted_keys` and `leak_checked_keys`, so a reader of the artifact can see
+   what was actually protected rather than trusting the boolean.
+
+   **WHAT IS NOT PROTECTED, precisely.** Redaction covers exactly two things:
+   a key some `env/registry/*.json` flags `"secret": true`, and a key named in
+   the manifest's explicit `redact_keys` / `secret_keys` (the composite and
+   non-component values — `DATABASE_URL`, `POSTGRES_PASSWORD`,
+   `CLICKHOUSE_PASSWORD`). **A key that is neither is written raw**, and no lane
+   goes red for it.
+
+   That is not hypothetical. The verifier added `VIZRA_S3_ACCESS_ID` the fully
+   correct way — registered in `env/registry/core.json`, declared in the
+   template, delivered by compose — but WITHOUT `"secret": true`, and its value
+   appeared 47 times across the 13 models with render, topology, coverage and
+   template-claims all exit 0. An AWS access key id is a credential and `_ID`
+   matches nothing, so `check-config-coverage.py`'s `unclassified-secret-key`
+   suffix net (`_PASSWORD`, `_SECRET`, `_TOKEN`, `_KEY`) does not catch it
+   either. That net is deliberately NOT widened here: one declared exception
+   beats a matcher nobody trusts, and the primary signal is meant to be the
+   component's own flag.
+
+   So the honest statement, and the one the operator-facing documents must
+   repeat rather than soften: **the component's `secret` flag is the control.**
+   A component that declares a credential without flagging it is a
+   component-side bug that this renderer cannot see, and the flag itself is
+   compared against the component's source only by
+   `check-config-coverage.py --drift`, which needs the component checkouts and
+   cannot run in CI.
+
+   **A caller can only inject two of these.** `ci_overrides` is applied with
+   `env.update()` AFTER the process environment is copied, so it overwrites
+   `VIZRA_SESSION_SECRET`, `VIZRA_MFA_KEY_KEK`, `SEARCH_HMAC_KEY`,
+   `POSTGRES_PASSWORD` and `CLICKHOUSE_PASSWORD` unconditionally. Only
+   `DATABASE_URL` and `VIZRA_CACHE_URL` — which are not in `ci_overrides` —
+   take a caller's value. That is a deliberate property: rendering cannot be
+   made to embed an operator's real session secret by exporting it. Keep it.
+
+   This was a real defect, found in review and worth naming: the previous code
+   computed a redacted copy, ran the leak check against that copy, and then
+   serialised the ORIGINAL — stamped `"secret_values_redacted": true`. The
+   control was inert, the stamp was false, and `find_leaks` could never fire on
+   what was actually written. `demo.sh` case 18 is what keeps it from going
+   dead again.
+
+4. **Enforces the shape floor.** The declared `floor` list and the `shapes`
+   array must name the same ids. Deleting a shape is then a visible edit instead
+   of a quietly smaller matrix — the same rule `.github/required-checks.txt` has
+   for lanes.
+
+Usage:
+    compose-render.py --list
+    compose-render.py --all --out <dir>
+    compose-render.py --shape <id> --out <dir>
+    compose-render.py --variables            (union of interpolation variables)
+
+Exit codes:
+    0  every requested shape rendered
+    1  a render or a validation FAILED (the actionable message says which)
+    2  UNEVALUABLE - the manifest, the floor or the toolchain is unusable
+"""
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MANIFEST = os.path.join(REPO_ROOT, "scripts", "compose-shapes.json")
+REGISTRY_DIR = os.path.join(REPO_ROOT, "env", "registry")
+REGISTRY_COMPONENTS = ("core", "user", "search")
+
+# Q-017. Kept as a tuple so the comparison is numeric, never lexical:
+# "2.9" > "2.24" as strings.
+COMPOSE_FLOOR = (2, 24, 4)
+
+COMPONENT_DIRS = ("vizra-core", "vizra-user", "vizra-search")
+
+# Below this length a value is too short to be matched safely as a substring:
+# a 3-character "password" would redact fragments of unrelated strings and turn
+# every model into noise. Injected values in this repository are far longer.
+MIN_SECRET_LEN = 8
+
+# The bind source Caddy needs. Generated by `vizra setup`, gitignored, and
+# absent in CI. `docker compose config` does not touch the filesystem for a
+# bind source, so a render does not need it — but a DEPLOY does, and a missing
+# bind source is created by Docker as an empty DIRECTORY that Caddy crash-loops
+# on. `create_host_path: false` in docker-compose.yml is what turns that into a
+# refusal; this constant is here so the fact is recorded next to the render.
+CADDYFILE = os.path.join("deploy", "Caddyfile.local")
+
+
+def fail(msg, code=1):
+    sys.stderr.write(msg.rstrip() + "\n")
+    sys.exit(code)
+
+
+# --------------------------------------------------------------------------
+# 1. Compose floor
+# --------------------------------------------------------------------------
+
+def compose_version():
+    try:
+        out = subprocess.run(
+            ["docker", "compose", "version", "--short"],
+            capture_output=True, text=True, timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError) as err:
+        fail(
+            f"UNEVALUABLE: `docker compose version --short` could not be run: {err}\n"
+            "  Docker Compose v2 or later is required. Nothing was rendered.",
+            2,
+        )
+    if out.returncode != 0:
+        fail(
+            "UNEVALUABLE: `docker compose version --short` exited "
+            f"{out.returncode}: {out.stderr.strip()}\n"
+            "  Nothing was rendered.",
+            2,
+        )
+    return out.stdout.strip()
+
+
+def require_floor(raw):
+    """Fail closed. An unparseable version is refused, never assumed current."""
+    text = raw.lstrip("v")
+    m = re.match(r"^(\d+)\.(\d+)(?:\.(\d+))?", text)
+    if not m:
+        fail(
+            f"UNEVALUABLE: cannot parse the Docker Compose version {raw!r}.\n"
+            f"  This check fails closed: an unreadable version is refused rather\n"
+            f"  than assumed to meet the floor of "
+            f"{'.'.join(map(str, COMPOSE_FLOOR))} (Q-017).",
+            2,
+        )
+    found = (int(m.group(1)), int(m.group(2)), int(m.group(3) or 0))
+    if found < COMPOSE_FLOOR:
+        fail(
+            f"Docker Compose {raw} is below the floor "
+            f"{'.'.join(map(str, COMPOSE_FLOOR))} (Q-017).\n"
+            "  The overlays use the `!override` and `!reset` merge tags. An older\n"
+            "  Compose does not reject them - it IGNORES them - so the render\n"
+            "  would succeed while leaving the bundled PostgreSQL enabled, the\n"
+            "  developer ports published and `build:` in place on the production\n"
+            "  one-shot. Upgrade the Compose plugin before deploying.",
+            1,
+        )
+    return found
+
+
+# --------------------------------------------------------------------------
+# 2. External DSN validation
+# --------------------------------------------------------------------------
+
+DSN_RULES = {
+    "DATABASE_URL": {
+        "schemes": ("postgres://", "postgresql://"),
+        "example": "postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require",
+        "overlay": "docker-compose.external-postgres.yml",
+    },
+    "VIZRA_CACHE_URL": {
+        "schemes": ("redis://", "rediss://"),
+        "example": "rediss://:PASSWORD@HOST:6379/0",
+        "overlay": "docker-compose.external-redis.yml",
+    },
+}
+
+
+def validate_dsn(var, value):
+    """Return None when acceptable, or an actionable message.
+
+    The message names the variable, the expected scheme and the overlay that
+    required it. It NEVER contains the value: an operator pastes these into an
+    issue, and a DSN carries a password.
+    """
+    rule = DSN_RULES[var]
+    if value is None or value.strip() == "":
+        return (
+            f"{var} is empty, but {rule['overlay']} is in the chain and requires it.\n"
+            f"  Expected: {rule['example']}\n"
+            f"  The bundled service is disabled by that overlay and will NOT be\n"
+            f"  started as a fallback - a fallback would write your data into a\n"
+            f"  database nothing backs up.\n"
+            f"  (The value is not echoed here; it carries a password.)"
+        )
+    lowered = value.strip().lower()
+    if not lowered.startswith(rule["schemes"]):
+        return (
+            f"{var} is not a valid DSN: it does not start with "
+            f"{' or '.join(rule['schemes'])}.\n"
+            f"  Expected: {rule['example']}\n"
+            f"  Required by {rule['overlay']}.\n"
+            f"  (The value is not echoed here; it carries a password.)"
+        )
+    rest = value.strip()[len(lowered.split("://", 1)[0]) + 3:]
+    host_part = rest.split("/", 1)[0].split("?", 1)[0]
+    if "@" in host_part:
+        host_part = host_part.rsplit("@", 1)[1]
+    if not host_part:
+        return (
+            f"{var} names no host.\n"
+            f"  Expected: {rule['example']}\n"
+            f"  Required by {rule['overlay']}.\n"
+            f"  (The value is not echoed here; it carries a password.)"
+        )
+    return None
+
+
+# --------------------------------------------------------------------------
+# 3. Manifest and floor
+# --------------------------------------------------------------------------
+
+def registry_secret_names():
+    """Every key any component registry marks `"secret": true`.
+
+    This is the PRIMARY signal, and it is derived rather than hand-maintained
+    for a reason worth stating: the previous design read one hand-written list,
+    so a key could be added the fully correct way — declared to the component
+    with `"secret": true`, documented in the template, delivered by compose —
+    and still be written raw into every model under a
+    `secret_values_redacted: true` stamp, with all four lane checkers green.
+    A control that only protects the secrets someone remembered to enumerate
+    protects nothing about the next one.
+
+    The manifest's explicit lists are unioned on top, because some secrets are
+    not registry keys at all: POSTGRES_PASSWORD belongs to the bundled
+    datastore, and DATABASE_URL is ASSEMBLED from it, so the composite has to be
+    named even though the component never sees the part.
+    """
+    names = set()
+    for comp in REGISTRY_COMPONENTS:
+        path = os.path.join(REGISTRY_DIR, f"{comp}.json")
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                reg = json.load(fh)
+        except (OSError, ValueError) as err:
+            fail(
+                f"UNEVALUABLE: cannot read {path}: {err}\n"
+                "  The secret set is derived from the registries, so an "
+                "unreadable one would silently narrow it.",
+                2,
+            )
+        for k in reg.get("keys") or []:
+            if k.get("secret"):
+                names.add(k["name"])
+    if not names:
+        fail(
+            "UNEVALUABLE: no component registry marks a single key secret. "
+            "Either every registry is wrong or the derivation is broken; both "
+            "would leave the leak check looking for nothing.",
+            2,
+        )
+    return names
+
+
+def load_manifest():
+    try:
+        with open(MANIFEST, "r", encoding="utf-8") as fh:
+            man = json.load(fh)
+    except (OSError, ValueError) as err:
+        fail(f"UNEVALUABLE: cannot read {MANIFEST}: {err}", 2)
+
+    shapes = man.get("shapes") or []
+    if not shapes:
+        fail(
+            f"UNEVALUABLE: {MANIFEST} declares no shapes. A matrix with nothing\n"
+            "  in it renders nothing and asserts nothing; that is not a pass.",
+            2,
+        )
+    declared = [s["id"] for s in shapes]
+    floor = man.get("floor") or []
+    if not floor:
+        fail(
+            f"UNEVALUABLE: {MANIFEST} declares no floor. Without one, deleting a\n"
+            "  shape lowers the matrix silently and every remaining shape still\n"
+            "  passes - which is the failure the floor exists to prevent.",
+            2,
+        )
+    missing = [i for i in floor if i not in declared]
+    extra = [i for i in declared if i not in floor]
+    if missing or extra:
+        msg = "SHAPE FLOOR VIOLATION in scripts/compose-shapes.json:\n"
+        for i in missing:
+            msg += (
+                f"  MISSING: '{i}' is in `floor` but no shape defines it. A shape\n"
+                f"           in the floor may not be removed - docs/META_REPO.md §2\n"
+                f"           lists the topologies Vizra claims to support, and an\n"
+                f"           unrendered one is an unsupported one.\n"
+            )
+        for i in extra:
+            msg += (
+                f"  UNDECLARED: shape '{i}' exists but is not in `floor`. Add it, so\n"
+                f"              the matrix is a decision rather than a side effect.\n"
+            )
+        fail(msg, 1)
+    dupes = {i for i in declared if declared.count(i) > 1}
+    if dupes:
+        fail(f"duplicate shape id(s) in the manifest: {sorted(dupes)}", 2)
+    return man
+
+
+# --------------------------------------------------------------------------
+# 4. Rendering
+# --------------------------------------------------------------------------
+
+def bundle_tree(man):
+    """A directory holding ONLY what a deployment bundle ships.
+
+    This is the proof for the `bundle-no-checkouts` shape and it is built by
+    copying IN rather than by trusting that the component directories happen to
+    be absent from the working tree. A shape that passes because nobody cloned
+    the components today proves nothing tomorrow.
+
+    docker-compose.override.yml and docker-compose.dev.yml are deliberately NOT
+    copied: they are the two files that name build contexts or re-add developer
+    ports, a bare `docker compose` AUTO-LOADS the override, and in a bundle
+    those contexts do not exist. Their absence here is the same absence the
+    bundle builder (VZ-ISSUE-004) must produce.
+    """
+    tmp = tempfile.mkdtemp(prefix="vizra-bundle-")
+    for name in os.listdir(REPO_ROOT):
+        if not name.startswith("docker-compose"):
+            continue
+        if name in ("docker-compose.override.yml", "docker-compose.dev.yml"):
+            continue
+        shutil.copy2(os.path.join(REPO_ROOT, name), os.path.join(tmp, name))
+    shutil.copytree(os.path.join(REPO_ROOT, "env"), os.path.join(tmp, "env"))
+    os.makedirs(os.path.join(tmp, "deploy"), exist_ok=True)
+    for comp in COMPONENT_DIRS:
+        if os.path.exists(os.path.join(tmp, comp)):
+            fail(
+                f"UNEVALUABLE: the bundle tree contains {comp}. It must not - the\n"
+                "  whole point of this shape is that the production chain renders\n"
+                "  with no component source on the host.",
+                2,
+            )
+    return tmp
+
+
+def render(shape, man, out_dir, registry_secrets):
+    sid = shape["id"]
+    cwd = REPO_ROOT
+    tmp = None
+    if shape.get("checkouts") == "absent":
+        tmp = bundle_tree(man)
+        cwd = tmp
+
+    env = dict(os.environ)
+    env.update(man.get("ci_overrides", {}))
+    # `_note` documents the block above inside the JSON; it is not a variable.
+    env.pop("_note", None)
+
+    env_file = (
+        man["dev_env_file"] if shape["kind"] == "development" else man["env_file"]
+    )
+
+    if shape.get("external_dsn"):
+        # Placeholders for the keys the caller did NOT supply. A DSN given in
+        # the real environment always wins: otherwise an operator debugging
+        # their own DATABASE_URL would silently be shown a render of the CI
+        # placeholder, and the invalid-DSN refusal could never fire.
+        for var, placeholder in man.get("external_dsn_overrides", {}).items():
+            if var.startswith("_"):
+                continue
+            if var not in os.environ:
+                env[var] = placeholder
+
+    # DSN validation runs for every shape whose chain carries an external
+    # overlay, whether or not this invocation supplied the value.
+    chain_overlays = set(shape["files"])
+    for var, rule in DSN_RULES.items():
+        if rule["overlay"] in chain_overlays:
+            problem = validate_dsn(var, env.get(var))
+            if problem:
+                fail(f"shape {sid}: {problem}", 1)
+
+    base = ["docker", "compose"]
+    for f in shape["files"]:
+        base += ["-f", f]
+    base += ["--env-file", env_file]
+    for p in shape.get("profiles", []):
+        base += ["--profile", p]
+    cmd = base + ["config", "--format", "json"]
+
+    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, env=env)
+    if proc.returncode != 0:
+        stderr = proc.stderr.strip()
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
+        fail(
+            f"shape {sid} FAILED TO RENDER (exit {proc.returncode}).\n"
+            f"  command: {' '.join(cmd)}\n"
+            f"  cwd:     {'<bundle tree>' if shape.get('checkouts') == 'absent' else '.'}\n"
+            f"  {stderr}",
+            1,
+        )
+
+    try:
+        model = json.loads(proc.stdout)
+    except ValueError as err:
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
+        fail(f"UNEVALUABLE: shape {sid} rendered unparseable JSON: {err}", 2)
+
+    # --- variables the chain actually reads, from Compose itself -------------
+    # Not a grep for `${...}` over the YAML: Compose is the authority on what it
+    # interpolates, and it knows about defaults, presence forms and files this
+    # script never opened.
+    vcmd = base + ["config", "--variables", "--format", "json"]
+    vproc = subprocess.run(vcmd, capture_output=True,
+                           text=True, cwd=cwd, env=env)
+    variables = []
+    if vproc.returncode == 0:
+        try:
+            variables = sorted(json.loads(vproc.stdout).keys())
+        except (ValueError, AttributeError):
+            variables = []
+    if not variables:
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
+        fail(
+            f"UNEVALUABLE: shape {sid} reported no interpolation variables.\n"
+            "  `docker compose config --variables --format json` is how the\n"
+            "  coverage check learns which template keys have a consumer; with an\n"
+            "  empty answer it would report every template key as unused. Nothing\n"
+            "  was written.",
+            2,
+        )
+
+    if tmp:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # --- redaction ----------------------------------------------------------
+    # Values that get REDACTED: every registry key flagged secret, PLUS the
+    # manifest's explicit list for the composite and non-component ones.
+    redact_keys = set(man.get("redact_keys", [])) | registry_secrets
+    redact_values = {
+        env[k] for k in redact_keys if env.get(k) and len(env[k]) >= MIN_SECRET_LEN
+    }
+    # Values that get CHECKED FOR: the manifest's `secret_keys`. A SEPARATE
+    # list from `redact_keys`, and identical to it today — the independence is
+    # the mechanism, not the contents. Redaction reads one list, the leak check
+    # reads the other, so deleting a key from `redact_keys` stops redacting its
+    # value and does not stop looking for it. The render then fails instead of
+    # writing a file that is less redacted than its own stamp claims.
+    #
+    # Deliberately NOT everything this renderer injects: `VIZRA_CORE_TAG` and
+    # `VIZRA_PUBLIC_ORIGIN` are injected too and belong in a rendered model.
+    # Treating every injected value as a secret made the renderer refuse to
+    # write anything at all.
+    secret_keys = set(man.get("secret_keys") or []) | registry_secrets
+    if not secret_keys:
+        fail(
+            "UNEVALUABLE: scripts/compose-shapes.json declares no `secret_keys`, "
+            "so the leak check has nothing to look for and would pass on any "
+            "model at all.",
+            2,
+        )
+    sensitive_values = {
+        env[k] for k in secret_keys
+        if env.get(k) and len(env[k]) >= MIN_SECRET_LEN
+    }
+
+    redacted = redact(model, redact_keys, redact_values)
+    redacted["x-vizra-shape"] = {
+        "id": sid,
+        "title": shape["title"],
+        "kind": shape["kind"],
+        "files": shape["files"],
+        "profiles": shape.get("profiles", []),
+        "checkouts": shape.get("checkouts", "any"),
+        "env_file": env_file,
+        "interpolation_variables": variables,
+        "secret_values_redacted": True,
+        "redacted_keys": sorted(redact_keys),
+        "leak_checked_keys": sorted(secret_keys),
+    }
+
+    # THE LEAK CHECK RUNS ON THE OBJECT THAT IS ABOUT TO BE SERIALISED, not on a
+    # copy that gets thrown away. That distinction is the whole finding: a guard
+    # that inspects something other than the bytes it is guarding is not a guard.
+    leaked = find_leaks(redacted, sensitive_values)
+    if leaked:
+        fail(
+            f"shape {sid}: a value this renderer injected survived into the "
+            f"model at {leaked}.\n"
+            "  Nothing is written. The models are uploaded as CI artifacts and\n"
+            "  stamped `secret_values_redacted: true`, so publishing one that\n"
+            "  still carries the value would make that stamp a false claim.\n"
+            "  Add the key that carries it to `redact_keys` in\n"
+            "  scripts/compose-shapes.json.",
+            1,
+        )
+
+    path = os.path.join(out_dir, f"{sid}.json")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(redacted, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+    return path, variables
+
+
+def redact(node, keys, secrets):
+    if isinstance(node, dict):
+        out = {}
+        for k, v in node.items():
+            if k in keys and isinstance(v, str):
+                out[k] = "<redacted>"
+            else:
+                out[k] = redact(v, keys, secrets)
+        return out
+    if isinstance(node, list):
+        return [redact(v, keys, secrets) for v in node]
+    if isinstance(node, str):
+        for s in secrets:
+            if s in node:
+                return node.replace(s, "<redacted>")
+    return node
+
+
+def find_leaks(node, secrets, path="$"):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            hit = find_leaks(v, secrets, f"{path}.{k}")
+            if hit:
+                return hit
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            hit = find_leaks(v, secrets, f"{path}[{i}]")
+            if hit:
+                return hit
+    elif isinstance(node, str):
+        for s in secrets:
+            if s in node:
+                return path
+    return None
+
+
+# --------------------------------------------------------------------------
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--list", action="store_true")
+    ap.add_argument("--all", action="store_true")
+    ap.add_argument("--shape")
+    ap.add_argument("--variables", action="store_true")
+    ap.add_argument("--out", default="build/compose-models")
+    args = ap.parse_args()
+
+    man = load_manifest()
+    shapes = man["shapes"]
+
+    if args.list:
+        for s in shapes:
+            print(f"{s['id']:26} {s['kind']:12} {s['title']}")
+        return 0
+
+    raw = compose_version()
+    found = require_floor(raw)
+    print(
+        f"docker compose {raw} (parsed {'.'.join(map(str, found))}) meets the "
+        f"floor {'.'.join(map(str, COMPOSE_FLOOR))} (Q-017)"
+    )
+
+    selected = shapes if args.all or args.variables else [
+        s for s in shapes if s["id"] == args.shape
+    ]
+    if not selected:
+        fail(f"no such shape: {args.shape!r}. Try --list.", 2)
+
+    registry_secrets = registry_secret_names()
+    out_dir = os.path.join(REPO_ROOT, args.out)
+    os.makedirs(out_dir, exist_ok=True)
+
+    all_vars = set()
+    for shape in selected:
+        path, variables = render(shape, man, out_dir, registry_secrets)
+        all_vars.update(variables)
+        print(f"  rendered {shape['id']:26} -> {os.path.relpath(path, REPO_ROOT)}")
+
+    # The manifest travels with the models so check-compose-topology.py never
+    # has to re-read the repository to know what it is looking at.
+    with open(os.path.join(out_dir, "shapes.json"), "w", encoding="utf-8") as fh:
+        json.dump(
+            {
+                "shapes": selected,
+                "interpolation_variables": sorted(all_vars),
+                # Carried through so check-compose-topology.py never has to
+                # re-read the repository to know which probes are admitted
+                # false, and so the uploaded artifact records the admission.
+                "known_false_probes": man.get("known_false_probes") or [],
+                "release_image_services": man.get("release_image_services") or [],
+                "known_false_disclosure": man.get("known_false_disclosure") or {},
+                "gated_probes": man.get("gated_probes") or {},
+            },
+            fh, indent=2,
+        )
+        fh.write("\n")
+
+    if args.variables:
+        for v in sorted(all_vars):
+            print(v)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

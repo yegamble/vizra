@@ -1,0 +1,29 @@
+# Vizra — EXTERNAL ClickHouse. PLACEHOLDER OVERLAY: it renders the analytics
+# component OFF and wires nothing.
+#
+# What it does today, completely:
+#   the bundled `clickhouse` container is suppressed, so enabling the
+#   `analytics` profile with this overlay in the chain starts NO container.
+#
+# What it deliberately does NOT do, and why:
+#   it sets no CLICKHOUSE_URL on any service. At M0 no Vizra service reads one
+#   — vizra-core's config registry (internal/config/keys.go at c043df7) has no
+#   analytics key at all. `scripts/check-config-coverage.py` fails on a
+#   template key no service reads, and it is right to: a DSN an operator fills
+#   in that reaches no process is worse than an absent one, because it looks
+#   configured. The wiring lands with the slice that gives vizra-core an
+#   analytics client (VZ-ANALYTICS-*), and this file grows a DSN then.
+#
+# So: ANALYTICS_MODE in docs/META_REPO.md §3 is a target, not a key this
+# overlay honours. OFF and EXTERNAL are indistinguishable here because both
+# create no container, which is exactly rule 1 of §2 — the distinction only
+# becomes observable once something connects.
+#
+# `profiles: !override` rather than `!reset`: see the header of
+# docker-compose.external-postgres.yml. `!reset` deletes the key and leaves a
+# service that starts on EVERY invocation.
+
+services:
+
+  clickhouse:
+    profiles: !override ["external-disabled"]

@@ -1,0 +1,185 @@
+# Vizra — production overlay. EXPLICIT `-f` CHAIN ONLY.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#     --env-file env/production.env \
+#     --profile core --profile frontend --profile edge [--profile worker …] …
+#
+# A bare `docker compose` on a production host is WRONG and the deploy scripts
+# use the chain above instead (docs/META_REPO.md §2; VZ-TOPOLOGY-001 negative
+# case). Bare invocation auto-loads docker-compose.override.yml, which sets
+# development mode and publishes developer ports.
+#
+# WHAT THIS FILE IS FOR, in one sentence each:
+#
+#  1. Release-record images. Every service that comes from a Vizra repository
+#     is re-declared with `${VIZRA_*_TAG:?…}`, so a deploy without a resolved
+#     release record FAILS TO RENDER rather than silently running `:dev` or, in
+#     the base file's absence of a default, `:latest`. `pull_policy: always`
+#     makes a re-pushed tag actually arrive.
+#
+#  2. No build, anywhere. `build: !reset null` on every buildable service.
+#     `docker compose run` has NO `--no-build` flag, so a service Compose
+#     considers buildable will compile on the host on a cold cache — for the
+#     migration one-shot that means a Go toolchain on a 2 vCPU droplet in the
+#     middle of a deploy. `pull_policy` is not consulted for a buildable
+#     service. This is also what lets the production chain render on a host with
+#     no component checkout at all.
+#
+#  3. The only ports that face anything. api and frontend on 127.0.0.1 (so an
+#     operator can curl them, and so an external nginx can proxy them when
+#     VIZRA_TLS_MODE=external); caddy on 80/443; the IPFS swarm port when that
+#     profile is on. Nothing else, with EVERY optional profile enabled —
+#     asserted by the `prod-all-optional` shape.
+#
+#  4. Production mode, and no development seam. VIZRA_MODE=production is set
+#     here, not inherited, so it cannot be lost by an overlay ordering mistake.
+#
+#  5. A memory cap on every long-running service. THESE ARE CAPS ON PEAK, NOT
+#     RESERVATIONS, and they deliberately sum above the documented floor host's
+#     4 GB — see the capacity note in docs/quality/COMMANDS.md. The job they do
+#     is containment, not scheduling: without a cgroup limit anywhere, four
+#     concurrent libvips decodes exhaust RAM and the kernel OOM killer picks by
+#     badness score, which on a Docker host is routinely PostgreSQL (largest
+#     RSS, shared memory). The operator's symptom is then not "uploads are
+#     slow" but PostgreSQL killed mid-write and crash recovery on restart, for
+#     reasons that have nothing to do with the upload. A limit that OOM-kills
+#     the worker is recoverable; one that OOM-kills PostgreSQL is not.
+#     Every limit is `${VIZRA_*_MEM_LIMIT:-default}` so a larger host raises it
+#     without editing this file. Precedent: Vidra's docker-compose.prod.yml sets
+#     cpus/mem_limit on api, worker and ipfs — read for shape, not for values,
+#     which are scaled here to the 2 vCPU / 4 GB floor host.
+#     `scripts/check-compose-topology.py`'s `missing-mem-limit` rule fails a
+#     production shape where a long-running service has none.
+#
+# Compose >= 2.24.4 (Q-017). `!reset` and `!override` are used below. An older
+# Compose does not error on them — it IGNORES them — which would leave `build:`
+# in place and the developer ports published. Nothing here depends on a version
+# comment: `scripts/check-compose-topology.py` proves from the RENDERED model
+# that the tags were honoured (no `build:` survives, the external overlays
+# actually remove their datastore), and `scripts/compose-render.py` refuses to
+# render at all below the floor.
+
+services:
+
+  postgres:
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+    # The service we most want the OOM killer NOT to choose, so its cap sits
+    # well above PostgreSQL 18's realistic use on the floor host (shared_buffers
+    # defaults to 128 MB; no tuning knobs are set here - VZ-OPS-007 adds them
+    # when it has measured a budget, not before).
+    mem_limit: ${VIZRA_POSTGRES_MEM_LIMIT:-768m}
+    # F6: Docker's default is 10s, then SIGKILL. A checkpoint or a long client
+    # transaction in flight at that moment means crash recovery on next start -
+    # minutes of downtime during a deploy, with nothing telling the operator
+    # why boot is slow. The postgres image uses STOPSIGNAL SIGINT (fast
+    # shutdown), so 10s is usually plenty; 60s is what makes "usually" not
+    # matter on a large database.
+    stop_grace_period: 60s
+
+  redis:
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+    # VALKEY_MAXMEMORY defaults to 256mb; the rest is fragmentation and
+    # copy-on-write headroom. Raise both together or the cap fights the policy.
+    mem_limit: ${VIZRA_REDIS_MEM_LIMIT:-384m}
+
+  migrate:
+    image: ${VIZRA_IMAGE_REGISTRY:-ghcr.io}/${VIZRA_IMAGE_OWNER:-yegamble}/vizra-core:${VIZRA_CORE_TAG:?VIZRA_CORE_TAG is required (e.g. v0.1.0) and comes from releases/<tag>.json, so a deploy and its rollback name the same artefact}
+    pull_policy: always
+    build: !reset null
+    restart: "no"
+    environment:
+      # Bound, so a migration that cannot take its lock fails the deploy instead
+      # of holding the database while api and worker pile up behind it.
+      PGOPTIONS: "-c lock_timeout=${VIZRA_MIGRATE_LOCK_TIMEOUT:-5s}"
+      VIZRA_MODE: production
+    # Not required by the missing-mem-limit rule (one-shots are exempt: they
+    # exit), but set anyway - a migration that runs away should not take the
+    # host down with it.
+    mem_limit: ${VIZRA_MIGRATE_MEM_LIMIT:-256m}
+
+  api:
+    image: ${VIZRA_IMAGE_REGISTRY:-ghcr.io}/${VIZRA_IMAGE_OWNER:-yegamble}/vizra-core:${VIZRA_CORE_TAG:?VIZRA_CORE_TAG is required (e.g. v0.1.0) and comes from releases/<tag>.json}
+    pull_policy: always
+    build: !reset null
+    environment:
+      VIZRA_MODE: production
+    ports:
+      # LOOPBACK. `!override` replaces the list rather than appending to it:
+      # Compose MERGES sequences across a -f chain, so a plain list here would
+      # add to whatever docker-compose.override.yml published if someone put
+      # both files in one chain.
+      - !override "127.0.0.1:${VIZRA_HTTP_PORT:-8080}:8080"
+    # No pixel decode ever happens in the API process (ADR-002, Q-034), so this
+    # is request handling, connection pools and Go runtime overhead.
+    mem_limit: ${VIZRA_API_MEM_LIMIT:-768m}
+    stop_grace_period: 30s
+
+  worker:
+    image: ${VIZRA_IMAGE_REGISTRY:-ghcr.io}/${VIZRA_IMAGE_OWNER:-yegamble}/vizra-core:${VIZRA_CORE_TAG:?VIZRA_CORE_TAG is required (e.g. v0.1.0) and comes from releases/<tag>.json}
+    pull_policy: always
+    build: !reset null
+    environment:
+      VIZRA_MODE: production
+    # The largest cap in the stack, and the one doing the real containment work:
+    # the worker is the only process that runs libvips (ADR-002), and a 12 MP
+    # JPEG derivative set is the peak. Sized for the shipped
+    # VIZRA_WORKER_CONCURRENCY=2; the floor host should run 1.
+    mem_limit: ${VIZRA_WORKER_MEM_LIMIT:-1500m}
+    stop_grace_period: 30s
+
+  frontend:
+    image: ${VIZRA_IMAGE_REGISTRY:-ghcr.io}/${VIZRA_IMAGE_OWNER:-yegamble}/vizra-user:${VIZRA_USER_TAG:?VIZRA_USER_TAG is required (e.g. v0.1.0) and comes from releases/<tag>.json}
+    pull_policy: always
+    build: !reset null
+    # Next.js standalone server: rendering and the fetch layer, no build here.
+    mem_limit: ${VIZRA_FRONTEND_MEM_LIMIT:-512m}
+    ports:
+      - !override "127.0.0.1:${VIZRA_FRONTEND_PORT:-3000}:3000"
+
+  search:
+    image: ${VIZRA_IMAGE_REGISTRY:-ghcr.io}/${VIZRA_IMAGE_OWNER:-yegamble}/vizra-search:${VIZRA_SEARCH_TAG:?VIZRA_SEARCH_TAG is required (e.g. v0.1.0) and comes from releases/<tag>.json}
+    pull_policy: always
+    build: !reset null
+    # A static Go binary on `scratch` that owns no index, no database and no
+    # cache at M0. This cap rises with VZ-SEARCH-001.
+    mem_limit: ${VIZRA_SEARCH_MEM_LIMIT:-256m}
+    # Never published. vizra-search is reachable from vizra-core over the
+    # compose network and from nowhere else.
+
+  clickhouse:
+    restart: unless-stopped
+    # OFF by default, and NOT sized for the floor host: enabling the analytics
+    # profile on 4 GB is not a supported shape. This cap keeps it from taking
+    # the host with it on a larger one.
+    mem_limit: ${VIZRA_CLICKHOUSE_MEM_LIMIT:-1g}
+    # F6: ClickHouse flushes on shutdown, so the 10s default is worse here than
+    # it is for PostgreSQL.
+    stop_grace_period: 60s
+
+  ipfs:
+    # THE ONE OPTIONAL SERVICE PORT ALLOWED TO FACE THE NETWORK, and only the
+    # swarm port: an IPFS node that cannot be dialled cannot participate. The
+    # HTTP API (5001) and the gateway (8080) are NOT published — the API is a
+    # full-control surface and publishing it is remote code execution on the
+    # node. docs/META_REPO.md §2 additionally requires this port to be gated in
+    # the cloud firewall; compose cannot assert that and does not claim to.
+    mem_limit: ${VIZRA_IPFS_MEM_LIMIT:-768m}
+    ports:
+      - "4001:4001/tcp"
+      - "4001:4001/udp"
+
+  caddy:
+    # The one container whose death is TOTAL SITE DOWNTIME, and it was the
+    # tightest cap in the stack at 96m. Caddy idles at 25-40 MiB but reaches
+    # 80-150 MiB with HTTP/2, TLS session state and a few hundred concurrent
+    # connections. Saving 64 MiB on a 4 GB host is not worth an OOM of the edge.
+    mem_limit: ${VIZRA_CADDY_MEM_LIMIT:-160m}
+    ports:
+      - "80:80"
+      - "443:443"

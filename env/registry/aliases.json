@@ -1,0 +1,23 @@
+{
+  "note": "ONE operator key feeding two differently-spelled service keys. Each entry is a naming conflict between component repositories, not a convenience, and each carries an explicit `authorised` decision: an alias is a place where an operator can believe they configured something they did not, so 'somebody wrote a paragraph about it' is not the same as 'somebody decided it'. scripts/check-config-coverage.py refuses an alias with no `authorised` field, and PRINTS every alias with its state on each green run. The floor makes adding one a visible edit.",
+  "floor": 1,
+  "aliases": [
+    {
+      "operator_key": "VIZRA_PUBLIC_ORIGIN",
+      "service_keys": [
+        {
+          "component": "vizra-core",
+          "key": "VIZRA_PUBLIC_ORIGIN"
+        },
+        {
+          "component": "vizra-user",
+          "key": "PUBLIC_ORIGIN"
+        }
+      ],
+      "authorised_by": "chair ruling 2026-09-21, WARROOM-BOARD queue 2h",
+      "removed_when": "vizra-user main reads VIZRA_PUBLIC_ORIGIN",
+      "authorised": true
+    }
+  ],
+  "resolved_note": "SEARCH_HMAC_KEY was alias 1 and is RESOLVED: vizra-core 4a80a1e adopted the contract's spelling, so one operator key now feeds one service key name in both services. The entry is deleted rather than marked resolved, and the floor moved from 2 to 1 in the same edit - a resolved alias left in the table is a compromise that reads as current."
+}

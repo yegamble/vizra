@@ -1,0 +1,222 @@
+{
+  "component": "vizra-core",
+  "source_commit": "4a80a1e3f36b8001c2954d0568bea29268e739fe",
+  "source_files": [
+    "internal/config/keys.go",
+    "internal/config/config.go",
+    ".env.example"
+  ],
+  "read_2026_09_21_by": "VZ-ISSUE-002 review round 1 (re-snapshotted from keys.go at core main)",
+  "services": [
+    "api",
+    "worker",
+    "migrate"
+  ],
+  "keys": [
+    {
+      "name": "VIZRA_MODE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": "development",
+      "reason": "the deployment decides its own mode; docker-compose.prod.yml sets production and docker-compose.override.yml sets development. An operator-settable mode would let a production host boot with vizra-core's production refusals disabled."
+    },
+    {
+      "name": "VIZRA_PUBLIC_ORIGIN",
+      "required": "production",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "http://localhost:8080"
+    },
+    {
+      "name": "VIZRA_LISTEN_ADDR",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": ":8080",
+      "reason": "the in-container listen address is a topology fact, not an operator choice; the published port is VIZRA_HTTP_PORT."
+    },
+    {
+      "name": "VIZRA_METRICS_ADDR",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": "127.0.0.1:9090",
+      "reason": "pinned to loopback. /metrics is not in api/openapi.yaml and no client should reach it."
+    },
+    {
+      "name": "VIZRA_SITE_HANDLE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "default"
+    },
+    {
+      "name": "DATABASE_URL",
+      "required": "production",
+      "secret": true,
+      "delivered_by": "compose-or-template",
+      "reason": "composed from POSTGRES_* in the MANAGED shape; supplied verbatim by the operator in the EXTERNAL shape (docker-compose.external-postgres.yml)."
+    },
+    {
+      "name": "VIZRA_CACHE_URL",
+      "required": "production",
+      "secret": true,
+      "delivered_by": "compose-or-template",
+      "default": "redis://127.0.0.1:6379/0",
+      "reason": "fixed to the bundled service in the MANAGED shape; supplied verbatim in the EXTERNAL shape (docker-compose.external-redis.yml)."
+    },
+    {
+      "name": "VIZRA_CACHE_NAMESPACE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "default"
+    },
+    {
+      "name": "VIZRA_STORAGE_PREFIX",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "default"
+    },
+    {
+      "name": "VIZRA_SESSION_SECRET",
+      "required": "production",
+      "secret": true,
+      "delivered_by": "template"
+    },
+    {
+      "name": "VIZRA_MFA_KEY_KEK",
+      "required": "production",
+      "secret": true,
+      "delivered_by": "template"
+    },
+    {
+      "name": "VIZRA_SEARCH_MODE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "off"
+    },
+    {
+      "name": "VIZRA_SEARCH_URL",
+      "required": "conditional",
+      "secret": false,
+      "delivered_by": "template"
+    },
+    {
+      "name": "SEARCH_HMAC_KEY",
+      "required": "conditional",
+      "secret": true,
+      "delivered_by": "template",
+      "reason": "core's OWN spelling since 4a80a1e \u2014 the canonical contract's name, read identically by vizra-core and vizra-search. No alias: one operator key, one spelling, both services."
+    },
+    {
+      "name": "VIZRA_SEARCH_TIMEOUT",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "2s"
+    },
+    {
+      "name": "VIZRA_CORS_ALLOWED_ORIGINS",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template"
+    },
+    {
+      "name": "VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template"
+    },
+    {
+      "name": "VIZRA_QUEUE_AGE_THRESHOLD",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "15m"
+    },
+    {
+      "name": "VIZRA_WORKER_CONCURRENCY",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "4"
+    },
+    {
+      "name": "VIZRA_JOB_LEASE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "60s"
+    },
+    {
+      "name": "VIZRA_JOB_TIMEOUT",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "5m"
+    },
+    {
+      "name": "VIZRA_SHUTDOWN_GRACE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "20s"
+    }
+  ],
+  "escape_hatches": [
+    "VIZRA_DEV_DISABLE_AUTH",
+    "VIZRA_DEV_ALLOW_ANY_ORIGIN",
+    "VIZRA_DEV_SKIP_MIGRATIONS",
+    "VIZRA_DEV_AUTOLOGIN_USER",
+    "VIZRA_DEV_FAKE_SEARCH",
+    "VIZRA_DEV_INSECURE_COOKIES",
+    "VIZRA_DEV_TRUST_ANY_HMAC"
+  ],
+  "escape_hatch_note": "vizra-core refuses every one of these by name when VIZRA_MODE=production. They must never appear in a rendered production model at all - not set to false, not set to anything - because VIZRA_DEV_AUTOLOGIN_USER is refused on PRESENCE. scripts/check-config-coverage.py asserts their absence.",
+  "non_registry_env": [
+    "PGOPTIONS"
+  ],
+  "non_registry_env_note": "PGOPTIONS is libpq's own variable, not a Vizra config key: docker-compose.prod.yml sets `-c lock_timeout=...` on the migrate one-shot so a migration that cannot take its lock fails the deploy instead of holding the database. It is declared here so the coverage check can tell 'deliberately delivered, read by the driver' from 'delivered and read by nobody'.",
+  "drift_ignore": [
+    "CHANGE",
+    "ME",
+    "VIZRA_TEST_CACHE_FLAVOUR",
+    "VIZRA_TEST_CACHE_URL",
+    "VIZRA_TEST_DATABASE_URL"
+  ],
+  "drift_ignore_note": "The drift extractor is a deliberately coarse literal scan: it over-reports rather than under-reports, and every entry here is a token it found that is NOT a key the component reads. SEARCH_HMAC_KEY was ignored here until core 4a80a1e, when core adopted the contract's spelling and began reading it - the entry is removed rather than left as harmless, because an ignore list that still names a live key hides the next rename.",
+  "binaries": [
+    "vizra-api",
+    "vizra-worker",
+    "vizra"
+  ],
+  "commands": [
+    "vizra version",
+    "vizra doctor",
+    "vizra migrate"
+  ],
+  "commands_note": "The operator CLI's subcommands AS SHIPPED, read from vizra-core/cmd/vizra/main.go at source_commit. scripts/check-template-claims.py refuses a template or compose comment that tells an operator to run anything else, unless the reference is marked future by naming its slice - a sentence promising `vizra setup --rotate` is what that check exists to catch.",
+  "retired_keys": [
+    "VIZRA_SEARCH_HMAC_KEY"
+  ],
+  "retired_keys_note": "Names vizra-core USED TO read and now REFUSES in production on presence (internal/config/keys.go RetiredKeys at source_commit). Not a compatibility alias: the value has no effect, which is exactly why it must be refused rather than ignored \u2014 an operator who carried the old name forward has a file that LOOKS configured while the process booted with no key at all. scripts/check-config-coverage.py fails if any compose environment map delivers one.",
+  "future_commands": {
+    "vizra setup": "VZ-ISSUE-004",
+    "vizra backup": "VZ-ISSUE-004",
+    "vizra restore": "VZ-ISSUE-004",
+    "vizra deploy": "VZ-ISSUE-004",
+    "vizra rollback": "VZ-ISSUE-004",
+    "vizra update": "VZ-ISSUE-004",
+    "vizra release": "VZ-ISSUE-004",
+    "vizra status": "VZ-ISSUE-004",
+    "vizra logs": "VZ-ISSUE-004",
+    "vizra restart": "VZ-ISSUE-004",
+    "vizra healthcheck": "queue 2h"
+  },
+  "future_commands_note": "Commands docs/META_REPO.md \u00a75 names as targets, mapped to the MARKER that must appear in the comment block of any operator-facing file that names them. scripts/check-template-claims.py enforces it, so 'marked as future' is mechanical rather than a judgement about tone: either the sentence names the slice that will deliver the command, or it does not get to promise it.",
+  "source_commit_rule": "Names a commit on this component's `main`. Confirmed at re-stamp time with `git -C <checkout> merge-base --is-ancestor <sha> origin/main`."
+}

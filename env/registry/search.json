@@ -1,0 +1,88 @@
+{
+  "component": "vizra-search",
+  "source_commit": "808a5499dae1d58971d740f34749c2f35149fa4d",
+  "source_files": [
+    "internal/config/config.go",
+    "Dockerfile",
+    "AGENTS.md"
+  ],
+  "read_2026_09_21_by": "VZ-ISSUE-002",
+  "services": [
+    "search"
+  ],
+  "keys": [
+    {
+      "name": "SEARCH_HMAC_KEY",
+      "required": "always",
+      "secret": true,
+      "delivered_by": "template"
+    },
+    {
+      "name": "MAX_INTERNAL_BODY_BYTES",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "1048576"
+    },
+    {
+      "name": "VIZRA_SEARCH_MODE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": "production",
+      "reason": "NAME COLLISION, and the reason no service in this tree takes an env_file: vizra-search reads production|development here, while vizra-core reads off|managed|external from a key of the SAME NAME. A shared env file would hand search the string 'off', which its validator refuses. Set literally per service. Reported to the chair as a contract naming conflict."
+    },
+    {
+      "name": "VIZRA_SEARCH_ADDR",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": ":8081",
+      "reason": "in-network listen address. vizra-search is never published off-host in any shape."
+    },
+    {
+      "name": "VIZRA_SEARCH_MAX_CLOCK_SKEW",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "300s"
+    },
+    {
+      "name": "VIZRA_SEARCH_REQUEST_TIMEOUT",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "5s"
+    },
+    {
+      "name": "VIZRA_SEARCH_SHUTDOWN_GRACE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "15s"
+    }
+  ],
+  "escape_hatches": [],
+  "escape_hatch_note": "vizra-search declares none. Its development mode is selected by VIZRA_SEARCH_MODE, which this tree sets literally.",
+  "drift_ignore": [
+    "GOFLAGS",
+    "GOTESTFLAGS",
+    "MAKEFLAGS",
+    "SEARCH_MODE",
+    "SHELL",
+    "UNEVALUABLE",
+    "VIOLATION"
+  ],
+  "drift_ignore_note": "Tokens the coarse literal scan found in AGENTS.md prose and in build tooling, none of which vizra-search reads as configuration. SEARCH_MODE is vizra-core's key, discussed in vizra-search's AGENTS.md; vizra-search reads VIZRA_SEARCH_MODE.",
+  "binaries": [
+    "vizra-search"
+  ],
+  "commands": [
+    "vizra-search version",
+    "vizra-search healthcheck"
+  ],
+  "commands_note": "argv subcommands read from vizra-search/cmd/vizra-search/main.go at source_commit; no argument runs the server.",
+  "retired_keys": [],
+  "future_commands": {},
+  "source_commit_rule": "Names a commit on this component's `main`. Confirmed at re-stamp time with `git -C <checkout> merge-base --is-ancestor <sha> origin/main`."
+}

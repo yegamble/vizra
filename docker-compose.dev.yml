@@ -1,0 +1,58 @@
+# Vizra — build from the nested component checkouts.
+#
+# Explicit `-f` only; never auto-loaded. Use it when you are changing component
+# source and want the stack to run YOUR tree:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml \
+#                  -f docker-compose.dev.yml --profile core --profile frontend up
+#
+# It requires ./vizra-core, ./vizra-user and ./vizra-search to exist. Clone them
+# yourself for now: `bootstrap.sh`, which will do it, arrives with VZ-ISSUE-004
+# — the slice that owns the installer and the bundle. (This comment previously
+# cited VZ-ISSUE-003, which is the CI fan-in and owns no script.)
+# This is the ONLY file in the tree
+# that names a build context, which is what makes the bundle shape work: the
+# production chain never loads it, so a production host needs no source, no
+# compiler and no Docker build (asserted by the `bundle-no-checkouts` shape in
+# scripts/compose-shapes.json, which renders the production chain with the three
+# directories absent).
+#
+# EVERY buildable service is redirected here, the one-shot included. Leaving
+# `migrate` on the registry image while api and worker build from source is the
+# classic way to run this release's migrations against last release's schema —
+# or to have Compose try to pull a tag that was never published.
+#
+# Apple Silicon: these are native arm64 builds for development only, with no
+# support claim (Q-027). Published runtime images are linux/amd64.
+
+services:
+
+  migrate:
+    build:
+      context: ./vizra-core
+      dockerfile: Dockerfile
+    image: vizra-core:dev
+
+  api:
+    build:
+      context: ./vizra-core
+      dockerfile: Dockerfile
+    image: vizra-core:dev
+
+  worker:
+    build:
+      context: ./vizra-core
+      dockerfile: Dockerfile
+    image: vizra-core:dev
+
+  frontend:
+    build:
+      context: ./vizra-user
+      dockerfile: Dockerfile
+    image: vizra-user:dev
+
+  search:
+    build:
+      context: ./vizra-search
+      dockerfile: Dockerfile
+    image: vizra-search:dev

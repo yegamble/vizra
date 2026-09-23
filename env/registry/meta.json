@@ -1,0 +1,15 @@
+{
+  "component": "vizra (meta)",
+  "note": "Artefacts this REPOSITORY owns, as opposed to the component snapshots beside it. It exists because scripts/check-template-claims.py has to answer a question about belief, not provenance: an operator reading `backup.sh refuses to back the cache up` cannot tell a Go subcommand from a shell script, and does not care. The checker's registries described components only, so every shell-script claim was outside its scope - and one present-tense claim about a script that does not exist survived round 1 in two operator-facing files.",
+  "scripts": [],
+  "scripts_note": "Shell scripts that EXIST in this repository today. Empty: there is no backup.sh, restore.sh, install.sh, bootstrap.sh or deploy.sh yet. A reference to a script listed here needs no marker.",
+  "future_scripts": {
+    "backup.sh": "VZ-ISSUE-004",
+    "restore.sh": "VZ-ISSUE-004",
+    "install.sh": "VZ-ISSUE-004",
+    "bootstrap.sh": "VZ-ISSUE-004",
+    "deploy.sh": "VZ-ISSUE-004",
+    "rollback.sh": "VZ-ISSUE-004"
+  },
+  "future_scripts_note": "Scripts docs/META_REPO.md §3 and §6 name as targets, mapped to the MARKER that must appear within scripts/check-template-claims.py's MARKER_WINDOW of any operator-facing reference. Declared exactly as `vizra setup` is: naming one in the present tense is what the checker refuses, because an operator who believes a backup tool exists defers setting up provider snapshots until they have 'checked what backup.sh does'. There is nothing to check, and the gap is only visible the first time they need a restore."
+}

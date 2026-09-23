@@ -1,0 +1,66 @@
+{
+  "component": "vizra-user",
+  "source_commit": "90896beb9669a3b305269a298d507fd7a9e27aa4",
+  "source_files": [
+    "lib/config.ts",
+    "Dockerfile"
+  ],
+  "read_2026_09_21_by": "VZ-ISSUE-002",
+  "services": [
+    "frontend"
+  ],
+  "keys": [
+    {
+      "name": "INTERNAL_API_BASE_URL",
+      "required": "always",
+      "secret": false,
+      "delivered_by": "compose",
+      "reason": "the in-network address of the api service. Never operator-settable: pointing the frontend at anything but http://api:8080 within this topology is a misconfiguration, not a choice."
+    },
+    {
+      "name": "PUBLIC_ORIGIN",
+      "required": "always",
+      "secret": false,
+      "delivered_by": "alias",
+      "reason": "fed from the operator key VIZRA_PUBLIC_ORIGIN; see env/registry/aliases.json."
+    },
+    {
+      "name": "API_TIMEOUT_MS",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "10000"
+    },
+    {
+      "name": "PORT",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": "3000",
+      "reason": "the in-container port; the published port is VIZRA_FRONTEND_PORT."
+    },
+    {
+      "name": "HOSTNAME",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": "0.0.0.0",
+      "reason": "binds inside the container so caddy can reach it over the compose network. No port is published by the base file, so this is not an exposure."
+    }
+  ],
+  "escape_hatches": [],
+  "escape_hatch_note": "vizra-user declares none. Its test-harness variables (E2E_*, CI, TEST_WORKER_INDEX) are not service configuration and are deliberately absent from this snapshot and from every template.",
+  "drift_ignore": [
+    "NEXT_TELEMETRY_DISABLED",
+    "NODE_ENV"
+  ],
+  "drift_ignore_note": "Baked into the image by vizra-user's Dockerfile and never varied per deployment: NODE_ENV=production is what makes it a production build at all, and NEXT_TELEMETRY_DISABLED=1 is a build-time opt-out. Neither is service configuration, so neither belongs in an operator template.",
+  "binaries": [
+    "node server.js"
+  ],
+  "commands": [],
+  "commands_note": "vizra-user ships no operator CLI; its image CMD is `node server.js`.",
+  "retired_keys": [],
+  "future_commands": {},
+  "source_commit_rule": "Names a commit on vizra-user's `main`, NOT on a branch. The previous value 77305009 was the tip of an unmerged PR branch: a snapshot stamped with a commit that may never merge cannot be re-derived by anyone, and the drift check would compare against a tree that does not exist for them. Verified at re-stamp time by reading lib/config.ts and Dockerfile out of `git show origin/main:` - the three keys and the two image ENV declarations are unchanged. The same rule applies to every registry here."
+}
