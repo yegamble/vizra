@@ -513,3 +513,153 @@ F1, F2, F3 and F4 are **fixed and reproduced**:
 One REQUIRED finding remains, R1-F1. Under the chair's "no false-guarantee merges" rule it blocks: sentences this PR authored or edited state that a `-` prefixed gate recipe is refused by name before make, and on GNU Make 4.3 a pinned `.RECIPEPREFIX` makes the anchor pass with a failing gate. The fix is a one-line pre-make refusal plus one fixture, or a qualified sentence. If the chair rules pre-existing control gaps out of this slice's scope, everything else here would support `PASS (local; CI BLOCKED)`.
 
 FINAL VERDICT: FAIL — SHA 08a59a91a6dcc91c2346bcb206d4c0ad8603e90e
+
+---
+
+# Re-verification at 398ac4f (round 2 of 2, the last)
+
+- **Head:** `gh pr view 10` at start → `398ac4fe2bd8a6096a24e402936ef3ab2c2238bc`. It is one commit on `08a59a9`: "fix(ci): B5 fix round 2 — refuse .RECIPEPREFIX and .SECONDEXPANSION before make; target/pattern-specific and define assignments; expansion-produced prefixes and suffixes; resolver fixtures".
+- **Clone:** new `mktemp -d …/vzv-core-pr10r2-XXXXXX`, fresh clone + `fetch pull/10/head`, detached at the SHA, with a second local clone for my sweeps.
+- **Host:** darwin/arm64, GNU Make 3.81, go1.27.1.
+- **4.3:** my own container `vzvpr10r2-make43-<pid>`, `--rm`, with **PyYAML 6.0.1 installed this time** and a logging `/usr/bin/make` wrapper. `ubuntu:24.04` was already present and in use by `searchci-r2-66aa22`, so it was not removed.
+
+## R2-0. Scope
+
+- Outside `scripts/`, `docs/`, `.github/pinned-makefiles.yml`, `AGENTS.md` and `README.md`: nothing.
+- Frozen-path grep: no output.
+- No file deleted in the round.
+- Pin still `e7cc357c…` and still matches the Makefile.
+- `git diff 08a59a9..HEAD -- scripts/scripts_test.go scripts/makefiledigest_test.go`: **zero removed lines**. The round only adds tests.
+
+## R2-1. The builder's driver and demonstrations
+
+- **3.81 host:** `demo.sh` exit 0, 0 uncommitted paths. Every row reproduced:
+  - D0–D6 as in round 1.
+  - **D7** (`.RECIPEPREFIX`): anchor exit 1 in both modes, 0 make processes, `Makefile:3 names .RECIPEPREFIX`.
+  - **C10** and **C10b**: on 3.81 they are refused only as a `make -q` exit-2 parse error, because 3.81 lacks the feature.
+  - C7 as before; C1–C9 red/green; **C11** (resolver removed), **C12**, C13 and C14 each turn their named test red (go test exit 1) and green after restore.
+- **4.3 container** (`DEMO_ONLY=D`, exit 0):
+  - D0–D6 match 3.81, with `ci-required-guard` **exit 0 on D0 and exit 1 by name on D1, D2 and D4** now that PyYAML is installed.
+  - **D7:** raw `make ci` exits 0 on those bytes, while the anchor exits 1 with 0 make processes.
+  - **C10** (pre-make refusal removed): the anchor still exits 1 after 4 make processes, from the resolver backstop `make resolves .RECIPEPREFIX to '>'`.
+  - **C10b** (both removed, the 08a59a9 state): the anchor **exits 0**, reproducing R1-F1. Restored: exit 1, 0 make processes.
+  - C7 BROKEN, then HELD after restore.
+  - The in-container copy reported 1 uncommitted path afterwards. That is the container's scratch copy only; the host tree is clean.
+
+## R2-2. All 46 makeguard fixtures, on 3.81 and 4.3
+
+Swept with the recorder at `--workflow`; on 4.3 also counted with the make wrapper. **Exit codes and make-process counts are identical on 3.81 and 4.3 for all 46, and the recorder and wrapper counts agree on every fixture.**
+- 0 make processes: every text-refused fixture, including the new `recipeprefix`, `secondexpansion`, `define-shell` and `pattern-specific-shell`.
+- 1: `make-q-parse-error` (the probe's exit 2 is now labelled "make reported an ERROR", closing the round-1 NIT).
+- 2: `missing-prerequisite`.
+- 4 then refused by the resolver by name: `resolver-computed-{shell,makeflags,recipeprefix,secondexpansion}`, `prefix-from-{variable,chained-variable,function,pattern-specific}`, `suffix-from-variable`.
+- 0 failures: `good` and `include-pinned-good`.
+
+## R2-3. The chair's spellings (item 2)
+
+I read these from code and confirmed them against the builder's fixtures and table. I built no new Makefile.
+
+| Spelling | Where it is refused | Evidence |
+|---|---|---|
+| `.RECIPEPREFIX` in any line: comment, recipe, CRLF, tab-indented, any operator | before make (substring scan of every raw line of every file in the pinned read set, :876-880) | fixture `recipeprefix`; `TestEveryRefusedSpellingIsRefusedBeforeMake` (32 rows) is present and passed in the unit run |
+| via `-include`/`include` of a pinned file | before make (the included file is in the read set and scanned the same way) | code :866-880 |
+| via `$(eval …)` | before make (makefile_pin refuses any `$(eval`) | fixture `eval-in-pinned-bytes` |
+| name held in a variable (`$(X)PREFIX`) | after make, resolver `.RECIPEPREFIX` from the `-pn` db | fixture `resolver-computed-recipeprefix`; C10 on 4.3 |
+| backslash-newline split | not a substring. make joins a continuation with a space, so this is not a `.RECIPEPREFIX` name; the resolver backstop reads the db either way | reasoned, not run |
+| prefix via a chained or recursive variable | after make: leading references are resolved iteratively from the db, up to 25 levels, then refused | fixture `prefix-from-chained-variable` |
+| prefix via `+=` | after make (the db holds the final value) | reasoned from code, not run |
+| via a leading function, automatic variable, substitution reference, or a target/pattern-specific variable | after make, refused as undeterminable | fixtures `prefix-from-function`, `prefix-from-pattern-specific` |
+
+## R2-4. Remaining GNU Make 4.3 evaluation features (item 3)
+
+**Method:** static reading of `make-integrity-guard.py`, `makefile_pin.py` and the docs (`grep` for each name), plus the GNU Make manual's documented semantics. **I did not build a Makefile for any of these.** A dynamic check of each would require constructing a neutering Makefile, which is outside my byte-and-file-mutation remit. Where a row needs a live check, I say so.
+
+| Feature | Status at 398ac4f | Note |
+|---|---|---|
+| **`.IGNORE`** | **not named by any check** (0 hits in the guard, makefile_pin or docs). Before make: not refused. After make: the resolver's MAKEFLAGS check might catch a prerequisite-less `.IGNORE:` if make reflects it as `i` in the `-pn` MAKEFLAGS. **UNVERIFIED.** `.IGNORE: <gate target>` (per-target, per the manual) is by reading not visible to any check. | Same effect as a `-` prefix, per the manual. Covered only by the catch-all residual ("everything else a reviewed Makefile says is review's to catch", AGENTS.md:235-238) and the "not exhaustive" clause (AGENTS.md:215-217). For test lanes it is mitigated by the direct suite steps with floors, which run without make; `fixtures-verify`, `openapi-verify` and the other make-only lanes have no such second layer. **NEW-CLASS, see R2-F1** |
+| `.SILENT` | not named | Suppresses echo only; no exit-status effect per the manual. Not a neutering feature |
+| `.ONESHELL` | refused before make (line start) **and** after make (db) | fixture `oneshell`; C11 |
+| `.POSIX` | not named | In 4.3 it adds `-e` to the shell flags only when .SHELLFLAGS is the default; here .SHELLFLAGS is pinned and checked. By reading, it does not weaken exit status. Residual |
+| `.DEFAULT` | not named | Supplies a recipe for a prerequisite with no rule. Its recipe is outside the scanned gate closure (check_text notes rule-less prerequisites as "file dependencies, not lanes"). Catch-all residual. **Same class as R2-F2** |
+| `.EXTRA_PREREQS` (4.3) | not named | Adds prerequisites the text closure (which parses explicit rule lines) does not see, so their recipes are not scanned. Catch-all residual. **R2-F2 class** |
+| `.NOTPARALLEL` | not named | Ordering only; no exit-status effect |
+| `$(eval)` / `$(call)` building rules | `$(eval`/`$(guile` refused before make wherever named (makefile_pin). `$(call)` cannot build a rule without eval. `$(call)` leading a gate recipe line → refused after make as undeterminable | fixtures `eval-in-pinned-bytes`, `prefix-from-function` |
+| `vpath` / `VPATH` | not named | Changes prerequisite search, not recipe exit status. Catch-all residual |
+| `.DEFAULT_GOAL` | not relevant | CI names explicit targets (pinned step bodies) |
+| `export SHELL` | `export SHELL := x` refused before make (assignment regex allows `export`/`override`/`private`); bare `export SHELL` only exports the approved value | code :857-861; fixtures shell-* |
+| `MAKESHELL` | not relevant | MS-DOS/Windows only, per the manual |
+| gate target declared twice with `::` | by reading, refused before make as "defined 2 times" (the definition regex `^ci\s*:` matches `ci::`). A single `ci::` has its recipe scanned like any other | reasoned from code, not run |
+| pattern-rule / implicit-rule recipes reached through a gate's prerequisites | not scanned for literal `-`/`+`/`|| true` (check_text scans only explicit `target:` rules for names in the closure) | **R2-F2** |
+
+## R2-5. Lanes at 398ac4f (clean clone)
+
+| Command | Exit | Counts |
+|---|---|---|
+| direct unit step + `go-test-report.py` | 0 / 0 | **1206 executed, 1206 pass, 0 skip** (my own JSON count `{'pass': 1206}`); `scripts` **286**; floor 943; `TestEveryRefusedSpellingIsRefusedBeforeMake` present and passed |
+| `make ci` | **0** | all 10 lanes; `internal/fixtures` 253 s, `scripts` 42.8 s |
+| both anchors (host) | 0 / 0 | 18 make processes on the pinned Makefile |
+| `ci-required-guard.sh` (host and 4.3) | 0 / 0 | check 11 ok |
+| tree after all runs | clean | 0 porcelain entries |
+
+**CI: BLOCKED** (billing). There is no `ci-required` or any other Actions result for this SHA, and the integration suites were not run locally. Everything in §10 of the round-0 section remains absent.
+
+## R2-6. Docs under "no false-guarantee merges"
+
+- **Every sentence round 2 added is scoped to a named list of constructs,** with timing (before or after make), and ends in the explicit residual "the value of any other variable in the pinned bytes is not checked … everything else a reviewed Makefile says is review's to catch". COMMANDS.md and AGENTS.md match the code (R2-2, R2-3).
+- **"-q runs no ordinary recipe"** and the single-probe sentences remain true (R1-2 and D6 on both versions).
+- **One broad sentence is not from this PR:** the AGENTS.md control-matrix row "A one-line edit to the Makefile or its includes … cannot turn a required lane into a no-op" (blame: `eeeea06`, main) is contradicted, if R2-F1 is confirmed, by the unnamed `.IGNORE`. The same file says the list "is not called exhaustive". I record it as a pre-existing over-claim for the chair (R2-F3), not a round-2 authored one.
+
+## R2-7. Findings (round 2)
+
+No REGRESSION: every round-0 and round-1 row still holds on both make versions.
+
+```
+FINDING R2-F1: `.IGNORE` is not named by any anchor check. It has the same effect as a `-` prefix (the manual: errors are ignored for the listed targets, or for all when it has no prerequisites)
+Severity:    SHOULD (follow-up slice). NEW-CLASS
+Confidence:  medium (static reading plus manual semantics; dynamic behaviour UNVERIFIED)
+Affected:    vizra-core scripts/make-integrity-guard.py (REFUSED_TOKENS :308-314 lists only .RECIPEPREFIX/.SECONDEXPANSION; no `.IGNORE` anywhere); AGENTS.md:235-238 residual
+Observed:    `grep -c '\.IGNORE'` = 0 in the guard, makefile_pin.py, AGENTS.md and COMMANDS.md. Whether the resolver's MAKEFLAGS check sees a prerequisite-less `.IGNORE:` is UNVERIFIED. The per-target form has, by reading, no check that could see it.
+Failure:     If confirmed, reviewed bytes naming `.IGNORE` for a make-only lane (fixtures-verify, openapi-verify, sqlc-verify, …) would let that lane pass on a failing command, with the anchor green. Test lanes keep the direct-suite second layer.
+Recommendation: add `.IGNORE` to REFUSED_TOKENS (refused wherever named, before make), plus a fixture `ignore-special-target` (notInvoked). The same one-line treatment is worth considering for `.DEFAULT` and `.EXTRA_PREREQS` (R2-F2).
+Acceptance criteria: a pinned Makefile naming `.IGNORE` → anchor exit 1 in both modes, 0 make processes, on 3.81 and 4.3.
+Tests:       TestMakeIntegrityGuardFixtures row plus TestEveryRefusedSpellingIsRefusedBeforeMake rows.
+Cross-repo:  search: same class (not checked).
+Challenge:   The PR's docs never claim it is refused, they state a catch-all review residual, and the neutering-construct checks are B1 scope that predates this slice. That is why this is SHOULD, not BLOCKER. I withheld the dynamic confirmation (it would mean constructing a neutering Makefile); the builder's next slice can confirm it with its fixture.
+```
+
+```
+FINDING R2-F2: recipes the gate closure reaches through rules other than explicit `target:` lines are not scanned for literal `-`/`+`/`|| true`
+Severity:    SHOULD. NEW-CLASS
+Confidence:  medium (code reading)
+Affected:    scripts/make-integrity-guard.py check_text :938-956 (only lines matching `^<target>\s*:` for closure names are scanned); :988-990 ("prerequisite(s) have no rule and are treated as file dependencies")
+Observed:    pattern/implicit rules, `.DEFAULT` and 4.3's `.EXTRA_PREREQS` can supply recipes that run as part of a gate, and none of them is a closure name with an explicit rule. The expanded-suffix dry-run check (check_warnings) does see their `|| true`; the literal `-` prefix, invisible to `--dry-run`, is not checked there.
+Failure:     the "over the prerequisite closure" sentence (COMMANDS.md) is true only for explicit rules.
+Recommendation: refuse `.DEFAULT`/`.EXTRA_PREREQS` by name, and either refuse pattern rules that match a closure prerequisite or scan their recipes; or narrow the sentence to "explicit rules".
+Cross-repo:  search: same.
+Challenge:   reviewed bytes; covered by the catch-all residual.
+```
+
+```
+FINDING R2-F3 (pre-existing, for the chair): AGENTS.md control-matrix row "A one-line edit to the Makefile or its includes … cannot turn a required lane into a no-op" (from main, eeeea06) is broader than the controls, given R2-F1/R2-F2
+Severity:    NIT for this PR (not authored here); SHOULD for the follow-up.
+Recommendation: qualify it with "for the constructs named in sweep B5; review for the rest".
+```
+
+## R2-8. Cleanup and head
+
+- Scratch `vzv-core-pr10r2-Vp6LXO` was deleted by exact path.
+- The container ran with `--rm`. `ubuntu:24.04` was left in place (in use by `searchci-r2-66aa22`).
+- The builder's checkout, the core #8 worktree and vizra-search were not touched.
+- Head re-checked at end (see below).
+
+## Round-2 verdict
+
+- **Every round-2 claim reproduced on 3.81 and 4.3:** D7; C10 and C10b; the 46 fixtures, identical across versions and counted by two independent observers; C11–C14; the NIT fixes; no weakened test; 0 skips; 1206 executed; `scripts` 286; `make ci` 0.
+- **Round-0 and round-1 findings are closed, with no regression.**
+- **What remains is NEW-CLASS coverage**, all reachable only through reviewed, pinned bytes, all outside the slice's acceptance ("make runs only on reviewed bytes", FINDING 4), and none contradicting a sentence this PR authored:
+  - R2-F1 `.IGNORE` (dynamic behaviour UNVERIFIED);
+  - R2-F2 pattern/`.DEFAULT`/`.EXTRA_PREREQS` recipes;
+  - R2-F3, a pre-existing broad sentence on main.
+- **My recommendation to the chair:** open these as a follow-up hardening slice rather than re-plan B5. If the chair instead reads the main-branch sentence in R2-F3 as a false guarantee this merge would carry, the verdict would be FAIL on that basis alone.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 398ac4fe2bd8a6096a24e402936ef3ab2c2238bc
