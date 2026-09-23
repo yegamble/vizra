@@ -443,3 +443,189 @@ These three are REQUIRED under the "no false-guarantee merges" rule; FINDINGS 12
 **Head at end (888a51b):** `gh pr view 5 --json headRefOid` = `888a51b872f15fa5fa0ca9d323f4d06a9b12d166`; `git ls-remote` `refs/heads/chore/m0-ci-hardening` and `refs/pull/5/head` = the same. The head did not move. The scratch clone `vzv-search-pr5-888a-QqaK84` and its two worktrees were removed by exact path.
 
 FINAL VERDICT: FAIL — SHA 888a51b872f15fa5fa0ca9d323f4d06a9b12d166
+
+---
+
+# Re-verification at e711d33 (closing slice, fix round 2 of 2, the last)
+
+- **SHA under test:** `e711d336e147583a084252387f4a19697e5f8788` (one commit on `888a51b`).
+- **Head at start:** `gh pr view 5 --json headRefOid` = `e711d336e147583a084252387f4a19697e5f8788`; `git ls-remote` `refs/heads/chore/m0-ci-hardening` and `refs/pull/5/head` = the same. State OPEN.
+- **Clone:** fresh clone in my own `mktemp -d …/scratchpad/vzv-search-pr5-e711-XXXXXX`.
+- **Host:** darwin/arm64, go1.27.1, GNU Make 3.81, Python 3.9.6. **Nothing ran on GNU Make 4.3.**
+- **Method:** the repo's committed tests; the repo's own history; and in-process calls of the committed functions on inert strings. I wrote no Makefile and ran make on none. No safety classifier stopped anything.
+- **Scope:** `git diff --stat 888a51b e711d33 -- Makefile api/ .github/` is empty. The Makefile's sha256 is `e9d7c58e…`, equal to its pin.
+
+## E1. Lanes and demo (run by me at e711d33)
+
+| command | exit | counts / result |
+|---|---|---|
+| `make ci` | **0** | contract-drift 365; test-noskip **720 tests / 7 packages / 0 skipped / 0 failed**; selftest 17/17 |
+| `go test -count=1 -v ./scripts/ ./internal/httpapi/` | **0** | **479 PASS / 0 FAIL / 0 SKIP** |
+| of which | | `TestNamedMakefileConstructsAreRefusedBeforeMake` 72 subtests; `TestTheRealMakefileFitsTheGrammar` PASS, logging `assignment:15 blank/comment:133 phony:17 recipe:24 rule:17`, `RECIPE_FUNCTIONS = []`; `TestTheRemakeProbeCoversEveryPinnedInclude` PASS; `TestTheAnchorRefusesAPinnedMakefileMakeWouldRemake` 10/10, where e.g. "newer Makefile.sh \| anchor exit 1: make would REMAKE a pinned makefile"; `TestEveryOtherMakeCallIsGated` 8/8; `TestTheLaneGuardRefusesEveryKnownBypass/-run_hidden_behind_a_make_variable` PASS; `TestTheLaneGuardRefusesAFlagFromAnIncludedMakefile` PASS; M-4 2/2 |
+| `python3 scripts/ci-hardening-demo.py` | **0** | **75/75 rows behaved as declared.** The output has no NOT RED, NOT IDENTICAL or STILL RED. G1–G6 and the redefined R01 and R04 each go red as declared and green after a byte-identical restore. |
+| `env -i … bash scripts/ci-required-guard.sh` | **0** | 11 required checks. It reaches the grammar through `mg.check_pinned_bytes`, which calls `static_read_set` and then `grammar_problems` (read). |
+| `env -i … ./scripts/make-integrity-guard.sh --workflow` | **0** | make ran 21 times |
+| `env -i … python3 scripts/vendor-contract.py --check` | **0** | OK |
+
+**GitHub CI on e711d33:** 12 jobs failed and GitGuardian succeeded. The `ci-required` annotation reads "The job was not started because recent account payments have failed …". **CI: BLOCKED (billing)**, not re-run.
+
+## E2. The new tests against 888a51b's gate files, then restored
+This is a worktree at e711d33 with `git checkout 888a51b -- scripts/makegate.py scripts/make-integrity-guard.py`.
+- **Result:** `go test -count=1 -v -run 'TestNamedMakefileConstructsAreRefusedBeforeMake|TestTheRealMakefileFitsTheGrammar|TestTheRemakeProbeCoversEveryPinnedInclude|TestEnvironmentTakenVariablesNeverReachMake' ./scripts/` exits 1. The same run of `TestTheLaneGuardRefusesAFlagFromAnIncludedMakefile` in `./internal/httpapi/` exits 1. Together: **35 FAIL / 44 PASS / 0 SKIP.**
+  - **All 31 grammar rows are red.** 24 fail with `exit 0; want "outside the makefile grammar" refused with 0 make processes`, meaning 888a51b accepted them outright. The other 7 are exit 1, refused by an older check with a different message.
+  - `TestTheRealMakefileFitsTheGrammar` is red (no grammar function).
+  - `TestTheRemakeProbeCoversEveryPinnedInclude` is red: "want it refused by the grammar before make".
+  - The lane test is red: "expected the include refused by the Makefile grammar before make".
+  - These numbers match the builder's "24 accepted outright, 7 caught only by other checks".
+- **Restored** with `git checkout e711d33 -- scripts/` (status clean): both packages `ok`.
+
+## E3. Hunting for a line the grammar accepts that it shouldn't (`makegate.grammar_problems` on inert strings)
+
+**Refused (G ≥ 1):**
+- **Directive lines:** every directive as a directive: `ifeq`, `ifdef`, `include`, `-include`, `sinclude`, `load`, `define`, `undefine`, `export X`, `export X = 1`, `unexport`, `override X = 1`, `private X = 1`, `vpath …`.
+- **Rule forms:** `.IGNORE:`, `a:: b`, `a b &: c`, `a &: b`, `a: b | c`, `%: %.c`, `.c.o:`, `a: X = 1`, `a: ; true`, `a: b\ c`, `a:b`, `x: .WAIT`, `a: -lfoo`, `a: ~/x`.
+- **Assignment values:** `$(shell $(shell id))`, `$(Y:a=b)`, `$Y`, `${shell id}`, `$(eval Y)`, `$(shell echo #)`.
+- **Recipe lines:** `$(MAKE)`, `${MAKE}`, `$(value MAKE)`, `$@`.
+- **Layout:** a TAB line outside a rule, leading spaces, a rule line ending CR, a fullwidth `：`, a Cyrillic target.
+
+**Accepted (G = 0) and consistent with make:**
+- `.PHONY: a b`, `Makefile: x`, `a.o: a.c`.
+- `X := $(shell echo $(Y))`, `$(shell echo $$(date))`, `$(shell⇥id)`, `X := a # c`, `X := a\#b`, `X := 1 ; y`, `X = a:b`.
+- Recipe lines with `-`, `$$x`, `$(X)` or a raw `#`.
+- A backslash-continued rule line, and an assignment continued onto a TAB line.
+- Special variable names: `VPATH`, `MAKEFILE_LIST`, `CC`, `MAKE`, `MAKEFILES`, `SUFFIXES`.
+- `+true` passes the grammar but is refused by name (R=1).
+
+**Accepted (G = 0) where make's meaning, or the anchor's reading, differs:**
+1. **A comment line ending in an unescaped backslash.** GNU Make manual §3.1: "a trailing backslash not escaped by another backslash will continue the comment across multiple lines." Two strings show it:
+   - `test:⏎⇥go test⏎# note \⏎inert:⏎⇥-false⏎`;
+   - `test: # c \⏎inert:⏎⇥-false⏎`, a rule line with a trailing continued comment.
+
+   The grammar and make agree here: the comment swallows `inert:`, the rule stays open, and `-false` is **test's** recipe. The anchor's text reading (`make-integrity-guard.py` reads `path.read_text().split("\n")`, and `logical_recipe_lines` works on physical lines) does not. It skips the `#` line, stops at `inert:`, and returns `[(2, 'go test')]` and `[]` respectively. **The `-` prefix on a recipe line of a gate target is unread → FINDING 14.**
+2. **A lone CR inside a comment**, i.e. the physical line `# note\rX := 1` between recipe lines: grammar G=0. makegate decodes bytes and keeps the `\r`, and so does make. The anchor's `read_text()` uses universal newlines and turns `\r` into a line break, so it stops at `X := 1` and misses a later `⇥-false`. Same finding.
+3. **CRLF and NUL** (the grammar differs from make; confidence medium, from my reading of GNU make's `readline()` source, not measured):
+   - make strips a CR before LF, so `# c \` followed by CRLF continues the comment, while the grammar sees the line end in `\r` and does not join.
+   - a NUL mid-line makes make drop the rest of that physical line and join the next line to it ("Athena lossage" path).
+
+   Both are accepted in comment lines (G=0). Either way the grammar's view of the following lines is not make's. This belongs in FINDING 14's recommendation: refuse `\r`, NUL and other control characters except TAB.
+4. **Directive keywords as assigned NAMEs**: `ifdef := 1`, `endif := 1`, `else := x`, `define = x`, `export := 1`, `include := x`, `override ?= 1`, `private := 1`, `vpath := x`, `load := x` are all G=0.
+   - In GNU Make 4.x, `parse_var_assignment` runs first, so these are assignments.
+   - In 3.81 I am NOT sure. I recall a check that skips conditional parsing only when the second token is exactly `:`, `+` or `=`, so `ifdef := 1` … `endif := 1` may be parsed as a conditional pair that hides the lines between them.
+   - UNVERIFIED, confidence low. **FINDING 15 (SHOULD):** refusing these ~15 keywords as NAMEs costs nothing.
+5. **A Unicode-whitespace-only line** (U+00A0 NBSP): G=0, because `str.strip()` treats it as blank. make sees `\xc2\xa0` and stops with "missing separator", so it fails loudly and nothing is bypassed. NIT.
+
+## E4. The two changed assertions (plus the moved rows)
+- **`TestTheLaneGuardRefusesAFlagFromAnIncludedMakefile`** (httpapi). Its premise, `include drift.mk`, is now refused by the grammar, so asserting "the include is refused, make was NOT invoked" is right. The coverage it used to give is still exercised: `TestTheLaneGuardRefusesEveryKnownBypass/-run_hidden_behind_a_make_variable` (lane_selection_test.go:379-382, `TESTFLAGS ?= -run=…` then `$(TESTFLAGS)` in the recipe) passes with want "carries -run". That form is grammatical, so it reaches make through the gate. **Justified; coverage preserved.**
+- **`TestTheRemakeProbeCoversEveryPinnedInclude`.** The pinned include can no longer reach make. A second pinned file that make would not read is refused as a stale pin (makegate.py:686-690, the "pins … which make would NOT read" refusal at :689). So the multi-file form of the one-invocation probe (`make -q Makefile inc.mk`) is **no longer reachable, and not exercised**. The single-file probe is still exercised where it can reach make: `TestTheAnchorRefusesAPinnedMakefileMakeWouldRemake` 10/10 with a byte-identity assert, the `TestEveryOtherMakeCallIsGated` newer-`Makefile.sh` rows 8/8, and the anchor's final `make -q`. The include-following code in `static_read_set` is now unreachable for an accepted pin. **Justified.** The docstring states this accurately.
+- **Moved or reduced rows:**
+  - The anchor row "- prefix inside a conditional within the test recipe" is now a before-make grammar row, and the conditional stepping in the reader was removed. That is justified, because conditionals cannot be written.
+  - The M-4 test's planted forms dropped `$V`, `$(V:a=b)`, `$(origin)`, `$(value)` and `ifdef`. Each is now a grammar row, and the 7 remaining names still assert per make process. Justified.
+
+## E5. The built-in implicit-rule residual
+- **Stated accurately:** at AGENTS.md "What they cannot do" and at the anchor docstring (:44-50, :414-420; the note at :47-50 and :415-418). A recipe make supplies from its built-in implicit rules is not scanned, "for a closure prerequisite with no explicit rule (printed as a note; there are none today), or for a target whose explicit rule has no recipe and is not `.PHONY`".
+- **Reachable within the grammar: yes.** A literal prerequisite word such as `test: foo`, with no rule and a `foo.c` or `foo.sh` beside it, gets a built-in recipe. So does a non-`.PHONY` rule with no TAB lines. The built-in recipes expand variables the grammar lets a reviewer assign (`CC`, `LINK.c` …, for example `CC := -false`). make applies a `-` prefix after expansion, and that expansion happens in a recipe the text reading never sees.
+- It remains a residual that needs reviewed bytes, as stated. Core B5b's `.PHONY`-closure rule is the named follow-up.
+
+## E6. Changed sentences
+
+| sentence | verdict |
+|---|---|
+| The grammar's five shapes (AGENTS.md "every line of the reviewed bytes fits the Makefile grammar"; makegate docstring step 2 and the block comment at :265-293; README round 2) | **Accurate as a description of `grammar_problems`**: each shape matches the code, and E3's refused list holds. The one gap against make is E3 items 3-4, which are FINDING 14's CRLF and NUL part and FINDING 15. |
+| "Any other line is refused with its line number. So a conditional, `include`, … cannot appear, in any spelling." | Accurate for the listed constructs (E3). |
+| **"Because of the grammar, a rule's recipe is exactly the TAB lines after it"** (AGENTS.md, the "What it guarantees" paragraph); **"every TAB recipe line of the EXPLICIT rules … may carry no `-` prefix"**; anchor docstring :44-47 "so a rule's recipe is exactly the TAB lines after it"; `logical_recipe_lines` docstring "a rule's recipe is exactly the TAB lines after it, up to the next line of another shape" | **OVERCLAIMS (FINDING 14).** It is true of the grammar's logical lines, but the anchor reads physical lines, and a continued comment moves the next line into the comment. |
+| "A `-`/`+` prefix cannot be produced that way, because a recipe body may not begin with an expansion" (residuals) | Accurate for explicit recipes: the by-name check refuses a leading `$` after `@-+` and whitespace, and a value cannot hold a newline without `define`. Built-in recipes are covered by the separate implicit-rule residual (E5). |
+| FINDING 13: "One read the anchor does NOT refuse remains possible: an immediate `:=` value referencing a name assigned only LATER … the lane's own pinned `make` step … would still receive it" | **Accurate. F13 closed.** In the grammar, `$(NAME)` is the only make read, and `environment_taken` misses only the read-before-assignment case. (A shell's own `$$NAME` read belongs to the existing "variables outside the named set" residual.) |
+| makegate "WHAT IT DOES NOT DO" and the anchor residual, now describing the grammar | Accurate. |
+| The by-name functions' docstrings now call themselves diagnoses with known misses | Accurate. |
+| ci-required-guard gets the grammar through `check_pinned_bytes` | Accurate (E1). |
+
+## E7. Scope and deleted-line audit (`888a51b..e711d33`)
+- The Makefile, its pin, `.github/` and `api/` are unchanged.
+- **Removed assertions:**
+  - the two changed tests' old asserts (E4);
+  - the conditional reading row (moved, E4);
+  - the M-4 planted forms (moved, E4).
+
+  Every removed assertion is either replaced or moved to a before-make row that runs and passes.
+- No `t.Skip` was added. 0 skips in every run.
+- Code: the anchor's conditional stepping was removed (conditionals are refused), and `RULE_RE` was already gone in round 1. No `g.fail` was removed.
+
+## Findings (fix round 2)
+
+```
+FINDING 14: a backslash-continued comment line moves the next line into the comment, and the anchor's `-` scan stops there
+Severity:    REQUIRED  (the grammar accepts it; make and the grammar agree the TAB line after it belongs to the open rule;
+             the anchor's reading, which the sentences say reads "every TAB recipe line", does not)
+Confidence:  high for the code path (evaluated). make: GNU Make manual §3.1, "a trailing backslash not escaped by
+             another backslash will continue the comment across multiple lines" (not measured, per the brief).
+Affected:
+  repo:      vizra-search
+  files:     scripts/make-integrity-guard.py:461-484 (logical_recipe_lines: physical lines; a `#` line is skipped
+             without following its continuation) and :552-566 (read_text().split("\n")); scripts/makegate.py:378-436
+             (grammar_problems accepts the continued comment as one blank/comment line and keeps the rule open);
+             sentences AGENTS.md ("Because of the grammar, a rule's recipe is exactly the TAB lines after it"),
+             make-integrity-guard.py:44-47 and the logical_recipe_lines docstring
+  requirements: VZ-CI-ANCHOR-DIGEST (proposed)
+Observed:
+  grammar_problems("Makefile", "test:\n\tgo test\n# note \\\ninert:\n\t-false\n") gives [] and
+  logical_recipe_lines(<its lines>, 1) gives [(2, 'go test')].
+  grammar_problems("Makefile", "test: # c \\\ninert:\n\t-false\n") gives [] and the anchor's recipe for test is [].
+  makegate._logical_lines of the second string gives ['test: ', '\t-false', ''], which is make's view and the grammar's.
+  Also: a lone `\r` inside a comment (`# note\rX := 1`) is one line to makegate (bytes) and to make, but two lines to
+  the anchor (read_text, universal newlines), which then stops at `X := 1`.
+Failure:     In a pinned Makefile, a `-` prefix on a gate target's recipe line placed after a backslash-ended comment
+             passes the grammar and every anchor reading. The dry-run prints it without the `-`, and the lane's
+             failure is ignored. This needs reviewed bytes, and it is the M-1 class this slice exists to close.
+Recommendation (smallest): in grammar_problems refuse a comment whose logical line was joined from more than one
+             physical line (a comment ending in an odd number of backslashes), and refuse `\r`, NUL and any other
+             control character except TAB anywhere. Or have logical_recipe_lines and the anchor's definitions loop
+             read makegate._grammar_lines over the same decoded bytes. Doing both is cheap.
+Acceptance criteria: the two strings above, and `# c\rX := 1` between recipe lines, are red before make with 0 make
+             processes; the real Makefile still fits.
+Tests:       rows in TestNamedMakefileConstructsAreRefusedBeforeMake ("grammar: a comment continued with a backslash",
+             "grammar: a CR", "grammar: a NUL").
+Cross-repo:  core: unexamined.
+Challenge:   "Nobody ends a comment with a backslash." The chair's allowlist exists so that "nobody writes that" is
+             no longer the argument.
+```
+
+```
+FINDING 15: directive keywords are accepted as assigned variable names
+Severity:    SHOULD   Confidence: low (make 3.81 behaviour UNVERIFIED; on 4.x they are plain assignments)
+Affected:    scripts/makegate.py `_G_NAME` / `_G_ASSIGN_RE` (any identifier)
+Observed:    `ifdef := 1`, `endif := 1`, `else := x`, `define = x`, `export := 1`, `include := x`, `override ?= 1`,
+             `private := 1`, `vpath := x`, `load := x`, `undefine = 1` all give G=0.
+Failure:     If 3.81 (the local host's make) parses `ifdef := 1` as a conditional, a pinned pair could hide lines from
+             make that the grammar and anchor read, for example a gate recipe, turning the lane into a no-op locally.
+Recommendation: exclude the directive keywords from NAME in the grammar.
+```
+
+NIT: a line that is only Unicode whitespace (NBSP) counts as blank to the grammar (`str.strip()`). make stops with "missing separator", so it fails loudly. Checking blank lines as `[ \t]*` would match make.
+
+## What did not run (round 2)
+- **GitHub CI:** BLOCKED (billing).
+- **GNU Make 4.3:** nothing ran on it.
+- **Live make behaviour of FINDING 14 (comment continuation, CRLF, NUL) and FINDING 15:** not measured, because the brief forbids authoring or running Makefiles. FINDING 14's comment-continuation part rests on the manual's text. The CRLF, NUL and FINDING 15 parts rest on my reading of make's source.
+
+## Instruction-shaped text
+None observed.
+
+## Cleanup and head at end (e711d33)
+- The worktree `wt-mix` and the scratch clone `vzv-search-pr5-e711-lA2HRK` are removed by exact path. The demo removed its own temp copy. No container or image was created.
+- **Head at end:** `gh pr view 5 --json headRefOid` = `e711d336e147583a084252387f4a19697e5f8788`; `git ls-remote` `refs/heads/chore/m0-ci-hardening` and `refs/pull/5/head` = the same. The head did not move.
+
+## Verdict at e711d33
+**What holds:**
+- Every lane is green locally, and the builder's numbers reproduce: `make ci` 720/0 skips, 479 PASS, demo 75/75, guards and vendor check 0, and the real Makefile at 133/15/17/17/24.
+- All 31 grammar rows are red on 888a51b's gate files (24 accepted outright, 7 caught by other checks), and green when restored.
+- G1–G6 reproduce.
+- FINDINGS 9–13 are closed by the grammar. Both changed assertions are justified, and the coverage they gave is kept where it can still reach make.
+- The Makefile, its pin, `.github/` and `api/` are unchanged, with 0 skips and no weakened assertion.
+
+**What fails:**
+- **FINDING 14 (REQUIRED).** The grammar accepts a comment line continued with a backslash (and a CR or NUL in a comment). There, the anchor's physical-line recipe reader stops early, so a `-` prefix on a gate target's recipe line goes unread. The sentence "a rule's recipe is exactly the TAB lines after it" is then false for the reading that enforces it. The fix is small (refuse continued comments and control characters in the grammar, or have the anchor read the grammar's logical lines).
+- **FINDING 15** is a low-confidence SHOULD.
+
+CI remains BLOCKED by billing.
+
+FINAL VERDICT: FAIL — SHA e711d336e147583a084252387f4a19697e5f8788
