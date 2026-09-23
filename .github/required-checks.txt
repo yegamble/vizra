@@ -7,8 +7,9 @@
 # blocks the merge instead of disappearing.
 #
 # One job name per line. Blank lines and # comments are ignored.
-# This file is owner-reviewed (CODEOWNERS): it must not be edited in the same
-# PR as the thing it guards.
+# CODEOWNERS names the owner for this file, but CODEOWNERS is advisory; the war
+# room's verifier-gated merge is the only review. It must not be edited in the
+# same PR as the thing it guards.
 #
 # A PR may ADD a lane here. It may not REMOVE the floor lane — `validate` —
 # because this manifest is read from the checkout under test, so a PR could
@@ -17,10 +18,11 @@
 # Entries must be bare job names: no trailing comment, no "optional" marker.
 #
 # docs/META_REPO.md §7 names three target lanes for this repo — `validate`,
-# `bundle` and `boot`. Only `validate` exists today: there is no compose file,
-# no installer, no bundle and no image to boot, so `bundle` and `boot` have
-# nothing to run against. They are NOT listed here, because listing a lane that
-# does not exist would make `ci-required` wait forever for a check nobody
-# defined. They are added when the slices that create them land.
+# `bundle` and `boot`. Only `validate` exists today. The compose topology
+# landed in meta #4, and `validate` renders and asserts it, but there is still
+# no installer, no bundle builder and no booted stack, so `bundle` and `boot`
+# have nothing to run against. They are NOT listed here, because listing a
+# lane that does not exist would make `ci-required` wait forever for a check
+# nobody defined. They are added when the slices that create them land.
 
 validate
