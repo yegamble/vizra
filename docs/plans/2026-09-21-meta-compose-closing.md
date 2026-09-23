@@ -193,3 +193,28 @@ are read with `git -C … show origin/main:<file>`).
 If the verifier fails this round, the chair's standing instruction applies:
 prefer **removing** a claim to defending a weak one, and the PR is cut down to
 the topology plus the rules whose claims hold.
+
+### 2026-09-23 — T-1 / T-2 (after the verifier's PASS at `cf9e4c86`)
+
+- Commit **`ddec39c34fe92857b03c40a21b9645dec96c50c5`**, one commit on top of
+  `cf9e4c8`, plain push. Diff: `claims.py` +5/-5 (template string literals
+  only), `CLAIMS.md` +5/-5 (regenerated through `claims.py`, not hand-edited).
+  PR body sentence on `claims.py --check` corrected (local lane only, not
+  `validate`).
+- The `claims.py` AST is identical to `cf9e4c8`'s with every `str` constant
+  replaced (`ast.dump` equal: True).
+- Local lane on `ddec39c`, all exit 0: ledger, quality-json, doc-links,
+  ci-required-guard, render (13), topology (27 rules, 0 violations), coverage,
+  template-claims, `claims.py --check` (47); `--drift` exit 2 BLOCKED (absent
+  checkouts, as designed); `demo.sh` exit 0,
+  `95 assertion(s) passed, 0 failed, across 50 case(s)`, 0 broken pipes, tree
+  clean. Host load average was about 200 during this run.
+- **CI BLOCKED, external.** `validate` run 35826344782 and `ci-required` on
+  `ddec39c`: the job was never started (0 steps, no runner). Annotation: "The job
+  was not started because recent account payments have failed or your spending
+  limit needs to be increased." A rerun (attempt 2) was refused the same way. Two
+  attempts, stopped. Missing input: the owner must fix GitHub Actions billing or
+  the spending limit, then re-run `validate` on `ddec39c`.
+- The 25× loop log from the first session is gone: the session scratchpad was
+  cleared, so the result is unrecoverable and is not claimed. The verifier's own
+  10/10 clean runs at `cf9e4c8` stand in its place.
