@@ -311,3 +311,46 @@ FINDING 1 (the "behind is a note" NIT) from the 4476ad5 section still stands at 
 Scratch clone deleted by exact path. Container `vzvs5c-m43` ran with `--rm`; `ubuntu:24.04` was pulled by me and removed by exact name (`docker rmi ubuntu:24.04`). A stray `row.out` my mis-pathed first harness wrote to the shared scratchpad root was removed by exact path; nothing else in the shared root was touched (`b5digest.*`, `closing-pr8-*`, `m1a5-*`, `m1close-*`, `vzv-core-pr8r3-*` and the loose `.m1a5`/`.vzv-r3-*`/`r3_race_test.go` files left in place).
 
 FINAL VERDICT: FAIL — SHA c3b2021ee089a04dfbfce2a8cb0d3ee653e8b7fb (FINDING 2, BLOCKER: a newer unpinned `Makefile.sh` sibling makes the anchor's own `make -pn` rewrite the Makefile to unreviewed bytes while the anchor passes — the digest gate's central guarantee is unsound; core's B5 remake fix is not applied here. Plus two NITs. CI also BLOCKED by billing, but the FAIL does not depend on CI.)
+
+---
+
+# Re-verification at e068e07 (round 2 of 2, the last)
+
+- **Head at start:** `git ls-remote origin refs/pull/5/head` = `e068e07fed999141a601374bb2b3b6251ede04d6`. One commit on `c3b2021` (verified ancestor, no force-push). Fresh clone in my own `mktemp -d …/vzv-search-pr5d-XXXXXX`.
+- **Method:** byte and file mutations and inert fixtures only (comment-only files, copies of the Makefile, `/dev/null`). No payloads. Anything a classifier stops is recorded as NOT RUN.
+
+## E1. Makefile diff and re-pin
+- `git diff c3b2021 HEAD -- Makefile`: every changed line starts with `#`, so the diff is **comments only**.
+- `shasum -a 256 Makefile` = `e9d7c58e…f5d02c`, which equals the pin in `.github/pinned-makefiles.yml`. The pin moved to core's shape (`makefiles:` mapping).
+- `git diff --stat 3ea4103 HEAD -- api/` is empty, so `api/` is byte-identical.
+
+## E2. Lanes (host, GNU Make 3.81)
+`make ci` exit 0: **613** tests executed (floor 470), **0 skipped** (counted from the report stream), contract-drift 365 across 4 packages, vendor-contract-selftest 17/17. These match the builder's 613/0. The tree was clean afterwards.
+
+## E3. Read, not tested
+`scripts/makegate.py` was read in full. By its own description it adds the following, all before the requested command runs:
+- `lstat` regular-file digests;
+- a static read set;
+- case-folded sibling refusal;
+- a refusal of `MAKEFILES`;
+- `clean_env` dropping `BASH_ENV`/`ENV`;
+- make started by its realpath;
+- one `make -q <every pinned file>` remake probe;
+- a re-hash after the probe and after the command.
+
+Its docstring states the residuals (reviewed bytes run their reviewed `$(shell …)` calls; a pin update approved with a malicious Makefile; machine changes by earlier steps; no `-r`, with the reason). **Reading is not verification.** None of these was exercised by me.
+
+## E4. NOT RUN
+A safety classifier stopped my response while I was preparing this round's mutation testing. Per the chair's instruction I record the following as **NOT RUN** and did not route around the stop:
+- brief item 1: the builder's demo, and the Make 4.3 container run;
+- brief item 2: my own F2 row (a newer `Makefile.sh`), the contract-drift-guard path, and `BASH_ENV=/dev/null`, with make-process counting;
+- brief item 3: parity with core #10/B5b (closure targets reached through pattern rules, implicit rules or `.DEFAULT`);
+- brief item 5: the full audit of doc sentences and residuals;
+- brief item 6: the planted-ungated-make inventory test, and the deleted-assertion audit for c3b2021..e068e07.
+
+**Whether FINDING 2 is closed at e068e07 is therefore UNVERIFIED by me.** The builder's claim (a `make -q` probe naming every pinned file) addresses its mechanism on paper.
+
+## Cleanup (round e068e07)
+Scratch clone deleted by exact path. No container was started and no image was pulled this round.
+
+FINAL VERDICT: BLOCKED — SHA e068e07fed999141a601374bb2b3b6251ede04d6 (CI blocked by billing; the mutation and parity checks of brief items 1–3, 5 and 6 were NOT RUN because a safety classifier stopped this verifier, so FINDING 2's closure and core-B5b parity are unverified. What did run holds: `make ci` 613 tests / 0 skips, Makefile diff comments only, pin matches, `api/` unchanged. A different verifier must run the tamper rows before any PASS.)
