@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 212 — **owner request: a Greptile-style proactive agent team.** Built the **sentinel team** (commits `6c355e5` + sweep hook): `.claude/agents/sentinel/` — `vizra-sentinel-workflows` (runs documented workflows on current main), `vizra-sentinel-bugs` (maps call paths, confirms bugs with failing tests), `vizra-sentinel-contracts` (cross-repo and claim-vs-code drift), `vizra-sentinel-pr` (blast-radius PR review, no public comments unless asked); `/sentinel` command; `docs/sentinel/RULES.md` (15 learned rules from this project's real defects), `WORKFLOWS.md` (12-entry catalogue), `FINDINGS.md` register; `/warroom` now runs sentinel PR review on contract/guard/migration PRs and a sweep when a slot is free. First sweep dispatched (2 hunters): workflows W-OP-2/W-OP-3/W-DEV-1 and bugs in core M1-A. User PR B plan r5 **APPROVED for phase 2** (after user #10 merges). In flight: verifiers on core #12, user #10; builders core 2p, meta 2i; 2 sentinels. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 213 — core #12 (B3) **FAIL at `6edaf83`** on REQUIRED V-1: AGENTS.md:267 "the API leaks no credential into its own log" is false as measured — `obs.Redact` misses `redis://:PW@`, keyword DSN `password=`, `?password=`, GCS `X-Goog-Signature`, `api_key=`/`access_token=`/`claim_token=` query values, session cookies; `internal/search/service.go:53,70` log raw errors. Everything else reproduced (unit 1209/0, integration 1378 ×3, floors = generator, M1–M7, CI green). Chair ruling: fix the redactor (table test per form), route the search log sites, cheap AST refusals for V-2 shapes, narrow the sentences to the covered set → round 1 of 2. In flight: core #12 fix, verifier on user #10, core 2p, meta 2i, sentinel sweep (workflows + bugs). History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -168,6 +168,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 213 (2026-09-23) — core #12 FAIL at `6edaf83` (redaction overclaim); redactor extension ruled, round 1 of 2.
 - Tick 212 (2026-09-23) — sentinel team built (owner request); first sweep dispatched; PR B plan r5 approved for phase 2.
 - Tick 211 (2026-09-23) — PR B plan r4 seat check (R4-1 effective launch options, R4-2 test.use).
 - Tick 210 (2026-09-23) — PR B plan r4 (R3-1 deviation: one screened launch per worker; chair proposes deep-equality) → seat check.
