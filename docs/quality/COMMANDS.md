@@ -134,6 +134,29 @@ To regenerate after editing a generator source — and you must commit both:
 
 Last run: **exit 0**, `OK 192 requirements; core=142` (2026-09-23).
 
+### 1a. Ledger status only with evidence (queue 2i)
+
+The generator in check 1 also refuses a status written anywhere except a checked record in
+`docs/evidence/ledger-generator/status_records.json`. The online half and the demonstrations run
+right after it:
+
+```
+(cd docs/evidence/ledger-generator && python3 -m unittest -v test_status)
+GH_TOKEN=… ./scripts/check-ledger-status-remote.py --self-test
+GH_TOKEN=… ./scripts/check-ledger-status-remote.py
+GH_TOKEN=… bash docs/evidence/ledger-status/demo.sh
+```
+
+These need `gh`. Locally an authenticated `gh` works without `GH_TOKEN`. Without `gh`, the remote
+checker exits 2 (BLOCKED, never a pass). The rules, the reason for the split, and today's decisions
+on the candidate entries are in `docs/evidence/ledger-status/README.md`.
+
+Last run (2026-09-23, local, macOS arm64, Python 3.9.6, gh 2.98.0):
+- unit tests: exit 0, 30 tests;
+- self-test: exit 0, 8/8 cases;
+- remote check: exit 0, 0 records;
+- demo: exit 0, 26 passed / 0 failed.
+
 ### 2. Quality JSON parses and every requirement id resolves
 
 ```

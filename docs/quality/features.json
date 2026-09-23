@@ -1,7 +1,7 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "generated": "2026-09-15",
-  "notice": "Atomic requirement ledger produced by Prompt 00 on 2026-09-15. Every entry is PLANNED/UNVERIFIED. No entry may be marked IMPLEMENTED or VERIFIED without recorded evidence (commands, exit codes, counts, SHA, artifacts). Removing or narrowing an entry requires an owner decision recorded in docs/OPEN_QUESTIONS.md. Open questions ratified 2026-09-15; DECIDED ids are listed under `decided`, remaining open ids under `unresolved` — see docs/OPEN_QUESTIONS.md ratification record.",
+  "notice": "Atomic requirement ledger produced by Prompt 00 on 2026-09-15. An entry is PLANNED/UNVERIFIED/NOT_STARTED unless a record in docs/evidence/ledger-generator/status_records.json admits IMPLEMENTED or VERIFIED. The generator refuses a status written anywhere else, refuses every other claimed status by name, checks each record's cited acceptance bullets and, for VERIFIED, that the verifier's evidence file under docs/evidence/warroom/ ENDS with a PASS on the merged head; the validate lane's scripts/check-ledger-status-remote.py proves with the GitHub API that each PR merged from that head into that merge commit, that the merge commit is on the component repo's main and, for VERIFIED, that ci-required succeeded on the verified head. A recorded entry lists its merges under `evidence`. release_status is never set by the generator. Removing or narrowing an entry requires an owner decision recorded in docs/OPEN_QUESTIONS.md. Open questions ratified 2026-09-15; DECIDED ids are listed under `decided`, remaining open ids under `unresolved` — see docs/OPEN_QUESTIONS.md ratification record.",
   "parity_baseline_status": "UNVERIFIED",
   "status_vocabulary": {
     "implementation_status": [
@@ -114,7 +114,13 @@
       "Q-041",
       "Q-042",
       "Q-043"
-    ]
+    ],
+    "by_implementation_status": {
+      "PLANNED": 192
+    },
+    "by_verification_status": {
+      "UNVERIFIED": 192
+    }
   },
   "features": [
     {
@@ -3174,9 +3180,9 @@
       ],
       "cases": {
         "success": [
-          "The retention/anonymisation path is added ADDITIVELY: a later migration widens audit_events_append_only() with CREATE OR REPLACE FUNCTION, which migrate-lint's destructive pattern does not match, so the migration needs no -- allow-destructive: annotation provided it never contains the bare word TRUNCATE (migrate-lint greps every line, comments and function bodies included, so a widened body that names TG_OP = 'TRUNCATE' must instead refuse by default, or carry the annotation); the row trigger and statement-level TRUNCATE trigger stay in place",
+          "The retention/anonymisation path is added ADDITIVELY: a later migration widens audit_events_append_only() with CREATE OR REPLACE FUNCTION, which migrate-lint's destructive pattern does not match, so the migration needs no -- allow-destructive: annotation provided it never contains the bare word TRUNCATE (migrate-lint matches every line except a whole-line `--` comment, which it skips: a trailing `-- …` comment and every function-body line ARE matched, so a widened body that names TG_OP = 'TRUNCATE' must instead refuse by default, or carry the annotation; vizra-core scripts/migrate-lint.sh at main 36a72df, the `--*) continue` comment skip); the row trigger and statement-level TRUNCATE trigger stay in place",
           "A retention sweep removes or anonymises rows older than the retention window only through that path, in batches, and writes one audit row per run naming the window and the count, never row contents",
-          "Account erasure (VZ-ACCOUNT-002) scrubs and tombstones the users row — email NULLed (users.email is NOT NULL in vizra-core migration 0005, so this first needs an additive ALTER TABLE users ALTER COLUMN email DROP NOT NULL, which migrate-lint does not flag and 0005 anticipates), username replaced with a non-identifying handle that satisfies users_username_shape, credentials removed, tombstoned_at set — and anonymises that user's username in the audit rows that name them; actor_user_id still references the tombstoned row, so the audit chain stays intact"
+          "Account erasure (VZ-ACCOUNT-002) scrubs and tombstones the users row — email NULLed (users.email is NOT NULL in vizra-core migration 0005, so this first needs an additive ALTER TABLE users ALTER COLUMN email DROP NOT NULL, which migrate-lint does not flag and 0005 anticipates), username replaced with a unique, non-identifying handle of 3–30 ASCII characters that satisfies users_username_shape (^[A-Za-z0-9][A-Za-z0-9_-]{2,29}$) and the case-folded unique index users_username_fold_key (vizra-core migration 0005) — so neither a constant placeholder (it collides on the second erasure) nor `erased-` + a full 32-hex UUID (39 characters, over the shape) will do, and an erasure test erases two users in sequence, credentials removed, tombstoned_at set — and anonymises that user's username in the audit rows that name them; actor_user_id still references the tombstoned row, so the audit chain stays intact"
         ],
         "negative": [
           "Every UPDATE or DELETE on audit_events other than the retention/anonymisation shape is still refused by the trigger, and TRUNCATE is still refused; a controlled mutation that widens the function to accept any UPDATE turns a named test red",
