@@ -787,3 +787,93 @@ None observed.
 This PASS is local only. It is not a merge and not VERIFIED in the ledger; the chair records those, and `ci-required` must still go green on this SHA once billing is fixed.
 
 FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 854a3376f005dc7cca3358d9b815205616f7b2fb
+
+---
+
+# Re-confirmation at 6646ccd (FINDING 16 and the re-plan NITs)
+
+- **SHA under test:** `6646ccde99f466d6c52f2c8ef43571c24abc875f` (one commit on `854a337`).
+- **Head at start and at end:** `gh pr view 5 --json headRefOid` and `git ls-remote` (`refs/heads/chore/m0-ci-hardening`, `refs/pull/5/head`) = `6646ccde99f466d6c52f2c8ef43571c24abc875f` both times.
+- **Clone:** fresh clone in my own `mktemp -d …/scratchpad/vzv-search-pr5-6646-XXXXXX`, since removed by exact path together with its worktree.
+- **Host:** darwin/arm64, go1.27.1, GNU Make 3.81, Python 3.9.6. No make run on any new Makefile, and no safety classifier stop.
+
+## C1. Scope and the `_ASSIGN_RE` change
+- **Diff:** `scripts/makegate.py` (a comment, plus `re.M` dropped from `_ASSIGN_RE`), `scripts/scripts_test.go`, `scripts/ci-hardening-demo.py` (C21, C22), AGENTS.md (the one-reader sentence, `-load`), README and `closing/replan/` transcripts. The Makefile, its pin, `.github/` and `api/` are unchanged; the Makefile sha256 `e9d7c58e…` equals its pin.
+- **The 9-output comparison, 854a337 worktree vs 6646ccd clone, gives 9/9 IDENTICAL:** grammar, by-name, read set, parse-time sites, environment_taken (`BUILD_TIME, COMMIT, CORE, CORE_REMOTE, GOFLAGS, IMAGE, VERSION`), environment_words, closure, and `check_text` failures and log. The `re.M` removal changes no verdict on the real Makefile, as expected: `_ASSIGN_RE.match` runs on one logical line, and `^` without `re.M` still anchors at its start.
+
+## C2. Lanes, demo, planted-reader red
+| command | exit | result |
+|---|---|---|
+| `make ci` | **0** | 809 tests / 7 packages / **0 skipped**; contract-drift 365; selftest 17/17 |
+| `go test -count=1 -v ./scripts/ ./internal/httpapi/` | **0** | **568 PASS / 0 FAIL / 0 SKIP**; `TestTheOneReaderSourceCheckRefusesAPlantedReader` 7/7; `TestEveryMakefileReaderConsumesTheOneLineReader` PASS; `TestTheRealMakefileFitsTheGrammar` PASS |
+| `python3 scripts/ci-hardening-demo.py` | **0** | **87/87**, no NOT RED, NOT IDENTICAL or STILL RED; C21 and C22 each red as declared, then green after a byte-identical restore |
+| `ci-required-guard.sh`, `make-integrity-guard.sh --workflow`, `vendor-contract.py --check` (under `env -i`) | **0, 0, 0** | the anchor reports make ran 21 times |
+
+- **Planted-reader red at 854a337.** Method as in the builder's transcript: 854a337's own `scripts_test.go` (its narrow probe), with the new `plantedReaders` and `TestTheOneReaderSourceCheckRefusesAPlantedReader` appended; gate code unmodified. I ran it with `TMPDIR` set to my scratch dir, because 854a337's probe leaks.
+  - Result: exit 1, **8 FAIL (7 plants + parent) / 0 PASS / 0 SKIP**. Six report `the SOURCE check reported []`. The `read_text + split` plant was caught by the old `split("\n")` check under different wording, so it is also red on the name.
+  - Restored with `git checkout 854a337 -- scripts/scripts_test.go`.
+  - (Control: the new test file over 854a337's gate code is green, 8 PASS. The red comes from the widened probe, not from gate code, as it should.)
+- **GitHub CI on 6646ccd:** 12 jobs failed and GitGuardian succeeded (billing annotation, as before). **BLOCKED**, not re-run.
+
+## C3. The 28 named reads
+I read every one in the source:
+- **makegate (11).**
+  - `makefile_lines` (split) and `decode_makefile` (decode) are THE reader.
+  - `read_makefile_text` and `check_pinned_bytes` read bytes that are decoded only through `decode_makefile`. `recheck` reads bytes for the digest only.
+  - `load_pin` (read_bytes, decode, split) reads the pin YAML.
+  - `resolve_make`, `remake_probe` and `main` call splitlines on shell output, make output and the docstring.
+- **make-integrity-guard (4):** `resolve_database`, `check_warnings` and `check_expanded_commands` read make's stdout and stderr; `main` reads the docstring.
+- **ci-required-guard (6).**
+  - The module-level `re.M` is `MAKE_INVOCATION` / `GO_TEST_INVOCATION`. It is applied only to a workflow step's `run` (`step_runs_make`, `step_runs_go_test`) and to the pinned-steps bodies.
+  - The `read_text` calls in `load_workflows`, `load_pins`, `check_makefile_pins` and `main` read the workflow YAML, `pinned-steps.yml`, `pinned-makefiles.yml` and `required-checks.txt`.
+- **contract-drift-guard (7).**
+  - `resolved_recipe` and `check_make_warnings` read make --dry-run's output, and `indent` works on message text.
+  - `open` in `vendored_markers`, `packages_guarding_vendored_files`, `cmd_workflow` and `cmd_ran` reads the manifest, `*_test.go` files, `ci.yml` and the go test report.
+
+**None of them reads makefile text in disguise.** A named read that disappears also fails the test ("no longer exists").
+
+## C4. Temp directories
+- The probe root is now the Go test's `t.TempDir()`.
+- A full `go test -count=1 -v ./scripts/ ./internal/httpapi/` at 6646ccd created **0** new `one-reader-*` directories: I compared sorted listings of `$TMPDIR/one-reader-*` before and after.
+- The shared `$TMPDIR` holds 22 old ones. The 7 newest are dated 11:42:04 local, the builder's 854a337 BEFORE run at 15:42Z. The rest are from earlier 854a337 runs. They are not deleted, because they sit in a shared location and I cannot attribute them by exact path.
+- My own 854a337 reproduction wrote its 7 into my scratch `TMPDIR`, which I removed.
+
+**The leak NIT is fixed.** The `-load` NIT and the `open().read()` NIT are also fixed: `TestTheRealMakefileFitsTheGrammar` now uses `mg.read_makefile_text`.
+
+## C5. Sentences
+- **makegate comment (:213-225):** it now states the three layers, and states what is NOT seen: "a makefile read added INSIDE one of those named functions using the spelling already allowed there, and a name built at run time (getattr, exec)".
+- **AGENTS.md:** "Across the four files, every other line split, file read, decode or multi-line regex flag is a NAMED read of a non-makefile input, listed in that test by function; a reader planted elsewhere is red … A makefile read added inside one of those named functions with the spelling already allowed there is not seen."
+- **Both are true today of the four files.** A grep finds no `re.split`, `StringIO`, `str(…, enc)`, variable-separator newline split or `subprocess cat` in them; the only other `.split(` calls are `shlex.split` and whitespace `split()`.
+- **Both overstate the check's reach.** I extracted the committed `text_reads` scanner and fed it inert source: it misses `re.split(r'\n', t)`, `t.split(NL)` with `NL = chr(10)`, `io.StringIO(t)` iteration and `subprocess.check_output(['cat','Makefile'])`. It catches `splitlines`, and `read_bytes` in `str(Path(p).read_bytes(), 'utf-8')`. So "every other line split" and "a reader planted elsewhere is red" are wider than the listed AST spellings, and the NOT-seen list omits these forms.
+- The same class as FINDING 16, which was SHOULD: a code comment and a test-reach sentence, true of the current files, not a gate guarantee. **FINDING 17 (SHOULD), non-blocking.**
+
+```
+FINDING 17: the one-reader sentences name every line split / file read, but the AST scan sees only its listed spellings
+Severity:    SHOULD   Confidence: high (committed scanner evaluated on inert source)
+Affected:    AGENTS.md (the "Across the four files, every other line split …" sentence); scripts/makegate.py:213-225;
+             scripts/scripts_test.go text_reads / TEXT_ATTRS
+Observed:    text_reads misses re.split(r'\n', …), a newline separator held in a variable, io.StringIO iteration and
+             reading via subprocess (cat). None occurs in the four files today (grep).
+Recommendation: word the sentence as "every use of split('\n')/rsplit, splitlines, readlines, read_text, read_bytes,
+             decode, open or a multi-line regex flag", and add re.split / StringIO / computed separators to the
+             NOT-seen list, or widen TEXT_ATTRS with re.split and StringIO.
+```
+
+## C6. Deleted-line audit (`854a337..6646ccd`)
+- The removed lines in scripts_test.go are the old narrow SOURCE checks: the makegate splitter set `{makefile_lines, load_pin}`, and a per-file `split("\n")` regex over the three guards. The new AST check replaces and widens both. `split-newline` is allowed in makegate only for `makefile_lines` and `load_pin`, as before, and it is refused anywhere in the three guards.
+- No `t.Skip` was added and no assertion was weakened. 0 skips.
+
+## Verdict at 6646ccd
+**What holds:**
+- Every lane is green locally, and the builder's numbers reproduce: 809/0 skips, 568 PASS, demo 87/87, guards and vendor check 0.
+- The planted readers are 7/7 red under 854a337's probe and green now.
+- All 28 named reads are non-makefile inputs.
+- The real-Makefile readers are 9/9 identical to 854a337.
+- The temp-dir leak and both other NITs are fixed.
+- The Makefile, its pin, `.github/` and `api/` are unchanged.
+
+**What remains:** FINDING 17 (SHOULD), a test-reach wording point of the same class as FINDING 16. It is not blocking.
+
+This PASS is local. It is not a merge and not VERIFIED; `ci-required` must still pass on this SHA once billing is fixed.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 6646ccde99f466d6c52f2c8ef43571c24abc875f
