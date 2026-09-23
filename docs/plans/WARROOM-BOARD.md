@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 210 — user PR B plan: seat confirmed C1/C4 of r3; R3-1 (Lane B must not let a fixture-supplied browser bring unscreened launch options) and R3-2 (count signals observed, not written; write failures; tokens) → plan r4. The builder deviated from R3-1's literal "refuse launch at any time" because Playwright launches the worker's own browser through the same patched `launch` (creation-guard.ts:82-83, :297-298) — r4 allows one screened launch per worker; chair proposes the single launch must deep-equal the Lane-B config's `launchOptions` (a key allowlist admitting `args` would admit `--proxy-server`) → seat checking. Q-r3-1: no benign-header list (O-1 expiry; residual R-13). In flight: verifiers on core #12 and user #10, core 2p, meta 2i, seat check of r4. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 212 — **owner request: a Greptile-style proactive agent team.** Built the **sentinel team** (commits `6c355e5` + sweep hook): `.claude/agents/sentinel/` — `vizra-sentinel-workflows` (runs documented workflows on current main), `vizra-sentinel-bugs` (maps call paths, confirms bugs with failing tests), `vizra-sentinel-contracts` (cross-repo and claim-vs-code drift), `vizra-sentinel-pr` (blast-radius PR review, no public comments unless asked); `/sentinel` command; `docs/sentinel/RULES.md` (15 learned rules from this project's real defects), `WORKFLOWS.md` (12-entry catalogue), `FINDINGS.md` register; `/warroom` now runs sentinel PR review on contract/guard/migration PRs and a sweep when a slot is free. First sweep dispatched (2 hunters): workflows W-OP-2/W-OP-3/W-DEV-1 and bugs in core M1-A. User PR B plan r5 **APPROVED for phase 2** (after user #10 merges). In flight: verifiers on core #12, user #10; builders core 2p, meta 2i; 2 sentinels. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -168,6 +168,8 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 212 (2026-09-23) — sentinel team built (owner request); first sweep dispatched; PR B plan r5 approved for phase 2.
+- Tick 211 (2026-09-23) — PR B plan r4 seat check (R4-1 effective launch options, R4-2 test.use).
 - Tick 210 (2026-09-23) — PR B plan r4 (R3-1 deviation: one screened launch per worker; chair proposes deep-equality) → seat check.
 - Tick 207–209 (2026-09-23) — PR B plan r2/r3 seat passes; F8 verbatim text recorded; user #10 (pixels off) → verifier.
 - Tick 206 (2026-09-23) — core #12 (B3) ready at `6edaf83` → verifier; leaked test temp dirs removed (6.1 GB); queue 2s.
