@@ -289,3 +289,109 @@ artifact) — by exact path, after this file was written.
   report archive and page snapshots, are public. The fix is a few docs lines in this PR.
 
 FINAL VERDICT: FAIL — SHA f9f9478eed8f0536345f88f59882716fcdcc9698
+
+---
+
+# Re-verification at `760cc8f` (2026-09-23)
+
+- **SHA verified:** `760cc8fa6bb815f92cc774ac9a81e11496a2fe0e`
+  (`gh pr view 9 -R yegamble/vizra-user --json headRefOid` → `760cc8f…` at start **and at end**).
+  One docs-only commit on `f9f9478`: `760cc8f docs(agents): retention by artifact family, the pre-PR-A artifact, and log wording`.
+- **Environment:** fresh clone in a new private dir `…/scratchpad/vzv-vizra-user-pr9r2-jwmpCN/`
+  (mktemp -d, deleted at the end); node v22.14.0 (the `.nvmrc` pin), npm 10.9.2, macOS arm64.
+- **Scope:** FINDING 1 (REQUIRED), FINDING 4 (NIT), FINDING 5 (NIT). FINDINGS 2 and 3 are
+  follow-ups outside this PR and remain open for the chair to route.
+
+## RV-1. Diff
+
+| Check | Result |
+|---|---|
+| `git diff --stat f9f9478 HEAD` | `AGENTS.md | 41 +++++---` (+29/−12) |
+| `git diff --stat origin/main...HEAD` | `AGENTS.md | 75 +++++---` (+66/−9) — **AGENTS.md only**; `gh pr view --json files` → `AGENTS.md` |
+| digest-hashed? | no (as before; hygiene `17 mutation-digest line(s) match this tree`) |
+
+## RV-2. FINDING 1 — retention by family, re-measured
+
+```
+$ gh api --paginate 'repos/yegamble/vizra-user/actions/artifacts?per_page=100' \
+    --jq '.artifacts[] | [.id,.name,.created_at,.expires_at,.expired] | @tsv'   # 61 rows
+families (name with sha/run stripped) × expired:
+  30 npm-audit-<sha>                      false
+  30 trivy-image-<sha>                    false
+   1 playwright-artifacts-<run>-<attempt> false
+retention (expires_at − created_at, days): npm 30 ×30, trivy 30 ×30, playwright 14 ×1
+10612777314  playwright-artifacts-35536837315-1  2026-09-20T20:53:24Z  2026-10-04T20:53:23Z  false
+$ grep -rn "upload-artifact\|build-push-action\|retention-days" .github/workflows/
+supply-chain.yml:102,107 (30) · supply-chain.yml:177,182 (30) · e2e.yml:240,247 (3)   — no other uploader
+```
+
+| New sentence | Measured | Verdict |
+|---|---|---|
+| e2e artifact (`playwright-artifacts-*`) "as uploaded by the current workflow: 3 days" | e2e.yml:247 `retention-days: 3`; ceiling in `check-e2e-lane.mjs` | true, and now correctly scoped |
+| supply-chain `npm-audit-*`, `trivy-image-*` "29 of each on that day", 30 days, scan output not browser artifacts | 30 days each, `supply-chain.yml:107,182`; upload paths `npm-audit.json`, `trivy-image.json` | true. Count was 29+29 (+1) = 59 at my first run; it is **30+30+1 = 61 now** because this SHA's own runs added one of each. The sentence is dated ("on 2026-09-23 … on that day") so it stays a true point-in-time reading — NIT RV-a |
+| pre-PR-A `playwright-artifacts-35536837315-1`, id 10612777314, uploaded 2026-09-20, 14-day, expiring 2026-10-04; contains `playwright-report/index.html` with base64 archive, `playwright-report/data/`, four `error-context.md` with `# Page snapshot`; PR A's guarantees do not apply; deletion is the owner's decision | id, dates, 14 days, `expired:false` re-measured above; contents match what I unpacked in round 1 (§5) | true |
+| "Its content is the skeleton page and is harmless, as an independent verifier found" | round 1: I read a page snapshot (skeleton page) and found no live `?k=v` query string in the unpacked trace archives; nothing in the repo authenticated at that SHA | faithful to my wording ("benign"); "harmless" is slightly broader than two probes — NIT RV-b, not an over-claim of a control |
+| No other artifact family left out | the listing has exactly three name families; the workflows have exactly three `upload-artifact` steps; no `build-push-action` (no implicit build-record artifacts) | **complete** |
+| Heading narrowed to "a public `e2e` artifact uploaded under the current workflow"; hard-rule line now "3 days in the `e2e` artifact" | — | correct scoping; closes the inventory gap |
+
+**FINDING 1: closed.** I did not delete any artifact.
+
+## RV-3. NITs 4 and 5
+
+| NIT | New text | Verdict |
+|---|---|---|
+| 4 | "A line in a job log cannot be edited, and deleting a run's logs does not un-publish what was already read." | accurate; no longer claims logs cannot be removed. Closed |
+| 5a | "URL query strings and fragments, in the four URL shapes above, and `Location` are redacted, and nothing else is." | matches merged AGENTS.md:510 ("…and `Location`") and :1246. Closed |
+| 5b | page-snapshot bullet: "…refused at the upload gate, subject to "What still gets through" above" | the referenced paragraph exists at AGENTS.md:750, above line 868. Closed |
+
+## RV-4. No sentence claims more than is measured
+
+Re-read AGENTS.md:827-893 in full at `760cc8f`. Every retention figure matches the listing; the
+guarantees are scoped to current-workflow `e2e` uploads and restate PR A's merged rows at or below
+their strength; the page-snapshot claim now carries its residual pointer; the log paragraph is
+unchanged from round 1 (verified then against e2e.yml:160-162, playwright.config.ts:90-91,
+redact.ts:130-175). `git grep -n -i collaborator AGENTS.md` → only line 832, the historical
+"used to say" sentence. No over-claim found.
+
+## RV-5. Lanes (mine) and CI
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm ci` | 0 | — |
+| `npm run ci` | 0 | vitest **19 files / 627 passed, 0 skipped**; `next build` ✓; hygiene `OK: 308 … 17 mutation-digest line(s) match` |
+| `bash scripts/ci/check-e2e-lane.sh` | 0 | OK |
+
+`gh api repos/yegamble/vizra-user/commits/760cc8fa6bb815f92cc774ac9a81e11496a2fe0e/check-runs` → 7:
+frontend, contract, e2e, deps-scan, image-scan, GitGuardian Security Checks, **ci-required** — all
+`completed / success` on `760cc8f`. ci-required log (job 107307846459): `CHECK_SHA: 760cc8f…`,
+manifest `frontend, contract, ?guard, ?docker-build, e2e`; `guard` and `docker-build` "not
+triggered, optional-if-absent" (AGENTS.md-only diff is outside their path filters); `OK: every
+required check on 760cc8fa… concluded success.` The three mandatory lanes each have a real,
+successful check-run on this SHA.
+
+## RV-6. Findings at 760cc8f
+
+```
+NIT RV-a: the "59 unexpired … 29 of each" figures are a dated snapshot that ages with every run
+  (61 = 30+30+1 at this verification, the increase being this SHA's own scan reports). Dated, so
+  true; the retention figures are what matter and they are exact.
+NIT RV-b: "harmless" rests on one snapshot read and a query-string grep; "benign on inspection
+  (skeleton page, no live query string)" would state the measurement exactly.
+```
+
+Still open from round 1, outside this PR, for the chair: FINDING 2 (REQUIRED follow-up — e2e.yml:231-237,
+check-e2e-lane.mjs:1268 + d7b transcript, redact.ts:143 still say collaborator-only) and FINDING 3
+(SHOULD — six "vizra-core is private" locations).
+
+## RV-7. Cleanup
+
+`rm -rf …/scratchpad/vzv-vizra-user-pr9r2-jwmpCN` by exact path. No artifact deleted.
+
+## Verdict at 760cc8f
+
+FINDING 1 (REQUIRED) closed with a re-measured, complete artifact-family inventory; NITs 4 and 5
+applied accurately; no sentence exceeds its measurement; diff is AGENTS.md only; `npm run ci`
+green locally on the pinned node; all 7 check-runs including `ci-required` green on this SHA; head
+unchanged start→end. PASS is not a merge and not VERIFIED in the ledger.
+
+FINAL VERDICT: PASS — SHA 760cc8fa6bb815f92cc774ac9a81e11496a2fe0e
