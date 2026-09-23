@@ -146,6 +146,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 135 (2026-09-23) — security seat re-review of core PR #8 at `56504c1`: no blocking finding (NEW-1/NEW-4 closed; classification adds no oracle or amplification; no audit row or charge on a claimed instance; seam unreachable from production; 0005 DDL identical); F-1 (unredacted generic 500 log) → B3; F-2 NIT (a comment points at an AGENTS.md row that does not exist) held for the other verdicts.
 - Tick 134 (2026-09-23) — search PR #5 round 1 at `c3b2021` (Makefile digest gate; scanner retired; SIGPIPE flake fixed); verifier + desk reviewer re-judging; CI billing-blocked.
 - Tick 133 (2026-09-23) — core PR #8 closing slice at `56504c1` (race closed, 800 green iterations; main merged in with floors); CI billing-blocked; verifier + both seats re-judging locally.
 - Tick 132 (2026-09-23) — desk review: the text scanner is passable and core has no pre-flight; chair ruled a committed Makefile digest for both repos; search #5 round 1 and core B5 dispatched.

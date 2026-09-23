@@ -573,3 +573,115 @@ Challenge: "It is unreachable." It is — which is why this is a NIT and not a f
 ---
 
 BLOCKING FINDINGS OPEN AT 59a19c5: NEW-1 (claim-status and claim-owner share one hard-ceiling bucket, so an anonymous GET flood answers the operator's valid token 429; `internal/httpapi/setup_limits.go:70-77`)
+
+---
+
+## Chair note (2026-09-23, tick 135)
+
+No blocking finding open at `56504c1`. NEW-1 and NEW-4 CLOSED; NEW-3 an accepted residual; NEW-2/N-7's 500 half and F-1 → core hardening B3; F-2 (a code comment claims AGENTS.md records the fixed-window ceiling residual; it does not) weighed with the verifier's and backend seat's verdicts before any merge. The seat's re-review follows verbatim.
+
+---
+
+# Re-review at 56504c1 — `vizra-security` seat
+
+**Date:** 2026-09-23 · **Head:** `56504c14683224cfd1fce0ecd7b826dcbf6de88d`. I confirmed that HEAD and that the worktree is clean. The history since my last review is `655f46a` (round 2), then `a42ca76` (the closing slice, `classifyRefusal`), `8b54916` (merge of main `eeeea06`), `c79c4d2` (package floors), and `b2f0d22` / `56504c1` (evidence only). I reviewed read-only. The only scratch was a comment-stripped copy of the migration, made with `mktemp -d` and deleted.
+
+**Nothing is blocking.** My blocker (NEW-1) is closed and tested in both directions. The closing slice decides 409 versus 403 in one function, with no new oracle, no meaningful extra database load, and no remaining way to write an audit row or charge the failure budget on a claimed instance. Two small documentation and logging items are left, neither blocking.
+
+**The frozen objects did not move in a way that matters.** `655f46a` did touch `migrations/0005` and `api/openapi.yaml`. I diffed the 0005 up and down files from `59a19c5` to `56504c1` with comments stripped: the DDL is **identical**. The only API change is a declared `429` on `GET /api/v1/setup/claim-status` (`api/openapi.yaml:171-179`), which is a correct addition. The closing slice itself touches neither directory, as stated.
+
+## Status of my open items
+
+| # | Status at 56504c1 | Reason (file:line) |
+|---|---|---|
+| **NEW-1**: status GET and claim POST shared one hard-ceiling bucket | **CLOSED** | Separate counters: `claimOwnerCeiling = 600` and `claimStatusCeiling = 3000` (`internal/httpapi/setup.go:51,56`), keyed `ceiling.claim` and `ceiling.status` (`:251`, `:212`) through `allowSetupRequest(c, bucket, limit)` (`internal/httpapi/setup_limits.go:75`). Tested both ways: `TestAStatusFloodDoesNotStarveTheClaim` (`internal/integration/owner_claim_test.go:2135`) exhausts the status ceiling with 4000 GETs and then requires a 201 for the valid token; `TestAClaimFloodDoesNotSilenceTheStatusEndpoint` covers the reverse. |
+| **NEW-4**: `checkOrigin` would accept a match between two unnormalisable values | **CLOSED** | Denies when either side normalises to `""` (`setup.go:386`). An `Origin: null` request is now refused whatever is configured. |
+| **NEW-2 / N-7**: the 503 dropped its cause; the 500 logged it unredacted | **PARTIAL** (follow-up only) | 503 half fixed: `s.unavailable` logs the cause once, through `obs.Redact`, with the request id (`setup.go:492-499`). 500 half unchanged: `middleware.go:166` still logs `err.Error()` raw, and `internal/httpapi` still has no redaction-coverage test. I still cannot construct a leak through it; see F-1. |
+| **NEW-3**: the hard ceiling is a fixed window, so anyone can trip it | **CLOSED as an accepted residual** (one doc gap) | Recorded in code (`setup_limits.go:70-74`), with the concurrency bound assigned to M1-B. The comment says the residual is also written in `AGENTS.md`, but it is not there; see F-2. |
+
+## The closing slice from the attacker's side
+
+**1. Can a caller learn anything new from 409-vs-403 timing?** No.
+- On a claimed instance the handler answers 409 before `Claim` runs: from the monotonic cache, or from one `AnyUserExists` read on a cold cache (`setup.go:277`). Whether an instance is claimed is already public via claim-status.
+- On an unclaimed instance, every refusal cause goes through the same `classifyRefusal` re-read (`internal/ownerclaim/ownerclaim.go:443,499,600`): malformed, never minted, wrong digest, correct but dead, and the redeem's empty result. So they all pay the same extra query, and their relative timing is unchanged.
+- The only remaining divergences are the two I accepted last round. A malformed token skips the token read, but token shape is public. A correct live token hashes, but only someone holding the token can trigger that, and the 201 reveals it anyway.
+
+**2. Can the re-read amplify database load?** Negligibly. A refusal now costs one extra indexed `EXISTS`: a wrong token goes from 2 reads to 3, a malformed one from 1 to 2.
+- The failure limiter is still consulted after `Claim` runs, so it does not stop that work. The per-route claim ceiling (600 per 15 minutes) bounds it, at roughly 1,800 trivial reads per window at most.
+- A read error during classification is 503, with no charge and no row (`ownerclaim.go:600-611`).
+- The re-read after an empty redeem runs on the pool *after* `tx.Rollback` (`:497-499`), so no request holds two connections.
+
+**3. Does any path still write a permanent audit row or charge budget on a claimed instance?** No.
+- The only way to write a `refused` or `rate_limited` row, or to charge the failure budget, is `refuseToken` (`setup.go:510-527`). It is reached only through `ErrTokenNotAccepted` (`:418-424`), which `Claim` returns only from `classifyRefusal` after a fresh read found **no** users. `examineToken` never returns that error itself (`ownerclaim.go:546`).
+- `ErrAlreadyClaimed`, the `users_one_owner` 23505, and `ValidationError` write nothing and charge nothing.
+- One residual is stated honestly in `AGENTS.md:277`: an instance that becomes claimed microseconds *after* the re-read can still get one 403 decided just before. That needs a wrong-token request to land inside the winner's commit window, so it is bounded by the failure limiter and cannot accumulate. I accept it. The claim that it cannot happen between holders of the valid token is correct under READ COMMITTED: the re-read is a new statement with a new snapshot, and the winner's token consumption and user row commit together.
+
+**4. Is the test seam unreachable from a production build?** Yes.
+- `afterClaimedCheck` is an unexported `atomic.Pointer`, nil unless set (`ownerclaim.go:619-625`).
+- Its only setter is in `internal/ownerclaim/seam_integration.go`, behind `//go:build integration`. It is the **only** non-test file in the repository with a build constraint.
+- The three `go build` lines in the `Dockerfile` (`:131-133`) carry no `-tags`.
+- `TestTheClaimSeamCannotBeSetFromAProductionBuild` pins both halves: the setter's file is in `IgnoredGoFiles` under no tags, and it asserts that file exists so the test cannot pass vacuously; and no default-build file contains `afterClaimedCheck.Store(`.
+- Production cost is one atomic load per claim.
+
+**5. Merge of main.** Nothing security-relevant was lost on either side.
+- Against the PR-side parent (`a42ca76`), the merge adds only main's CI, script, docs and test-data changes. No owner-claim product file differs.
+- Against main (`eeeea06`), it adds only the PR's files.
+- The two files that differ from both parents are `README.md`, a two-section conflict where both sections were kept (I read the combined diff), and `AGENTS.md`, which merged without a conflict hunk.
+- The `openapi-verify` `-run` regex still names `TestPublicContractIsTheProbesPlusTheSetupOperations` (`Makefile:86`).
+- `c79c4d2` adds floors for the three new packages (audit 14, credential 4, ownerclaim 16, below the measured 17 / 6 / 19) and changes no other floor.
+
+**6. Anything new that I object to.** Nothing that needs a finding. Two notes:
+- `655f46a` added `AND NOT EXISTS (SELECT 1 FROM users)` to the redeem CTE (`store/queries/owner_claim.sql:97`), and its comment says this decides "the GUARANTEE". Under READ COMMITTED it is a snapshot check: it cannot see a concurrent *uncommitted* user. At M1-A that does not matter, because only the claim creates users, and the `consumed_at` guard plus `users_one_owner` decide the race. **M1-B's registration must not rely on this predicate** as a barrier against an owner being created beside a member being registered at the same moment.
+- `655f46a` also changed the handler's 409 pre-check from a cache peek to `instanceClaimed`, which closes a cold-cache path. On a restarted server over a long-claimed instance, a malformed body previously went on to token examination and wrote a `refused` row. That fix is right and is covered by `TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody`.
+
+## Follow-ups
+
+```
+FINDING F-1: the generic 500 log line in the HTTP error handler is still unredacted, and httpapi has no redaction-coverage test
+Severity:    SHOULD
+Confidence:  medium
+Slice:       M1-B, or core hardening sweep B2
+
+Affected:
+  repo:      vizra-core
+  files:     internal/httpapi/middleware.go:165-167 (`log.Error("http: request failed", "error", err.Error(), ...)`)
+  requirements: AGENTS.md "No credential, signed URL, session id or API key ever reaches a log line"
+
+Observed:
+  The claim endpoint's own 503 path now redacts (setup.go:492-499). The shared handler's
+  500 path does not, and nothing in internal/httpapi counts its error log sites the way
+  TestEveryErrorLogSiteInTheWorkerIsRedacted does for the worker. I found no path that
+  carries a secret there: pgconn redacts the password, and PgError.Error() omits DETAIL.
+Failure: a later route whose unmapped error embeds a credential would log it, and no test would go red.
+Recommendation: wrap that one attribute in obs.Redact, and add an AST-walk coverage test for internal/httpapi.
+Tests: `TestEveryErrorLogSiteInTheAPIIsRedacted`.
+Cross-repo implications: core | meta: none
+Challenge: "Nothing reaches it today." Agreed, which is why this is a SHOULD. M1-B adds sign-in, the first route whose errors are adjacent to a password.
+```
+
+```
+FINDING F-2: a code comment says AGENTS.md records the fixed-window ceiling residual; AGENTS.md does not
+Severity:    NIT
+Confidence:  high
+Slice:       this PR if it is touched again, otherwise M1-B
+
+Affected:
+  repo:      vizra-core
+  files:     internal/httpapi/setup_limits.go:70-74 ("…the number and this consequence are written down here and in AGENTS.md")
+             AGENTS.md:286 ("A request carrying the VALID claim token is never answered 429 by the failure limiter")
+
+Observed:
+  The AGENTS.md row is accurate as far as it goes: it is scoped to the failure limiter.
+  But no row names the per-route hard ceiling (600 per 15 minutes on the claim), which
+  CAN answer a valid token 429 until the window rolls. So the comment claims something
+  the file does not contain. This repository treats a promise in a comment that the
+  referenced file does not keep as a defect (0003's own header).
+Recommendation: extend row 286 with one clause: "…; the per-route hard ceiling
+  (claim 600 / status 3000 per 15 min) can, and is an accepted residual until M1-B's
+  concurrency bound", or delete the comment's "and in AGENTS.md".
+Tests: none; this is documentation.
+Cross-repo implications: none
+Challenge: "It's documented in the code." It is. The comment just says it is also somewhere it is not.
+```
+
+BLOCKING FINDINGS OPEN AT 56504c1: none
