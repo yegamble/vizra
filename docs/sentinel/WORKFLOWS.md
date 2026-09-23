@@ -5,10 +5,10 @@ This is every workflow a person or CI is told to run, as documented on `main`. `
 | ID | Workflow | Where it is documented | Repos | Last swept |
 |---|---|---|---|---|
 | W-OP-1 | Operator install and first boot with the compose shapes: render, `docker compose up`, all services healthy | meta README / `docs/quality/COMMANDS.md` §4–6, `deploy/` | meta, core, user, search | never |
-| W-OP-2 | First-run owner claim: `vizra` issues the claim token, claim-status is unclaimed, the claim succeeds once, a second claim gets 409, rate limits apply | core README / AGENTS.md (M1-A) | core | never |
-| W-OP-3 | Health and diagnosis: `vizra healthcheck api|worker`, `vizra doctor` (cache floor, unclaimed warning), readiness with the cache down | core README | core, meta compose | never |
+| W-OP-2 | First-run owner claim: `vizra` issues the claim token, claim-status is unclaimed, the claim succeeds once, a second claim gets 409, rate limits apply | core README / AGENTS.md (M1-A) | core | 2026-09-23 (S-0011…S-0020) |
+| W-OP-3 | Health and diagnosis: `vizra healthcheck api|worker`, `vizra doctor` (cache floor, unclaimed warning), readiness with the cache down | core README | core, meta compose | 2026-09-23 (S-0011…S-0020) |
 | W-OP-4 | Configuration: every template key documented, `config-template-check`, a boot refused on a bad value with a named error | core `.env.example`, meta `check-config-coverage.py` | core, meta | never |
-| W-DEV-1 | Core developer loop: `make ci`, `make test-integration` (Valkey and Redis 7.2), `sqlc-verify`, `openapi-verify`, `migrate-lint`, `fixtures-verify` | core AGENTS.md / README / COMMANDS | core | never |
+| W-DEV-1 | Core developer loop: `make ci`, `make test-integration` (Valkey and Redis 7.2), `sqlc-verify`, `openapi-verify`, `migrate-lint`, `fixtures-verify` | core AGENTS.md / README / COMMANDS | core | 2026-09-23 (S-0011…S-0020) |
 | W-DEV-2 | User developer loop: `npm ci`, `npm run ci`, `npm run e2e` (Lane A), `e2e:demos`, `codegen` then `check:contract` | user AGENTS.md / README | user, core (spec) | never |
 | W-DEV-3 | Search developer loop: `make ci`, `contract-drift`, `vendor-contract-check`, `boot-matrix`, `run` | search AGENTS.md / README | search, core | never |
 | W-DEV-4 | Meta validate lane: the ledger generator reproduces, quality JSON, doc links, compose checks, `ci-required-guard`, `demo.sh` | meta `docs/quality/COMMANDS.md` | meta | never |

@@ -66,9 +66,9 @@ Mutations on the fixed tree (each restored with `git checkout -- .`):
 
 ## Blockers and handoff
 - No blocker. The remaining gate is an independent verifier.
-- CI on PR #12, head `6edaf83` (merge ref against main `96d19b3`, which includes core #10/#11; `git merge-tree` is clean). Not re-run:
+- CI on PR #12, head `6edaf83`. Corrected per verifier V-4: every job's provenance says the tested tree was `3b29172`, the merge of `6edaf83` into `36a72df` (core #10 only), NOT into main `96d19b3`. `git merge-tree` against `96d19b3` is clean, and the verifier's local merge passed `make ci`. Not re-run:
   - Passed: `ci-required`, `build-test`, `cache-matrix` (both legs), `append-only`, `fixtures`, `govulncheck`, `docker-build`, GitGuardian.
-  - build-test's own reports: unit 1306 executed (floor 1028); integration 1475 and 1475 shuffled (floor 1171); 0 unexpected skips. These counts are higher than the local ones because the merge ref carries the tests from #10/#11.
+  - build-test's own reports: unit 1306 executed (floor 1028); integration 1475 and 1475 shuffled (floor 1171); 0 unexpected skips. These counts are higher than the local ones because the merge ref carries the tests from #10.
   - `image-scan` (NOT required) failed on 49 HIGH Debian 13.7 base-image OS CVEs, for example CVE-2025-69720 (ncurses) and CVE-2026-16742 (systemd libs). The scan itself is valid. This PR changes no Dockerfile or dependency.
 - Cleanup:
   - Containers `vizra-b3-{pg,valkey,redis72}-23727` removed. They were removed without `-v`, so their anonymous volumes may remain among the host's dangling volumes. I could not attribute one to them with certainty, so I deleted none.
