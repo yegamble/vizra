@@ -3545,3 +3545,219 @@ class (a). None is a defect in anything the acceptance bullets depend on, and
   involved is true, and I verified each one.
 
 FINAL VERDICT: PASS — SHA cf9e4c86b077335fcad8cf8050c8fe57a50431c2
+
+---
+
+# Re-confirmation of docs delta at ddec39c
+
+Verifier: a fresh independent verifier (did not write the code and did not produce the
+`cf9e4c8` verdict above). Date: 2026-09-23. Scope: the delta `cf9e4c8..ddec39c` only,
+plus the local lane and CI on `ddec39c`.
+
+## Head and ancestry
+
+| When | `gh pr view 4 --json headRefOid` | `git ls-remote … refs/heads/feat/m0-compose-topology` |
+|---|---|---|
+| start | `ddec39c34fe92857b03c40a21b9645dec96c50c5` | `ddec39c34fe92857b03c40a21b9645dec96c50c5` |
+| end (2026-09-23T17:09:59Z) | `ddec39c34fe92857b03c40a21b9645dec96c50c5` (OPEN, not merged) | `ddec39c34fe92857b03c40a21b9645dec96c50c5` |
+
+- `git merge-base --is-ancestor cf9e4c8 ddec39c` → true; `git rev-list --parents -n1 ddec39c` →
+  single parent `cf9e4c86b077335fcad8cf8050c8fe57a50431c2`. A one-commit fast-forward.
+- `git diff --stat cf9e4c8 ddec39c`:
+  `docs/evidence/compose-topology/CLAIMS.md | 10 +++++-----`,
+  `docs/evidence/compose-topology/claims.py | 10 +++++-----`; 2 files, 10 insertions, 10 deletions.
+  Nothing else changed.
+- AST comparison (Python 3.9.6 `ast`, every `str` constant replaced by one placeholder,
+  `include_attributes=False`): **identical** (37641-char dump on both sides). Without blanking the
+  raw ASTs differ, as they should. The five `w("…")` header lines became four text lines plus one
+  extra `w("")`, so the call count is unchanged; code is unchanged apart from string literals.
+
+## Environment
+
+Own clone: `mktemp -d …/scratchpad/vzv-vizra-pr4-XXXXXX` → `vzv-vizra-pr4-CAUCD1/repo`, checked
+out detached at `ddec39c`. macOS arm64, Python 3.9.6, PyYAML 6.0.3, Docker 29.8.0, Compose 5.5.1,
+git 2.50.1. The builder's worktree was not used.
+
+## Local lane (docs/quality/COMMANDS.md §1–§8), run from the clone root
+
+| Command | Exit | Result line |
+|---|---:|---|
+| `python3 docs/evidence/compose-topology/claims.py --check` | 0 | `CLAIMS.md is current (47 audited claims)` |
+| `python3 docs/evidence/compose-topology/claims.py` (write) then `git diff --exit-code` | 0 / 0 | CLAIMS.md sha256 `a08e8384…a344d` before and after: **byte-identical regeneration** |
+| `./scripts/check-generated-ledger.sh` | 0 | `OK 191 requirements; core=141`; byte-for-byte in UTF-8 and C/POSIX locales |
+| `./scripts/check-quality-json.py` | 0 | 4 JSON files; 191 ids; 287 references, 204 distinct, 14 documents, all resolve |
+| `./scripts/check-doc-links.py` | 0 | 95 markdown files; compose comments 6 paths / 8 files resolve (2 allow-listed) |
+| `./scripts/ci-required-guard.sh` | 0 | 1 required lane; fixtures 6/6, 7/7, 10/10 at floor |
+| `./scripts/compose-render.py --all --out build/compose-models` | 0 | 13 shapes rendered |
+| `./scripts/check-compose-topology.py build/compose-models` | 0 | `13 shape(s) … 27 rules, 0 violations; 2 known-false probe(s)` |
+| `./scripts/check-config-coverage.py build/compose-models` | 0 | `34 component keys … 58 template keys, 58 interpolated variables, 13 shapes; 1 alias; 1 retired key refused; 0 violations` |
+| `./scripts/check-template-claims.py` | 0 | `10 operator-facing file(s), 16 … reference(s) … 0 violations` |
+| `bash docs/evidence/compose-topology/demo.sh` | 0 | `RESULT: 95 assertion(s) passed, 0 failed, across 50 case(s)`; 0 `FAIL` lines; 0 `Broken pipe`; `tree is clean`; 355 s |
+
+No skips. `git status --porcelain` (excluding `build/`) empty after every step.
+
+## Mutations on the changed sentences (each restored; `--check` exit 0 and a clean tree after)
+
+| # | Mutation | Observed | Sentence it tests |
+|---|---|---|---|
+| M1 | append one line to CLAIMS.md | `--check` exit **1**, `CLAIMS.md is stale` | "`claims.py --check` fails on a hand edit" — **true** |
+| M2 | insert one line at the top of `docs/quality/COMMANDS.md` (14 rows cite it) | `--check` exit **1** | line numbers in the `Where` column are resolved — **true when the generator runs** |
+| M3 | replace CLAIMS row 1's anchor (`is rendered on every run and asserted`, `docs/META_REPO.md`) | write exit **2**, `UNEVALUABLE … no longer appears`; CLAIMS.md sha256 unchanged | "REFUSES to write anything if an anchor is missing" — **true** |
+| M4 | append a second copy of the same anchor | write exit **2**, `appears 2 times … (lines [85, 353])` | "… or appears more than once" — **true** |
+| M5 | insert one comment line after the shebang of `scripts/ci-required-guard.sh` and `scripts/ci-required-select.sh` | `--check` exit **0**, `CLAIMS.md is current`; CLAIMS.md:157–158 still say "lines 80, 249, 348, 423, 440" and "line 56"; guard line 80 is now `[ -z "$lane" ] && continue`, select line 56 is now blank | "every line number is resolved … a line number is **never quietly wrong**" — **false** for these six numbers (F-1) |
+
+At `ddec39c` without mutation the six hand-written numbers are correct today: guard lines
+80, 249, 348, 423, 440 are the `printf '%s\n' … | grep -q…` lines, and select line 56 is
+`printf '%s\n' "$rows" | head -n 1`.
+
+Other changed sentences, checked against code and workflow:
+
+- "the claim text, the kind and the cited cases in each row are hand-written" — true: they are
+  literals in `CLAIMS` (`claims.py`), emitted unchanged by `build()`.
+- "The rule-id table further down is the exception: it is computed from `demo.sh` and each
+  checker's `RULES`" — true: `undemo`/`total` come from `demonstrated_rules()` (demo.sh scan) and
+  `declared_rules()` (the `RULES = frozenset({…})` of the three checkers).
+- "It is **not** a step of the `validate` CI lane, so CI does not notice a stale CLAIMS.md" — true:
+  `git grep claims.py ddec39c` finds no reference in `.github/workflows/` (validate.yml line 226 is
+  `check-template-claims.py`, a different script), none in `demo.sh`, none in `scripts/`.
+- "`claims.py --check` is run by hand as part of the local lane (recorded in `local-run.txt`)" —
+  recorded: yes (`local-run.txt:107`, exit 0, 47 claims, at code commit `e82e659e`). "Part of the
+  local lane" is looser: the transcript header says it was "generated by the 8 required local lane
+  commands in docs/quality/COMMANDS.md", and `claims.py --check` is not one of the eight — COMMANDS.md
+  §8 mentions only the write form. (F-2, NIT.)
+
+## CI on ddec39c (`gh api repos/yegamble/vizra/commits/ddec39c/check-runs`)
+
+| Check run | Status | Conclusion | Job / run |
+|---|---|---|---|
+| `validate` | completed | **success** | job 107288215713, run 35826344782 (attempt 3), 16:59:14–17:05:39Z |
+| `ci-required` | completed | **success** | job 107288209911, run 35826344784 (attempt 2), 16:59:49–17:05:42Z |
+| `GitGuardian Security Checks` | completed | failure | 107068799057, 06:21Z |
+
+- `ci-required` log: manifest `.github/required-checks.txt` at `ddec39c` lists exactly `validate`;
+  the guard printed `required checks: - validate`, polled `validate: in_progress` until
+  `validate: success`, then `ci-required: every required check succeeded on ddec39c34fe9…`. The one
+  listed lane actually ran and succeeded on this SHA — no listed-but-unexecuted lane.
+- `validate` log: PR head `ddec39c…`, base `6b8158c3280ecd17a32efbb009ab06d04da42260` (= `origin/main`
+  when I cloned); topology `13 shape(s) … 27 rules, 0 violations`; coverage `… 0 violations`;
+  template claims `0 violations`; `RESULT: 95 assertion(s) passed, 0 failed, across 50 case(s)`.
+  Same figures as my local run.
+- GitGuardian: `1 secret uncovered` — incident 37486665, "Generic Password", commit
+  `a96f18895f38594164bc216b2f9727d63a10ecf9`, `docs/evidence/compose-topology/demo.sh` line 546. That is
+  the historical fake-marker commit; `demo.sh` is not in this delta and the check is not in the
+  required manifest. Reported, not counted as a finding against this delta.
+
+## Findings
+
+```
+FINDING F-1: "every line number is resolved … never quietly wrong" is false for six line numbers in the same file
+Severity:    REQUIRED (merge-blocking only under the chair's "no false guarantee merges" ruling; not a product defect)
+Confidence:  high
+
+Affected:
+  repo:      vizra
+  files:     docs/evidence/compose-topology/claims.py:558, CLAIMS.md:4, CLAIMS.md:157-158,
+             claims.py (the "Known weak spots" w() lines), PR #4 body ("The generator guarantees that a
+             line number is never quietly wrong.")
+  requirements: VZ-CI-002 (evidence discipline for this slice)
+
+Observed:
+  The new header (the whole point of ddec39c, "states only what claims.py enforces") says:
+  "every line number is resolved against the live file at generation time … so **a line number is
+  never quietly wrong**". CLAIMS.md:157-158 contain six line numbers that are hard-coded string
+  literals in claims.py and are never resolved: `scripts/ci-required-guard.sh` (lines 80, 249, 348,
+  423, 440) and `scripts/ci-required-select.sh` (line 56). The PR body goes further: "The generator
+  guarantees that a line number is never quietly wrong."
+
+Failure:
+  Reproduction (in a clean clone at ddec39c):
+    sed -i '' '1a\
+    # x
+    ' scripts/ci-required-guard.sh scripts/ci-required-select.sh
+    python3 docs/evidence/compose-topology/claims.py --check   # exit 0, "CLAIMS.md is current"
+    sed -n 157,158p docs/evidence/compose-topology/CLAIMS.md    # still "lines 80, 249, …" / "line 56"
+    sed -n 80p scripts/ci-required-guard.sh                      # now `[ -z "$lane" ] && continue`
+  Those scripts are exactly the ones the follow-up will edit, so the numbers will go quietly wrong
+  with the generator and --check both green. It is the same class as the vizra-core #6 hold: a
+  sentence that reads as exhaustive ("every", "never", "guarantees") while omitting a case.
+
+Perspective:
+  developer (the reviewer who follows a cited line number)
+
+Recommendation:
+  One of, in claims.py (then regenerate) and the PR body:
+  (a) scope the sentence: "every line number in the Where column is resolved …; line numbers quoted
+      in prose (Known weak spots) are hand-written and not checked"; or
+  (b) drop the six numbers from the prose and cite the pattern instead; or
+  (c) resolve them through anchors like the Where column.
+  Change the PR body's "guarantees" sentence to match.
+
+Acceptance criteria:
+  After M5 above, either --check exits non-zero, or no sentence in CLAIMS.md / claims.py / the PR body
+  says every line number in the file is resolved or can never be quietly wrong. claims.py AST unchanged
+  modulo strings if (a) or (b).
+
+Tests:
+  M5 above, plus claims.py --check and a byte-identical regeneration.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: CLAIMS.md header and PR body only
+
+Challenge:
+  The header also says CLAIMS.md is not checked in CI and that hand-written parts should be read at
+  source, and the six numbers are correct today. The previous verifier ruled the predecessor sentence
+  non-blocking because it concerns an audit file, not an operator control. If the chair applies that
+  reading, F-1 is a NIT; I rate it REQUIRED only because this commit exists to make exactly this
+  sentence exact, and the PR body now uses the word "guarantees".
+```
+
+```
+FINDING F-2: two small non-exhaustive statements in the new header
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra
+  files:     claims.py:559-560 → CLAIMS.md:5-6; docs/evidence/compose-topology/local-run.txt:1,107;
+             docs/quality/COMMANDS.md §8
+  requirements: VZ-CI-002
+
+Observed:
+  (1) "What it does NOT enforce: the claim text, the kind and the cited cases …" leaves out the
+  "What it does NOT guarantee" column, which is also a hand-written literal (CLAIMS tuple field
+  `limit`). (2) "run by hand as part of the local lane": it is recorded in local-run.txt:107, but that
+  transcript describes itself as "the 8 required local lane commands in docs/quality/COMMANDS.md", and
+  --check is not one of the eight; COMMANDS.md §8 documents only the write form.
+
+Failure:
+  A reader could take the limit column as checked, or look for --check in COMMANDS.md and not find it.
+
+Recommendation:
+  Add "and the 'does NOT guarantee' cell" to the list; add `claims.py --check` to COMMANDS.md §8 (or say
+  "run by hand alongside the local lane").
+
+Acceptance criteria / Tests:  text change; --check exit 0 after regeneration.
+
+Cross-repo implications:  none
+
+Challenge:
+  "The rule-id table is the exception" already implies everything else is hand-written.
+```
+
+## Verdict
+
+Everything the delta was supposed to be, it is: a one-commit fast-forward, two files, claims.py
+unchanged apart from string literals (AST-identical), CLAIMS.md regenerated byte-for-byte, the whole
+local lane green (`demo.sh` 95/0 across 50 cases, clean tree), and `validate` + `ci-required` green on
+`ddec39c` with the manifest's only lane actually executed. Four of the five checkable claims in the
+new header are true, and M1, M3 and M4 confirm the refusals.
+
+The headline sentence is not. "Every line number is resolved … never quietly wrong", and the PR
+body's "The generator guarantees that a line number is never quietly wrong", are false for six
+hand-written line numbers in the same file, and M5 shows `--check` staying green while they point at
+the wrong lines. Under the standing "no false guarantee merges" ruling I return FAIL. The fix is one
+sentence of wording in claims.py plus regeneration, and one PR-body sentence. No code change is
+needed and nothing else is outstanding from this delta. If the chair reads F-1 as a NIT, as the prior
+verifier did for T-2, then everything else here would support PASS.
+
+FINAL VERDICT: FAIL — SHA ddec39c34fe92857b03c40a21b9645dec96c50c5

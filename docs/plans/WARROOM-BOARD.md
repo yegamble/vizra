@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 195 — **four verifier-gated merges** after the repos went public and Actions ran again: meta #5 `c3bb02e` → `04ef3a0`; user #8 `c2ff445` → `7a3a572`; search #5 `1d28281` → `4810048`; core #8 `0cc906e` → `f1972e8` (each: verifier PASS evidence, `ci-required` green on the verified SHA by the chair's own check-runs call, head unmoved via `--match-head-commit`, no blocking specialist finding; core #8's red `image-scan` is the pre-existing base-image CVE set also red on main and not a required check — owner inbox 9). Next: core #10 merges main + re-pins the Makefile (core #8 changed it) → re-confirmation → CI → merge; then core #11 onto main with R2-1 → re-confirmation → merge; meta #4 `ddec39c` `ci-required` green, waiting on its docs-delta verifier. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 196 — meta PR #4 docs-delta re-confirmation **FAIL at `ddec39c`** on F-1 (REQUIRED under the no-false-guarantee rule): CLAIMS.md/PR body say a line number is "never quietly wrong", but six prose line numbers (guard :80,249,348,423,440; select :56) are hard-coded in `claims.py` and stay green when shifted (M5 reproduced). Everything else holds: delta = claims.py strings + regenerated CLAIMS.md (AST identical sans constants); local lane all 0 (demo 95/0/50); CI `validate` + `ci-required` success on `ddec39c`; GitGuardian red only on historical `a96f188`. Fresh builder fixing (prefer resolving the six references; else narrow). **Dispatched:** user PR B artifact privacy II — PLAN phase (plan-first; security seat reviews before code); core B3 redaction (N-7 middleware 500 path, httpapi redaction-coverage AST test, F-1 from #8's security seat, L-2 cancelled-ctx degraded flag). In flight: core #10 re-pin (`a6838af8c94145b13`), meta #4 fix, user PR B plan, core B3. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -159,6 +159,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 196 (2026-09-23) — meta #4 FAIL at `ddec39c` (hand-coded line numbers vs "never quietly wrong"); fix dispatched; user PR B (plan) and core B3 dispatched.
 - Tick 195 (2026-09-23) — merged meta #5, user #8, search #5, core #8; core #10 re-pin dispatched.
 - Tick 194 (2026-09-23) — owner: repos made public (secret pre-scan clean); Actions runs again; CI re-run on all verified heads.
 - Tick 193 (2026-09-23) — loop resumed; billing probe still refused.
