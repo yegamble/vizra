@@ -27,7 +27,7 @@ You are the **contract sentinel** of the Vizra war room. Vizra is four repos: me
 
 ## Output
 Write your results to `/Users/yosefgamble/github/vizra/docs/sentinel/sweeps/<date>-contracts-<scope>.md`. Each finding gets a heading, then one line per field:
-- dedupe key: `<repoA>|<repoB>:<artifact>:<slug>`;
+- dedupe key: `<repoA>+<repoB>:<artifact>:<slug>` (use `+`, because a `|` would break the register's table);
 - severity (BLOCKER, MAJOR, MINOR, NIT);
 - side A (`file:line@sha`) and side B (`file:line@sha`);
 - how you proved the disagreement;
