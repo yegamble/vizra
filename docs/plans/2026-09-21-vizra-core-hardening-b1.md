@@ -257,7 +257,7 @@ them.
 `.github/` tree; the harness aborts unless the digest moved; the repository is
 never modified.
 
-**46 attack rows — every one RED, each by a named rule.** That includes all
+**45 attack rows — every one RED, each by a named rule.** That includes all
 thirteen that were GREEN-and-UNLISTED, and `A7`/`A11`, which do not actually
 neuter make but are refused anyway because the shape is pinned.
 
@@ -281,3 +281,50 @@ Three honest counter-rows are GREEN and named in the residuals:
 - `D6-docker-run-failure.txt` — rewritten. Main's step against `broken`
   **exits 125** (the verifier is right, my first transcript was wrong); against
   `broken-probes-1-3` it prints all three reassuring lines and **exits 0**.
+
+## Session restart (2026-09-22) — re-oriented from disk
+
+Machine restarted mid-round. `git status` on `chore/m0-hardening-b1` @ `e710c3c`:
+58 modified, 2 deleted (`guard/step-env-makeflags/`, superseded by
+`guard/make-step-env/`), 33 untracked — the whole round-2 redesign was on disk,
+uncommitted. Two stray artefacts at the repo root (`unit-events.json`,
+`unit-exit.txt`, left by an earlier verbatim run of the pinned step) were
+deleted, not committed. `/tmp` was cleared by the reboot, so both suites were
+re-measured for the final floors rather than reusing pre-restart numbers.
+Containers restarted by name: `vzb2-pg`, `vzb2-cache` (this round's prefix;
+no `vzb1-*` containers remained). `vizra-m1a-*` and `vidra-*` untouched.
+
+Correction to an earlier number: a pre-restart measurement set the `scripts`
+package floor at 171 from a run in which the migrate-lint test table had been
+clobbered by the guard table (65 subtests instead of 15). After restoring it,
+`scripts` runs 151 and the per-package floor went RED while the whole-suite
+floor (1071 ≥ 953) stayed green — FINDING 7's property, observed live on my own
+mistake. Floors are regenerated from the post-restart measurement.
+
+## Round 2 committed and pushed (2026-09-22)
+
+| | |
+|---|---|
+| commits | `8fa04b1` (redesign: guard, anchor, report, pins, 65/12/6 fixtures, workflows, docs) · `6b65eff` (evidence) — on top of `e710c3c`, no amend, no force-push |
+| head | `6b65eff6ee29e99e1b93b01242b4c97d90a57267` |
+| PR | https://github.com/yegamble/vizra-core/pull/9 — body replaced with the round-2 account |
+| attribution | commits carry `Co-Authored-By: Claude Opus 5.5 (1M context)` per the harness attribution in force after the restart (round 1 carried Fable 5.1 per the brief) |
+
+Local at `8fa04b1`: `make tidy-check` 0 · `make ci` 0 · `make build` 0 · both guards 0 ·
+unit report 0 (1071, 0 skips, floor 910) · integration report 0 (1116, 0 skips, floor 949;
+internal/integration 45 ≥ 40) · `go test -race -count=3 ./scripts/` 0.
+
+Runtime: fixture subtests now run in parallel — `scripts` under -race went 53s → 13s locally,
+because it runs twice in build-test (make ci's test-race and the direct unit step).
+
+Cleanup: `vzb2-pg`, `vzb2-cache` removed by name; scratch copy for R4 removed.
+
+## CI on `6b65eff` — every required lane green
+
+ci-required success 11m22s · build-test success **11m17s** (was 11m03s; timeout 20, unchanged) ·
+cache-matrix 5s (legs 4m51s/5m01s) · docker-build 2m48s · fixtures 2m01s · govulncheck 36s ·
+append-only 7s · GitGuardian 20s · image-scan failure (not required; exit 1 findings, 48 HIGH).
+Fan-in `all 6 required check(s) succeeded` on head 6b65eff. CI counts: unit 1071/0 skips,
+integration 1116/0 skips (×2 incl. shuffled), internal/integration 45. New controls' ok
+lines present in the CI log for every make-running lane. State: READY_FOR_REVIEW; next action
+is the independent verifier at 6b65eff.
