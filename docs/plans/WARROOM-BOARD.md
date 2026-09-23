@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 193 — loop resumed at the owner's request; billing probe (re-run of meta `validate` 35837872919) still refused: "recent account payments have failed or your spending limit needs to be increased". Owner action (inbox 0): github.com/settings/billing — payment information and the Actions spending limit/budget. Each tick re-probes with one cheap re-run; when a job starts, the chair re-runs CI on every verified SHA and merges in order meta #4 → meta #5 → core #8 → core #10 (re-pin) → core #11 (rebase + re-confirm) → user #8 → search #5. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 194 — **owner instruction: "just make the repos public"**. Chair pre-flight before publishing: history-wide secret scan of all four repos (AWS/private-key/GitHub/Slack/Anthropic/OpenAI/Google token patterns) → only `AKIAIOSFODNN7EXAMPLE` (AWS's published documentation example, used as a redaction fixture); no `.env`/key/cert files ever committed (`.env.example` placeholders only); no goimg catalyst-ui-kit files. `yegamble/vizra`, `vizra-core`, `vizra-user`, `vizra-search` set PUBLIC (confirmed). **Actions runs again** (meta `validate` 35837872919: success, 10 steps). CI re-run on every verified head (meta #4 `ddec39c`, meta #5 `c3bb02e`, core #8 `0cc906e`, core #10 `398ac4f`, user #8 `c2ff445`, search #5 `1d28281`); fresh verifier re-confirming meta #4's docs delta. Merges follow in order as `ci-required` goes green on each verified SHA. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -155,6 +155,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 194 (2026-09-23) — owner: repos made public (secret pre-scan clean); Actions runs again; CI re-run on all verified heads.
 - Tick 193 (2026-09-23) — loop resumed; billing probe still refused.
 - Tick 192 (2026-09-23) — search PR #5 PASS (local; CI BLOCKED) at `1d28281`; loop paused: six verifier-PASSed PRs wait only on GitHub Actions billing; nothing dispatchable without merges or owner decisions.
 - Tick 191 (2026-09-23) — quiet.
