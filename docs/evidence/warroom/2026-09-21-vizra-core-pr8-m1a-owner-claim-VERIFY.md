@@ -1862,3 +1862,178 @@ Every in-scope item reproduced locally at `56504c1`:
 **CI did not run** (billing), so `ci-required`, provenance and all six floor lanes on this SHA are **not obtained** (R3-CI). This is not a merge and not VERIFIED. The merge waits for the owner and a green `ci-required` on this SHA.
 
 FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 56504c14683224cfd1fce0ecd7b826dcbf6de88d
+
+---
+---
+
+# Re-confirmation at 37601f5 (floors-only delta from 56504c1) — 2026-09-23
+
+- **SHA:** `37601f5f0b3e85582080b1762985743cd04bd2a1`. PR head at start = `37601f5…`; `compare 56504c1...37601f5` = ahead 2 / behind 0 (`94fc68c` "raise the outgrown integration and httpapi floors…", `37601f5` "apply the generator's cmd/vizra and internal/config floors…"). PR now has 10 commits.
+- **CI BLOCKED by billing** — not re-run, as instructed. Local verdict only.
+
+## R4-1. The delta touches only floors, one AGENTS.md row, and the harness/README
+
+`git diff --stat 56504c1 37601f5`:
+```
+ AGENTS.md                                    |  2 +-
+ docs/evidence/m1a-owner-claim/README.md      | 19 +++++++
+ docs/evidence/m1a-owner-claim/demonstrate.sh | 76 ++++++++++++++++++++++++++++
+ scripts/test-floors.json                     | 37 ++++++++++----
+```
+`git diff --stat 56504c1 37601f5 -- internal/ cmd/ migrations/ api/ .github/ Makefile Dockerfile store/ go.mod go.sum` → **empty**. No code, test, migration, contract, workflow or dependency changed. So the full-suite results at 56504c1 (R3-5) carry over unchanged, and no full integration re-run is needed.
+
+## R4-4. The new AGENTS.md row and `allowSetupRequest`'s comment — **NOT TRUE as written**
+
+The row added in this delta (AGENTS.md, "A request carrying the VALID claim token is never answered 429 by the failure limiter. **The per-route HARD CEILING is different, and CAN answer a valid token 429** …") says:
+- each route "has its own **fixed-window counter** — claim-owner **600** and claim-status **3000** requests per **15 minutes**";
+- once reached, every request "is 429 **until the window rolls**";
+- this is an "**Accepted residual** … the guard the pool actually wants is a concurrency bound, which is M1-B's".
+
+`allowSetupRequest`'s comment (`internal/httpapi/setup_limits.go`, unchanged since 56504c1) says the same: "this is a FIXED-WINDOW count, so N requests inside one window answer even a valid token 429 until the window rolls".
+
+What is true:
+- the per-route split (never a shared bucket);
+- the values 600 and 3000 per 15 minutes;
+- that a valid token CAN be answered 429 once a route's cap is reached;
+- the M1-B citation.
+
+What is **false** is "fixed window … until the window rolls" — on the production (cache) path.
+
+`internal/cache/ratelimit.go` `FallbackLimiter.Allow` (M0 code, unchanged by this PR) issues `INCR k` **and `EXPIRE k window` on every call**. EXPIRE resets the TTL each time, so the counter expires only after 15 minutes with **no** requests to that route. Measured through the real handler, on a real Valkey 9.1.2 (verifier probe `TestVZV4_IsTheClaimCeilingAFixedWindow`, own database and container):
+
+```
+after 600 claim-owner requests: map[415:600] | key default:rl:default:rl:setup.claim:ceiling.claim = 600, TTL 15m0s
+8 s later: TTL 14m52s; request #601 -> 429; now count=601, TTL 15m0s          <- expiry pushed back out
+the operator's VALID-token claim -> 429 "rate_limited"; count=602, TTL 15m0s  <- and again, by the operator's own attempt
+```
+
+Consequences the stated residual does not disclose:
+- After one 600-request burst, **one request every < 15 minutes keeps the claim route shut indefinitely**. With a true fixed window, holding it would cost 600 requests per window.
+- **Every retry by the operator extends their own lockout.**
+
+The in-process `MemoryLimiter` fallback IS a fixed window, so the behaviour also depends on whether the cache is up. Its comment, "a fixed window, like the cache implementation", is itself inaccurate about the cache implementation — pre-existing M0 text. The same refresh applies to the claim-status ceiling and to the failure-budget buckets.
+
+This is **pre-existing** behaviour: the hard ceiling has sat on this limiter since 32b616d. I did not catch the TTL refresh in rounds 1–3. It becomes a blocking item now because this delta writes an **accepted-residual** statement into AGENTS.md and the code for the owner to accept, and that statement describes a materially milder residual than the one that exists.
+
+## R4-2. Floors recomputed from MY measured counts at 56504c1 — every floor equals the generator
+
+A fresh unit run at `56504c1` (`go test -race -count=1 -json ./...`, exit 0) gives **1184 executed / 0 skipped**, identical per package to my R3 run. `python3 scripts/go-test-report.py … --emit-floors` on those events, compared mechanically with the committed `scripts/test-floors.json` at 37601f5:
+
+| package | measured | generator | committed |
+|---|---|---|---|
+| cmd/api | 1 | 1 | 1 |
+| **cmd/vizra** | 12 | **10** | **10** |
+| internal/audit | 17 | 14 | 14 |
+| internal/authz | 502 | 427 | 427 |
+| internal/cache | 6 | 4 | 4 |
+| **internal/config** | 101 | **86** | **86** |
+| internal/credential | 6 | 4 | 4 |
+| internal/doctor | 39 | 33 | 33 |
+| internal/fixtures | 42 | 36 | 36 |
+| internal/healthcheck | 12 | 10 | 10 |
+| **internal/httpapi** | 56 | **48** | **48** |
+| internal/jobs | 30 | 26 | 26 |
+| internal/obs | 17 | 14 | 14 |
+| internal/ownerclaim | 19 | 16 | 16 |
+| internal/search | 129 | 110 | 110 |
+| internal/site | 6 | 4 | 4 |
+| scripts | 189 | 161 | 161 |
+| **unit `min_tests`** | 1184 | **1006** | **1006** |
+
+**17/17 unit package floors and `min_tests` MATCH; nothing is committed that the run did not measure.**
+
+**Integration suite.** The integration tag adds test files **only** in `internal/integration` (`go list -tags=integration` vs default, for every package; the one other tagged file, `internal/ownerclaim/seam_integration.go`, is not a test file). So each package's integration count equals its unit count, and `internal/integration` adds 165 (measured in all four legs at 56504c1). The sum 1184 + 165 = **1349**, exactly the integration total I measured at 56504c1. The generator's formula (`count − max(2, round(0.15·count))`, `min_tests` = `executed − max(5, round(0.15·executed))`) gives `internal/integration` **140**, httpapi **48**, config **86**, cmd/vizra **10**, `min_tests` **1147**. **18/18 integration package floors and `min_tests` MATCH.**
+
+**No floor exceeds what CI can execute.**
+- No test file is platform-constrained: no `_linux`/`_darwin`/`_windows` test files, no `//go:build <os>` test files, no `runtime.GOOS` in any test.
+- The last CI run that executed `go-test-report` (main `eeeea06`, build-test run 35820058941, ubuntu) counted **identically** to my darwin run for every package this PR did not change: authz 502, cache 6, doctor 39, fixtures 42, healthcheck 12, jobs 30, obs 17, search 129, site 6, scripts 189.
+- Every floor sits 15% (at least 2) below the measured count.
+
+## R4-3. MUT-60 and MUT-61 — reproduced: red against the new floors, green against the old, green restored
+
+`./docs/evidence/m1a-owner-claim/demonstrate.sh MUT-61` and `… MUT-60`, pristine clone at 37601f5, my database and cache:
+
+| case | deleted | executed after deletion | old floor (56504c1) | new floor | RED run | GREEN (restored) |
+|---|---|---|---|---|---|---|
+| MUT-61 | `internal/httpapi/setup_test.go` | **32** | 26 → would stay **green** | **48** | exit 1: "package …/internal/httpapi executed 32 test(s); its recorded floor is 48" | 56, floor met, exit 0 |
+| MUT-60 | `owner_claim_test.go` + `claimtoken_cli_test.go` | **45** | 40 → would stay **green** | **140** | exit 1: "package …/internal/integration executed 45 test(s); its recorded floor is 140" | 165, floor met, exit 0 |
+
+Both `RESULT: … PASS`, 0 harness-fail, tree clean afterwards. The harness only scores a case whose red run carries the per-package-floor message, so neither can be red for another reason. Each deletion leaves a count above the old floor, so the raise is what makes these deletions visible.
+
+MUT-id audit at 37601f5: **65 cited = 60 scored (`run_case` + `run_floor_case`) + 5 review-only (MUT-4, 4b, 14, 36, 53); 0 dangling.**
+
+## R4-5. Guards and `scripts` tests at 37601f5
+
+| Command | Exit | Output |
+|---|---|---|
+| `./scripts/ci-required-guard.sh` | **0** | `ci-required-guard: passed (6 required check(s))` |
+| `./scripts/make-integrity-guard.sh --workflow` | **0** | `make-integrity-guard: passed (8 gate target(s))` |
+| `go test -count=1 ./scripts/` | **0** | 189 pass, 0 fail, 0 skip |
+
+## R4-6. Finding
+
+FINDING R4-A: the new "accepted residual" says the setup hard ceiling is a FIXED window; on the cache path it refreshes on every request, so a lockout is indefinitely sustainable
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     AGENTS.md:286 (row added in this delta), internal/httpapi/setup_limits.go:70-74 (allowSetupRequest comment), docs/evidence/m1a-owner-claim/README.md:217, internal/cache/ratelimit.go:11 and :85 (M0 comments), internal/cache/ratelimit.go FallbackLimiter.Allow (`pipe.Incr` + `pipe.Expire(ctx, k, window)` on every call)
+  requirements: VZ-INSTALL-003 (S-3 denial-of-claim, S-7 hard ceiling)
+
+Observed:
+  The row and the comment state a "fixed-window counter", 429 "until the window
+  rolls", and call that an accepted residual until M1-B. Measured through the
+  real handler on Valkey 9.1.2: 600 claim-owner requests → key = 600, TTL
+  15m0s. Eight seconds later TTL = 14m52s; request #601 → 429 and the TTL is
+  back to 15m0s. The operator's VALID-token claim → 429, and the TTL resets to
+  15m0s again. EXPIRE runs on every request, so the counter only expires after
+  15 minutes with no requests to that route. The in-process MemoryLimiter
+  fallback is a true fixed window, so behaviour differs with cache health.
+
+Failure:
+  The residual put to the owner for acceptance is milder than the real one.
+  After one 600-request burst, a single request per < 15 minutes keeps the
+  claim route closed indefinitely. With a fixed window, holding it would cost
+  600 requests per window. And each operator retry extends the operator's own
+  lockout. The same refresh applies to claim-status (3000) and to the failure
+  buckets. The underlying behaviour has existed since 32b616d; I missed it in
+  rounds 1–3.
+
+Perspective:
+  operator
+
+Recommendation:
+  Either make the text true — "the counter expires 15 minutes after the LAST
+  request to that route; a single request per < 15 min after the cap sustains
+  the 429, including the operator's own retries" — and let the owner/seats rule
+  on accepting THAT residual. Or make the code match the text: set the TTL only
+  when the counter is created (`EXPIRE … NX`, or only when INCR returns 1). The
+  second is an M0 limiter change affecting every bucket, so it is the chair's
+  call which to take.
+
+Acceptance criteria:
+  The AGENTS.md row, the allowSetupRequest comment and README:217 describe what
+  the cache-backed limiter does. If a fixed window is intended, a request above
+  the cap does not extend the key's TTL, and a named test proves it.
+
+Tests:
+  internal/integration: the shape of my probe — cap the route, wait, send one
+  more, and assert the TTL did not move (or, if the refreshing semantics are
+  accepted, assert that it DID and state it).
+
+Cross-repo implications:
+  core: M0 limiter or text | user: the claim page's retry behaviour after a 429 | search: none | meta: owner inbox (accepted residual)
+
+Challenge:
+  M1-B's concurrency bound is due to replace this guard, and reaching the cap
+  still needs 600 requests. But the row exists precisely to record a residual
+  the owner is asked to accept, and it misstates that residual.
+
+## R4-7. Verdict at 37601f5
+
+The delta is exactly as claimed: floors, one AGENTS.md row, and the harness/README; nothing in `internal/`, `cmd/`, `migrations/`, `api/` or `.github/`. Every floor equals `--emit-floors` from my own 56504c1 counts, and none exceeds what CI can execute. MUT-60 and MUT-61 reproduce (red under the new floors, green under the old, green restored). Both guards pass, and `go test ./scripts/` passes 189/189.
+
+**Check 4 fails.** The M1-B citation is present and a valid token is indeed 429ed once the cap is hit. But the row's and `allowSetupRequest`'s "fixed window … until the window rolls" is false on the cache-backed path (FINDING R4-A, measured). The fix is a text correction plus an owner/seat ruling on the real residual, or a one-line limiter change. The head was `37601f5` at start and at end. CI is blocked by billing and was not re-run.
+
+FINAL VERDICT: FAIL — SHA 37601f5f0b3e85582080b1762985743cd04bd2a1
