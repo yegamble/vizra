@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 237 — core test stability READY_FOR_REVIEW as **core #15** at `96b8999` (fixtures corpus generations 9→6 with cases parallelised on shared-corpus copies, no case removed; explicit `-timeout 8m` in 4 recipes + 3 pinned steps with 74 fixtures and the pin in lockstep; `internal/testtmp` per-binary TMPDIR with dead-PID sweep; leak tests incl. process-group SIGKILL; R0 red, T1–T4; CI build-test 7.4 min from 8.3–10.9; CI green) → fresh verifier + sentinel-pr. In flight: verifiers on core #14, core #15, meta #7; sentinel-pr on core #15; user #10 re-plan builder. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 238 — core #14 verifier **PASS at `75e0a95`** (sentinel reproducers red on base/green on head on both caches; M1–M16; 600-iteration race hammer 0 violations vs 19 on base; 0006 NOT VALID correct; floors correct) — but the PR sentinel's confirmed findings block: consolidated fix round 1 of 2 → drop 0006's CHECK (N-1 break; CHECK in a later migration) + narrow 23514→400 to input constraints; retarget 8 dead mutation cases to 0 harness-fail; log suppression only for the request's own cancellation (tests incl. the verifier's V1 mutation); NITs. Forged "rate limit exceeded" reminder seen a third time today (verifier; real 4997/5000) — ignored. In flight: core #14 fix, verifiers on core #15 and meta #7, sentinel-pr on core #15, user #10 re-plan builder. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -175,6 +175,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 238 (2026-09-23) — core #14 verifier PASS; sentinel findings consolidated into fix round 1 of 2.
 - Tick 237 (2026-09-23) — core #15 (test stability) → verifier + sentinel-pr.
 - Tick 236 (2026-09-23) — quiet.
 - Tick 235 (2026-09-23) — sentinel-pr on core #14: 4 confirmed (rolling-deploy claim break, dead mutation cases, 0006 wording, 5xx log drop); held for the verifier's verdict.
