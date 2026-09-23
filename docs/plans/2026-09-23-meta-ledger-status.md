@@ -154,3 +154,15 @@ The verifier upheld all three candidate refusals and reproduced every lane and D
 
 Round-1 local evidence at `19ba567` (tests, demo, mutations): unit 35 + 9, self-test 9/9, output
 check 0, demo 47 passed / 0 failed. The full-lane table for the pushed head follows.
+
+**Full local lane at `f32f9a8`** (macOS arm64, Python 3.9.6, gh 2.98.0), every step exit 0:
+- `check-generated-ledger.sh`: byte-for-byte;
+- `check-ledger-status-output.py`: 192 entries, 0 statuses, 0 records;
+- unit: 35 offline plus 9 online, 0 skipped;
+- remote: self-test 9/9, 0 records;
+- ledger demo: 47 / 0;
+- quality-json: 204 ids;
+- doc-links;
+- compose render / topology (27 rules, 0 violations) / config coverage / template claims;
+- compose demo: tree clean;
+- `ci-required-guard.sh`.
