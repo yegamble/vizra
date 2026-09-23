@@ -22,4 +22,8 @@ The chair adds a rule when a confirmed finding reveals a new class, citing the e
 | R14 | **Public-repo exposure.** Since 2026-09-23 every artifact, job log and comment is public. | Uploads of traces, screenshots or HAR; logs echoing input; local paths in evidence | user #9, user #10, PR B review |
 | R15 | **Supply chain and pins.** Actions pinned by SHA, images by digest, vendored contracts by recorded SHA with a check that the pin matches. | `@v4`-style action refs; `:latest`; vendored files without a source SHA check | meta `check-action-pins.py`, search #3 |
 
+| R16 | **An upsert must not resurrect a terminal state.** `ON CONFLICT DO UPDATE` needs a `WHERE` that refuses consumed, revoked or deleted rows; a check made in an earlier snapshot does not survive a lock wait. | `ON CONFLICT … DO UPDATE` without a `WHERE`; `NOT EXISTS` guards read before a row lock | sentinel S-0002 (core owner-claim remint) |
+| R17 | **An input validator must match the database constraint exactly,** and the test that says so must compare every constrained column. | Go `regexp` or `unicode` classes against PostgreSQL `[:space:]`/`CHECK`; a "never reached" fallback branch | sentinel S-0003 |
+| R18 | **Wrap errors with `%w`, not `%v`,** where a caller branches on `errors.Is`/`As` (cancellation, not-found). | `fmt.Errorf("…: %v", err)` feeding `errors.Is(err, context.Canceled)` | sentinel S-0005 |
+
 Two principles apply to every sentinel. **Confirm by execution:** a finding needs a reproducer that was run. **Stay inert:** no exploit payloads, and a safety-classifier stop is recorded and never routed around.
