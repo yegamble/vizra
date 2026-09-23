@@ -144,3 +144,77 @@ Every claim in the PR reproduced on GNU Make 3.81 and 4.3:
 CI is blocked by billing. This PR is a draft stacked on #10: **after #10 merges it is rebased, and the rebased SHA needs re-confirmation before merge.**
 
 FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 29387da9dcb4b6bd842396a5d01857f10de7a856
+
+---
+
+## Cross-check: inline and multi-target rules (chair's cross-repo question from search PR #5)
+
+- **Head:** `gh pr view 11` → `29387da9dcb4b6bd842396a5d01857f10de7a856`. New scratch clone `vzv-core-pr11x-XXXXXX`, detached at the SHA.
+- **Method:** in-process calls to core's committed functions on **in-memory strings**:
+  - `RULE_RE`, `logical_recipe_lines`, `check_recipe`;
+  - `prerequisite_closure` and `check_text`, handed a stand-in root whose `/ rel` returns an object with `read_text()`.
+  - I wrote no Makefile to disk and ran no make. `subprocess.Popen`/`run` were replaced by functions that raise, and none raised.
+- **Scope of what I ran:** only the two spellings the chair named, and neighbours of the same shape. Two further spellings I identified **by reading the code** were **not executed** (marked below). I kept to reading because constructing new evasion spellings is what a classifier stopped in my PR #10 round-2 work.
+
+### Gap 1 — inline `;` recipe (`t: ; -true`, `t: ; $@x`)
+
+The recipe-line reader is tab-keyed (`logical_recipe_lines`, scripts/make-integrity-guard.py; it collects only `\t` lines after the rule line). The definition match `^ci\s*:(?!=)` hits `ci: ; -true`, but the reader returns `[]`: **the inline recipe is not scanned**. It is also never added to `GATE_RECIPE_LINES`, so the post-make expanded-prefix check does not see it either.
+
+What `check_text` did, pre-make, on each string (the full pre-make text reading plus the closure):
+
+| String (after the two approved SHELL lines) | Result |
+|---|---|
+| control `ci:` / `\t-./run…` | refused: "recipe line prefixed `-`" |
+| `ci: ; -true` | **refused**, but only because `RULE_RE` makes `;` and `-true` "prerequisites": "`;` … has no explicit rule" |
+| `ci:;-true` | refused (`;-true` treated as a prerequisite) |
+| `ci: ; $@x` | refused (`;` treated as a prerequisite; `$@x` is dropped as a `$`-token) |
+| `ci: ; ./run… \|\| true` | refused (`;`, `./run…` and `true` treated as prerequisites) |
+| a closure prerequisite `lane: ; -./run…` | refused the same way |
+
+**Core does not have the search spellings as a hole.** Every inline form the chair named is refused before make. But the refusal is **incidental**: it comes from B5b's "every closure prerequisite needs an explicit rule" rule applied to junk tokens, with a misleading message. It is not a scan of the inline recipe.
+
+**By reading, not executed:** `prerequisite_closure` drops every whitespace-separated token that starts with `$` (`if not d.startswith("$")`). An inline recipe whose `;` is glued to a `$`-token would therefore produce no junk prerequisite, and nothing above would fire. The unscanned inline recipe would then pass the pre-make checks. After make, the dry-run suffix check would still catch a `|| true`, but a leading `-` is invisible to `--dry-run`. **UNVERIFIED by execution** — I did not construct that spelling.
+
+### Gap 2 — the closure target is not the first name (`bar ci-lane:`)
+
+The definition match is anchored at the line start and needs `:` directly after the name (optional whitespace), so **any** multi-target line fails it: `bar ci:` and also `ci bar:`. `RULE_RE` in `prerequisite_closure` does split multi-target names, so the target is in the closure but has no "definition".
+
+| String | Result |
+|---|---|
+| `bar ci:` + `\t-./run…` (ci a seed) | **refused**: "gate target `ci` is not defined in any makefile make will read" |
+| `ci bar:` + `\t-./run…` | refused, same message (even as the FIRST name) |
+| `ci: lane`, then `bar lane:` + `\t-./run…` | refused: "`lane` … has no explicit rule in the pinned bytes" |
+
+**B5b does NOT treat `bar ci-lane:` as the explicit rule**, and its recipe is not scanned. The lane is refused outright (fail-closed), with a message that is inaccurate: the rule exists, but in multi-target form.
+
+**By reading, not executed:** if the same closure target also has a **recipe-less** single-target line (e.g. `lane:` alone, which satisfies "one explicit rule" with an empty recipe), and the recipe sits on a multi-target line naming it:
+- the recipe is not scanned before make;
+- make reports no duplicate, because only one rule has a recipe;
+- after make, only a `|| true` suffix would be caught (dry run); a `-` prefix would not.
+**UNVERIFIED by execution** — not constructed.
+
+### Doc sentences
+
+- `scripts/make-integrity-guard.py:118-122`: "every target in the gate closure must have ONE explicit rule … so every recipe the closure reaches is an explicit one the text reading scans".
+- AGENTS.md:165-166: "so every recipe the gate closure reaches is one the text reading scans".
+- COMMANDS.md:75: "The recipe scan covers the EXPLICIT rules of the prerequisite closure".
+
+For the spellings the chair named, the outcome is refusal, so these sentences are not falsified **by those spellings**. The code does not do what the sentences say, though: inline `;` recipes and recipes on multi-target lines are explicit rules the text reading does **not** scan. Whether the two by-reading spellings above slip through is UNVERIFIED by execution. If either does, those three sentences overclaim.
+
+The AGENTS.md matrix row ("a literal `-`/`+` prefix … on a gate recipe line") has the same dependency.
+
+```
+FINDING X-1: core's recipe scan ignores inline `;` recipes and recipes on multi-target rule lines; the named spellings are refused only incidentally
+Severity:    REQUIRED if the by-reading spellings are confirmed (the doc sentences above would then be false guarantees); SHOULD otherwise. NEW-CLASS relative to B5b
+Confidence:  high for the mechanism (executed on inert strings); medium for the two by-reading spellings (not executed)
+Affected:    vizra-core scripts/make-integrity-guard.py logical_recipe_lines (tab-only), check_text definition match `^%s\s*:(?!=)` (single-target only), prerequisite_closure (`$`-token filter); AGENTS.md:165-166; COMMANDS.md:75; guard docstring :118-122
+Recommendation (smallest, default-deny): before make, refuse any rule line in the pinned read set that carries an inline `;` recipe, and any multi-target rule line naming a gate-closure target. Or scan both forms and give the exact message. Add one inert fixture per form (notInvoked) plus rows in TestEveryRefusedSpellingIsRefusedBeforeMake.
+Acceptance:  each form refused by name, 0 make processes, on 3.81 and 4.3; the real tree unaffected. The Makefile uses neither form: every gate rule there is a single-target line with tab recipes.
+Cross-repo:  search: the same two gaps as reported by its verifier.
+Challenge:   today every spelling I executed is refused. The residual needs a reviewed Makefile that uses an unusual form. That is why it is not a BLOCKER.
+```
+
+- **Cleanup:** scratch clone deleted by exact path; no container used.
+- **Head re-check** at the end: see the next line.
+
+CROSS-CHECK: GAP — SHA 29387da9dcb4b6bd842396a5d01857f10de7a856 (the named spellings are refused, incidentally; the recipe scan does not cover inline or multi-target rules, and two bypass spellings found by reading are UNVERIFIED by execution)
