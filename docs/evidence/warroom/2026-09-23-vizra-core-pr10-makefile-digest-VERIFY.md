@@ -663,3 +663,71 @@ Recommendation: qualify it with "for the constructs named in sweep B5; review fo
 - **My recommendation to the chair:** open these as a follow-up hardening slice rather than re-plan B5. If the chair instead reads the main-branch sentence in R2-F3 as a false guarantee this merge would carry, the verdict would be FAIL on that basis alone.
 
 FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 398ac4fe2bd8a6096a24e402936ef3ab2c2238bc
+
+---
+
+# Re-confirmation at 33b951a (merge of main + re-pin)
+
+- **Head:** `gh pr view 10` → `33b951aed7db3137024f0247c6241425737846b2` (OPEN, MERGEABLE) at start and at end.
+- **Graph:** `398ac4f` (my PASS) → `60c70c3` (merge, parents `398ac4f` and `f1972e8` = origin/main, core #8) → `33b951a` (re-pin).
+- **Clone:** fresh, in `mktemp -d …/vzv-core-pr10rc-XXXXXX`. Host: 3.81, go1.27.1.
+
+## RC-1. The merge carries exactly main's changes; the re-pin is one line
+
+- **Merge tree:** `git merge-tree --write-tree 398ac4f f1972e8` = `54056805…`, which equals `60c70c3^{tree}`. The merge commit is exactly git's automatic merge, **with no hand edits**. The merge base is `eeeea06`.
+- **Files both sides touched:** only `AGENTS.md` and `README.md`, both resolved automatically.
+- **Patch equivalence:** `git patch-id --stable` of `git diff eeeea06 398ac4f` (the #10-only diff) **equals** that of `git diff f1972e8 60c70c3`. The merge adds nothing beyond #10 on top of main.
+- **Re-pin:** `git diff 60c70c3 33b951a` changes 1 file, 1 line: `  Makefile: e7cc357c…` → `  Makefile: ad681247536d61376d6789dfe6a1d654bd3cc1b65e437a7f32f094efd1199ba1`.
+- **The Makefile's only change since `eeeea06`:** #8's `-run` rename in `openapi-verify`, `TestM0ContractIsTheFourProbes` → `TestPublicContractIsTheProbesPlusTheSetupOperations`.
+
+## RC-2. The pin matches
+
+`shasum -a 256 Makefile` at `33b951a` gives `ad681247536d61376d6789dfe6a1d654bd3cc1b65e437a7f32f094efd1199ba1`, which equals the pin.
+
+## RC-3. Local lanes on the merged tree
+
+| Command | Exit | Detail |
+|---|---|---|
+| anchor `--workflow` / lenient (recorder) | 0 / 0 | 18 make processes each; `passed (8 gate target(s) … only on the pinned bytes of Makefile)` |
+| `./scripts/ci-required-guard.sh` | 0 | check 11: "pins 1 makefile(s) (Makefile) … every digest matches" |
+| **OLD pin restored** (`e7cc357c`, via `mutate.sh`, byte-identical restore) | anchor 1 / 1, **0 make processes** | `Makefile: sha256 ad681247… does not match … (e7cc357c…)`, "make was NOT invoked (0 make process(es) started)"; ci-required-guard FAILED, "Makefile changed without the paired update" |
+| `make ci` | 0 | "make ci: all lanes passed"; tree clean afterwards |
+
+## RC-4. CI on 33b951a (it runs now)
+
+`gh api repos/yegamble/vizra-core/commits/33b951a…/check-runs` returns 11 runs, all completed:
+
+| Check run | Conclusion |
+|---|---|
+| **ci-required** | **success** (17:18:09 → 17:28:52Z; run 35894652069, event `pull_request`, headSha `33b951a…`) |
+| build-test | success |
+| cache-matrix | success |
+| cache-matrix-leg (redis) | success |
+| cache-matrix-leg (valkey) | success |
+| fixtures | success |
+| govulncheck | success |
+| docker-build | success |
+| append-only | success |
+| GitGuardian Security Checks | success |
+| image-scan | **failure** (known red on main: base-image CVEs; not in `required-checks.txt`; reported only) |
+
+**Manifest against the jobs that ran:**
+- `.github/required-checks.txt` lists append-only, build-test, cache-matrix, fixtures, govulncheck and docker-build. All six ran on this SHA and succeeded.
+- ci-required's own fan-in log ends with SUCCESS for all six. Its `ci-required-guard` step reports "all 6 floor lane(s) are present and non-optional", each required check "resolves to a job", and each make lane "runs the make-integrity-guard anchor … before make … each immediately preceded by the anchor".
+- ci-required checked that the PR merge ref's `HEAD^2` equals the PR head SHA.
+
+**build-test log** (run 35894652033):
+- every anchor step prints `make-integrity-guard: passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)` on the ubuntu-24.04 runner (GNU Make 4.3);
+- `make ci: all lanes passed`;
+- the direct unit suite: **1281 executed, 0 skipped** (floor 1006, 17 packages);
+- the direct integration suite and the shuffled integration suite: **1450 executed, 0 skipped** each (floor 1150, 18 packages).
+
+This is the first run of the integration suites against #10's code.
+
+## Verdict
+
+The merge is git's automatic merge of main and nothing else. The re-pin is exactly the merged Makefile's digest. The anchor passes the merged tree and refuses it before make under the old pin. `make ci` passes locally. **`ci-required` is green on `33b951a`**, with every listed required lane having run and succeeded. `image-scan` is red, but it is a known, non-required failure on main.
+
+The earlier findings on #10 that are outside this re-confirmation stay as recorded: R2-F1 to R2-F3 were handed to #11, which is stacked on this branch and must be rebased and re-confirmed after this merges.
+
+FINAL VERDICT: PASS — SHA 33b951aed7db3137024f0247c6241425737846b2

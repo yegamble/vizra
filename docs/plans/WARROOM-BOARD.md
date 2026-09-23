@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 198 — user PR B plan: a SECOND safety-classifier stop on the stamp-key (V-D) design section; recorded, not re-routed. Ruling: item 1 (V-D design) → owner inbox 10; the builder completes items 2–4 with item 1 as a placeholder (measured fact + approved benign probe) and Lane B's gate stays CLOSED until item 1 lands; plus a small immediate vizra-user docs PR correcting the now-false "artifacts/logs readable only by collaborators of a private repo" sentence (repos public since tick 194). Owner inbox 5 updated: the repos being public makes rulesets available free — the chair can apply them with `gh api` on the owner's word. meta #4 F-1 fixed at `8e2a867` (line numbers computed; CI green) → re-confirming. core #10 at `33b951a` → re-confirming + CI. core B3 building. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 199 — **core #10 MERGED** `33b951a` → `36a72df` (verifier re-confirmation PASS: merge commit = git's automatic merge, patch-ids equal, one-line pin `ad681247…` = Makefile sha256; old pin refused with 0 make starts; CI: all six required checks + `ci-required` green, integration suites 1450/0 run for the first time on #10's code; `image-scan` pre-existing red). Branch kept for #11 (stacked) → builder retargets #11 to main, merges main, keeps R2-1 `bc8df3a`, marks ready. Merged today: meta #5, user #8, search #5, core #8, core #10. In flight: core #11 onto main, meta #4 re-confirmation at `8e2a867`, user PR B plan (items 2–4) + visibility docs PR, core B3. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -137,6 +137,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-09-23 | vizra-core | #10 hardening B5: anchor never runs make on unreviewed Makefile bytes (digest pin, one `make -q` over pinned files, pre-make refusals) | `33b951a` → `36a72df` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-core-pr10-makefile-digest-VERIFY.md`: rounds at `62d16aa` FAIL, `08a59a9` FAIL, `398ac4f` PASS, merge-of-main + re-pin at `33b951a` PASS); all six required checks + `ci-required` success on `33b951a`; `image-scan` pre-existing red (inbox 9). Follow-ups: #11 (B5b), queue 2p (allowlist grammar), 2o. | CI control; no ledger item. |
 | 2026-09-23 | vizra (meta) | #5 ledger obligations for M1-A (`VZ-AUDIT-001`; `VZ-INSTALL-003`, `VZ-ADMIN-USERS-001` extended) | `c3bb02e` → `04ef3a0` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-meta-pr5-ledger-m1a-VERIFY.md`, re-confirmed at `c3bb02e`); `ci-required`, `validate`, GitGuardian success on `c3bb02e` (chair's check-runs call). NITs R-N1/R-N2 → queue 2i. | Ledger entries PLANNED/UNVERIFIED as generated; no status change. |
 | 2026-09-23 | vizra-user | #8 artifact privacy A (VZ-FOUND-008 harness) | `c2ff445` → `7a3a572` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-user-pr8-closing-VERIFY.md`, re-confirmed at `c2ff445`); 9/9 check-runs success incl. `ci-required`, `e2e`. V-D (stamp key in the main process) NOT CLOSED → PR B (queue 2f). | IMPLEMENTED; eligible for VERIFIED on the independent evidence (ledger regeneration). |
 | 2026-09-23 | vizra-search | #5 CI hardening (queue 2g: default-deny guard, Makefile digest + allowlist grammar, one line reader) | `1d28281` → `4810048` (squash, `--match-head-commit`) | Verifier PASS after re-plan (`docs/evidence/warroom/2026-09-23-vizra-search-pr5-closing-VERIFY.md`, re-confirmed at `1d28281`); security desk review NO BLOCKER; 13/13 check-runs success incl. `ci-required`. | CI control; no ledger item. |
@@ -161,6 +162,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 199 (2026-09-23) — core #10 merged (`36a72df`); #11 being brought onto main.
 - Tick 198 (2026-09-23) — user PR B item 1 (V-D design) → owner inbox 10 after a second classifier stop; items 2–4 continue; visibility docs PR; inbox 5 (rulesets now free) and 11 (public-repo consequences).
 - Tick 197 (2026-09-23) — core #10 re-pinned at `33b951a` (CI running, re-confirming); user PR B plan scoped by ruling (a) after a classifier stop.
 - Tick 196 (2026-09-23) — meta #4 FAIL at `ddec39c` (hand-coded line numbers vs "never quietly wrong"); fix dispatched; user PR B (plan) and core B3 dispatched.
