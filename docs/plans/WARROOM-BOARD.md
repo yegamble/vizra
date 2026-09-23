@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 256 — security seat on the user #10 allowlist plan: **APPROVE WITH CHANGES** (`docs/evidence/warroom/2026-09-23-vizra-user-pr10-allowlist-PLAN-REVIEW-security.md`). BLOCKER S-1: `error-context.md` carries a whole-page accessibility snapshot incl. typed input values under `# Error details` (not `# Page snapshot`) → **dropped; stage only `results.json`**. S-2: Playwright's git-info plugin puts the PR diff into results.json on Actions (lockfile integrity runs reach 93 > N) → `captureGitInfo` off. S-3 wording + residuals R-A…R-D; public job log ungated → queue **2ac**. S-4/S-5/S-8/S-9 taken; S-7 fork-PR approval → owner inbox 5. Builder `ab29c4d29b3b03d48` given GO. In flight: core #14 final round, meta #8 re-confirm, user #10 build, search 2o-5. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 257 — **meta #8 MERGED** `31bebdb` → `a1ffa28` (2j). **Merged today: 15.** In flight: core #14 final round, user #10 allowlist build, search 2o-5. Queue next when core #14 merges: 2o-1 (core B5e), then 2ab/2aa/2v in core; meta: 2y, 2k (after 2v's S-0011 fix — the worker probe must not be adopted while `healthcheck worker` answers for the api). History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -151,6 +151,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-09-23 | vizra (meta) | #8 `.github/required-checks.txt` comments: CODEOWNERS advisory; compose has landed (queue 2j) | `31bebdb` → `a1ffa28` (squash, `--match-head-commit`) | Verifier BLOCKED `3572218` (stale merge ref 29e694b never recomputed) → chair `gh pr update-branch` → PASS `31bebdb` (tree = the verified local merge, `23947eaf`; `docs/evidence/warroom/2026-09-23-meta-pr8-manifest-wording-VERIFY.md`); chair's own check-runs: `validate` + `ci-required` + GitGuardian success on `31bebdb`. NITs → 2y. | Last live "owner-reviewed (CODEOWNERS)" claim gone. |
 | 2026-09-23 | vizra-core | #15 test stability: `-timeout 8m` on full-suite lanes, `internal/testtmp` per-run TMPDIR + dead-root sweep, fixtures corpus copy (queue 2m + 2s + S-0016) | `e161af7` → `27cee54` (squash, `--match-head-commit`) | Verifier FAIL `96b8999` (T4 red = build failure) → PASS `434abe5` → docs-only R1 hold → re-confirmation PASS `e161af7` (`docs/evidence/warroom/2026-09-23-vizra-core-pr15-test-stability-VERIFY.md`); sentinel-pr F-1…F-5 closed in round 1 (`docs/sentinel/pr/vizra-core-pr15-96b8999.md`); chair's own check-runs: `ci-required` success on `e161af7`; `image-scan` red (non-required, inbox 9). NIT FINDING 8 (T1–T4 pre-squash line unverifiable) + 7a → 2aa. | S-0001 and S-0016 FIXED by merge (verifier re-ran the leak + timeout checks). |
 | 2026-09-23 | vizra (meta) | #10 self-test fixture → reserved never-committed path (queue 2x; R24) | `33d435c` → `b5829d8` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-meta-pr10-selftest-fixture-VERIFY.md`: base 9/10 → head 10/10; M1/M3–M6 red; driver sound); chair's own check-runs: `validate` + `ci-required` + GitGuardian success on `33d435c`. NIT (case passes on any contents-read error, not only 404) → 2y. | Unblocks every meta PR's `validate`; #8 closed+reopened for a fresh merge ref. |
 | 2026-09-23 | vizra (meta) | #7 war-room records onto main (queue 2u) + CODEOWNERS wording sweep | `939b32d` → `608ffbf` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-meta-pr7-records-VERIFY.md`, FINAL VERDICT PASS — SHA 939b32d…); chair's own check-runs: `ci-required` success on `939b32d`. Verifier NIT (`.github/required-checks.txt:10` CODEOWNERS claim) corrected in the PR body without a commit → queue 2j. | Records on main; ledger VERIFIED entries now possible from evidence on main. |
@@ -185,6 +186,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 257 (2026-09-23) — meta #8 merged (`a1ffa28`); 15 merges today.
 - Tick 256 (2026-09-23) — user #10 plan APPROVE WITH CHANGES; results.json only; GO; 2ac queued; inbox 5 fork-PR setting.
 - Tick 255 (2026-09-23) — 2o architect review → split 2o-1…7; 2o-5 dispatched.
 - Tick 254 (2026-09-23) — meta #8 BLOCKED on a stale merge ref → update-branch `31bebdb` → re-confirm.

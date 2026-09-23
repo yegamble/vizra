@@ -276,3 +276,49 @@ Last CI poll: 2026-09-23T23:35:15Z, 23 min 46 s after the reopen at 23:11:29Z. `
 Missing input: a `pull_request` CI run on `3572218` whose merge ref includes `b5829d8`. Once that run is green, this verification can be re-read against it without re-running §1–§3, provided the head has not moved.
 
 FINAL VERDICT: BLOCKED — SHA 357221840ee17cfd0af87f0dfbf439dfe705096a
+
+## Re-confirmation at 31bebdb
+
+The chair ran `gh pr update-branch 8`, because GitHub never recomputed the stale merge ref (FINDING 1). This made the new head `31bebdb6c4b48b4b058b4cb551d0820fc4934c68`.
+
+**(c) Head unmoved.** `gh api repos/yegamble/vizra/pulls/8` gave head `31bebdb6c4b48b4b058b4cb551d0820fc4934c68` both at the start (about 23:38Z) and at the end (23:46Z). The PR is open and not merged. Its base is `b5829d8`.
+
+**(a) Tree identity.** In a fresh `mktemp -d` clone:
+
+```
+git log -1 --format='%H parents=%P tree=%T' 31bebdb
+  -> 31bebdb6… parents=357221840ee17cfd0af87f0dfbf439dfe705096a b5829d8a950d46a6ed439e770e5043ea739b6fc4 tree=23947eaf5ff89bb4fe7107e3d681046d8d9330ec
+git checkout --detach 3572218 && git merge --no-ff --no-edit b5829d8   (rebuilt local merge, no conflicts)
+  -> tree=23947eaf5ff89bb4fe7107e3d681046d8d9330ec
+git diff --stat <local merge> 31bebdb   -> (empty)
+git diff --stat b5829d8 31bebdb         -> .github/required-checks.txt | 16 +++++++++-------  (1 file); 0 non-comment +/- lines
+```
+
+The tree hashes are identical. This is the same merge of the same two parents I ran the full lane on in §3 (all exit 0; self-test 10/10; compose demo 95/0). I did not re-run the lane.
+
+**(b) CI on 31bebdb** (read with my own `gh api repos/yegamble/vizra/commits/31bebdb…/check-runs`):
+
+| check-run id | name | conclusion | started, completed | run |
+|---|---|---|---|---|
+| 107428642967 | validate | **success** | 23:38:24Z, 23:45:16Z | 35934583393 (pull_request) |
+| 107428642751 | ci-required | **success** | 23:38:23Z, 23:45:37Z | 35934583421 (pull_request) |
+| 107428628871 | GitGuardian Security Checks | success | 23:38:17Z | |
+
+Evidence from the validate log (run 35934583393):
+- `PR base SHA … b5829d8a950d46a6ed439e770e5043ea739b6fc4`, so the logged base is b5829d8 itself.
+- The tree under test was `ca0eb0e72741ab589b20fd7ec3c85c744dda38e3`. `gh api …/git/commits/ca0eb0e` gives parents `[b5829d8, 31bebdb]` and tree `23947eaf5ff89bb4fe7107e3d681046d8d9330ec`, the same tree as (a).
+- Step results:
+  - generated ledger reproduces byte-for-byte
+  - ledger status output: 192 entries, 0 statuses
+  - `self-test: 10/10 cases behaved as expected`
+  - ledger-status demo 61/0
+  - compose topology 13 shapes, 27 rules, 0 violations
+  - compose demo `RESULT: 95 assertion(s) passed, 0 failed`
+
+The ci-required log (run 35934583421) shows `validate: success` and `ci-required: every required check succeeded on 31bebdb6c4b48b4b058b4cb551d0820fc4934c68`. The guard at the start of that job passed, and the manifest it read is the single entry `validate`, which `validate` itself satisfies. There is no listed-but-unexecuted lane.
+
+`gh api rate_limit`: 4732 requests remaining. No rate-limit notice appeared in any tool result.
+
+**Disposition.** FINDING 1 is closed: CI is green on a merge ref that contains b5829d8. FINDINGS 2 and 3 are NITs that the chair has queued separately; they are not in this PR and do not block it. Every in-scope check is now reproduced: the diff is comments only, the parsed manifest is identical to main's, every R1 sentence is true, the lane is green on this exact tree, and CI is green on this SHA.
+
+FINAL VERDICT: PASS — SHA 31bebdb6c4b48b4b058b4cb551d0820fc4934c68
