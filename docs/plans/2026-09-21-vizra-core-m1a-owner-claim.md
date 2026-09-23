@@ -1045,3 +1045,46 @@ before re-reading the rule; nothing was changed by it. No further git in the met
 - Chair coordination (received mid-slice): core #9 merges first; when it lands, merge origin/main
   (no rebase), add floors for internal/audit, internal/credential, internal/ownerclaim via
   `--emit-floors`, run both guards, no skips. At a42ca76: #9 OPEN, origin/main still 5eb2829.
+- Baseline 655f46a, Valkey, contended, 200×: 198 pass / 2 FAIL (repeatable_read 1, serializable 1;
+  "28 … want 31", "30 … want 31", each loser a 403 `that claim token was not accepted`).
+- Fix a42ca76, Redis 7.2.16, contended, 200×: 200/200 per isolation, 0 fail (2761 s, load ~300-370).
+- Core #9 MERGED (main eeeea06). Merged origin/main into the branch → `8b54916` (README.md conflict,
+  both sections kept). `git diff a42ca76 8b54916 -- internal cmd migrations api store go.*` empty,
+  so binaries built at a42ca76 test the same product and test code.
+- Floors commit `c79c4d2`: audit 14 / credential 4 / ownerclaim 16 in both suites (measured 17/6/19,
+  `--emit-floors`); nothing else changed. `ci-required-guard.sh` 0, `make-integrity-guard.sh
+  --workflow` 0 (8 gate targets). Direct unit step: 1147 executed, 0 fail, 0 skip; direct integration
+  step (Valkey): 1313 executed, 0 fail, 0 skip, internal/integration 165. Both reports' ONLY remaining
+  problem: `internal/fixtures` panics on the 10-min default timeout under host load 300-400 (same
+  package, same symptom as make ci attempt 1 and the previous builder's MUT-53 attempt 1).
+- MUT-id audit at c79c4d2: 63 cited = 58 scored + 5 review-only (MUT-4, 4b, 14, 36, 53), 0 dangling.
+- Harness at c79c4d2 (Valkey): 58 scored, 58 passed, 0 failed, 0 harness-fail; tree clean after.
+  MUT-56 red: all four sub-tests "A answered 403 … want 409 conflict"; MUT-43 red: 403 where 503 wanted.
+- Stress (fix): Valkey no-extra 200/200, Valkey contended 200/200, Redis no-extra 200/200, Redis
+  contended 200/200 (×3 isolations each, 0 fail); Redis -race 20/20.
+- Pushed 655f46a..c79c4d2 (fast-forward). CI on c79c4d2: every Actions job REFUSED — annotation
+  "The job was not started because recent account payments have failed or your spending limit needs
+  to be increased" (ci-required, build-test). GitGuardian success. Not re-run (owner-only spend).
+- `make ci` alone at c79c4d2: exit 0, all 10 lanes. `make test-integration-shuffle` Valkey exit 0,
+  Redis exit 0; direct shuffled seeds 20260923 and 424242 exit 0 (337 top-level, 1349 PASS lines, 0
+  skip). CI seed 1790134723139270269 on Redis: every package ok except internal/fixtures (10-min
+  timeout under load); internal/integration ok. Direct unit/integration CI steps attempt 1: only
+  internal/fixtures timed out; all other packages at/above floor, 0 fail, 0 skip.
+- Batch 2 at c79c4d2: CI seed 1790134723139270269 on VALKEY exit 0 (337 top-level, 1349 PASS, 0 skip;
+  race test 3/3); direct unit step go 0 / report 0 (1184 executed, 0 skip); direct integration step
+  (Valkey) go 0 / report 0 (1349 executed, internal/integration 165, 0 skip); Valkey -race 20/20.
+- MUT-53 re-measured against the new code: gate deleted, integration + ownerclaim + httpapi exit 0
+  (still review-only). The digest line in that transcript was garbled by a wrapper quoting defect and
+  was recomputed on a copy (same digests as a first run whose exit code was lost to zsh's lack of
+  PIPESTATUS); stated in the transcript.
+- Evidence commits `b2f0d22` (transcripts 01-08 + README) and `56504c1` (timing prose fix), pushed
+  fast-forward. Head `56504c14683224cfd1fce0ecd7b826dcbf6de88d`. `git diff c79c4d2 56504c1` touches only
+  docs/evidence/m1a-owner-claim/. PR #8 body rewritten (status BLOCKED on CI, history, closing slice,
+  evidence, race table).
+- CI on 56504c1: every Actions job refused (billing annotation on ci-required); GitGuardian success.
+  Checked once, not re-run.
+- Cleanup: containers m1close-pg18/-valkey/-redis removed with `docker rm -f -v`; scratch binaries,
+  raw logs and the 655f46a source copy deleted (scratch dir kept, 332K of summaries).
+
+**State: BLOCKED (CI refused for billing — owner-only). Local evidence complete. Next: owner restores
+Actions; then CI on 56504c1 (or a re-run) must be green before READY_FOR_REVIEW; then the verifier.**
