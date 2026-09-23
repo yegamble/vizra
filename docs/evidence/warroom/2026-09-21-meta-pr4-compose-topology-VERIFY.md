@@ -3761,3 +3761,181 @@ needed and nothing else is outstanding from this delta. If the chair reads F-1 a
 verifier did for T-2, then everything else here would support PASS.
 
 FINAL VERDICT: FAIL — SHA ddec39c34fe92857b03c40a21b9645dec96c50c5
+
+---
+
+# Re-confirmation at 8e2a867
+
+Same verifier as the `ddec39c` section above. Date: 2026-09-23. Scope: the delta
+`ddec39c..8e2a867` (the builder's fix for F-1 by option (a), and for F-2), plus the local lane and CI
+on `8e2a867`.
+
+## Head and ancestry
+
+| When | `gh pr view 4 --json headRefOid` | `git ls-remote … refs/heads/feat/m0-compose-topology` |
+|---|---|---|
+| start | `8e2a86742f1df87091f1891d5b4ed407955b57f7` (OPEN) | `8e2a86742f1df87091f1891d5b4ed407955b57f7` |
+| end (2026-09-23T17:49:12Z) | `8e2a86742f1df87091f1891d5b4ed407955b57f7` (OPEN, not merged) | `8e2a86742f1df87091f1891d5b4ed407955b57f7` |
+
+- The only parent of `8e2a867` is `ddec39c34fe9…`, so this is a one-commit fast-forward.
+- `git diff --stat ddec39c 8e2a867`: `CLAIMS.md | 11`, `claims.py | 64`, 62 insertions and 13 deletions.
+  Only those two files changed.
+- `claims.py` code changes: a new `WEAK_SPOT_LINES` dict with two regexes, plus `resolve_lines()`
+  (reads the file, returns every matching line number, calls `fail()` → exit 2 on zero matches) and
+  `cite_lines()`. `build()` now computes `guard_lines`/`select_lines` before emitting anything. The
+  docstring, header strings and the weak-spot bullet also changed. No other function changed.
+
+Own clone: `mktemp -d …/scratchpad/vzv-vizra-pr4-XXXXXX` → `vzv-vizra-pr4-Eso6Zb/repo`, detached at
+`8e2a867`. Same machine and toolchain as the `ddec39c` section.
+
+## Regeneration and the local lane (all run one after another, clean tree before and after)
+
+| Command | Exit | Result |
+|---|---:|---|
+| `python3 docs/evidence/compose-topology/claims.py --check` | 0 | `CLAIMS.md is current (47 audited claims)` |
+| `claims.py` (write), then `git diff --exit-code` | 0 / 0 | sha256 `1d0ad340…dcb231` before and after: **byte-identical** |
+| `./scripts/check-generated-ledger.sh` | 0 | byte-for-byte in both locales |
+| `./scripts/check-quality-json.py` | 0 | every id resolves |
+| `./scripts/check-doc-links.py` | 0 | all resolve |
+| `./scripts/ci-required-guard.sh` | 0 | fixtures at floor |
+| `./scripts/check-template-claims.py` | 0 | 0 violations |
+| `./scripts/compose-render.py --all --out build/compose-models` | 0 | 13 shapes |
+| `./scripts/check-compose-topology.py build/compose-models` | 0 | 13 shapes, 27 rules, 0 violations |
+| `./scripts/check-config-coverage.py build/compose-models` | 0 | 0 violations |
+| `bash docs/evidence/compose-topology/demo.sh` | 0 | `RESULT: 95 assertion(s) passed, 0 failed, across 50 case(s)`; 0 FAIL, 0 Broken pipe, tree clean; 665 s |
+
+Process note: my first pass of the fast checks overlapped with a background `demo.sh` in the same
+tree. That demo run also gave 95/0/50 with a clean tree. I discarded the overlapped results anyway
+and the table above comes from a strictly sequential re-run.
+
+## Do the patterns match exactly the intended lines?
+
+- The guard pattern `printf '%s\\n' [^|]*\| *grep -q` gives `[80, 249, 348, 423, 440]` in
+  `scripts/ci-required-guard.sh`. The select pattern `printf '%s\\n' [^|]*\| *head -n` gives `[56]` in
+  `scripts/ci-required-select.sh`. These are the same numbers the hand list had at `ddec39c`.
+- I listed every pipe in both scripts, to check nothing was matched too broadly or missed:
+  - The guard has 32 pipe lines. The only ones whose reader exits early, which is the race, are the
+    five `| grep -q…` lines.
+  - The others read all of their input: `grep -c`, `grep -nvE`, `grep -o | sed`, `sed`, `awk`,
+    `cut`, `tr`.
+  - The selector's only early-exit reader is line 56, `| head -n 1`. Lines 37, 44, 46, 49, 57 and 58
+    use `awk`, `grep -c`, `sort` or `cut`.
+  - No comment line matches either pattern.
+- So the patterns hit exactly the intended six lines, no more and no fewer.
+
+## Mutations (each restored; `--check` exit 0 and a clean tree afterwards)
+
+| # | Mutation | Observed |
+|---|---|---|
+| M5 | one comment line after the shebang of both scripts | `--check` exits **1** (`CLAIMS.md is stale`). Regenerating prints `lines 81, 250, 349, 424, 441` / `line 57`, and those lines are the five `grep -q` lines and the `head -n 1` line. |
+| M6 | append a new matching sibling `printf '%s\n' "$x" \| grep -q y \|\| true` to the guard | `--check` exits **1** |
+| M7 | rewrite all five guard lines as here-strings (0 remaining `\| grep -q`) | the write exits **2**, `UNEVALUABLE: the weak-spot pattern … no longer matches any line of scripts/ci-required-guard.sh … Nothing was written.`, CLAIMS.md sha256 unchanged; `--check` also exits 2 |
+| M8 | rewrite select line 56 as `line="$(head -n 1 <<< "$rows")"` | the write exits **2** with the same refusal for `ci-required-select.sh` |
+| M9 | the M5 shift at `ddec39c`, for contrast | `--check` exits **0**: the F-1 defect, now closed |
+
+The builder's M5 table in the PR body matches what I observed.
+
+## The changed sentences
+
+- **Header: "every line number in this file is computed from the live file each time it runs, and none is typed by hand."**
+  **True.** I scanned CLAIMS.md at `8e2a867` for any line number outside the `Where` column: `path:N`,
+  `line(s) N`, `LN`, `#LN`. The only hits are the two computed weak-spot lists (157–158). "Within 2
+  lines" at row 72 is a window size, not a line number. `:8080`/`:3000` at 137 are ports.
+- **"The `Where` column comes from an anchor that must appear exactly once … REFUSES …"**
+  **True.** M3 and M4 in the `ddec39c` section showed this, and `resolve()` is unchanged.
+- **"The line numbers under 'Known weak spots' are every line of the named script that matches a fixed pattern — it REFUSES … if a pattern matches nothing."**
+  **True** (M7, M8).
+- **"So when a cited line moves, `claims.py --check` exits 1 until CLAIMS.md is regenerated; a committed CLAIMS.md is only as current as the last time someone ran it."**
+  **True** (M2 at `ddec39c` for the Where column, M5 here for the weak spots). The second clause
+  honestly states the limit. The "never quietly wrong" wording is gone.
+- **"What it does NOT enforce: the claim text, the kind, the cited cases and the 'What it does NOT guarantee' cell … and so is the prose of every section."**
+  **True.** This closes the first half of F-2.
+- **"What is computed rather than written: the line numbers, the row count, and the rule-id table."**
+  **True.** The row count is `len(rows)`, and the table comes from `demonstrated_rules()` and
+  `declared_rules()`.
+- **"`claims.py --check` is run by hand and its result is recorded in `local-run.txt`, but it is not one of the eight required local-lane commands in `docs/quality/COMMANDS.md` (§8 documents only the write form). It is not a step of the `validate` CI lane either."**
+  **True.** `local-run.txt:107` records it. §8 shows only `python3 …/claims.py`. `git grep claims.py`
+  finds no reference in `.github/`, `scripts/` or `demo.sh`. This closes the second half of F-2.
+- **Weak-spot bullet: "`printf … | grep -q` in the guard, `printf … | head -n 1` in the selector"**
+  **Accurate** about the pipe shapes. See O-1 on "the same race".
+- **Docstring: "no line number in CLAIMS.md is typed by hand"**
+  **True**, as above.
+- **PR body: "Every line number in it is computed from the live files when the generator runs …"**
+  **True.** Each clause matches the header. The body adds "neither lane notices a stale CLAIMS.md",
+  which is also true. The word "guarantees" is gone.
+
+## COMMANDS.md:654–655, the residual the builder disclosed
+
+> `scripts/ci-required-guard.sh` (lines 80, 249, 348, 423, 440) and
+> `scripts/ci-required-select.sh` (line 56) still carry that shape; they are outside this slice's
+> diff and are recorded here as a follow-up …
+
+These numbers are hand-written and correct at `8e2a867`. I read §8 and found no sentence claiming
+they are computed, checked or kept current. §8's one generator sentence concerns CLAIMS.md
+recomputing the rule-id mapping from `demo.sh`. The sentence is a plain present-tense observation
+with no guarantee word, so it is **not a false guarantee**. It will go stale when the follow-up edits
+those two scripts, and whoever edits them should update or delete the sentence (O-2).
+
+## CI on 8e2a867 (my own `gh api repos/yegamble/vizra/commits/8e2a867…/check-runs`)
+
+| Check run | Status | Conclusion | Job / run |
+|---|---|---|---|
+| `validate` | completed | **success** | job 107294690393, run 35894428837 (attempt 1, `pull_request`) |
+| `ci-required` | completed | **success** | job 107294689656, run 35894428778 (attempt 1, `pull_request`) |
+| `GitGuardian Security Checks` | completed | failure | 107294667998 |
+
+- **`ci-required` log:** `required checks: - validate` → `validate: success` →
+  `ci-required: every required check succeeded on 8e2a86742f1df87091f1891d5b4ed407955b57f7`. The
+  manifest at this SHA lists only `validate`, and `validate` ran.
+- **`validate` log:** PR head `8e2a867…`, base `6b8158c…`; topology 27 rules / 0 violations;
+  coverage 0 violations; `RESULT: 95 assertion(s) passed, 0 failed, across 50 case(s)`.
+- **GitGuardian:** the same single incident 37486665, "Generic Password", commit
+  `a96f18895f38594164bc216b2f9727d63a10ecf9`, `demo.sh` line 546, the historical fake marker. It is
+  not in the manifest and not in this delta.
+
+## Findings from the ddec39c section
+
+| Finding | Status at 8e2a867 |
+|---|---|
+| F-1 "every line number … never quietly wrong" false for six hand-written numbers | **CLOSED.** The numbers are computed (M5 now exits 1), zero matches are refused (M7/M8 exit 2), the sentence is accurate and the PR body sentence matches |
+| F-2 non-exhaustive NOT-enforced list; "part of the local lane" | **CLOSED.** Both are reworded, and the new wording is true |
+
+## Observations (non-blocking; none is a false guarantee)
+
+- **O-1 (NIT).** The weak-spot bullet says the selector's `printf … | head -n 1` is "the same race
+  removed from `demo.sh`".
+  - `ci-required-select.sh` runs under `set -uo pipefail` **without `-e`**.
+  - Line 56's exit status (`line="$(…)"`) is never checked, and `line` still receives the first row
+    even if `printf` takes EPIPE.
+  - So the pipe shape is the same, but it cannot fail the lane the way the `demo.sh` race did.
+  - This overstates a risk rather than overclaiming a guarantee, and the wording existed before this
+    delta. It is worth sharpening in the follow-up that fixes these lines.
+- **O-2 (NIT).** COMMANDS.md:654–655 hand-writes the same six numbers. They are correct today, with
+  no currency claim. Update or delete them in that follow-up.
+- **O-3 (information for the chair).** `main` moved after CI ran: CI's merge base is `6b8158c`, and
+  `main` is now `04ef3a0` (#5, VZ-AUDIT-001 ledger; it touches `docs/quality/COMMANDS.md` and
+  `features.json`). I merged `origin/main` into `8e2a867` in a separate worktree:
+  - The merge is clean (auto-merged COMMANDS.md). #5's COMMANDS.md edits replace lines without
+    adding any, so no anchor moved.
+  - On the merge tree, `claims.py --check` exits 0 (current, 47 claims).
+  - `check-generated-ledger.sh`, `check-quality-json.py` and `check-doc-links.py` each exit 0.
+  - I did not re-run the compose lane on the merge tree. #5 touches no compose file, script or
+    registry.
+  - As COMMANDS.md says, a green `ci-required` on the head certifies the merge with `6b8158c`, not
+    with `04ef3a0`.
+
+## Verdict
+
+- The delta is two files: the generator and the file it regenerates, byte-identically.
+- F-1 is fixed the right way: the six numbers are computed, and a pattern that matches nothing is
+  refused.
+- My M5 now exits 1 where it exited 0 at `ddec39c`, and the zero-match cases exit 2 without writing.
+- The patterns match exactly the six intended lines.
+- Every changed sentence in the header, the docstring and the PR body is true against the code and
+  the workflow. COMMANDS.md:654–655 claims no currency.
+- The full local lane is green when run sequentially.
+- `validate` and `ci-required` are green on this SHA, and the manifest's only lane ran.
+- The head did not move during verification.
+- No blocking finding is open.
+
+FINAL VERDICT: PASS — SHA 8e2a86742f1df87091f1891d5b4ed407955b57f7

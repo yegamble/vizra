@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 202 — core #11 on main at `238a9ca` (retargeted to main; six conflicts resolved three-way on the true fork `398ac4f`, patch-ids = main + #11; R2-1 `bc8df3a` with a `-W error` compile test; no re-pin needed; `make ci` 0 after a first run hit ENOSPC; unit 1328/0) → CI running, verifier re-confirming. User #9 FAIL at `f9f9478` on one REQUIRED false guarantee ("artifacts: 3 days" — supply-chain reports keep 30 days; a pre-PR-A public artifact with a page snapshot expires 2026-10-04) → docs-only fix; stale collaborator-only/"core is private" wording elsewhere queued as 2q. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 203 — **meta #4 MERGED** `8e2a867` → `b2c5b96` (re-confirmation PASS: F-1 closed with computed line numbers, M5–M9 mutations, patterns exact; `validate` + `ci-required` green; GitGuardian red only on the historical fake marker `zzMARKERzzPOSTGRESzz` in `a96f188`). Merged today: meta #4, meta #5, user #8, search #5, core #8, core #10. Dispatched meta 2i (ledger status only with mechanical evidence; carries meta #5 NITs). In flight: core #11 re-confirmation + CI at `238a9ca`, user #9 docs fix, user PR B plan security review, core B3, meta 2i. Now unblocked by meta #4: 2j (required-checks comment), 2k (real probes + ruled names), 2l (pipe race). History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -138,6 +138,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-09-23 | vizra (meta) | #4 compose topology (VZ-ISSUE-002) | `8e2a867` → `b2c5b96` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-21-meta-pr4-compose-topology-VERIFY.md`: PASS at `cf9e4c8`, FAIL at `ddec39c` on a line-number over-claim, PASS at `8e2a867`); infrastructure seat review on file; `validate` + `ci-required` success on `8e2a867`; GitGuardian red = fake marker in historical `a96f188` (not required). O-1/O-2 nits → 2l. | Ledger status via 2i. |
 | 2026-09-23 | vizra-core | #10 hardening B5: anchor never runs make on unreviewed Makefile bytes (digest pin, one `make -q` over pinned files, pre-make refusals) | `33b951a` → `36a72df` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-core-pr10-makefile-digest-VERIFY.md`: rounds at `62d16aa` FAIL, `08a59a9` FAIL, `398ac4f` PASS, merge-of-main + re-pin at `33b951a` PASS); all six required checks + `ci-required` success on `33b951a`; `image-scan` pre-existing red (inbox 9). Follow-ups: #11 (B5b), queue 2p (allowlist grammar), 2o. | CI control; no ledger item. |
 | 2026-09-23 | vizra (meta) | #5 ledger obligations for M1-A (`VZ-AUDIT-001`; `VZ-INSTALL-003`, `VZ-ADMIN-USERS-001` extended) | `c3bb02e` → `04ef3a0` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-meta-pr5-ledger-m1a-VERIFY.md`, re-confirmed at `c3bb02e`); `ci-required`, `validate`, GitGuardian success on `c3bb02e` (chair's check-runs call). NITs R-N1/R-N2 → queue 2i. | Ledger entries PLANNED/UNVERIFIED as generated; no status change. |
 | 2026-09-23 | vizra-user | #8 artifact privacy A (VZ-FOUND-008 harness) | `c2ff445` → `7a3a572` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-user-pr8-closing-VERIFY.md`, re-confirmed at `c2ff445`); 9/9 check-runs success incl. `ci-required`, `e2e`. V-D (stamp key in the main process) NOT CLOSED → PR B (queue 2f). | IMPLEMENTED; eligible for VERIFIED on the independent evidence (ledger regeneration). |
@@ -163,6 +164,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 203 (2026-09-23) — meta #4 merged (`b2c5b96`); meta 2i dispatched.
 - Tick 202 (2026-09-23) — core #11 on main at `238a9ca` → re-confirming; user #9 FAIL (retention sentence) → docs fix; queue 2q.
 - Tick 201 (2026-09-23) — quiet.
 - Tick 200 (2026-09-23) — disk freed (owner-approved cache prune); user PR B plan → security review; user #9 → verifier.
