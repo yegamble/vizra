@@ -208,3 +208,56 @@ Every claim reproduced:
 The grammar is a faithful port of search's verified grammar, stricter in one place. My hunt found no line it accepts that make reads differently. The one parity gap (F-1) is core looser than search for non-closure recipes, reachable only through reviewed bytes and stated as a residual: SHOULD, not blocking.
 
 FINAL VERDICT: PASS — SHA 54a137680cb8c7f9be28fd6c8befd1078d32145e
+
+---
+
+# Re-confirmation at 66fcb2e
+
+- **Head:** `gh pr view 13` → `66fcb2e6976b90102a61a01008c9d24335ba157f` (OPEN, MERGEABLE) at start and at end. One commit on `54a1376` ("docs(scripts): narrow the grammar comment to what core resolves after make"). Fresh clone in `mktemp -d …/vzv-core-pr13rc-XXXXXX`.
+
+## RC-1. The diff is comment-only
+
+- `git diff --stat 54a1376 66fcb2e`: `scripts/makefile_pin.py`, 8 insertions and 3 deletions.
+- Filtering `git diff -U0` for changed lines that are not `#` comment lines gives **0 lines**.
+- `git diff --quiet 54a1376 66fcb2e -- Makefile .github` is clean: **the Makefile, the pin and `.github/` are unchanged.**
+- `makefile_pin.py` compiles with `python3 -W error`.
+
+## RC-2. The new comment sentences
+
+| Sentence | Verdict |
+|---|---|
+| "Core's differences from search's grammar, all NARROWER: one — a RULE or PHONY line continued with a backslash is refused here (search refuses it by name, after its grammar). Otherwise the same shapes." | **Correct and complete.** My §6 function-by-function comparison against search `4810048` found `grammar_problems` differing only in wording, type annotations and this one refusal; the reader, the byte checks and every grammar constant are identical. My hunt rows "rule line continued" and ".PHONY continued" show core refusing by grammar and search by name |
+| "core resolves the leading reference from make's own database after make (check_expanded_prefixes) ONLY for recipe lines of the GATE CLOSURE's targets" | correct; F-2 closed |
+| "NOT refused before make here (verifier F-1 on #13, queued to 2o …): a grammar-conforming recipe line on a rule OUTSIDE the gate closure — the by-name recipe checks read only closure recipes, and the grammar allows `$(NAME)` in any recipe line" | correct: it matches my §6 rows (non-closure `+`, `-` and `$(NAME)`-led recipe lines accepted). "The grammar allows `$(NAME)` in any recipe line" has one exception, `$(MAKE)`, which the grammar refuses; the whole-file token scan still applies to every line. NIT only |
+
+## RC-3. Tests
+
+`go test -count=1 -json ./scripts/` → **exit 0: 493 pass, 0 fail, 0 skip** (39 top-level tests). The tree was clean afterwards.
+
+## RC-4. CI on 66fcb2e (my own `gh api`)
+
+11 check-runs, all completed:
+
+| Check run | Conclusion |
+|---|---|
+| **ci-required** | **success** (run 35914283059, `pull_request`, headSha `66fcb2e…`) |
+| build-test | success |
+| cache-matrix | success |
+| both cache-matrix legs | success |
+| fixtures | success |
+| govulncheck | success |
+| docker-build | success |
+| append-only | success |
+| GitGuardian | success |
+| image-scan | failure (pre-existing, not required; reported only) |
+
+ci-required's fan-in: SUCCESS for all six manifest lanes.
+
+## Verdict
+
+- The commit is comment-only.
+- The new sentences are accurate. F-2 is closed, and F-1 is now stated in the code and queued to 2o.
+- `go test ./scripts/` is green.
+- `ci-required` is green on `66fcb2e`.
+
+FINAL VERDICT: PASS — SHA 66fcb2e6976b90102a61a01008c9d24335ba157f

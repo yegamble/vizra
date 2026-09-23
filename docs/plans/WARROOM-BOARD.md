@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 225 — core #12 round 1 at `25f62ac` (obs.Redact widened to every V-1 form with a 23-row table and a lookalike control; search fallback logs redacted with a real `*url.Error` leak test; 11 checker refusals; sentences narrowed with named residuals; floors raised; lanes green after load-timeout retries in untouched `internal/fixtures`; CI pending) → re-verifying. In flight: re-verifications of core #12 and user #10; fixes on meta #6 and core #13 (comment). History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 227 — **core #13 MERGED** `66fcb2e` → `3994893` (B5d: allowlist Makefile grammar + one line reader in core; verifier PASS at `54a1376`, comment-only re-confirmation PASS at `66fcb2e`; `ci-required` green via the chair's own check-runs call). **Merged today: 9.** meta #6 round 1 at `b694813` (out-of-process output check; guard tests; qualifier allowlist) → re-verifying. In flight: re-verifications of meta #6, core #12, user #10. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -143,6 +143,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-09-23 | vizra-core | #13 hardening B5d: allowlist Makefile grammar + one line reader (ported from search `4810048`) | `66fcb2e` → `3994893` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-core-pr13-b5d-allowlist-grammar-VERIFY.md`: PASS at `54a1376`, comment-only re-confirmation PASS at `66fcb2e`); `ci-required` + six required checks green; `image-scan` pre-existing red. F-1 (non-closure recipe lines not refused pre-make) → queue 2o. | CI control; no ledger item. |
 | 2026-09-23 | vizra-core | #11 hardening B5b: `.IGNORE`/`.DEFAULT`/`.EXTRA_PREREQS`/`.POSIX`, inline/multi-target/computed rules refused; fail-closed database scan + closure equality | `238a9ca` → `96d19b3` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-core-pr11-b5b-special-targets-VERIFY.md`: `29387da` PASS, cross-check GAP X-1, `5488eb0` FAIL, `0243f2e` PASS, on-main `238a9ca` PASS); six required checks + `ci-required` green on `238a9ca`. | CI control; no ledger item. |
 | 2026-09-23 | vizra-user | #9 public-repo visibility docs (artifact 3-day / supply-chain 30-day / log 90-day retention; PR A guarantees at measured strength) | `760cc8f` → `783483f` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-user-pr9-visibility-VERIFY.md`: FAIL at `f9f9478` on the retention sentence, PASS at `760cc8f`); 7/7 check-runs success. Follow-ups → 2q. | Docs; no ledger item. |
 | 2026-09-23 | vizra (meta) | #4 compose topology (VZ-ISSUE-002) | `8e2a867` → `b2c5b96` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-21-meta-pr4-compose-topology-VERIFY.md`: PASS at `cf9e4c8`, FAIL at `ddec39c` on a line-number over-claim, PASS at `8e2a867`); infrastructure seat review on file; `validate` + `ci-required` success on `8e2a867`; GitGuardian red = fake marker in historical `a96f188` (not required). O-1/O-2 nits → 2l. | Ledger status via 2i. |
@@ -171,6 +172,8 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 227 (2026-09-23) — core #13 merged (`3994893`); 9 merges today; meta #6 re-verifying.
+- Tick 226 (2026-09-23) — quiet.
 - Tick 225 (2026-09-23) — core #12 round 1 at `25f62ac` → re-verifying.
 - Tick 224 (2026-09-23) — core #13 PASS (comment fix held); user #10 round 1 → re-verifying.
 - Tick 223 (2026-09-23) — quiet.

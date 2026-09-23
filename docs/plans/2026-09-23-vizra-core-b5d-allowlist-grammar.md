@@ -36,3 +36,4 @@ Test-first; red rows for every out-of-grammar form search covered; C-rows (gramm
 
 ## Blockers and handoff
 State READY_FOR_REVIEW. Next: independent verifier on PR #13 at `54a1376`. Queue 2o not started.
+- Verifier PASS at `54a1376` (meta `docs/evidence/warroom/2026-09-23-vizra-core-pr13-b5d-allowlist-grammar-VERIFY.md`). Chair asked for one comment-only commit (F-2, optional F-1 note): `66fcb2e` — `scripts/makefile_pin.py` 8+/3-, 0 non-comment lines, no pin change. `go test -count=1 ./scripts/` ok; both anchors exit 0 (8 gate targets). Fast-forward push `54a1376..66fcb2e`. CI on `66fcb2e`: ci-required, build-test, cache-matrix + both legs, fixtures, govulncheck, append-only, docker-build, GitGuardian pass; image-scan (not required) fail, as on main.
