@@ -65,5 +65,13 @@ Mutations on the fixed tree (each restored with `git checkout -- .`):
 - M7: `logsites_test.go` moved aside, whole unit suite run. The report is red at `internal/httpapi` 56 < 66. Against the old floors, the same events pass.
 
 ## Blockers and handoff
-- No blocker. The remaining gate is an independent verifier plus `ci-required` on `6edaf83`. CI result: see the final report to the chair.
+- No blocker. The remaining gate is an independent verifier.
+- CI on PR #12, head `6edaf83` (merge ref against main `96d19b3`, which includes core #10/#11; `git merge-tree` is clean). Not re-run:
+  - Passed: `ci-required`, `build-test`, `cache-matrix` (both legs), `append-only`, `fixtures`, `govulncheck`, `docker-build`, GitGuardian.
+  - build-test's own reports: unit 1306 executed (floor 1028); integration 1475 and 1475 shuffled (floor 1171); 0 unexpected skips. These counts are higher than the local ones because the merge ref carries the tests from #10/#11.
+  - `image-scan` (NOT required) failed on 49 HIGH Debian 13.7 base-image OS CVEs, for example CVE-2025-69720 (ncurses) and CVE-2026-16742 (systemd libs). The scan itself is valid. This PR changes no Dockerfile or dependency.
+- Cleanup:
+  - Containers `vizra-b3-{pg,valkey,redis72}-23727` removed. They were removed without `-v`, so their anonymous volumes may remain among the host's dangling volumes. I could not attribute one to them with certainty, so I deleted none.
+  - Worktree removed.
+  - The scratch transcripts are kept at the path above for the verifier.
 - Finding outside this slice: `internal/integration/healthcheck_test.go:55` `os.MkdirTemp("", "vizra-healthcheck-bin-")` is never removed. That leaks about 74 MB per integration run; 88 had accumulated in `$TMPDIR` on this host, and that caused the ENOSPC above. I removed only the five my runs created.
