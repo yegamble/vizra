@@ -144,3 +144,59 @@ The condensed F8 entry above referred to the seat's hand-back for the full text;
 > "An authenticated browser spec publishes no credential and no page content in an uploaded CI artifact or in the job log: it runs only in the separate authenticated lane, whose projects configure no trace, screenshot or video and write no snapshot baseline, whose output directory, log and report are in no upload path, whose writes into an upload path withhold the upload, and whose only contribution to the uploaded artifact is a summary of allowlisted structured fields with no error message, stack, locator or URL. Demonstrated against a loopback fixture with synthetic credentials by an end-to-end canary with runtime-minted markers, positively controlled (every marker found with recorders on) and negatively controlled (none found in the files of the allowlisted upload paths in the shipped configuration). Every run is backstopped by a credential-shape scan that withholds the upload on a hit; that scan detects known shapes and does not prove the absence of secrets. In the unauthenticated lane, a request carrying a header or body parameter from a fixed list of credential names fails the test, and any such signal, or a response Set-Cookie or vendor token header, withholds that lane's upload."
 
 Status stays UNVERIFIED, as the plan says.
+
+## Seat confirmation pass on plan revision 2 (tick 208) — recorded by the chair
+
+**SEAT VERDICT: CHANGES STILL REQUIRED** (C1–C4 are small and local; the architecture holds; the seat can confirm without another full pass once they are in).
+
+**Status of the round-1 findings:**
+- Addressed: F1 (except C3), F2, F4 (but see C1), F5, F6, F7, F10, F11, F12–F14, NIT 1, NIT 2.
+- Partly addressed: F3 (see C2) and F9 (see C4).
+- F8: the text was supplied at tick 207.
+
+**New and remaining items:**
+
+- **C1 (REQUIRED).** The B-10 inventory is compared after the `redact` step has rewritten `test-results/` in place, so every failing run would withhold the upload.
+  - Add a pinned `lane_a_inventory_check` step right after `auth_floor`, before `redact`, with `if: always()`. It writes an outcome record, and `scan` requires "unchanged".
+  - Exclude the summary path from the inventory.
+  - A missing inventory is allowed only when no auth or canary `start` record exists.
+  - Tests: RC-10 rows for "check step after redact" and "check step missing"; D19d, where a red Lane A with a green Lane B still uploads.
+
+- **C2 (REQUIRED).** F3 is still open in three places:
+  - (a) WebSocket traffic: the guard must install its own `context.routeWebSocket` that closes non-allowlisted URLs, and B-5 covers WebSocket again.
+  - (b) `context.unroute('**')` and `unrouteAll()` remove the guard's route: refuse them for the guard's pattern, or reinstall the guard.
+  - (c) The option surfaces are open:
+    - give the auth config's `use` (top level and per project) an exact key allowlist;
+    - in Lane B, creation-guard refuses `proxy`, `recordHar`, `recordVideo`, any `serviceWorkers` other than "block", and `BrowserType.connect`/`connectOverCDP`.
+  - Tests: D21f, D21g, and RC-4 rows.
+
+- **C3 (REQUIRED).** Worker-side taint has no closing record, so a signal lost before it is written (async `headersArray()`, a teardown or kill, a write that throws) fails open.
+  - Each worker writes `worker-start` and a `worker-end` carrying its signal count.
+  - Teardown awaits pending header reads with a bound; a read unresolved at the bound counts as a signal.
+  - The scanner requires the start/end pairs.
+  - A failed write throws.
+  - Test: D20h.
+
+- **C4 (REQUIRED).** The T14 marker sits in the failing canary test's title, which contradicts D19b and the literal-title lint.
+  - Plant it in a PASSING canary test's title (or an attachment name).
+  - Give only that test a per-file lint exemption.
+
+- **C5 (SHOULD).** Substring stems over-match header names (`x-csrf-token`, `access-control-allow-credentials`).
+  - Headers use an exact normalised list: authorization, proxyauthorization, cookie, setcookie, xapikey, xauthtoken, dpop, xamzsecuritytoken.
+  - Stems apply to body parameter names only.
+  - A header that matches only by stem taints but does not fail the test.
+  - Add CSRF and CORS names to the false-positive corpus.
+
+- **C6 (SHOULD).** A local `-u` run can still write authenticated baselines.
+  - Add `.gitignore` entries for `e2e/authenticated/**/*-snapshots/` and `*.aria.yml`.
+  - Assert `testInfo.config.updateSnapshots === "none"` at runtime.
+
+- **NIT 1.** Paste the F8 text in, with the author's precision edit: "fails the test" → "fails the test, or the run when no test owns the request".
+- **NIT 2.** State that T18's positive control is M10, and that M10's restore step deletes the baseline it writes.
+
+**Answers to the builder's questions:**
+- **Q-r2-1:** yes. The protection comes from the taint, and C3 makes the taint reliable.
+- **Q-r2-2:** `session`, `sessionid` and `sessid` match exactly; `assertion` stays a stem for body names only.
+- **Q-r2-3:** a distinct exit code plus the fixed plain line is enough. An annotation is optional, and if added is built only from the fixed lists.
+
+**Chair ruling (tick 208):** C1–C6 and both NITs are accepted, and Q-r2-1…3 are answered as the seat recommends. After the builder amends the plan to revision 3, the seat checks only C1–C4, and phase 2 may then start once user #10 has merged.
