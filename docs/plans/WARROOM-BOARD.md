@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-21, tick 115 — user PR #8 fix round 1 landed at `4158b10` (9/9 check-runs success; manifest unchanged — chair checked): effective-value guard for `PLAYWRIGHT_NO_COPY_PROMPT`, a fourth redactor program for the four missed URL shapes, workflow-level env read, npm pre/post hooks refused; 7 of the verifier's 11 green mutations now red, 4 stated review-only. The builder declared two process failures of its own (a retracted "mechanism is removed" claim; one commit pushed over a red gate). Same verifier re-verifying. In flight: user #8, core #8, meta #4 verifiers; core #8 builder (round 2, local); core #9 builder. History: "Tick log" at the end of this file.
+Last tick: 2026-09-22, tick 116 — **session restart**: five agents had stopped mid-task and Docker's daemon was down (restarted). Reconciled against GitHub: open PRs unchanged — meta #4 `cf9e4c8`, core #8 `59a19c5`, core #9 `e710c3c`, user #8 `4158b10`; mains core `5eb2829`, user `6bf0a0e`, search `3ea4103`. On disk: core #8 round 2 as two UNPUSHED local WIP commits; core #9 round 1 as ~93 uncommitted files; meta #4 verifier's re-verification written through §8a (all findings closed, stability loop + verdict missing); core #8 and user #8 verifiers had written nothing on their new SHAs. All five resumed by SendMessage with instructions to re-orient from disk, use only their own containers, and write evidence incrementally. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -142,6 +142,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 116 (2026-09-22) — session restart: five stopped agents resumed (core #8 verifier + builder, core #9 builder, user #8 verifier, meta #4 verifier); Docker restarted; no PR head had moved.
 - Tick 115 (2026-09-21) — user PR #8 fix round 1 at `4158b10`; same verifier re-verifying; builder's two self-declared process failures recorded.
 - Tick 114 (2026-09-21) — both seats re-reviewed core PR #8 at `59a19c5`: all earlier findings closed; two new blockers from round 1's own claim-status fix (shared ceiling bucket; undeclared 429); round 2 of 2 started locally.
 - Tick 113 (2026-09-21) — vizra-search #4 merged (`cb02cdf` → `3ea4103`); core PR #8 fix round 1 at `59a19c5` → verifier + both seats re-judging.

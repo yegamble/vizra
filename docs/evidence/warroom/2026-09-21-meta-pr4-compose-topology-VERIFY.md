@@ -2815,3 +2815,658 @@ container started, no image pulled or built. The only file written outside my
 scratch directory is this one.
 
 FINAL VERDICT: FAIL — SHA 9c4b5d3285e1368634bc2042a83a91bfcb7e564b
+
+---
+
+# Re-verification at cf9e4c8 (2026-09-21)
+
+Same verifier. Three clones under one private `mktemp -d`: `loop/` runs the
+demo stability loop and is never edited, `atk/` takes every mutation, `prev/`
+holds `9c4b5d3` for the model comparison. No container started. Only this file
+written outside my scratch.
+
+| | |
+|---|---|
+| Head SHA verified | `cf9e4c86b077335fcad8cf8050c8fe57a50431c2` |
+| Head moved? | No — read `cf9e4c86` at the start; every CI/artifact query below names it. |
+| Previous head | `9c4b5d3e` (my FAIL). Two commits on top, plain push. |
+| Environment | macOS arm64, Python 3.9.6, PyYAML 6.0.3, Docker Engine 29.8.0, Compose v5.5.1 (CI: v2.38.2) |
+
+## 0. Scope first — the topology did not move
+
+`git diff --name-only 9c4b5d3 HEAD` touches **no** `docker-compose*.yml`, no
+`.github/`, no `features.json`, no `build.py`, no component directory. I checked
+the stronger thing the chair asked for: I rendered all 13 shapes at **both**
+SHAs and compared the models.
+
+```
+SERVICE-MODEL DIFFERENCES (clone paths normalised): 1
+  bundle-no-checkouts.json -> caddy.volumes[0].source
+     .../vizra-bundle-0t7__4oc/deploy/Caddyfile.local   (prev)
+     .../vizra-bundle-3p7mlxme/deploy/Caddyfile.local   (new)
+provenance differences: none
+```
+
+The single difference is the random `mktemp -d` name of the bundle tree. **The
+rendered compose semantics are identical.** Everything below is about the
+checkers and the prose, which is what this slice was scoped to.
+
+| Check | Result |
+|---|---|
+| `docs/quality/features.json` | byte-identical |
+| `build.py:20` PLANNED/UNVERIFIED gate | present |
+| `.github/required-checks.txt` | untouched (one live entry, `validate`) |
+| Component repositories | untouched |
+
+## 1. Lanes and counts
+
+| Command | Exit | Result |
+|---|---|---|
+| `check-generated-ledger.sh` / `check-quality-json.py` / `check-doc-links.py` / `ci-required-guard.sh` | 0 | as before |
+| `claims.py --check` | 0 | `CLAIMS.md is current (47 audited claims)` |
+| `compose-render.py --all` | 0 | 13 shapes |
+| `check-compose-topology.py` | 0 | `13 shape(s) … **27 rules**, 0 violations; 2 known-false probe(s)` |
+| `check-config-coverage.py` | 0 | `34 component keys, 58 template keys, 58 interpolated variables, 13 shapes; 1 alias; 1 retired key refused; 0 violations` |
+| `check-template-claims.py` | 0 | `16 command and script reference(s); 5 shipped, 11 future commands, 0 script references resolved to a file, 6 scripts declared future` |
+| `demo.sh` (run 1 of 10, isolated clone) | 0 | **`RESULT: 95 assertion(s) passed, 0 failed, across 50 case(s)`**, 0 broken pipes, tree clean |
+
+Counted from source: **27** topology rule ids, **11** coverage, **4** template —
+every claimed count reproduces, and the demo line is byte-identical to CI's.
+
+## 2. Acceptance bullets — my own renderer, 13 shapes, 0 violations
+
+Re-rendered with plain `docker compose config --format json` and audited myself
+(ports, restart, log cap, healthcheck state, production build, image pinning,
+`mem_limit`, privileged/host-network): **0 violations found by me.**
+postgres/redis/search/clickhouse/migrate/worker publish **nothing** in any of the
+13; api and frontend loopback only; caddy `edge`-only on 80/443; ipfs 4001 the
+only other public port; external overlays delete their container;
+`prod-worker-split` renders worker alone and publishes nothing;
+`prod-frontend-only` renders frontend alone. **All three VZ-ISSUE-002 acceptance
+bullets remain MET.**
+
+## 3. CLAIMS.md, line by line
+
+I parsed all **47** rows and resolved every `file:line` myself: every anchor
+lands on a line that really contains the quoted claim. (My first automated
+relevance heuristic flagged 14 rows; reading each one, all 14 are exact — the
+heuristic had filtered out the distinctive words. Recording that so the number
+is not mistaken for a finding.)
+
+Kinds: 37 `demonstrated`, 6 `no mechanism`, 2 `code-only`, 2 `not ours`.
+
+### 3a. The adversarial mutation sample — 20 rows, run by me
+
+Every row below uses a guarantee word. I made its sentence false in the tree and
+recorded what fired.
+
+| CLAIMS row | Mutation | Result |
+|---|---|---|
+| 19, 18 | `ports:` on postgres in the BASE file | `rule=never-published` |
+| 18 | `ports:` on the cache **via the prod overlay** (invisible to a grep of the base) | `rule=never-published` |
+| 35 | ipfs publishes the Kubo API 5001 | `rule=port-not-allowed` |
+| 12 | `postgres:18@sha256:…` → `postgres:18` | `rule=unpinned-image` |
+| 13 | `healthcheck: disable: true` | `rule=missing-healthcheck` |
+| 13 | `healthcheck: test: ["NONE"]` | `rule=missing-healthcheck` |
+| 11 | service on profile `backup`, publishing 5432 | `rule=profile-not-enumerated` |
+| 4 | compose delivers the **retired** `VIZRA_SEARCH_HMAC_KEY` | `rule=retired-key-delivered` ×34 |
+| 22 | a template key with no consumer | `rule=template-key-unused` |
+| 47 | a shape deleted from the manifest | `SHAPE FLOOR VIOLATION`, render exit 1 |
+| 14, 45 | `POSTGRES_PASSWORD` removed from `redact_keys` | render exit 1, **0 files written** |
+| 10, 29, 33 | marker deleted from `env/production.env.example` | `rule=known-false-undisclosed` |
+| 10, 29, 33 | marker deleted from `README.md` | `rule=known-false-undisclosed` |
+| 10, 29, 33 | `known_false_probes` **emptied**, both paragraphs left | **`rule=known-false-stale-disclosure`** |
+| 5 | `service_healthy` edge onto `api` (declared known-false) | `rule=probe-gates-readiness` |
+| 9 | api probe changed so the declaration is stale | `rule=stale-known-false-probe` |
+| 7 | the five probe spellings (below) | `rule=gated-probe-unrecognised` |
+| 25 | six script spellings (below) | `unmarked-future-script` / `unknown-script` |
+| 17, 44 | a registry-flagged new secret | **47 → 0** occurrences |
+| 23, 41 | `--drift` with the `secret` flag stripped / with no checkouts | exit 1 / exit **2 BLOCKED** |
+
+Every one turned red for the reason its row cites. The one row whose *negative*
+is the evidence — row 17/44's `VIZRA_S3_ACCESS_ID` — reproduces exactly as
+stated: **47 occurrences, every lane exit 0**. The row says so in its own "does
+NOT guarantee" column.
+
+### 3b. Can `claims.py --check` be satisfied while a claim is false?
+
+The generator's **positive** claims hold. I broke an anchor two ways:
+
+```
+anchor reworded away  -> exit 2  "the anchor '…' no longer appears in docs/META_REPO.md"
+anchor duplicated     -> exit 2  "appears 2 times … an audit row must name one sentence"
+```
+
+But the **claim text** and the **Red-when** cells are hand-written in
+`claims.py` and tied to nothing:
+
+- I prefixed `Only ONE shape ` to the sentence row 1 audits, inverting it
+  (row 1 claims *“Every declared shape is rendered on every run”*). The anchor
+  substring still resolved uniquely → **`claims.py --check` exit 0**.
+- I rewired row 7's Red-when from `26, 26a…26e` to `1, 2, 3` — the *port* cases,
+  which test something else entirely. **Regeneration exit 0, `--check` exit 0.**
+
+So `--check` proves (i) every anchor resolves uniquely and (ii) CLAIMS.md is
+byte-identical to what the generator emits. It does **not** prove the claim text
+still describes the anchored sentence, nor that the cited cases exercise the
+claim. See **T-2**.
+
+### 3c. The "16 of 42" admission
+
+Accurate as a count, and computed rather than hand-listed. The gap is where it
+is published: `COMMANDS.md` §8 and CLAIMS.md say it in prose, while the **rule
+tables at `COMMANDS.md:363-375` describe all ten undemonstrated topology rules
+in exactly the same voice as the demonstrated ones.** Named, with the line that
+still reads as a demonstrated guarantee:
+
+| Line | Rule ids with no demonstration, described as controls |
+|---|---|
+| `:368` | `docker-socket`, `privileged`, `host-network`, `no-new-privileges` |
+| `:369` | `missing-service`, `unexpected-service` |
+| `:370` | `dev-mode-in-production`, `dev-hatch-in-production` |
+| `:363` | `oneshot-restart` |
+| `:366` | `missing-build` |
+
+None is false — I have personally seen `host-network` fire (round 1) — but a
+reader of the table alone is not told. See **T-3**.
+
+### 3d. The converse — guarantee sentences with no row
+
+CLAIMS.md declares its scope (`META_REPO.md` §2a; `COMMANDS.md` §4–§8; four
+docstrings/banners; README's operator section; the production template's
+comments about tooling). Swept **inside that scope** for
+every/never/cannot/refuses/enforced/both directions/invokes/proves/guarantee,
+excluding lines within ±3 of an audited anchor, I found at least four
+unaudited guarantee sentences:
+
+| Sentence | Verified by me |
+|---|---|
+| `COMMANDS.md:437` "Every long-running service in a production shape declares [a `mem_limit`]" | true — case 16 and my own 13-shape audit |
+| `COMMANDS.md:528-531` the retired key is "a guaranteed boot refusal" | true — 34 × `retired-key-delivered`, and core's `RetiredKeys` at `keys.go:91` |
+| `COMMANDS.md:534-536` "Every alias carries an explicit `authorised` decision … printed on every green run" | true — verified at 9c4b5d3 (`alias-floor` fires both ways) and printed in this run |
+| `COMMANDS.md:647` "No condition in the harness reads its captured output through a pipe. Every one uses a here-string" | true — `grep -c '| grep -q' demo.sh` = **0** |
+
+All four are **true but unaudited** — a completeness gap in the table, not a
+false claim. See **T-5**.
+
+## 4. S-2 — the probe tokeniser. This is the strong part of the round.
+
+`probe_invokes()` is structural: `["CMD", argv…]` → `basename(argv[0])` must
+**equal** the declared command; `["CMD-SHELL", s]` → `s` must contain none of
+`SHELL_CONTROL = (";","|","&","#","`","$(","<",">","\n")` and its first word's
+basename must equal the declared command; anything else fails closed.
+
+| Rendered probe on `postgres` (gated by api, worker, migrate) | Result |
+|---|---|
+| `["CMD","true"]` | **red** |
+| `["CMD-SHELL","pg_isready -U vizra \|\| true"]` | **red** |
+| `["CMD-SHELL","true # pg_isready"]` | **red** |
+| `["CMD","sh","-c","exit 0; pg_isready"]` | **red** |
+| `["CMD","echo","pg_isready"]` | **red** |
+| `["NONE"]` | **red** (`missing-healthcheck`) |
+| `["CMD","/tmp/pg_isready/true"]` — a *directory* named pg_isready | **red** |
+| `["CMD","env","pg_isready"]` | **red** |
+| `["CMD","sh","-c","pg_isready"]` | **red** |
+| `["CMD-SHELL","PGHOST=x pg_isready"]` — leading assignment | **red** |
+| `["CMD-SHELL","exec pg_isready"]` | **red** |
+| `["CMD-SHELL","pg_isready； true"]` — full-width semicolon | **red** |
+| `["CMD-SHELL","pg_isready \|\| true"]` — NBSP separator | **red** |
+| `["CMD-SHELL","pg_isready && true"]` | **red** |
+| **real newline** `["CMD-SHELL","pg_isready\nexit 0"]` (YAML block list) | **red** |
+| `["CMD","/usr/bin/pg_isready","-U","vizra"]` | green — **correct**, basename matches a real probe |
+| `["CMD-SHELL","pg_isready -U $POSTGRES_USER"]` | green — **correct**, `$VAR` is not substitution syntax and cannot change the exit status |
+| `["CMD-SHELL","  pg_isready\t-U vizra"]` | green — **correct**, whitespace only |
+| `["CMD-SHELL","pg_isready --version"]` | green — **the stated, measured residual** (CLAIMS row 7, `local-run.txt`) |
+| baseline: the real probes (`pg_isready -U "vizra" -d "vizra"`, `valkey-cli ping`) across all 13 shapes | green |
+
+**A correction to my own testing.** My first newline attempt reported green; the
+`\n` had not survived my one-line YAML edit as a real newline. Re-done with a
+YAML block list so a real newline lands in the rendered model, the rule fires.
+I nearly filed that as a REQUIRED finding — it would have been wrong.
+
+**What the rule guarantees now, plainly:** every `service_healthy` target must be
+listed in `gated_probes`, and its rendered probe must be a single command whose
+basename is the declared one, with no shell control or substitution syntax.
+**What it does not:** that the command can exit non-zero (`pg_isready --version`
+passes and always succeeds), and that a binary with the right name is the real
+one. Both need a running container. `META_REPO.md:169`, `COMMANDS.md:419` and
+the function's own docstring state exactly those two limits, and CLAIMS row 7
+and row 20 carry them. **My round-3 S-2 is closed and the documentation now
+matches the control.**
+
+## 5. S-1, S-3, S-5, S-6, NEW-3
+
+**S-1 — closed, by distinct rule ids.** Both directions fire, and a reviewer can
+tell which: `known-false-undisclosed` (list stands, paragraph gone — either
+file) and `known-false-stale-disclosure` (list emptied, paragraphs stand). The
+marker-string limit is still real — stripping the `curl` commands while leaving
+the heading is green — and it is conceded in CLAIMS rows 10/29/33 *and* in the
+"Known weak spots" section. Stated, so not a finding.
+
+**S-3 — closed.**
+
+| Spelling, no marker | Result |
+|---|---|
+| `backup.sh`, `./backup.sh`, `scripts/backup.sh`, `` `./backup.sh` ``, `deploy/rollback.sh` | all **red**, `unmarked-future-script` |
+| `rotate-secrets.sh` | **red**, `unknown-script` — the rule is reachable now |
+| `./backup.sh` **with** its `VZ-ISSUE-004` marker | green — no false positive |
+| `scripts/ci-required-guard.sh` (a script that **exists**) | green — correctly not flagged |
+| `bootstrap.sh` in a compose `:?` message; `./backup.sh` in a YAML comment | both **red** |
+| `BACKUP.SH` (uppercase) | green — a gap nobody writes; noted, not filed |
+
+**S-5 — closed and honestly bounded.** `--drift` now compares the `secret` flag:
+stripping `"secret": true` from `VIZRA_SESSION_SECRET` gives
+`rule=registry-drift … the snapshot's secret FLAG disagrees with the component`,
+exit 1. On the same tree the CI lane is exit 0 — which is the stated limit,
+because drift needs the checkouts. It also prints, every run, that
+`vizra-search` and `vizra-user` flags are **UNCHECKED** with the reason and the
+count. Absent checkouts: exit **2 BLOCKED**.
+
+**S-6 — stated, not fixed, as agreed.** `VIZRA_S3_ACCESS_ID` unflagged: 47
+occurrences, every lane exit 0. CLAIMS rows 17 and 44 and `COMMANDS.md:332-339`
+say so in those words.
+
+**NEW-3 — verified against the rendered model.** `README.md:100-110` names
+`VIZRA_HTTP_PORT` and `VIZRA_FRONTEND_PORT` beside `:8080` and `:3000`, which
+match the loopback publishes I re-derived; `/readyz` is now
+`curl -sS … ; echo   # NO -f: /readyz answers 200 "degraded"` in **both**
+`README.md:105` and `env/production.env.example:182-183`.
+
+## 6. S-4 — the pipe race
+
+`demo.sh` contains **zero** `| grep -q` sites and one `set -uo pipefail`. The
+only remaining sites in the repository are in files this PR does not touch:
+
+```
+scripts/ci-required-guard.sh:80,249,348,423,440   (5 sites)  — in diff? no
+scripts/ci-required-select.sh                      (0 sites) — in diff? no
+```
+
+The builder's follow-up list names `ci-required-guard.sh` lines 80, 249, 348,
+423 and 440 — **exactly the five I find**. It also names
+`ci-required-select.sh:56`; that line is
+`status="$(printf '%s' "$line" | cut -f2)"` — a `| cut` inside a command
+substitution, not a `grep -q` early-exit, and `cut` consumes its whole input, so
+it is not the same race. One entry of the follow-up list is misdescribed (**T-4**).
+
+The stability loop is reported in §9.
+
+## 7. Regression
+
+| | |
+|---|---|
+| R-1 redaction, my registry-flagged-secret mutation | **47 → 0**, and `rule=unclassified-secret-key` fires |
+| Case 18b (key removed from `redact_keys`) | render exit 1, 0 files written |
+| **CI artifact for THIS SHA** (run `35582443280`, 37 204 B) | **14 files, 0 secret-value hits**; `api.DATABASE_URL` = `'<redacted>'`; stamp true, `redacted_keys: 8`, `leak_checked_keys: 8` |
+| V1–V9, F1–F4, `postgres-shm-floor` | all re-exercised above or unchanged by a diff that touches no compose file |
+| Acceptance bullets | MET, from my own renderer, 0 violations |
+
+## 8. CI on `cf9e4c8`, and GitGuardian
+
+| Check run | Status | Conclusion | In the manifest? |
+|---|---|---|---|
+| `validate` | completed | **success** | **yes** — the only entry |
+| `ci-required` | completed | **success** | the aggregate |
+| `GitGuardian Security Checks` | completed | failure | **no** |
+
+All **18** `validate` steps succeeded, none skipped. The job log carries
+`13 shape(s) … 27 rules, 0 violations`, the coverage and template-claims lines,
+and **`RESULT: 95 assertion(s) passed, 0 failed, across 50 case(s)`** — identical
+to my local run.
+
+GitGuardian reports **1 secret across 11 commits** — the same single incident,
+count risen only with the commit range. I swept both new commits' added lines
+for credential-shaped assignments and `scheme://user:pass@host`: **no hits in
+`e82e659` or `cf9e4c8`**. It still names only `a96f188`.
+
+**One thing the lane does not run: `claims.py --check`.** It is not a workflow
+step, it is not invoked from `demo.sh`, and `CLAIMS.md is current` appears **0
+times** in the CI log for this SHA. I checked whether any artifact claims
+otherwise — `COMMANDS.md:643` says "regenerate it … when a rule or a document
+moves", the PR body lists `claims.py --check` as the *source of the 47 figure*,
+and nothing anywhere says it runs in the lane. So the builder has not
+over-claimed; but the brief I was given asserts it does, and it does not. See
+**T-1**.
+
+## 8a. Two things the audit invites a reader to check, checked
+
+- **CLAIMS row 2** ("Nothing in this repository starts a container… A reader
+  should verify that rather than take this sentence."). I did: every
+  `docker compose` invocation in `scripts/`, `.github/workflows/` and
+  `docs/evidence/compose-topology/` is `config` (8), `version` (5), or the
+  strings `up`/`ps` appearing inside comments, violation-message text, echoed
+  prose and transcripts. **No lane script or workflow step starts, runs, pulls
+  or creates a container.** Row 2 holds.
+- **`claims.py --check` catches a hand edit.** Changing `47 rows` to `48 rows`
+  in CLAIMS.md gives exit 1, `CLAIMS.md is stale: re-run …`. So the
+  "do not edit this file by hand" instruction is enforced locally.
+
+---
+
+# Findings — round 4
+
+All five are **class (a)**: a claim about, or the gating of, a checker — each
+could be corrected, or the rule removed with its claim, without touching the
+topology. **None is class (b): nothing here is a defect in anything the three
+VZ-ISSUE-002 acceptance bullets depend on**, which I re-derived independently at
+this SHA with 0 violations.
+
+```
+FINDING T-1: claims.py --check does not run in the validate lane
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     .github/workflows/validate.yml (no step); docs/evidence/compose-topology/demo.sh (no call);
+             docs/evidence/compose-topology/claims.py
+  requirements: VZ-CI-002
+
+Observed:
+  `claims.py --check` is the only thing that keeps CLAIMS.md honest about its
+  anchors and its own byte-identity. It is not a workflow step (the workflow is
+  untouched by this PR), it is not invoked from `demo.sh` — the lane's last
+  step — and `CLAIMS.md is current` appears **0 times** in the `validate` job
+  log for this SHA (run 35582443280).
+
+  No artifact over-claims: `COMMANDS.md:643` says "regenerate it … when a rule
+  or a document moves", and the PR body lists `claims.py --check` as the source
+  of the 47 figure, not as a gate. The brief I was given says it "runs in the
+  lane"; it does not, and the chair should not rely on that sentence.
+
+Failure:
+  The remedy for the class that has held this PR three times is itself ungated.
+  A later PR that reworks a checker and reworks a document can leave CLAIMS.md
+  behind — stale anchors, a row whose rule no longer exists — and the lane stays
+  green. Every other control added in this slice runs on every push; this one
+  runs only when someone remembers.
+
+Perspective:
+  developer
+
+Recommendation:
+  One line, in the PR that is allowed to touch the workflow (this one was not):
+  a `no claim is stale` step running
+  `python3 docs/evidence/compose-topology/claims.py --check`. It needs no new
+  dependency — it is the same interpreter the lane already pins — and it is a
+  gate, not a report, so it belongs beside the other four checker steps rather
+  than inside `demo.sh`.
+
+Acceptance criteria:
+  - `validate` fails when an anchor no longer resolves, when an anchor is
+    ambiguous, or when CLAIMS.md is not byte-identical to the generator's
+    output. All three already work locally; only the wiring is missing.
+  - The step is added in a PR that does not also change what it audits, per the
+    manifest rule this slice has respected throughout.
+
+Tests:
+  Already demonstrated locally: reworded anchor -> exit 2; duplicated anchor ->
+  exit 2; hand-edited CLAIMS.md -> exit 1. The step would carry those into CI.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: one workflow step.
+
+Challenge:
+  "The chair told this builder to add no new behaviour, and the workflow is
+  owner-reviewed — so leaving it out was correct." Agreed, and that is why this
+  is SHOULD and not higher, and why I am naming it as a follow-up rather than a
+  defect in the slice. But a reader of the PR body's table sees
+  `claims.py --check` in the right-hand column beside figures every other row
+  gets from a lane step, and will reasonably assume it runs.
+```
+
+```
+FINDING T-2: --check validates anchors and byte-identity, not the claim text or the cited cases
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     docs/evidence/compose-topology/claims.py resolve() and the CLAIMS table literals;
+             docs/evidence/compose-topology/CLAIMS.md:3-7 (the header)
+  requirements: VZ-CI-002
+
+Observed:
+  The positive mechanism works — I broke it two ways and it refused:
+
+      anchor reworded away  -> exit 2 "the anchor '…' no longer appears in docs/META_REPO.md"
+      anchor duplicated     -> exit 2 "appears 2 times … an audit row must name one sentence"
+      CLAIMS.md hand-edited -> exit 1 "CLAIMS.md is stale"
+
+  Two things are not tied to anything:
+
+  1. THE CLAIM TEXT. I prefixed `Only ONE shape ` to the sentence row 1 audits,
+     inverting it — row 1 claims *"Every declared shape is rendered on every
+     run"* — and the anchor substring still resolved uniquely:
+
+         ./docs/evidence/compose-topology/claims.py --check   ->  exit 0
+
+  2. THE "RED WHEN" CELL. I rewired row 7's cases from `26, 26a…26e` to
+     `1, 2, 3` — the port cases, which test something unrelated. Regeneration
+     exit 0, `--check` exit 0. The generator does compute a rule->case map from
+     `demo.sh`, but it feeds the "16 of 42" table, not the per-row cells.
+
+  The header reads: "Every line number below is resolved against the live file
+  at generation time, and the generator REFUSES to write anything if an anchor
+  no longer resolves uniquely — so **a stale row is a failed run**, not a
+  quietly wrong number." The tail scopes it to numbers; the clause a reader
+  takes away is about rows, and a row can be stale in the two ways above.
+
+Failure:
+  The artifact built to stop sentences outrunning their controls describes its
+  own control slightly more strongly than it is. Concretely: an author who
+  softens a sentence in META_REPO.md while leaving the anchor phrase intact
+  leaves CLAIMS.md asserting the old, stronger claim, and every check passes.
+  That is the same shape as S-1 and S-2 one level up.
+
+Perspective:
+  developer
+
+Recommendation:
+  Cheapest honest fix is wording: "the generator refuses to write if an anchor
+  is missing or ambiguous, so a LINE NUMBER is never quietly wrong. The claim
+  text and the cited cases are written by hand and are not machine-checked —
+  read the anchored sentence."
+  If it should be mechanical instead: store a hash of the anchored LINE beside
+  each row and fail when it changes, and validate each Red-when cell's case ids
+  against the ids `demonstrated_rules()` already parses out of `demo.sh`.
+
+Acceptance criteria:
+  - Editing an audited sentence without removing its anchor either fails
+    `--check` or is explicitly out of scope in the header.
+  - A Red-when cell naming a case id that does not exist in `demo.sh` fails.
+  - The three refusals I measured still work.
+
+Tests:
+  Both mutations above, in the transcript the way `local-run.txt` records the
+  other measurements.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: claims.py and one paragraph.
+
+Challenge:
+  "The header says 'line number' twice; you are reading it uncharitably." Fair,
+  and it is why this is SHOULD. But this PR's whole thesis is that a reader
+  takes the strong clause, and "a stale row is a failed run" is the strong
+  clause in a file whose subject is exactly that failure.
+```
+
+```
+FINDING T-3: the rule tables describe the 16 undemonstrated rule ids in the same voice as the demonstrated ones
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     docs/quality/COMMANDS.md:363, :366, :368, :369, :370 (the rule tables);
+             the admission itself is at COMMANDS.md:636-644 and CLAIMS.md row 28
+  requirements: VZ-CI-002
+
+Observed:
+  The admission is accurate and computed, not hand-counted. But it lives in §8
+  prose and in CLAIMS.md, while the tables a reader actually consults mark
+  nothing. The ten topology rule ids with no demonstration, and the line that
+  still reads as a control:
+
+    :368  docker-socket, privileged, host-network, no-new-privileges
+    :369  missing-service, unexpected-service
+    :370  dev-mode-in-production, dev-hatch-in-production
+    :363  oneshot-restart
+    :366  missing-build
+
+  None is false — I have seen `host-network` fire myself, with my own mutation,
+  in round 1. The issue is that the table does not distinguish "refuses X,
+  demonstrated" from "refuses X, code review only".
+
+Failure:
+  A reader deciding what a green lane proves reads the table, not §8.
+
+Perspective:
+  developer
+
+Recommendation:
+  A dagger and one legend line: mark the 16 ids in the tables and footnote
+  "† no red demonstration; asserted by code review — see CLAIMS.md". The
+  generator already computes the set, so the marks can be generated rather than
+  maintained.
+
+Acceptance criteria:
+  - Every rule id in COMMANDS.md's tables carries its demonstrated/undemonstrated
+    status.
+  - The marks come from `demonstrated_rules()`, not a hand list.
+
+Tests:
+  `claims.py` already computes the set; the check is that the two agree.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: docs.
+
+Challenge:
+  "§8 says it plainly and CLAIMS.md lists them." True — this is a NIT about
+  where the fact is published, not whether it is.
+```
+
+```
+FINDING T-4: one entry of the deferred pipe-race list is misdescribed
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     docs/evidence/compose-topology/CLAIMS.md ("Known weak spots"), and the
+             same list in the PR body; the real file is scripts/ci-required-select.sh:56
+  requirements: VZ-CI-002
+
+Observed:
+  The follow-up list names `scripts/ci-required-guard.sh` lines 80, 249, 348,
+  423, 440 — **exactly the five `printf … | grep -q` sites I find** — and
+  `scripts/ci-required-select.sh:56`. That line is
+
+      status="$(printf '%s' "$line" | cut -f2)"
+
+  `grep -c '| grep -q' scripts/ci-required-select.sh` is **0**. A `| cut` inside
+  a command substitution is not the `grep -q` early-exit race: `cut` consumes
+  its whole input, so `printf` never takes EPIPE.
+
+Failure:
+  Trivial, but the list is the handover to whoever fixes the siblings, and one
+  of its six entries points at a construct that is not the bug.
+
+Perspective:
+  developer
+
+Recommendation:
+  Drop the `ci-required-select.sh:56` entry, or re-describe it if a different
+  concern was meant.
+
+Acceptance criteria:
+  - Every line the list names contains a `printf … | grep -q` under pipefail.
+
+Tests:
+  `grep -n '| *grep -q' scripts/*.sh`.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: one list entry.
+
+Challenge:
+  "It is a follow-up list, not a control." Agreed — NIT.
+```
+
+```
+FINDING T-5: four guarantee sentences inside CLAIMS.md's own declared scope have no row
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta)
+  files:     docs/quality/COMMANDS.md:437, :528-531, :534-536, :647;
+             docs/evidence/compose-topology/claims.py (the CLAIMS table)
+  requirements: VZ-CI-002
+
+Observed:
+  CLAIMS.md declares its surfaces, and `COMMANDS.md` §4–§8 is one of them.
+  Sweeping that scope for guarantee words, excluding lines within +/-3 of an
+  audited anchor, at least four sentences have no row:
+
+    :437      "Every long-running service in a production shape declares [a mem_limit]"
+    :528-531  a compose map that still sends a retired key "is a guaranteed boot refusal"
+    :534-536  "Every alias carries an explicit `authorised` decision … printed on every green run"
+    :647      "No condition in the harness reads its captured output through a pipe. Every one uses a here-string"
+
+  I verified all four are TRUE: case 16 and my own 13-shape audit; 34 x
+  `retired-key-delivered` plus core's `RetiredKeys` at `keys.go:91`; the
+  `alias-floor` rule firing in both directions (measured at 9c4b5d3) and the
+  ALIASES banner in this run; and `grep -c '| grep -q' demo.sh` = 0.
+
+Failure:
+  A completeness gap, not a false claim. But the table's value is that a
+  reviewer can read it INSTEAD of re-deriving every guarantee, and four
+  omissions inside its own declared scope means the table cannot yet be read
+  that way. The sweep is mechanical and could be a check.
+
+Perspective:
+  developer
+
+Recommendation:
+  Add the four rows. Better: have `claims.py` run the sweep itself — the
+  guarantee-word regex over the declared surfaces, minus the audited anchors —
+  and fail when an unaudited sentence appears. That turns "we audited the
+  claims" from a one-time effort into a property, which is what this slice is
+  trying to establish.
+
+Acceptance criteria:
+  - The four sentences have rows, or are covered by an explicit exclusion the
+    file names.
+  - A new guarantee sentence added to an audited surface fails a check until it
+    is audited or excluded.
+
+Tests:
+  The sweep itself; its red case is adding a guarantee sentence to
+  `COMMANDS.md` §5 and seeing the generator refuse.
+
+Cross-repo implications:
+  core: none | user: none | search: none | meta: claims.py plus four rows.
+
+Challenge:
+  "All four are true, so nothing is wrong." Correct today. The finding is that
+  nothing keeps it so, and the previous three rounds are the argument that
+  'nothing keeps it so' is how this PR kept failing.
+```
+
+---
+
+# Round-3 findings — disposition
+
+| Round-3 finding | Severity | Status at `cf9e4c8` | Verified by |
+|---|---|---|---|
+| **S-1** `known-false-undisclosed` one-directional, four places said both | REQUIRED | **CLOSED** | both directions fire with **distinct rule ids** — `known-false-undisclosed` (either file) and `known-false-stale-disclosure` (list emptied). Marker-only limit conceded in three rows and the weak-spots section |
+| **S-2** the gate rule tested for a mention; docs said "invoke" | REQUIRED | **CLOSED** | structural tokeniser; 15 of my attacks red, including a real mid-string newline, a directory named `pg_isready`, `env`/`sh -c`, a leading assignment, `exec`, full-width `;` and NBSP. The 4 greens are correct behaviour or the stated residual, and the docs state exactly the two limits |
+| **S-3** path spellings missed; `unknown-script` unreachable | SHOULD | **CLOSED** | `./`, `scripts/`, `deploy/`, backticked path all red; `rotate-secrets.sh` red as `unknown-script`; marked path form and an existing script stay green |
+| **S-4** pipe race in a required lane | SHOULD | **CLOSED pending the loop** | 0 `\| grep -q` in `demo.sh`; siblings correctly outside the diff (one entry misdescribed, T-4). Stability loop in §9 |
+| **S-5** drift compared names only | SHOULD | **CLOSED** | secret-flag comparison fires (exit 1); per-component UNCHECKED reported; BLOCKED exit 2 unchanged |
+| **S-6** unflagged credential written raw | NIT | **STATED, not fixed** — as agreed | reproduced: 47 occurrences, every lane exit 0; said in CLAIMS rows 17/44 and COMMANDS.md:332-339 |
+| **S-7** stale PR-body counts and a repeated false claim | NIT | **CLOSED** | every figure matches my measurements (13 / 27 / 11 / 4 / 95 / 50 / 1 / 1 / 47); the case count now comes from the harness (41 `case_header` + 9 parameterised call sites = 50), and the body records the three-times-wrong history |
+
+Infrastructure NEW-2 (the stale-disclosure direction) and NEW-3 (README ports,
+`/readyz` without `-f` in both files, the 4092/4096 sentence) both verified.
+
