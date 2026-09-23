@@ -1,0 +1,39 @@
+# source SHA 94ac3bf8c312ca0c1ab08195293f1ad15170d7ff (branch feat/m0-ledger-status); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
+# command: attempt each candidate record in a scratch copy (evidence files from chore/warroom-records-2026-09-21 @ b331f63), then build.py and check-ledger-status-remote.py --records
+# exit: see per case
+
+=== C1  VZ-FOUND-007 IMPLEMENTED core#5: 56920fec76c5 -> c043df72f06c
+  offline (build.py): exit 1
+    status record #0 (VZ-FOUND-007): docs/issues/VZ-ISSUE-006.md schedules VZ-FOUND-007 (its Ledger IDs line names it) and the record cites none of its acceptance bullets. A requirement split across issues is not complete after the first one.
+  online (check-ledger-status-remote.py): exit 0
+    ok  status record #0 (VZ-FOUND-007 IMPLEMENTED): c043df72f06c is on yegamble/vizra-core main (compare: ahead, main ahead by 6)
+    OK: 1 status record(s) proved against GitHub
+=== C1v VZ-FOUND-007 VERIFIED core#5: 56920fec76c5 -> c043df72f06c
+  offline (build.py): exit 1
+    status record #0 (VZ-FOUND-007): docs/issues/VZ-ISSUE-006.md schedules VZ-FOUND-007 (its Ledger IDs line names it) and the record cites none of its acceptance bullets. A requirement split across issues is not complete after the first one.
+    status record #0 (VZ-FOUND-007): merges[0]: docs/evidence/warroom/2026-09-21-vizra-core-pr5-fixtures-VERIFY.md does not END with a PASS verdict. Its final non-empty line is 'Created and removed by me, by exact name: scratch clone and mutation copy under the se
+  online (check-ledger-status-remote.py): exit 0
+    ok  status record #0 (VZ-FOUND-007 VERIFIED): c043df72f06c is on yegamble/vizra-core main (compare: ahead, main ahead by 6)
+    ok  status record #0 (VZ-FOUND-007 VERIFIED): ci-required on 56920fec76c5: completed/success (check-run 106186425769)
+    OK: 1 status record(s) proved against GitHub
+=== C2  VZ-FOUND-008 VERIFIED user#3: 3b566c3b057a -> f49bca4615eb
+  offline (build.py): exit 1
+    status record #0 (VZ-FOUND-008): merges[0]: docs/evidence/warroom/2026-09-20-vizra-user-pr3-browser-env-VERIFY.md does not END with a PASS verdict. Its final non-empty line is 'stated accurately in the contract rather than contradicted by it.'; required 'FINAL
+  online (check-ledger-status-remote.py): exit 0
+    ok  status record #0 (VZ-FOUND-008 VERIFIED): f49bca4615eb is on yegamble/vizra-user main (compare: ahead, main ahead by 4)
+    ok  status record #0 (VZ-FOUND-008 VERIFIED): ci-required on 3b566c3b057a: completed/success (check-run 106171959382)
+    OK: 1 status record(s) proved against GitHub
+=== C2b VZ-FOUND-008 VERIFIED user#8: c2ff4454b28d -> 7a3a572b5a51
+  offline (build.py): exit 0
+    OK ... statuses={'PLANNED': 191, 'VERIFIED': 1}
+  online (check-ledger-status-remote.py): exit 0
+    ok  status record #0 (VZ-FOUND-008 VERIFIED): 7a3a572b5a51 is on yegamble/vizra-user main (compare: ahead, main ahead by 1)
+    ok  status record #0 (VZ-FOUND-008 VERIFIED): ci-required on c2ff4454b28d: completed/success (check-run 107288308319)
+    OK: 1 status record(s) proved against GitHub
+=== C3  VZ-INSTALL-003 VERIFIED core#8: 0cc906ed35b8 -> f1972e8226e4
+  offline (build.py): exit 1
+    status record #0 (VZ-INSTALL-003): VZ-INSTALL-003 has ui surface(s) ['/setup/claim'] but the record names no vizra-user merge; a component half is not the requirement
+  online (check-ledger-status-remote.py): exit 0
+    ok  status record #0 (VZ-INSTALL-003 VERIFIED): f1972e8226e4 is on yegamble/vizra-core main (compare: ahead, main ahead by 2)
+    ok  status record #0 (VZ-INSTALL-003 VERIFIED): ci-required on 0cc906ed35b8: completed/success (check-run 107288249394)
+    OK: 1 status record(s) proved against GitHub

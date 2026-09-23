@@ -1,0 +1,36 @@
+# tree: pre-amend commit f0369a0b4535cad52abe5ac1cbccd5797d8de005 (fix round 2; the pushed commit adds only these transcripts and docs to it); macOS arm64 26.5.1; Python 3.9.6; gh version 2.98.0 (2026-08-20); 2026-09-23
+
+SELF-TEST core8-implemented-true-facts: expected pass, got pass
+SELF-TEST core8-verified-true-facts: expected pass, got pass
+SELF-TEST merge-commit-not-on-main: expected red naming ['is NOT on yegamble/vizra-core main', 'merge_commit_sha is f1972e8226e42a2bf837bd45e12f5f447dd3a92f']; red, every reason named
+    status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra-core#8: yegamble/vizra-core#8 merge_commit_sha is f1972e8226e42a2bf837bd45e12f5f447dd3a92f, but the record says 66b3f3d50c56499432cbf6174661cbaa6bacbfea
+    status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra-core#8: merge commit 66b3f3d50c56499432cbf6174661cbaa6bacbfea is NOT on yegamble/vizra-core main (compare 66b3f3d50c56...main: diverged, behind_by 14)
+SELF-TEST verified-head-is-not-the-merged-head: expected red naming ['head is 0cc906ed35b804b18acac5dc74f0c9f2fda57e94']; red, every reason named
+    status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra-core#8: yegamble/vizra-core#8 head is 0cc906ed35b804b18acac5dc74f0c9f2fda57e94, but the record's verified_head is 66b3f3d50c56499432cbf6174661cbaa6bacbfea; the verified head must be the head that was merged
+SELF-TEST ci-required-failed-on-the-head: expected red naming ['head is c3bb02edb2bbb8da35775132c87d4dfca7dc944a', 'not completed/success']; red, every reason named
+    status record #0 (VZ-INSTALL-003 VERIFIED): merges[0] vizra#5: yegamble/vizra#5 head is c3bb02edb2bbb8da35775132c87d4dfca7dc944a, but the record's verified_head is cd4c0f2dddbe1616fa525fc5a4be9633ca4dfd86; the verified head must be the head that was merged
+    status record #0 (VZ-INSTALL-003 VERIFIED): merges[0] vizra#5: latest ci-required on cd4c0f2dddbe1616fa525fc5a4be9633ca4dfd86 (check-run 107101918306) is completed/failure, not completed/success
+    status record #0 (VZ-INSTALL-003 VERIFIED): merges[0] vizra#5: EVIDENCE NOT ON META MAIN — docs/evidence/warroom/2026-09-23-meta-pr5-ledger-m1a-VERIFY.md could not be read from yegamble/vizra main (gh api repos/yegamble/vizra/contents/docs/evidence/warroom/2026-09-23-meta-pr5-ledger-m1a-VERIFY.md?ref=main: exit 1: {"message":"Not Found","documentation_url":"https://docs.github.com/rest/repos/contents#get-repository-content","status":"404"}). Evidence must be merged before a status can cite it
+SELF-TEST no-ci-required-on-the-head: expected red naming ['no ci-required check-run from GitHub Actions on c043df72f06cc7b5d7237a12d2be4dac25fa788e']; red, every reason named
+    status record #0 (VZ-INSTALL-003 VERIFIED): merges[0] vizra-core#8: yegamble/vizra-core#8 head is 0cc906ed35b804b18acac5dc74f0c9f2fda57e94, but the record's verified_head is c043df72f06cc7b5d7237a12d2be4dac25fa788e; the verified head must be the head that was merged
+    status record #0 (VZ-INSTALL-003 VERIFIED): merges[0] vizra-core#8: no ci-required check-run from GitHub Actions on c043df72f06cc7b5d7237a12d2be4dac25fa788e; VERIFIED requires ci-required green on the verified head
+    status record #0 (VZ-INSTALL-003 VERIFIED): merges[0] vizra-core#8: EVIDENCE NOT ON META MAIN — docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md could not be read from yegamble/vizra main (gh api repos/yegamble/vizra/contents/docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md?ref=main: exit 1: {"message":"Not Found","documentation_url":"https://docs.github.com/rest/repos/contents#get-repository-content","status":"404"}). Evidence must be merged before a status can cite it
+SELF-TEST pr-never-merged: expected red naming ['was NOT MERGED']; red, every reason named
+    status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra-user#4: yegamble/vizra-user#4 was NOT MERGED (state 'closed')
+    status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra-user#4: yegamble/vizra-user#4 targets 'feat/m0-browser-env', not main
+    status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra-user#4: yegamble/vizra-user#4 merge_commit_sha is e67c35fed64dc6909a19201d85f204e218ef91aa, but the record says 7a3a572b5a518a88da4f503ad171956336b11ed5
+SELF-TEST merge-commit-does-not-exist: expected red naming ['could not place merge commit 0000000000000000000000000000000000000001']; red, every reason named
+    status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra-core#8: yegamble/vizra-core#8 merge_commit_sha is f1972e8226e42a2bf837bd45e12f5f447dd3a92f, but the record says 0000000000000000000000000000000000000001
+    status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra-core#8: could not place merge commit 0000000000000000000000000000000000000001 relative to yegamble/vizra-core main: gh api repos/yegamble/vizra-core/compare/0000000000000000000000000000000000000001...main: exit 1: {"message":"Not Found","documentation_url":"https://docs.github.com/rest/commits/commits#compare-two-commits","status":"404"}
+SELF-TEST merged-into-a-non-main-branch: expected red naming ["targets 'chore/m0-meta-baseline', not main"]; red, every reason named
+    status record #0 (VZ-INSTALL-003 IMPLEMENTED): merges[0] vizra#3: yegamble/vizra#3 targets 'chore/m0-meta-baseline', not main
+SELF-TEST evidence-not-on-meta-main: expected red naming ['EVIDENCE NOT ON META MAIN — docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md']; red, every reason named
+    status record #0 (VZ-INSTALL-003 VERIFIED): merges[0] vizra-core#8: EVIDENCE NOT ON META MAIN — docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md could not be read from yegamble/vizra main (gh api repos/yegamble/vizra/contents/docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md?ref=main: exit 1: {"message":"Not Found","documentation_url":"https://docs.github.com/rest/repos/contents#get-repository-content","status":"404"}). Evidence must be merged before a status can cite it
+self-test: 10/10 cases behaved as expected
+exit=0
+
+0 status records in docs/evidence/ledger-generator/status_records.json: no entry claims IMPLEMENTED or VERIFIED, so there is no merge to prove. (The self-test step exercises this checker.)
+exit=0
+
+ledger status output: 192 entries, exact key set; 0 carry a status, 0 record(s), sets equal; every entry re-derived from the committed records in a fresh process
+exit=0

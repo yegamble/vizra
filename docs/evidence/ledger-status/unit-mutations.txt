@@ -1,0 +1,40 @@
+# source SHA 94ac3bf8c312ca0c1ab08195293f1ad15170d7ff; copy of docs/evidence/ledger-generator in a scratch dir; Python 3.9.6; 2026-09-23
+# each mutation applied alone to status.py, then python3 -m unittest test_status; restored after each
+
+== mutation no-head-comparison: status.py sha256 18cdad054f64 -> 241b8b33f7f2
+   replaced: if m.group(1) != head:
+   exit=1
+   FAIL: test_verdict_sha_mismatch_is_refused (test_status.Evidence)
+   Ran 30 tests in 0.226s
+   FAILED (failures=1)
+== mutation any-status-recordable: status.py sha256 18cdad054f64 -> 325a1118600c
+   replaced: if status not in RECORDABLE:
+   exit=1
+   FAIL: test_unknown_status_is_refused_by_name (test_status.RecordShape)
+   Ran 30 tests in 0.106s
+   FAILED (failures=1)
+== mutation no-ui-floor: status.py sha256 18cdad054f64 -> 231655c97b62
+   replaced: if req["surfaces"]["ui"] and "vizra-user" not in repos:
+   exit=1
+   FAIL: test_ui_surface_needs_a_user_merge (test_status.Floors)
+   Ran 30 tests in 0.184s
+   FAILED (failures=1)
+== mutation verdict-anywhere-not-final: status.py sha256 18cdad054f64 -> cc6cf79b9109
+   replaced: if ln.strip():
+            return ln
+   exit=1
+   FAIL: test_fail_as_final_line_is_refused (test_status.Evidence)
+   FAIL: test_pass_not_on_the_final_line_is_refused (test_status.Evidence)
+   Ran 30 tests in 0.114s
+   FAILED (failures=2)
+== mutation no-dsl-default-check: status.py sha256 18cdad054f64 -> 39dc0910f9d5
+   replaced: if got != want:
+   exit=1
+   FAIL: test_hand_asserted_release_status_is_refused (test_status.DslDefaults)
+   FAIL: test_hand_asserted_verified_in_a_section_is_refused (test_status.DslDefaults)
+   Ran 30 tests in 0.156s
+   FAILED (failures=2)
+== restored
+   Ran 30 tests in 0.146s
+   
+   OK

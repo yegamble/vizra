@@ -22,6 +22,23 @@
 #       overlay three files away from the one being read — and all of it is
 #       visible in `docker compose config --format json`.
 #
+# Since queue 2i the ledger can carry a status, so a fifth failure is gated:
+#
+#   (e) an entry of the committed ledger carries a status that no committed
+#       record admits. Step (a2), the output check, catches this whatever
+#       produced it — a hand edit, a section source, or a generator tampered
+#       with in-process. It parses the committed JSON in a separate process.
+#       The same steps refuse a record that claims a status outside the two
+#       recordable ones, rests on a verdict that does not name the merged head,
+#       or names a merge that is not on the component repo's main or a head
+#       where ci-required is not green.
+#       Not covered: a pull request that edits these checkers. That change is
+#       visible in the diff and nothing else guards it: CODEOWNERS is advisory
+#       (no branch protection, no ruleset), so the war room's verifier-gated
+#       merge is the only review. This lane runs
+#       on pull requests and merge-queue entries only, so a record that becomes
+#       false AFTER it merged is caught at the next meta PR, not at once.
+#
 # META_REPO.md §7 names two further target lanes for this repo, `bundle` and
 # `boot`. Neither is built here. There is now a compose topology, but there is
 # still no installer, no bundle builder and no booted stack — `validate` renders
@@ -55,6 +72,12 @@ jobs:
   validate:
     name: validate
     runs-on: ubuntu-24.04
+    # Read-only. checks/pull-requests are for the ledger-status step's reads of
+    # this repository's own PRs and check-runs (queue 2i); nothing here writes.
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -121,8 +144,61 @@ jobs:
           esac
 
       # (a) The generated ledger reproduces byte-for-byte from its sources.
+      #     Since queue 2i the generator also refuses any status that is not
+      #     admitted by a checked record in
+      #     docs/evidence/ledger-generator/status_records.json (status.py), so
+      #     this step is also the OFFLINE half of "a status only with evidence".
       - name: the generated ledger matches its sources
         run: ./scripts/check-generated-ledger.sh
+
+      # (a2) LEDGER STATUS, the rest of it (queue 2i).
+      #
+      # The offline rules have their own unit tests; the ONLINE half proves with
+      # the GitHub API what only GitHub knows — each recorded PR merged from the
+      # verified head into the recorded merge commit, that commit is on the
+      # component repo's main, and for VERIFIED ci-required succeeded on the
+      # verified head. `--self-test` runs committed cases against real GitHub
+      # facts first, so the checker is never vacuous while few records exist.
+      # The component repositories are public: a read token is enough, and
+      # `checks: read` / `pull-requests: read` are granted to this job for the
+      # meta repo's own PRs and check-runs.
+      # Out of process, on the OUTPUT. The generator's own status checks run
+      # inside the process that imported every section source, so a section
+      # source can defeat them (meta PR #6 verify, probes 2c/2d/2e). This step
+      # parses the COMMITTED features.json as plain JSON and imports no
+      # section source. It requires the exact key set, and it re-derives every
+      # status from the committed records.
+      # It also requires every evidence file a VERIFIED record cites to be on
+      # meta `main` with identical bytes (fix round 2, R-3), so `main` is
+      # fetched first: the checkout above is the PR merge ref at depth 1.
+      - name: every status in the committed ledger is admitted by a committed record
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          ./scripts/check-ledger-status-output.py
+
+      - name: the ledger-status rules hold (unit tests)
+        run: |
+          set -euo pipefail
+          (cd docs/evidence/ledger-generator && python3 -m unittest -v test_status)
+          python3 scripts/test_ledger_status_remote.py -v
+
+      - name: every recorded ledger status is proved against GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh --version | head -n 1
+          ./scripts/check-ledger-status-remote.py --self-test
+          ./scripts/check-ledger-status-remote.py
+
+      # Same rule as the compose demonstrations below: the guards are shown
+      # failing against controlled mutations on every run, and the script fails
+      # if the tree is not restored afterwards.
+      - name: every ledger-status guard still fails against a controlled mutation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash docs/evidence/ledger-status/demo.sh
 
       # (b) Every quality JSON parses, and every VZ-… id resolves.
       - name: quality JSON parses and every requirement id resolves

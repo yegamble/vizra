@@ -1,0 +1,327 @@
+{
+  "about": "Cases for scripts/check-ledger-status-remote.py --self-test. Each runs against REAL GitHub facts (public repositories); expect is either \"pass\" or the list of reasons that must ALL be named. These records are fixtures, never claims: they are not read by the ledger generator.",
+  "cases": [
+    {
+      "name": "core8-implemented-true-facts",
+      "why": "vizra-core#8 merged from 0cc906e as f1972e8, which is on main",
+      "expect": "pass",
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "IMPLEMENTED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra-core",
+                "pr": 8,
+                "verified_head": "0cc906ed35b804b18acac5dc74f0c9f2fda57e94",
+                "merge_commit": "f1972e8226e42a2bf837bd45e12f5f447dd3a92f"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "core8-verified-true-facts",
+      "why": "as above, ci-required on 0cc906e is completed/success, and the cited evidence file is on meta main with identical bytes (any file on main serves: this checker does not read verdict lines, the generator does)",
+      "expect": "pass",
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "VERIFIED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra-core",
+                "pr": 8,
+                "verified_head": "0cc906ed35b804b18acac5dc74f0c9f2fda57e94",
+                "merge_commit": "f1972e8226e42a2bf837bd45e12f5f447dd3a92f",
+                "evidence_file": "docs/evidence/warroom/2026-09-21-meta-pr3-validate-lane-VERIFY.md"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "merge-commit-not-on-main",
+      "why": "66b3f3d is an earlier head of the same PR: it exists, and it is not on main (compare: diverged)",
+      "expect": [
+        "is NOT on yegamble/vizra-core main",
+        "merge_commit_sha is f1972e8226e42a2bf837bd45e12f5f447dd3a92f"
+      ],
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "IMPLEMENTED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra-core",
+                "pr": 8,
+                "verified_head": "0cc906ed35b804b18acac5dc74f0c9f2fda57e94",
+                "merge_commit": "66b3f3d50c56499432cbf6174661cbaa6bacbfea"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "verified-head-is-not-the-merged-head",
+      "why": "66b3f3d received a verifier PASS too, but it is not the head GitHub merged",
+      "expect": [
+        "head is 0cc906ed35b804b18acac5dc74f0c9f2fda57e94"
+      ],
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "IMPLEMENTED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra-core",
+                "pr": 8,
+                "verified_head": "66b3f3d50c56499432cbf6174661cbaa6bacbfea",
+                "merge_commit": "f1972e8226e42a2bf837bd45e12f5f447dd3a92f"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "ci-required-failed-on-the-head",
+      "why": "meta#5 at cd4c0f2: ci-required concluded failure (billing), and cd4c0f2 is not the merged head",
+      "expect": [
+        "head is c3bb02edb2bbb8da35775132c87d4dfca7dc944a",
+        "not completed/success"
+      ],
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "VERIFIED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra",
+                "pr": 5,
+                "verified_head": "cd4c0f2dddbe1616fa525fc5a4be9633ca4dfd86",
+                "merge_commit": "04ef3a03f1f264ec7f646f50c671898f57fc4ce8",
+                "evidence_file": "docs/evidence/warroom/2026-09-23-meta-pr5-ledger-m1a-VERIFY.md"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "no-ci-required-on-the-head",
+      "why": "c043df7 is a merge commit on main; no ci-required ever ran on it",
+      "expect": [
+        "no ci-required check-run from GitHub Actions on c043df72f06cc7b5d7237a12d2be4dac25fa788e"
+      ],
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "VERIFIED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra-core",
+                "pr": 8,
+                "verified_head": "c043df72f06cc7b5d7237a12d2be4dac25fa788e",
+                "merge_commit": "f1972e8226e42a2bf837bd45e12f5f447dd3a92f",
+                "evidence_file": "docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "pr-never-merged",
+      "why": "vizra-user#4 was a throwaway PR, closed unmerged",
+      "expect": [
+        "was NOT MERGED"
+      ],
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "IMPLEMENTED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra-user",
+                "pr": 4,
+                "verified_head": "0401d5ea78cc3cb8673701e2390c85f58537e401",
+                "merge_commit": "7a3a572b5a518a88da4f503ad171956336b11ed5"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "merge-commit-does-not-exist",
+      "why": "a well-formed SHA no repository has",
+      "expect": [
+        "could not place merge commit 0000000000000000000000000000000000000001"
+      ],
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "IMPLEMENTED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra-core",
+                "pr": 8,
+                "verified_head": "0cc906ed35b804b18acac5dc74f0c9f2fda57e94",
+                "merge_commit": "0000000000000000000000000000000000000001"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "merged-into-a-non-main-branch",
+      "why": "meta#3 merged from f9b8553 as 4920786 into the stacked base chore/m0-meta-baseline. That merge commit reached main later (compare: ahead), so every OTHER rule holds: only the base check refuses it (meta PR #6 verify, FINDING 2)",
+      "expect": [
+        "targets 'chore/m0-meta-baseline', not main"
+      ],
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "IMPLEMENTED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra",
+                "pr": 3,
+                "verified_head": "f9b85537fa1f596b6d01556bd868e280e27c3570",
+                "merge_commit": "4920786599f40cb2dad0193b7828612e2c24581a"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "evidence-not-on-meta-main",
+      "why": "true merge and CI facts, but the evidence file exists only on the chair's records branch, not on meta main (fix round 2, R-3)",
+      "expect": [
+        "EVIDENCE NOT ON META MAIN — docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md"
+      ],
+      "records_doc": {
+        "schema": 1,
+        "github_owner": "yegamble",
+        "records": [
+          {
+            "id": "VZ-INSTALL-003",
+            "status": "VERIFIED",
+            "rationale": "SELF-TEST FIXTURE, not a claim: exercises scripts/check-ledger-status-remote.py against real GitHub facts.",
+            "acceptance": [
+              {
+                "issue": "docs/issues/VZ-ISSUE-005.md",
+                "bullet": "self-test only: the remote checker never reads this"
+              }
+            ],
+            "merges": [
+              {
+                "repo": "vizra-core",
+                "pr": 8,
+                "verified_head": "0cc906ed35b804b18acac5dc74f0c9f2fda57e94",
+                "merge_commit": "f1972e8226e42a2bf837bd45e12f5f447dd3a92f",
+                "evidence_file": "docs/evidence/warroom/2026-09-21-vizra-core-pr8-m1a-owner-claim-VERIFY.md"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
