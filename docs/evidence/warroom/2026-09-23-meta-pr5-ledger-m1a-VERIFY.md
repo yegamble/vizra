@@ -300,3 +300,133 @@ Also noted, not a finding: the `notes` of all three entries cite `docs/evidence/
 - Open for the chair: F1 (owner-inbox item before the owner-transfer slice), F2 (next generator edit), F3–F5 (nits).
 
 FINAL VERDICT: PASS (local; CI BLOCKED) — SHA cd4c0f2dddbe1616fa525fc5a4be9633ca4dfd86
+
+---
+
+## Re-confirmation at c3bb02e
+
+- Head: `c3bb02edb2bbb8da35775132c87d4dfca7dc944a` (confirmed with `gh pr view 5 --json headRefOid` before and after). Parent `cd4c0f2`, merge-base with origin/main `6b8158c`. Delta `cd4c0f2..c3bb02e`: `docs/evidence/ledger-generator/s2_identity.py` (4 lines), `docs/quality/features.json` (4 lines), `docs/plans/2026-09-23-meta-ledger-m1a-obligations.md` (+8, a new "Round 1" section). No other file, and no `.github/` or `required-checks.txt` change.
+- Setup: a new fresh clone in a new `mktemp -d` (`vzv-meta-pr5-rc-*`), base `6b8158c` as a worktree of it, `PYTHONDONTWRITEBYTECODE=1` throughout, no containers.
+
+### R1. Generator and the four checks
+
+| Command | Python | Exit | Key output |
+|---|---|---|---|
+| `(cd docs/evidence/ledger-generator && python3 build.py ../../quality/features.json)` | 3.9.6 | 0 | `OK 192 requirements; core=142` |
+| `./scripts/check-generated-ledger.sh` | 3.9.6 | 0 | reproduces byte-for-byte (UTF-8 and C/POSIX) |
+| `./scripts/check-generated-ledger.sh` | 3.12.11 | 0 | same |
+| `./scripts/check-quality-json.py` | 3.9.6 | 0 | 4 files; 192 ids; 191 refs → 287 ids (204 distinct), 14 docs, all resolve |
+| `./scripts/check-doc-links.py` | 3.9.6 | 0 | no relative links across 95 md files; 7 external URLs |
+| `./scripts/ci-required-guard.sh` | 3.9.6 | 0 | fixtures 6/7/10 at floor; lane integrity 1 |
+
+The tree was clean after the runs.
+
+### R2. Field-by-field diff, base 6b8158c → c3bb02e
+
+- Top-level keys other than summary and features are identical. `summary` is identical to cd4c0f2's (192 / core 142 / identity 15 / recommended_safeguard 20).
+- Ids: removed `{}`, added `{VZ-AUDIT-001}`, base order kept.
+- Changed vs base: `VZ-INSTALL-003` (`notes`, `surfaces`) and `VZ-ADMIN-USERS-001` (`cases`, `notes`, `outcome`). An automated additive test found **0 non-additive changes**. It checked that every base list is an ordered prefix of the head list, every base string a prefix of the head string, and every base-null field only filled.
+- `VZ-INSTALL-003` is identical to cd4c0f2 in every field. `cases.recovery` is `['Restart re-mints; old token invalid']`, byte-identical to base; the outcome is identical.
+- Changed vs cd4c0f2: only `VZ-ADMIN-USERS-001.notes` and `VZ-AUDIT-001.cases` (success and privacy rewritten in place; counts 3 and 2 unchanged; negative and recovery unchanged). Both are text this PR itself introduced, so the change against base is still additive-only.
+- Statuses: all 192 are (`PLANNED`, `UNVERIFIED`, `NOT_STARTED`, `NOT_RELEASED`).
+
+### R3. Is the new wording true of core 56504c1's 0005 and migrate-lint?
+
+Source: `git -C …/core-m1-owner-claim show 56504c1:…`. PR #8 head is still `56504c1`.
+- `users.email`: 0005:65 `email text NOT NULL`. The entry now says a NULL email "first needs an additive `ALTER TABLE users ALTER COLUMN email DROP NOT NULL`". **True.**
+- `users_username_shape`: 0005:86 `CHECK (username ~ '^[A-Za-z0-9][A-Za-z0-9_-]{2,29}$')`, i.e. 3–30 ASCII characters. The entry says the username is "replaced with a non-identifying handle that satisfies users_username_shape". **True and feasible.** Checked against the regex: `erased-0190f3a2b4c5d6e7` (23 chars) matches. A full `erased-<32-hex uuid>` (39 chars) does not, and neither does `_erased`. See the nit R-N2 on uniqueness.
+- **migrate-lint, actually executed:** I extracted `scripts/migrate-lint.sh` at 56504c1 into scratch and ran it with `--dir` on single-migration fixture trees:
+
+| Fixture up-migration | migrate-lint exit | Result |
+|---|---|---|
+| `ALTER TABLE users ALTER COLUMN email DROP NOT NULL;` | **0** | not destructive — entry claim TRUE |
+| `CREATE OR REPLACE FUNCTION audit_events_append_only() …` whose body refuses by default (`IF TG_LEVEL='ROW' AND TG_OP='UPDATE' AND <guard> THEN RETURN NEW; END IF; RAISE …`), with no TRUNCATE word | **0** | entry claim TRUE |
+| same function, but its body contains `IF TG_OP = 'TRUNCATE' THEN RAISE … END IF;` | **1** `FAIL 0001_case.up.sql:4 destructive statement in an up migration` | entry's qualifier TRUE |
+| a whole-line comment `-- this widening still refuses TRUNCATE …` | **0** | **contradicts "comments … included"** (R-N1) |
+| `SELECT 1; -- TRUNCATE stays refused` (trailing comment) | **1** | a trailing comment does match |
+
+  migrate-lint.sh at 56504c1 has `case "$(… sed 's/^[[:space:]]*//')" in --*) continue;; esac # Ignore matches inside a comment.`, so whole-line comments are skipped. The new success-case parenthetical, "migrate-lint greps every line, comments and function bodies included", is wrong about whole-line comments. Its operative claim (a body naming TG_OP = 'TRUNCATE' needs the annotation) is right. The error is **mine**: my F3 said "including comments", the builder copied it, and I had not run the lint then. It errs cautious (it asks for an annotation in more cases than needed), so nothing unsafe follows.
+- Privacy case: "Because actor_user_id still joins audit rows to users, erasure scrubs or replaces users.username itself …; an erasure test asserts users.email, users.username and credentials hold no original value". Consistent with the FK (0005) and the 0003 CHECK. **True.**
+- `VZ-ADMIN-USERS-001` note: "pending owner ratification (owner inbox 8d) … no slice implementing owner transfer proceeds before the owner answers". Owner inbox **8d exists** at `docs/plans/WARROOM-BOARD.md:127` (chair records branch, commit `cad9118`) and is addressed to the owner. "PRODUCT_SPEC.md § 3 Actors and roles" is the right heading (PRODUCT_SPEC:22; the text is at :24). **F1 closed.**
+- **F2 closed; F3 closed** apart from R-N1.
+
+### R4. PR body against what I measured
+
+| PR-body claim | Observed |
+|---|---|
+| 0005 names no ledger ID; the mapping runs one way; the chair records it on the board | True (F4 closed) |
+| 191 → 192, core 141 → 142; additions only; recovery sentence unchanged | True (R2) |
+| Evidence table at c3bb02e (four checks exit 0; 4/192/191→287 (204)/14; 95 md, 7 URLs) | True (R1) |
+| "`ci-required` check run 107101918306" failure at cd4c0f2 | True (`gh api …/commits/cd4c0f2…/check-runs`: 107101918306 ci-required failure) |
+| "The same result is expected at c3bb02e" | Now observed: `validate` 107105581651 and `ci-required` 107105580958 are **failure**, jobs with **0 steps**, and both annotations say "The job was not started because recent account payments have failed…" |
+| Demos run at dd7955e and reproduced by the verifier at cd4c0f2 | True. I did not re-run them at c3bb02e: the delta changes no check script, and the lane still reproduces the JSON |
+| "only if the new migration never contains the bare word TRUNCATE, because migrate-lint greps every line" | Slightly overstated: whole-line comments are skipped (R-N1) |
+| F5 pre-existing items as described | True, matches my earlier observations |
+
+The plan's older "Blockers and handoff" bullet still says "to be confirmed at the implementing slice's plan review". The new Round 1 section below it supersedes that, so the plan reads as an append-only log. I do not count it as a finding.
+
+### Re-confirmation findings
+
+```
+FINDING R-N1: "comments … included" is wrong — migrate-lint skips whole-line comments (verifier's own F3 wording, copied)
+Severity:    NIT
+Confidence:  high (executed)
+
+Affected:
+  repo:      vizra
+  files:     docs/evidence/ledger-generator/s2_identity.py (VZ-AUDIT-001 success[0]); PR #5 body;
+             vizra-core@56504c1 scripts/migrate-lint.sh (the `--*) continue` comment skip)
+  requirements: VZ-AUDIT-001
+
+Observed:
+  A fixture whose only TRUNCATE is in a whole-line `-- …` comment passes migrate-lint (exit 0). A trailing
+  `… ; -- TRUNCATE` comment and a function-body line naming 'TRUNCATE' both fail (exit 1).
+
+Failure:
+  The parenthetical over-states the lint. That errs cautious and nothing unsafe follows. It is still a
+  false statement about a tool, in a ledger case.
+
+Perspective: developer
+Recommendation: In the next generator edit that touches VZ-AUDIT-001: "migrate-lint matches every
+  non-comment line, function bodies and trailing comments included". No new commit is needed for this alone.
+Acceptance criteria: the wording matches migrate-lint's comment skip.
+Tests: none (the fixture runs above are the reproduction).
+Cross-repo implications: none
+Challenge: The operative instruction (refuse by default, or annotate) is correct either way.
+```
+
+```
+FINDING R-N2: the username replacement must also be unique and ≤ 30 characters
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra
+  files:     VZ-AUDIT-001 success[2]; vizra-core@56504c1 0005 users_username_shape, users_username_fold_key
+  requirements: VZ-AUDIT-001
+
+Observed:
+  The handle must satisfy the shape (3–30 chars) AND the unique fold index. `erased-` + a full uuid is
+  39 chars and fails the shape.
+
+Failure:
+  An implementer who picks `erased-<uuid>` gets a 23514, and a constant placeholder gets a 23505 on the
+  second erasure. The erasure slice's own tests would catch both at once.
+
+Perspective: developer
+Recommendation: Optional: "…a unique, non-identifying handle (≤ 30 chars) that satisfies users_username_shape".
+Acceptance criteria: wording mentions uniqueness, or the slice's plan does.
+Tests: an erasure test that erases two users in sequence.
+Cross-repo implications: core: the erasure slice
+Challenge: "Satisfies users_username_shape" plus the existence of a unique index is enough for a competent implementer.
+```
+
+### Re-confirmation verdict
+
+- The four checks and the generator pass locally at c3bb02e (Python 3.9.6 and 3.12.11).
+- The diff against base 6b8158c is additive-only. The VZ-INSTALL-003 recovery sentence is byte-identical, and all 192 statuses are unchanged.
+- F1, F2, F3 and F4 are closed. The new wording is true against 0005 at 56504c1, and I executed migrate-lint on the proposed statements myself. Two nits remain (R-N1, R-N2); neither blocks.
+- CI at c3bb02e: `validate` and `ci-required` are FAILURE, 0 steps, billing. CI is **BLOCKED**, not a pass, so the merge rule's "ci-required green on the verified SHA" is still unmet.
+- No instruction-shaped text appeared in any tool output.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA c3bb02edb2bbb8da35775132c87d4dfca7dc944a
