@@ -327,3 +327,189 @@ The scratch dir `vzv-core-pr10-7gRiCT` was deleted by exact path. The `ubuntu:24
 **FAIL.** Every builder demonstration (D0–D5, C1–C6) reproduced. The root-Makefile controls hold on 3.81 and 4.3 under every byte and sibling mutation I tried, and the pre-make stop is real. But FINDING 1 (BLOCKER) shows that the B5 remake probe itself makes make remake and evaluate an unpinned included makefile, 6 times on the fixture and 19 on the real tree with a pinned include, while printing an ok line saying it did not. That contradicts the slice's headline guarantee for a shape the PR supports and tests. Also: `make ci` was not green locally (environmental timeout in untouched `internal/fixtures`), and CI is BLOCKED. The builder can reproduce with §2 (fixture `include-pinned-good` + `{ cat a.mk; echo '# x'; } > a.mk.sh; touch -t 202001010000 a.mk`) and fix with a single `make -q <all pinned files>` probe.
 
 FINAL VERDICT: FAIL — SHA 62d16aa773a2db4414bc2f96b3381c732e2ebf88
+
+---
+
+# Re-verification at 08a59a9 (round 1 of 2)
+
+- **Head:** `gh pr view 10` at start → `08a59a91a6dcc91c2346bcb206d4c0ad8603e90e`. It is one commit on `62d16aa`: "fix(ci): B5 fix round 1 — one make -q naming every pinned makefile; check 11 shares the anchor's reader; text checks before make".
+- **Clone:** new `mktemp -d …/vzv-core-pr10r1-XXXXXX`, fresh `git clone` + `fetch pull/10/head`, detached at the SHA, with a second local clone for my mutations. `HEAD:scripts` tree = `70d09e55…`, the same scripts tree object the builder's transcripts name (their `# tree: a656144` header is a pre-squash commit with identical `scripts/` bytes).
+- **Host:** darwin/arm64, GNU Make 3.81, Python 3.9.6, go1.27.1 (go.mod toolchain), heavily loaded by other agents. **4.3:** my own `ubuntu:24.04` containers `vzvpr10r1-make43-<pid>` and `vzvpr10r1-rp43-<pid>`, `--rm`, with a logging `/usr/bin/make` wrapper. The image was already present and in use by another agent's container (`searchci-r2-40c87c`), so I did **not** remove it.
+
+## R1-0. Scope of the diff
+
+- `git diff --name-only origin/main...HEAD` outside `scripts/`, `docs/` and `.github/pinned-makefiles.yml`: only `AGENTS.md` and `README.md`, both documentation, as in the original PR.
+- Frozen-path grep (Makefile, api/, internal/, cmd/, migrations/, required-checks.txt, pinned-steps.yml, test-floors.json, workflows): no output, exit 1.
+- `.github/pinned-makefiles.yml` changed in its comment header only; the digest is still `e7cc357c…` and equals `shasum -a 256 Makefile`.
+- No file deleted in the round (`--diff-filter=D` empty).
+
+## R1-1. The builder's driver
+
+`bash docs/evidence/hardening-b5/demo.sh ../demo-out` → **exit 0**, 0 uncommitted paths afterwards. Every row reproduced:
+- D0: 18 make processes, first argv `make -q Makefile`.
+- D1, D2, D4: anchor exit 1 in both modes, **0 make**; ci-required-guard exit 1 by name; restore byte-identical.
+- D3: a.mk byte change → 0 make; the control's first argv is `make -q Makefile a.mk b.mk`.
+- D5: one `make -q Makefile`, Makefile byte-identical.
+- **D6** (include sibling): exactly one make, `make -q Makefile a.mk b.mk`, a.mk unchanged.
+- C1–C6, **C7** (per-file probe restored): the anchor goes back to 6 make processes and `a.mk CHANGED`; restored, it is one process. **C8** (check-11 parity dropped) and **C9** (text checks moved after make): each named test red with go test exit 1, green after restore.
+- **P1:** the 5 new makefilepin fixtures are exit 0 under the 62d16aa check 11 and exit 1 now.
+
+## R1-2. F1 — my own reproducers (fixture `include-pinned-good`; recorder + PATH-first `cat/chmod/cc/get/…` observer; on 4.3 also the make wrapper)
+
+| Case | 3.81 (wf / lenient) | 4.3 (wf / lenient) | make processes | observer | makefiles after |
+|---|---|---|---|---|---|
+| control | 0 / 0 | 0 / 0 | 4: `-q Makefile a.mk b.mk`, `-pn … ci` ×2, `--dry-run … ci` | none | unchanged |
+| newer `a.mk.sh` | 1 / 1 | 1 / 1 | **1**: `make -q Makefile a.mk b.mk` | none | unchanged |
+| newer `b.mk.sh` (the `sinclude`) | 1 / 1 | 1 / 1 (the probe exits 2 on 4.3; still refused) | 1 | none | unchanged |
+| newer **`Makefile.sh` while includes are pinned** | 1 / 1 | 1 / 1 | 1 | none | unchanged |
+| newer `a.mk.sh` **and** `b.mk.sh` together | 1 / 1 | 1 / 1 | 1 | none | unchanged |
+| newer `a.mk.c` | 1 / 1 | 1 / 1 | 1 | none | unchanged |
+| newer `SCCS/s.b.mk` | 1 / 1 | — | 1 | none | unchanged |
+| real tree, clean | 0 / 0 | 0 / 0 | 18 (host); 4 on 4.3 with `--targets ci` | none | unchanged |
+| real tree, newer `Makefile.sh` | 1 / 1 | 1 / 1 | 1 | none | unchanged |
+
+**F1 is closed** on both versions: make starts once, as the single probe, runs no tool, and nothing is rewritten. My original round-0 reproducer (§2) now gives exit 1 with one make process.
+
+## R1-3. F4 — the text checks before make, and whether the fixtures got stricter
+
+Recorder over all 32 `scripts/testdata/makeguard/*` fixtures at `--workflow`:
+- Every failing fixture has **0 make processes** except `missing-prerequisite`, which has 2: `make -q`, then `make -pn ci` fails. That is by design.
+- `good` and `include-pinned-good` have 4 make processes, exit 0.
+
+`scripts/scripts_test.go` diff: the 16 text-check fixtures keep their `wantText` and **add** `notInvoked: true`, which asserts "make was NOT invoked (0 make process(es) started)". That is strictly stronger.
+
+`missing-target` changed text from `could not be established` (resolver) to `is not defined in any makefile make will read` and gained `notInvoked`. Coverage the resolver path had is kept by the new `missing-prerequisite` fixture: its target is defined but make cannot resolve it, and it asserts `could not be established`.
+- Loss check: the resolver's own failure path (`make -pn` non-zero) is still exercised.
+- `check_resolved`/`check_warnings` still run on every passing tree after make.
+- No fixture isolates `check_resolved`'s SHELL/.SHELLFLAGS/MAKEFLAGS failure branch. None did at 62d16aa either: the old `shell-override` text "shell" matched the text check first. So this is not a regression, but that defence-in-depth layer is untested (see R1-F2).
+
+`makefiledigest_test.go`:
+- The forbidden-spawn list now covers `makefile_pin.py` too, plus a regex that forbids it importing `subprocess`.
+- The remake test is table-driven: the Makefile case plus an included-makefile case. Each asserts exactly one make argv equal to `make -q <every pinned file>` and every pinned file byte-identical. Stronger than before.
+- The 5 new check-11 rows are `wantFail`.
+
+**No assertion was weakened.**
+
+## R1-4. `makefile_pin.verify_pin` through BOTH callers (anchor via recorder; `ci-required-guard.py --makefile-pins <copy>`)
+
+The base is fixture include-pinned-good. Every row fails closed, with the anchor starting 0 make processes:
+
+| Pin / tree mutation | anchor | check 11 |
+|---|---|---|
+| missing pin | 1 `does not exist` | 1 `is missing` |
+| header-only / zero-byte | 1 `pins no file` | 1 `pins no file` |
+| no header; flow mapping; CRLF; `---` second document; indented `  # note`; quoted key; tab indent; `./a.mk` key; `../x.mk` key | 1 (shape/header) | 1 `not in its one accepted shape` |
+| duplicate key | 1 `'b.mk' is pinned twice` | 1 |
+| pin is a directory | 1 `cannot be read: Is a directory` | 1 (labelled "not in its one accepted shape", a misleading label, NIT) |
+| pin not UTF-8 | 1 | 1 |
+| no `Makefile` entry | 1 | 1 |
+| extra pinned file, present but not included (stale) | 1 | 1 |
+| extra pinned file, absent | 1 `does not exist` | 1 `changed without the paired update` |
+| pinned file is a directory; `GNUmakefile` beside; symlinked Makefile | 1 | 1 |
+| pinned include unreadable (`chmod 000`) | **exit 1 via an uncaught `PermissionError` traceback**, 0 make | **exit 1 via a traceback** |
+| extra **unpinned** file beside, not included | 0 | 0 (correct: make does not read it) |
+
+Code read: `verify_pin` returns `ok` only when `problems` is empty. Every early exit (pin error, no Makefile) appends a problem. An unreadable pinned file raises rather than being skipped. `stale` is added only when there is no other problem, which cannot turn a failure into ok. **No path returns ok on a pin it could not fully read.** The only rough edge is the traceback: fail-closed, but not a by-name message (R1-F3, NIT).
+
+## R1-5. Lanes at 08a59a9 (clean clone; host load average fell from about 180 to about 17 during the run)
+
+| Command | Exit | Counts |
+|---|---|---|
+| direct unit step: `go test -race -count=1 -json ./...` + `go-test-report.py --suite unit --floors scripts/test-floors.json` | 0 / 0 | **1157 executed, 1157 pass, 0 fail, 0 skipped** (my own JSON count `{'pass': 1157}`), floor 943, 14 packages ok, 8 no-test-files; `scripts` **237** (floor 161), `internal/fixtures` 42 |
+| `./scripts/make-integrity-guard.sh --workflow` / lenient | 0 / 0 | `passed (8 gate target(s); make ran 18 time(s), only on the pinned bytes of Makefile)` |
+| `./scripts/ci-required-guard.sh` | 0 | `passed (6 required check(s))`, check 11 ok |
+| **`make ci`** | **0** | all 10 lanes; `test-race` 14 ok (internal/fixtures 221.9 s, scripts 31.6 s), 0 FAIL. The round-0 timeout did not recur at lower load |
+| tree after all runs | clean | 0 porcelain entries |
+
+On the 4.3 container I did not install PyYAML, so `ci-required-guard` exited 2 inside it. That is my own environment's missing input, not the product's; check 11 is make-version independent and passed on the host. The anchor (stdlib only) ran fully on 4.3.
+
+**CI evidence (all ABSENT):** `gh api …/commits/08a59a9…/check-runs` gives 11 runs: 10 failed ("The job was not started because recent account payments have failed…") and GitGuardian passed. No `ci-required`, build-test, integration, cache-matrix, fixtures (amd64), govulncheck, docker-build, image-scan or append-only result exists for this SHA, and the manifest-vs-jobs comparison is impossible. Integration suites were not run locally.
+
+## R1-6. Doc sentences, under "no false-guarantee merges"
+
+| Sentence | Verdict |
+|---|---|
+| "ONE `make -q` naming every pinned makefile … -q applies in make's remake phase only to goals" (AGENTS.md, README, COMMANDS, docstring, pin header) | true (R1-2) |
+| "-q runs no ORDINARY recipe; a `+`/`$(MAKE)` line still runs … can come only from the pinned, reviewed bytes (builtin RCS/SCCS checkout is a `+` line that expands to nothing for an existing file)" | true. Re-measured on 4.3 with the one-invocation form: a pinned `a.mk: dep.txt` + `+touch` rule runs under `make -q Makefile a.mk` and exits 0. The docs say exactly this |
+| "check 11 … calls the anchor's own `verify_pin`, so it refuses whatever the anchor refuses before make" | true for everything `verify_pin` decides (R1-4, P1). It does not run the anchor's pre-make TEXT checks or environment checks; the sentences name the list (GNUmakefile, symlink, stale/missing entry, computed include) and do not claim those. Acceptable |
+| COMMANDS guarantee row: "make reads only the pinned files and remakes none of them except through a `+`/`$(MAKE)` line in the pinned bytes"; swap window stated as the review-only residual | true as measured |
+| Docstring :94-100 "text checks … before make is ever invoked … a value only make can resolve … is refused by the RESOLVER, which necessarily runs make first" | true. The old NIT (FINDING 4) is closed |
+| **Docstring :101-102 (edited in this round) "a gate target whose recipe carries a `-` / `@-` prefix … fails the lane by name, before make is invoked"; COMMANDS.md:68-70 (line 68 authored in this PR) "On pinned bytes it then refuses … a `-`/`@-` prefix …"; AGENTS.md:57 (from main)** | **false**. See R1-F1 |
+
+## R1-7. Findings (round 1)
+
+```
+FINDING R1-F1: `.RECIPEPREFIX` in pinned bytes hides a `-` prefixed gate recipe; the anchor passes and `make ci` exits 0 with the gate failing, while the docs say the lane fails by name before make
+Severity:    REQUIRED (blocks under the chair's "no false-guarantee merges" rule; the control gap itself is pre-existing on main)
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     scripts/make-integrity-guard.py:101-102 (bullet edited at 08a59a9), check_text / logical_recipe_lines (tab-keyed; `.RECIPEPREFIX` appears only in the builtin-variable list at :685); docs/quality/COMMANDS.md:68-70 (line 68 authored at 17563bf in this PR); AGENTS.md:57 (from eeeea06)
+  requirements: none yet — the desk review's FINDING 2 (search) marked "core: same gap"
+
+Observed:
+  Fixture `good`, copied, with two byte changes: `.RECIPEPREFIX := >` added under `.SHELLFLAGS`, and the ci recipe rewritten with `>` prefixes, the second as `> -./run-the-real-tests.sh`. Makefile re-pinned (a reviewed-bytes shape; no payload).
+    GNU Make 4.3 (my container): `make-integrity-guard.py --root <copy> --targets ci --workflow` → exit 0, "passed (1 gate target(s); make ran 4 time(s), only on the pinned bytes of Makefile)". With `run-the-real-tests.sh` = `exit 1`, `make ci` exits 0.
+    GNU Make 3.81 does not support `.RECIPEPREFIX`: the probe fails with exit 2 ("missing separator"), and the anchor reports it as "make would REMAKE one of Makefile" (mislabelled, but fail-closed).
+  The pre-make text checks emitted no FAIL on either version.
+
+Failure:
+  The `-`-prefix and `|| true` checks are text controls on REVIEWED bytes. The PR's own tests call them the only reading that can see a `-` prefix ("A `-` prefix is INVISIBLE to `make --dry-run`… Only the text reading can see this one"). One directive blinds them on the acceptance platform's make (4.3), and a failing gate goes green. Three documents, two of whose lines this PR authored, state the refusal unconditionally.
+
+Perspective:
+  operator, developer
+
+Recommendation:
+  Smallest: refuse any assignment to `.RECIPEPREFIX` in the pinned read set pre-make (default-deny, like `.ONESHELL`), with a fixture `recipeprefix` (notInvoked). Or, at minimum, qualify the three sentences. The first is one line and matches the desk review's ask.
+
+Acceptance criteria:
+  The copy above → anchor exit 1 in both modes, 0 make processes, the message naming `.RECIPEPREFIX`; the clean tree and all 32 fixtures unchanged.
+
+Tests:
+  scripts/scripts_test.go TestMakeIntegrityGuardFixtures: add `{dir: "recipeprefix", wantFail: true, notInvoked: true, wantText: ".RECIPEPREFIX"}` plus its pinned fixture; the orphan test forces the row.
+
+Cross-repo implications:
+  core: this | search: the desk review's FINDING 2, same class | user/meta: none
+
+Challenge:
+  Pre-existing on main, and it needs a reviewer to approve both lines plus the pin. But this PR edited the very bullet and wrote the COMMANDS sentence, and the chair's rule is about what merges.
+```
+
+```
+FINDING R1-F2: no fixture isolates the resolver's SHELL/.SHELLFLAGS/MAKEFLAGS/.ONESHELL failure branch
+Severity: SHOULD   Confidence: high
+Affected: vizra-core scripts/make-integrity-guard.py check_resolved/check_warnings; scripts/scripts_test.go
+Observed: after fix round 1 every such fixture is refused by the text check before make, so check_resolved never fails in any test. At 62d16aa none isolated it either (text matched first), so this is not a regression.
+Recommendation: a code-mutation demo, or a fixture reaching the resolver only (e.g. via a construct the text reading does not attribute), proving the post-make layer still fails by name.
+Cross-repo: none.  Challenge: defence in depth, not the control.
+```
+
+```
+FINDING R1-F3: rough edges that still fail closed
+Severity: NIT   Confidence: high
+- A pinned file that is unreadable (`chmod 000`) raises an uncaught PermissionError in verify_pin: anchor and check 11 both exit 1 with a traceback, 0 make. Better to report it by name.
+- A pin that is a directory is labelled "not in its one accepted shape" by check 11.
+- `make -q` exit 2 (a parse error, e.g. `.RECIPEPREFIX` on 3.81) is reported as "make would REMAKE one of …".
+```
+
+## R1-8. Cleanup and head
+
+- Scratch `vzv-core-pr10r1-MGp6LT` was deleted by exact path.
+- Containers ran with `--rm`. `ubuntu:24.04` was not removed: it was present before and used by `searchci-r2-40c87c`.
+- The builder's checkout, the core #8 worktree and vizra-search were not touched.
+- Head re-checked at end: `08a59a91a6dcc91c2346bcb206d4c0ad8603e90e`.
+
+## Round-1 verdict
+
+F1, F2, F3 and F4 are **fixed and reproduced**:
+- the single probe works on 3.81 and 4.3, including a sibling of the main Makefile with includes pinned, and siblings of two includes at once;
+- the wording is corrected;
+- check-11 parity holds through the shared reader, with every malformed, duplicate, empty, missing or extra pin failing closed in both callers;
+- the text checks run before make, with strictly stronger fixtures.
+
+`make ci`, the unit report (1157/0 skipped), `scripts` 237 and both guards are green locally.
+
+One REQUIRED finding remains, R1-F1. Under the chair's "no false-guarantee merges" rule it blocks: sentences this PR authored or edited state that a `-` prefixed gate recipe is refused by name before make, and on GNU Make 4.3 a pinned `.RECIPEPREFIX` makes the anchor pass with a failing gate. The fix is a one-line pre-make refusal plus one fixture, or a qualified sentence. If the chair rules pre-existing control gaps out of this slice's scope, everything else here would support `PASS (local; CI BLOCKED)`.
+
+FINAL VERDICT: FAIL — SHA 08a59a91a6dcc91c2346bcb206d4c0ad8603e90e
