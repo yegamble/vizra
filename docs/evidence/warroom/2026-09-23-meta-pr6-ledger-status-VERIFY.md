@@ -578,3 +578,163 @@ Challenge:
 Both are small fixes.
 
 FINAL VERDICT: FAIL — SHA b694813fd63ce12cf2be403ad80ef448cbe41ca6
+
+---
+
+# Re-verification at e4c7be8 (fix round 2 of 2, the last)
+
+- Head verified: `e4c7be855d6dac447b7fa42a4791c41d8d1cd227`, confirmed with `gh pr view` at the start and at the end. Base `b2c5b96`.
+- The only commit since `b694813` is `e4c7be8`.
+- Clone: fresh, in `mktemp -d …/scratchpad/vzv-meta-pr6r2-XXXXXX`, deleted at the end.
+- Environment: macOS arm64, Python 3.9.6, gh 2.98.0.
+
+## Lanes (my runs)
+
+| Step | Command | Exit | Result |
+|---|---|---|---|
+| a | `./scripts/check-generated-ledger.sh` | 0 | reproduces |
+| a2 | `./scripts/check-ledger-status-output.py` | 0 | 192 entries, exact key set, 0 statuses, 0 records |
+| a2 | `(cd docs/evidence/ledger-generator && python3 -m unittest -v test_status)` | 0 | 38 tests, 0 skipped |
+| a2 | `python3 scripts/test_ledger_status_remote.py -v` | 0 | 13 tests, 0 skipped |
+| a2 | `./scripts/check-ledger-status-remote.py --self-test` | 0 | 10/10, including `evidence-not-on-meta-main` |
+| a2 | `./scripts/check-ledger-status-remote.py` | 0 | 0 records |
+| a2 | `bash docs/evidence/ledger-status/demo.sh` | 0 | `demo: 61 passed, 0 failed`; tree restored |
+| b, c, guard | quality-json, doc-links, `ci-required-guard.sh` | 0 / 0 / 0 | |
+
+**CI, read with my own `gh api`:**
+- `validate`: check-run 107376010435, success, github-actions.
+- `ci-required`: check-run 107376010342, success, github-actions.
+- Workflow runs: 35918466595 and 35918466616.
+
+The `validate` log shows, in order:
+- the checkout of the merge ref, "HEAD is now at 6f6fd96 Merge e4c7be8… into b2c5b96…";
+- the new fetch, `* [new branch] main -> origin/main`;
+- the output check: 192 entries, 0 statuses;
+- the unit tests: `Ran 38`, `Ran 13`;
+- the self-test: 10/10;
+- the remote check: 0 records;
+- the demo: 61/0, with D10b red as required, online against real `main`;
+- the compose demo: 95/0.
+
+`ci-required` logged: every required check succeeded on `e4c7be8…`. Its manifest lists `validate`, which ran.
+
+## Demonstrations and mutations reproduced
+
+**Demo cases.** D9 (`DUPLICATE KEY 'implementation_status' in entry VZ-CONTROLS-001`), D9b (`NON-CANONICAL BYTES`), D10a, D10b and D11 are each red by name, then green.
+
+**Online checker.** Five mutations, each red:
+
+| Mutation | Result |
+|---|---|
+| evidence-on-main call removed | unit test red, self-test 9/10 |
+| blob-SHA comparison removed | `test_evidence_must_be_on_meta_main_byte_identical` red |
+| API-error branch disabled | 2 unit tests red, self-test 9/10 |
+| `prove_auth` call site removed | `test_main_proves_auth_even_with_zero_records` red |
+| one-page cap removed | `test_more_than_one_page_of_check_runs_is_refused` red |
+
+**`status.py`.** Deleting the `test_ids` DSL check, deleting the records duplicate-key hook, or reverting the evidence check to `ev != []` each turns its named test red.
+
+**Output checker.** I built my own committed escape branches in a scratch copy, then ran a mutated copy of the checker on each:
+- N3 (duplicate key);
+- a non-canonical `json.dump`;
+- `test_ids` = `["VERIFIED"]` behind a wrapper;
+- a tampered summary;
+- a VERIFIED record whose evidence is on a scratch `origin/main` (control);
+- the same record with its evidence bytes changed in the PR;
+- the same record citing a case-variant path.
+
+| Mutation | Effect |
+|---|---|
+| duplicate-key hook removed | N3 still red, by NON-CANONICAL BYTES |
+| canonical-bytes check removed | N3 still red, by DUPLICATE KEY; the non-canonical route passes |
+| both removed | N3 passes |
+| `test_ids` pin removed | the `test_ids` route passes |
+| evidence-on-main call removed | bytes-differ and case-variant both pass |
+| evidence byte comparison removed | bytes-differ passes |
+| summary check removed | the summary route passes |
+
+Every guard is load-bearing for its route. The one guard no test covers is noted in NIT 3.
+
+## Escape attempts
+
+| Route | Outcome |
+|---|---|
+| my round-1 N3 (a replaced `json.dump` writes duplicate status keys) | **caught**: `DUPLICATE KEY 'implementation_status' in entry VZ-CONTROLS-001` (the generator and the regeneration check stay green, as the demo shows) |
+| a duplicate `records` key in `status_records.json` | **caught** by the generator (`STATUS RECORDS DO NOT PARSE`), the output check (`DUPLICATE KEY 'records'`) and the remote check (`REFUSED`) |
+| feature key order swapped | **caught**: `KEY SET … order differs` |
+| summary key order reversed | the output check passes, the regeneration check refuses it; not a status field |
+| trailing newline; trailing space; CRLF | **caught**: NON-CANONICAL BYTES |
+| `"PLANNED"` and `"VERIFIED"` as escapes; the whole file `ensure_ascii=True` | **caught**: NON-CANONICAL BYTES |
+| `1.92e2` for `total` | **caught**: NON-CANONICAL BYTES |
+| `192.0` for `total`; `Infinity` in `notes` | pass the output check (they round-trip through Python's `json`), and the regeneration check refuses both. Neither is a status field (NIT 1) |
+| `NaN` as a status value | refused (exit 1), but by a `TypeError` crash in the summary sort, so the named errors are lost (NIT 2) |
+| a VERIFIED record whose evidence is on (scratch) `origin/main`, byte-identical | admitted, the control case |
+| a record citing a file on main whose last line is a PASS for a different SHA (`3b566c3…` versus a verified head of `c2ff445…`) | **caught**: `VERDICT SHA MISMATCH` |
+| an evidence path that is a symlink (on main and in the tree) | **caught** by the generator (`symlink or escapes`) and the output check (`EVIDENCE DIFFERS FROM META MAIN`) |
+| the path through a directory symlink (`warroom/sub -> .`) | the generator admits it; **caught** by the output check (`EVIDENCE NOT ON META MAIN`), because git does not traverse tree symlinks |
+| a case variant (`PROBE-OK-VERIFY.md`; macOS resolves it locally) | the generator admits it; **caught** by the output check (`EVIDENCE NOT ON META MAIN`) |
+| the evidence file edited in the PR (bytes differ from main) | **caught**: `EVIDENCE DIFFERS FROM META MAIN` (online: blob-SHA compare, unit-tested) |
+| a stale `origin/main` that lacks the file | **caught**, fails closed: `EVIDENCE NOT ON META MAIN` |
+| `origin/main` absent | **caught**, fails closed: "refused, not skipped" |
+
+**Is the `origin/main` fetch in CI shallow or stale?**
+- It is shallow (depth 1) and taken at the moment the step runs, so it is the tip of `main` then.
+- Only that tip's tree is needed for `git show origin/main:<path>`, so depth 1 is enough.
+- A merge ref that predates a later change to the file on main is red, not green: the bytes differ.
+- In the merge queue, the ref already contains main.
+- A record whose evidence later disappears from main is caught only at the next meta PR. The notice states this ("not on main after a merge").
+
+## Sentences under the "no false-guarantee merges" rule
+
+**R-1 is resolved.** Every CODEOWNERS sentence this PR added now says what is true:
+- the generated notice: "No mechanism enforces review of such a change today (CODEOWNERS is advisory: no branch protection or ruleset requires it); the war room's verifier-gated merge is the only review";
+- `README.md:21-25`;
+- `validate.yml:35-38`;
+- `check-ledger-status-output.py:45-48`.
+
+**R-3 wording.** "so a PR cannot cite evidence it introduces itself" is demonstrated true (D10a, D10b and my probes). "Also not established: who wrote an evidence file, beyond that it is on meta main with identical bytes" is honest.
+
+**Other checked sentences.** "free-text fields such as notes and title are not status fields and are not checked for status words" is honest. So is "(probed: a hand edit, a section source, an extra key, a str subclass, an in-process wrapper, a replaced json.dump)". The README statement that queue 2u is a prerequisite is also true: no file under `docs/evidence/warroom/` on `origin/main` ends with a `FINAL VERDICT` line, and the core #8 and user #8 verifier files are on `chore/warroom-records-2026-09-21` only.
+
+**Imprecise, not a status guarantee (NIT 1).** "refuses … any byte that differs from the generator's own serialisation" is broader than the output check alone. It compares the bytes with the serialisation of its own parse, so `192.0` passes it. The same lane's regeneration check refuses those bytes, and no status can travel that way.
+
+**Older wording, out of scope, predating this PR.** "owner-reviewed under CODEOWNERS" or "CODEOWNERS puts it under owner review" appears in:
+- `.github/workflows/validate.yml:219` (line 143 at base `b2c5b96`);
+- `docs/quality/COMMANDS.md:116`;
+- `scripts/check-generated-ledger.sh:17,157`;
+- `scripts/ci-required-guard.sh:6`;
+- `scripts/ci-required-select.sh:12`.
+
+This is the same unenforced-CODEOWNERS claim. The chair should route it as a separate slice; it is not this PR's change.
+
+## Round-1 findings: status
+
+- **R-1 (REQUIRED):** resolved (above).
+- **R-2 (REQUIRED):** resolved. Duplicate keys are refused at every level in both files, the canonical-bytes rule backs that up, and both are load-bearing.
+- **R-3 (SHOULD):** resolved. Evidence must be on meta main and byte-identical, checked offline and online; demonstrated.
+- **Round-1 NITs:** all resolved:
+  - `test_ids` is pinned;
+  - the auth call site and the page cap are tested;
+  - the summary has D11.
+
+## Remaining (all NIT, none blocking)
+
+1. **Wording.** The notice and README say the output check refuses "any byte that differs from the generator's own serialisation". The output check itself admits round-tripping re-typings such as `192.0` or `Infinity` in `notes`. The regeneration check in the same lane refuses them, and no status route exists. Suggested wording: "…from the serialisation of its own parse; the regeneration check covers the rest".
+2. **Crash on a non-string status.** A non-string status value such as `NaN` makes the output check exit 1 through a `TypeError` in the summary sort. It fails closed, but the named `STATUS WITHOUT A RECORD` error is lost.
+3. **Untested offline byte comparison.** The offline "EVIDENCE DIFFERS FROM META MAIN" comparison has no demo or unit test; deleting it is caught by nothing offline. The online blob-SHA comparison covers the same fact, is unit-tested, and runs in the same lane.
+
+## Verdict
+
+Every acceptance bullet in scope reproduced for me on this SHA:
+- a status only from a committed record;
+- `IMPLEMENTED` and `VERIFIED` proved against GitHub;
+- VERIFIED needs a PASS on the verified head, with its evidence already on meta main;
+- default-deny;
+- no status recorded;
+- R-N1 and R-N2 carried into VZ-AUDIT-001.
+
+CI is green on this SHA. Every escape I tried in three rounds is now refused by name. The limits the docs declare (a PR that edits the checkers; who wrote an evidence file; the lane runs only on PRs) are stated truthfully. No blocking finding is open.
+
+This PASS is not a merge and not VERIFIED in the ledger; the chair records those.
+
+FINAL VERDICT: PASS — SHA e4c7be855d6dac447b7fa42a4791c41d8d1cd227
