@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 213 — core #12 (B3) **FAIL at `6edaf83`** on REQUIRED V-1: AGENTS.md:267 "the API leaks no credential into its own log" is false as measured — `obs.Redact` misses `redis://:PW@`, keyword DSN `password=`, `?password=`, GCS `X-Goog-Signature`, `api_key=`/`access_token=`/`claim_token=` query values, session cookies; `internal/search/service.go:53,70` log raw errors. Everything else reproduced (unit 1209/0, integration 1378 ×3, floors = generator, M1–M7, CI green). Chair ruling: fix the redactor (table test per form), route the search log sites, cheap AST refusals for V-2 shapes, narrow the sentences to the covered set → round 1 of 2. In flight: core #12 fix, verifier on user #10, core 2p, meta 2i, sentinel sweep (workflows + bugs). History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 215 — user #10 (Lane A pixels off) **FAIL at `a01a396`**: shipped config captures no pixels (measured; CI agrees), but the text reader reads only `arguments[0]`/initializers, so E1 (second `defineConfig` arg), E2 (`config.use =` later), E4 (`Object.assign(base.use,…)`), E5 (mutating `devices[…]`), E6 (`test.use({screenshot:'on',video:'on'})` — 6 png/6 webm with Lane A green) and S6 (unpinned canary `--config`) re-enable pixels with every check green; AGENTS.md overclaims. Ruling (rule R7): a runtime auto-fixture asserting the RESOLVED `screenshot`/`video`/`trace` values, text guard demoted to early warning, pin the canary config, docs at measured strength, regenerate transcripts → round 1 of 2. In flight: user #10 fix, core #12 fix, core 2p, meta 2i, sentinel sweep. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -168,6 +168,8 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 215 (2026-09-23) — user #10 FAIL at `a01a396` (text reader bypasses; E6 one-line `test.use`); runtime effective-option check ruled, round 1 of 2.
+- Tick 214 (2026-09-23) — quiet.
 - Tick 213 (2026-09-23) — core #12 FAIL at `6edaf83` (redaction overclaim); redactor extension ruled, round 1 of 2.
 - Tick 212 (2026-09-23) — sentinel team built (owner request); first sweep dispatched; PR B plan r5 approved for phase 2.
 - Tick 211 (2026-09-23) — PR B plan r4 seat check (R4-1 effective launch options, R4-2 test.use).
