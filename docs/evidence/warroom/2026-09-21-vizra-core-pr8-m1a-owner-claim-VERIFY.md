@@ -2166,3 +2166,52 @@ R4-A is closed, reproduced by my own measurement through the real handler on bot
 One NIT on atomicity wording (R5-N1). The head was `385fc51` at start and at end. CI is blocked by billing and was not re-run, so `ci-required` on this SHA is still **not obtained**. The merge waits for the owner and a green `ci-required`.
 
 FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 385fc51245f34cf8a04ea069c8c3769f7bda5c66
+
+---
+---
+
+# Re-confirmation at 66b3f3d (docs-only fix for R5-N1) — 2026-09-23
+
+- **SHA:** `66b3f3d50c56499432cbf6174661cbaa6bacbfea`. PR head at start = `66b3f3d…` (14 commits) and at end = `66b3f3d50c56499432cbf6174661cbaa6bacbfea`. `compare 385fc51...66b3f3d` = ahead 1 / behind 0 (`66b3f3d5` "docs: state the limiter's MULTI/EXEC guarantee at its real strength").
+- **CI BLOCKED by billing** — not re-run. Local verdict only.
+
+## R6-1. Scope, build, vet
+
+`git diff --stat 385fc51 66b3f3d`: `AGENTS.md` (1 row), `docs/evidence/m1a-owner-claim/README.md` (+10/−2), `internal/cache/ratelimit.go` (+7/−3). The changed `.go` lines, filtered for anything that is not a `//` comment or blank: **none — 0 non-comment Go lines.** `go build ./...` **ok**; `go vet ./internal/cache/` **ok**.
+
+## R6-2. The new wording, judged against measurement
+
+At all three sites (ratelimit.go:76-82, AGENTS.md:287, README.md:235-243) the new text claims:
+- (i) not interleaved with other clients;
+- (ii) "**a crash applies neither**";
+- (iii) a queue-time error discards both;
+- (iv) a runtime error is NOT rolled back, but the only realistic one (INCR on a non-integer) still lets EXPIRE NX set the TTL, and a TTL-less counter is healed on its next call, so no path leaves a permanent lockout.
+
+(i), (iii) and (iv) match what I measured in R5-2a. For (ii) I measured every crash case on Redis 7.2.16 (CI digest) and Valkey 9.1.2 (own containers, `--appendonly yes --appendfsync always`):
+
+| Crash case | Redis 7.2 | Valkey 9.1.2 | Outcome |
+|---|---|---|---|
+| client dies with `MULTI; INCR; EXPIRE NX` queued, **before** `EXEC` | key absent (`EXISTS 0`) | same | **neither** |
+| client dies **immediately after sending `EXEC`** (not waiting for the reply) | `EXISTS kb=1`, TTL 899 | same | **both** |
+| server crash mid-write: a `MULTI` block with `INCR kd` but no `EXPIRE`/`EXEC` left at the tail of `appendonly.aof.1.incr.aof`, then restart | log: "Truncating the AOF … at offset 235 … loaded anyway because aof-load-truncated is enabled"; `kd` absent; the earlier complete transaction's key present with TTL 896 | identical | **neither** (partial tail discarded) |
+
+Under RDB there is no half-transaction to lose. EXEC runs uninterrupted on the main thread and the snapshot is a point-in-time fork, so a snapshot holds both or neither. This is reasoned, not measured. With no persistence (`--save ''`, as CI runs) a server crash loses every key. With `aof-load-truncated no` a truncated AOF refuses to load until `redis-check-aof` strips the partial block — never half-applied either.
+
+**Judgement:** what holds in every crash case is **both-or-neither — never one without the other.** "A crash applies neither" is **inaccurate as worded**: a client that dies after `EXEC` has reached the server leaves **both** applied, as measured above. That outcome is the safe one (the key has its TTL), so the sentence misdescribes a benign case rather than hiding a risk. The conclusion it supports, "no path leaves a permanent lockout", holds.
+
+**NIT R6-N1** (non-blocking): replace "a crash applies neither" at all three sites with "a crash never applies one without the other (a client crash before EXEC applies neither, after EXEC both; a server crash with a half-written AOF tail has that tail truncated on load)", or simply "a crash never leaves one applied without the other".
+
+## R6-3. Any "both or neither" claim left?
+
+`grep -rn -iE 'both or neither|both commands or neither|applies neither'` over `*.go *.md *.sh *.txt *.yaml *.json`:
+- `internal/cache/ratelimit.go:78` — "It is NOT 'both or neither' for a runtime error" (a **negation**, correct);
+- `docs/evidence/m1a-owner-claim/README.md:242` — a **historical quotation** marked as the earlier, too-strong wording;
+- `ratelimit.go:77`, AGENTS.md:287 and README — "a crash applies neither" (R6-N1 above).
+
+**No positive "both or neither" claim remains.**
+
+## R6-4. Verdict at 66b3f3d
+
+The commit is docs-only: 0 non-comment Go lines, build and vet green. It removes the R5-N1 over-claim and states the guarantee at close to its measured strength. One wording NIT remains, R6-N1: "a crash applies neither" should read "never one without the other", because a client crash after EXEC applies both. It is benign, and whether it warrants another docs commit is the chair's call. No lanes needed re-running (no code change since 385fc51, whose lanes passed in R5). CI is blocked, so `ci-required` on this SHA is **not obtained**, and the merge waits for the owner and a green `ci-required`.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 66b3f3d50c56499432cbf6174661cbaa6bacbfea

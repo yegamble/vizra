@@ -354,3 +354,147 @@ A safety classifier stopped my response while I was preparing this round's mutat
 Scratch clone deleted by exact path. No container was started and no image was pulled this round.
 
 FINAL VERDICT: BLOCKED — SHA e068e07fed999141a601374bb2b3b6251ede04d6 (CI blocked by billing; the mutation and parity checks of brief items 1–3, 5 and 6 were NOT RUN because a safety classifier stopped this verifier, so FINDING 2's closure and core-B5b parity are unverified. What did run holds: `make ci` 613 tests / 0 skips, Makefile diff comments only, pin matches, `api/` unchanged. A different verifier must run the tamper rows before any PASS.)
+
+---
+
+# Re-verification at e068e07, part 2 (committed suite and reading)
+
+- **Head at start:** `git ls-remote origin refs/pull/5/head` = `e068e07fed999141a601374bb2b3b6251ede04d6`. Fresh clone in my own `mktemp -d …/vzv-search-pr5e-XXXXXX`.
+- **Method, as the chair narrowed it:** I ran the repository's own committed suite, and read tests, code and docs. I authored no mutation of the repository. The one thing I evaluated beyond reading: the inventory test's committed regexes, run against sample strings in a throwaway Python process (P3). No classifier stop occurred in this part.
+- **Host:** darwin/arm64, go1.27.1, GNU Make 3.81. No container. **Nothing here was run on GNU Make 4.3**; the 4.3 rows rest on the builder's `docs/evidence/ci-hardening/make43-round2.txt` alone.
+
+## P1. The committed suite
+`go test -count=1 -v ./scripts/ ./internal/httpapi/`: **exit 0**. `ok scripts 116.2s`, `ok internal/httpapi 26.2s`. 372 `--- PASS` lines, **0 SKIP, 0 FAIL**.
+
+| old finding | committed test (exact name) | ran / passed / skipped | what it asserts (read) | strong enough? |
+|---|---|---|---|---|
+| **FINDING 2**, newer sibling, through the anchor | `TestTheAnchorRefusesAPinnedMakefileMakeWouldRemake`, 10 subtests (`Makefile.sh`, `.c`, `.o`, `.y`, `.l`, `SCCS/s.Makefile`, `s.Makefile`, `Makefile,v`, `RCS/Makefile,v`, `RCS/Makefile`) | ran, 10/10 PASS, 0 skipped | The sibling is dated +24h, taken from the Makefile's own mtime. The test asserts: **the Makefile is byte-identical afterwards** (sha256 before and after, for every sibling); for the 7 `mustRed` siblings, a non-zero exit **and** the refusal by name ("would REMAKE a pinned makefile"); on any green, that the remake-probe-passed line was printed; and green again after the sibling is removed. | **Yes.** Byte-identity is the property FINDING 2 broke, and it is asserted directly. The 3 RCS rows are allowed to be green only with bytes unchanged and the probe line present. Make processes are not counted here; byte-identity is the stronger check for this finding. |
+| **FINDING 2** through contract-drift-guard (R-1 path) | `TestEveryOtherMakeCallIsGated/contract-drift-guard.py_recipe/newer_Makefile.sh`, and the same for `makegate.py_--_--dry-run` | ran, PASS (8/8 subtests in the test), 0 skipped | non-zero exit; the gate's own text ("make was NOT invoked" or "only `make -q` ran"); Makefile byte-identical | **Yes.** |
+| **FINDING 2** for a pinned include | `TestTheRemakeProbeCoversEveryPinnedInclude` | ran, PASS, 0 skipped | a reviewed, pinned include passes as the control; a newer `inc.mk.sh` then leaves `inc.mk` byte-identical, and the refusal names the one-invocation probe `make -q Makefile inc.mk` | **Yes.** |
+| **R-1**: every make launch is gated | `TestEveryPlaceThatStartsMakeIsGated` (inventory) and `TestEveryOtherMakeCallIsGated` (the two known callers) | ran, PASS, 0 skipped. The inventory's log: "every place that starts make: [scripts/makegate.py:379]" | see P3 | **Partly.** The two known callers are gated (strong). The inventory has a reach gap: FINDING 4. |
+| **R-2**: a failed pre-make check means 0 make processes | `TestTheAnchorStartsNoMakeAfterAFailedPreMakeCheck`, 10 subtests: `MAKEFILES` (workflow, local), a non-system make on PATH (workflow, local), `MAKEFLAGS=-i`, `BASH_ENV=/dev/null` (workflow, local), `ENV=/dev/null`, `GNUMAKEFLAGS=-i`, `VERSION=x` | ran, 10/10 PASS, 0 skipped | non-zero exit **and** the text "make was NOT invoked (0 make process(es) started)" | **Yes, with one note.** The "0" is interpolated from `makegate.MAKE_INVOCATIONS` (make-integrity-guard.py:870), not hard-coded. It is incremented in `makegate.run_make` (makegate.py:377-378), the only function that starts make. A read-only grep finds no `subprocess`/`os.system`/`os.exec`/`Popen` call in make-integrity-guard.py, contract-drift-guard.py or ci-required-guard.py, so every launch those scripts make goes through that counter. It is the guard's own counter, not an external recorder; an external PATH shim is impossible because the gate refuses a non-system make. `ENV` and `MAKEFLAGS` have a `--workflow` row only; local mode legitimately admits make-exported flag words. |
+| **the 25 named constructs** | `TestNamedMakefileConstructsAreRefusedBeforeMake`, **25 subtests** (`.RECIPEPREFIX` ×3 spellings, `.SECONDEXPANSION`, `.ONESHELL`, `.IGNORE` ×2, `.DEFAULT`, `.POSIX`, `.EXTRA_PREREQS` ×2, `SHELL`, `.SHELLFLAGS`, `MAKEFLAGS`, `GNUMAKEFLAGS`, `MFLAGS`, target-specific `MAKEFLAGS`, pattern-specific `SHELL`, target-specific private `SHELL`, override `.SHELLFLAGS`, `define MAKEFLAGS`, `$(eval …)`, `+` recipe, `$(MAKE)` recipe, a recipe beginning with an expansion) | ran, 25/25 PASS, 0 skipped | Each fixture is inert and **re-pinned** (`repin`), so the digest passes and the named refusal itself is under test. Asserts non-zero, the refusal **by name**, "0 make process(es) started", and ci-required-guard red with the same name (parity) | **Yes.** Re-pinning is what makes each row test the named refusal and not the digest. |
+| (R-3, parity) symlink and siblings | `TestPinnedFilesMustBeRegularAndAloneInBothReaders`, 5 subtests (a symlink to identical bytes, `GNUmakefile`, a case-variant `GNUMakefile`, a missing pinned file, a stale pin entry) | ran, 5/5 PASS, 0 skipped | refused by name before make in the anchor, and by ci-required-guard | **Yes.** |
+
+## P2. `make ci` (from part 1, same SHA)
+Exit 0: 613 tests, 0 skips, contract-drift 365, selftest 17/17.
+
+## P3. The inventory test, by reading and by evaluating its committed regexes
+`TestEveryPlaceThatStartsMakeIsGated` (scripts_test.go:1264-1322) walks `.go`/`.py`/`.sh` files. It skips `.git`, `bin`, `docs`, `testdata` and `node_modules`, and skips lines that start with `#` or `//`. It applies one regex per language, and it fails on a zero-hit scan (a good non-vacuity check). I evaluated the three committed regexes against sample strings in a throwaway process; the repository was not touched:
+
+| language | sample | result |
+|---|---|---|
+| go | `exec.Command("make", "ci")` | HIT |
+| go | `exec.Command("/usr/bin/make", "ci")` | HIT |
+| go | **`exec.CommandContext(ctx, "make", "ci")`** | **MISS**. The regex names `Context`, but `[^,)]*?` cannot cross the comma after `ctx`. |
+| py | `subprocess.run(["make", "ci"])` | HIT |
+| py | **`subprocess.run("make ci", shell=True)`** | **MISS** |
+| py | **`os.system("make ci")`** | **MISS** |
+| py | **`subprocess.run(["env", "make", "ci"])`** | **MISS** |
+| sh | `make ci`, `FOO=1 make ci` | HIT |
+| sh | **`cd x && make ci`**, **`if make -q ci; then …`**, **`/usr/local/bin/make ci`** | **MISS** (the pattern is anchored at line start, and only `/usr/bin/` is allowed as a path) |
+
+Every MISS is a literal call, not a variable or a wrapper. **Today's tree has none of them.** A broader read-only grep for `CommandContext(…"make"`, `os.system(…make`, `shell=True`, `make` after `&&`/`;`/`|`/`(`/`then`/`do`/`if`, and `/usr/local/bin/make`, over `.go`/`.py`/`.sh` outside `docs/`, found only messages, comments, test-fixture strings and a stub body inside a Go string. `scripts/*.sh` start no make. So the claim "every place a script or test starts make goes through makegate" is **true of this tree today**. The inventory test would not catch a future literal call in the missed forms. See FINDING 4.
+
+## P4. Doc sentences under "no false-guarantee merges"
+
+| sentence | verdict |
+|---|---|
+| AGENTS.md:518-522 "Every place a script or test … starts make goes through one helper … `TestEveryPlaceThatStartsMakeIsGated` fails on any other make call it can see" | **TRUE today**, by my grep; "it can see" is hedged |
+| **AGENTS.md:609-611** "`TestEveryPlaceThatStartsMakeIsGated` sees literal make calls in `.go`, `.py` and `.sh` files; a make started through a variable or a wrapper it cannot read is review-only" | **OVERSTATED**: the literal forms in P3 are not seen (FINDING 4) |
+| **makegate.py:9** "scripts/scripts_test.go inventories every place the repository starts make and fails on any other" | **OVERSTATED**, unhedged (FINDING 4) |
+| **scripts_test.go:1259-1262** (the test's own comment) "Anything else — a Go exec.Command, a Python subprocess list, a shell line — is red here, so a new, ungated make call cannot arrive unnoticed" | **OVERSTATED** (FINDING 4) |
+| AGENTS.md:540-551, makegate docstring: the `make -q <every pinned makefile>` probe; the sibling list; RCS forms green with bytes unchanged | **consistent with the committed tests on 3.81** (P1). The 4.3 half rests on the builder's transcript; I did not run 4.3. |
+| AGENTS.md:552-556 "After every make run the pinned files are re-hashed"; "`ci-required-guard.py` makes the same byte, symlink, include and sibling checks without running make" | **consistent with the code** (`Gate.run` → `recheck`) and with the parity asserts in P1 |
+| AGENTS.md:557-560, makegate docstring: "`-r` deliberately NOT used", with its reason | stated, and consistent with the code |
+| AGENTS.md "What it guarantees, exactly: make runs only on reviewed bytes — and those reviewed bytes run their own reviewed `$(shell …)` calls …" | **consistent with the committed tests** for every path those tests cover (P1). I did not assess core B5b parity (closure targets reached through pattern rules, implicit rules or `.DEFAULT`); the chair assigned it to the security seat. Whether this sentence survives that review is theirs to say. |
+| residuals: a reviewer approving a malicious Makefile with its pin; another step's effects on the machine; env vars outside the named set; reusable workflows and wrappers | stated. Accurate, except the inventory clause above |
+| evidence README:10 "every script or test that starts make goes through it" | **TRUE today** (P3 grep) |
+| evidence README: a first 4.3 container attempt hung, partial output not used, cause "not verified" | honest disclosure |
+
+## P5. Deleted-assertion audit, `c3b2021..e068e07` (reading `git diff`)
+Deletions: scripts_test.go −27, make-integrity-guard.py −234, ci-required-guard.py −28, lane_selection_test.go −6, contract-drift-guard.py −9, ci-hardening-demo.py −9, vendor-contract.py −5, revendor-demo.sh −1.
+- Each deleted mutation row in scripts_test.go reappears at HEAD under the same name, with its `want` updated to the new wording. Examples: "does not match its pinned digest" became "does not match its pin"; the pin-shape rows now name the `makefiles:` shape. `.SHELLFLAGS without -e` became `.SHELLFLAGS := -c` in `TestNamedMakefileConstructsAreRefusedBeforeMake`, which is stronger: it also asserts 0 make processes and guard parity.
+- lane_selection_test.go: the deleted `t.Fatalf("make --dry-run contract-drift failed…")` is replaced at line 61 by the same assertion over `makegate.py -- --dry-run contract-drift`.
+- make-integrity-guard.py −234: the digest logic moved into makegate.py.
+- **No weakened assertion found.**
+- `revendor-demo.sh`: the leftover `printf | grep -q` (my FINDING 3, NIT) is the one-line change, so FINDING 3 is presumably closed. Not re-run.
+
+## Findings (part 2)
+
+```
+FINDING 4: the make-launch inventory misses literal make calls, and three sentences say it does not
+Severity:    REQUIRED
+Confidence:  high
+Class:       NEW-CLASS (the inventory test is new in this round; not a regression of FINDING 2)
+
+Affected:
+  repo:      vizra-search
+  files:     scripts/scripts_test.go:1257-1268 (TestEveryPlaceThatStartsMakeIsGated and its regexes),
+             AGENTS.md:609-611, scripts/makegate.py:9
+  requirements: none (R-1 of the security desk review)
+
+Observed:
+  Evaluated against the committed regexes: exec.CommandContext(ctx, "make", …), subprocess.run("make …",
+  shell=True), os.system("make …"), subprocess.run(["env", "make", …]), and shell lines `cd x && make …`,
+  `if make …`, `/usr/local/bin/make …` do not match. All are literal calls. AGENTS.md:609-611 says the test
+  "sees literal make calls" and puts only variables and wrappers out of reach. makegate.py:9 says the test
+  "inventories every place the repository starts make and fails on any other". The test's own comment says
+  an ungated call "cannot arrive unnoticed". Today's tree has no such call (P3 grep), so there is no live
+  ungated launch.
+
+Failure:
+  A future PR could add, for example, a Go test that runs exec.CommandContext(ctx, "make", …) in the
+  test-noskip lane, where no anchor runs. That is exactly R-1's exposure. The inventory, which is the
+  control for R-1, stays green, and three sentences tell the reviewer it would not. This is a
+  false-guarantee sentence on a security control.
+
+Perspective:
+  developer, operator
+
+Recommendation:
+  The smallest fix is to state what the scan matches: "literal exec.Command("…make", …), a Python list
+  starting with "…make", and a shell line whose first word is make", and to name the missed forms as
+  review-only. Better is to widen the scan: a Go AST walk over every exec.Command* call with a "make"
+  string argument; for .py, any "make" token inside a string passed to subprocess/os.system/os.exec*;
+  for .sh, make in any command position (after ;, &&, ||, |, `(`, then, do, if).
+
+Acceptance criteria:
+  Either every form in the P3 table is refused by TestEveryPlaceThatStartsMakeIsGated, with a table case
+  for each, or AGENTS.md, makegate.py:9 and the test comment name exactly the forms matched and list the
+  rest as review-only.
+
+Tests:
+  scripts/scripts_test.go: give TestEveryPlaceThatStartsMakeIsGated a table of source lines, fed to its
+  matcher, one per P3 row, each expected to hit (or, after a narrowing, to be named in the doc as a miss).
+
+Cross-repo implications:
+  core: if core adopts an inventory test, the same regex shapes need the same review. user/meta: none.
+
+Challenge:
+  "Today's tree is clean and a reviewer would see such a line." True. So this is not a BLOCKER. But the
+  inventory exists precisely so that nobody has to notice, and three sentences promise more than it does.
+```
+
+Earlier findings at e068e07: **FINDING 2 (BLOCKER at c3b2021)** is covered by committed, passing, byte-identity-asserting tests on 3.81 (P1). I judge it **closed on 3.81**; on 4.3 it rests on the builder's transcript. FINDING 3 (NIT) is presumably closed (P5). FINDING 1 (NIT, "not forgery" wording): not re-checked.
+
+## Which rows rest on what
+- **Committed tests, run by me (3.81):** FINDING 2 through the anchor, through contract-drift-guard, and for a pinned include; R-2 (10 rows); the 25 named constructs; symlink and sibling parity; the two known make callers gated; `make ci` 613/0.
+- **Reading only:** the assertion strength of each test; the counter's provenance; doc truthfulness; the deleted-assertion audit; my judgement that `ci-required-guard.py` shares makegate's checks.
+- **Regex evaluation against sample strings (no repository change):** FINDING 4.
+- **Not run by me:** anything on GNU Make 4.3; core B5b parity (the security seat's); the builder's demo harness.
+
+## Cleanup (part 2)
+Scratch clone deleted by exact path. No container, no image.
+
+## Verdict at e068e07 (supersedes part 1's BLOCKED)
+Everything the committed suite covers holds on 3.81:
+- FINDING 2's sibling remake, through both callers and for a pinned include;
+- R-2's zero-make rows;
+- the 25 named constructs;
+- the byte, symlink and sibling parity;
+- `make ci` 613/0, with no weakened assertion and `api/` unchanged.
+
+One NEW-CLASS REQUIRED finding remains. The R-1 inventory misses literal make launches, and AGENTS.md:609-611, makegate.py:9 and the test's own comment say it does not. Under "no false-guarantee merges" that sentence is blocking. It is a narrow fix: reword three sentences, or widen the scan. It does not show a live ungated launch in today's tree. CI remains BLOCKED by billing. The 4.3 half rests on the builder's transcript, and core-B5b parity is with the security seat.
+
+FINAL VERDICT: FAIL — SHA e068e07fed999141a601374bb2b3b6251ede04d6 (FINDING 4, REQUIRED, NEW-CLASS: the make-launch inventory's stated reach exceeds its regexes. Everything else the committed suite covers passes, and FINDING 2 is closed on 3.81.)
