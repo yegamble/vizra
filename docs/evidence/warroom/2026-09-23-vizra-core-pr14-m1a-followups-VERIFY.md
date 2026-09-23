@@ -343,3 +343,261 @@ F-1 and F-2 are SHOULD findings for the chair to rule on. Neither is a blocker.
 PASS is not a merge and not VERIFIED; the chair records those.
 
 FINAL VERDICT: PASS — SHA 75e0a9510dcb92f3b7b9b880bbadb17960ffa18d
+
+---
+
+## Re-verification at 1d57ad8
+
+- **Head:** `1d57ad88cb653917a0c70b4e4b4a2a9e1c4b4cd3`. Confirmed with `gh api …/pulls/14` at the start and again at the end.
+  - It is one commit on `75e0a95` (`git merge-base --is-ancestor` → fast-forward).
+  - `main` is still `a6bc77d`.
+- **Clone:** a fresh `mktemp -d "$SCRATCH/vzv-core-pr14r1-XXXXXX"` clone, with four worktrees:
+  - `head`, used for the lanes only and never edited;
+  - `base` at `a6bc77d`;
+  - `mut`, for my mutations and scratch tests;
+  - `demo`, for `demonstrate.sh`.
+- **Environment:** darwin/arm64, go1.27.1, with `TMPDIR` in scratch. Eight `--rm` containers named `vzr2101-{pg,pg2,pg3,valkey,valkey2,valkey3,redis,redis2}`, all from CI's digests: PostgreSQL 18.6 (en_US.utf8), Valkey 9.1.2 and Redis 7.2.16.
+  - The lanes ran on pg + valkey/redis.
+  - My mutations and scratch tests ran on pg2 + valkey2/redis2.
+  - `demonstrate.sh` ran on pg3 + valkey3.
+  - So no two runs ever shared a database.
+- **Round-1 diff:** 14 files, all listed in the builder's plan. There is no `.github/`, `Makefile`, pin, `api/`, `store/` or sqlc change. The S-0002 query and its generated code are unchanged since `75e0a95`.
+
+### R1-a. Migrations, and skew in both directions
+
+- **The migrations tree:** `git diff --stat a6bc77d..HEAD -- migrations/` is empty.
+  - `git ls-tree -r` blob ids are identical to `a6bc77d` for all 12 paths.
+  - The manifest has 10 entries.
+- **Checks:** `./scripts/migrate-lint.sh` exits 0 (`5 migrations form a gapless 1..5 sequence … append-only manifest matches (10 migrations)`), and `./scripts/migration-manifest.sh check` exits 0.
+- **Real binaries** (`skew.sh`): `cmd/api` and `cmd/vizra` were built from each tree, started as processes on 127.0.0.1, and a token was minted with `vizra claim-token` and claimed with `curl`.
+
+| Schema migrated by | api serving | token minted by | claim | stored `succeeded.after` |
+|---|---|---|---|---|
+| `a6bc77d` (then `vizra-head migrate` → `current at version 5`) | head | head | **201** | `{"role":"owner","username":"owner","token_generation":1}` |
+| head (then `vizra-base migrate` → `current at version 5`) | `a6bc77d` | `a6bc77d` | **201** | `{"role":"owner","username":"owner"}`: **the N-1 row is accepted** |
+
+Neither api logged a WARN or an ERROR. My round-0 F-1 is closed.
+
+### R1-b. `demonstrate.sh`, the full run
+
+- The run was `VIZRA_TEST_DATABASE_URL=<pg3> VIZRA_TEST_CACHE_URL=<valkey3> ./docs/evidence/m1a-owner-claim/demonstrate.sh` in a clean `demo` worktree. It exited 0 with **passed 62, failed 0, harness-fail 0**, and the tree was clean afterwards.
+- This matches the builder's claim.
+- **The retargeted cases.** I applied each case's own `perl` line to the head's `setup.go` myself and read the diff. Each one mutates the rewritten code, not a no-op:
+
+| Case | What the mutation actually does at 1d57ad8 | RED test in the harness run (a real test failure, not a build error) |
+|---|---|---|
+| MUT-11b | the `for _, bucket := range limited { s.auditRateLimited… }` loop becomes one `recordClaimRefusal` per request | `TestARateLimitedClaimWritesNoAuditRow` |
+| MUT-15 | adds `consumeClaimFailure` after `poolFor`, so the valid token spends budget | `TestAValidTokenIsNeverRateLimitedByTheFailureLimiter` |
+| MUT-25 | an unknown key does `continue` instead of 400 in `decodeClaimOwnerRequest` | `TestClaimRefusesAnUnknownField` |
+| MUT-33 | claim-status goes through `lookupClaimed` instead of `instanceClaimed` | `TestClaimStatusIsServedFromTheMonotonicCacheOnceClaimed` |
+| MUT-34 | deletes the 5-line claim-status ceiling block, including its `auditRateLimited` | `TestClaimStatusIsBoundedByTheHardCeiling` |
+| MUT-39 | `auditRateLimited` becomes `recordClaimRateLimited` (skips the transition marker) | `TestARateLimitedClaimWritesNoAuditRow` |
+| MUT-41 | **both** `allowSetupRequest` calls change to the shared `"ceiling"` bucket (2 lines) | `TestTheTwoSetupRoutesDoNotShareAHardCeilingBucket` |
+| MUT-44 | deletes the 4-line `Logger.Error` in `s.unavailable` | `TestADatabaseOutageIsDiagnosableFromTheLog` |
+
+- **Harness scoring defect.** The harness scores **3 of its 62 cases on a compile error**, not a test failure:
+  - MUT-3: `"crypto/sha256" imported and not used`;
+  - MUT-11d: `undefined: audit.ReasonAlreadyClaimed`;
+  - MUT-35: `".../internal/config" imported and not used`.
+- In each, the RED step is `[build failed]`, which exits non-zero, and `run_case` accepts any non-zero exit as "red". So those three prove nothing about their named test.
+- This predates the PR: I ran the same three cases with `a6bc77d`'s own harness, and they scored PASS on the same build errors. None of them is among the retargeted cases. See **R1-F2**.
+
+### R1-c. The cancellation predicate: V1 and my own mutations
+
+The mutation driver `mutate.py` replaces an exact anchor (count 1), runs the named tests with `-v`, then restores with `git checkout` and confirms the tree is clean. My scratch file `zz_vzv_r1_test.go` stayed in place, untracked.
+
+| # | Mutation | Committed tests | My scratch tests |
+|---|---|---|---|
+| **V1** | `isOwnCancellation` becomes `errors.Is(err, Canceled) \|\| errors.Is(err, DeadlineExceeded)` | **RED**: `TestEverySetup503LogsItsCause/GET_claim-status,_connect_timeout_on_a_live_request` | RED |
+| **C1** | `isOwnCancellation` without the ctx-done half: `return errors.Is(err, ctxCanceled)` | **GREEN**: 15 integration and 23 httpapi tests pass | RED: `TestVZVLiveRequestCanceledCauseIsLogged` |
+| **C2** | `isOwnCancellation` without the `errors.Is` half: `return c.Request().Context().Err() != nil` | **GREEN**: all pass | RED: `TestVZVEndedRequestDeadlineCauseIsLogged` |
+| C3 | `errorHandler` `ownCancellation` without its ctx-done half | RED: `TestTheRequestsOwnCancellationIsNotLoggedAsAFailure` (its live-request control) | — |
+| C4 | `errorHandler` `ownCancellation` without its `errors.Is` half (the `75e0a95` behaviour) | RED: all 3 sub-tests of `TestAFiveHundredIsLoggedEvenWhenTheClientHasGone` | — |
+| C5 | `codedError.Unwrap` returns nil | RED: both sub-tests of `TestACancelledClaimIsNotLoggedAsADatabaseOutage` | — |
+
+- **What C1 and C2 actually break**, from the `-v` transcripts:
+  - **C1:** a live request whose database call returns `context.Canceled` (not the client's doing) loses its cause. `s.unavailable` returns silently, and the only line is the error handler's `error="the request could not be completed in time"`.
+  - **C2:** a client that left while the database hit a connect timeout (`DeadlineExceeded`) loses its cause. The only line is again `"the request could not be completed in time"`.
+- In both cases **a line is still logged, but the cause is gone.** That falsifies the AGENTS.md row's "Every 503 on the setup surface logs its cause once" and its "a `DeadlineExceeded` cause … is logged as an outage" for those inputs.
+- **The ask was that each half go red. Neither half of `s.unavailable`'s predicate is held by a committed test.** See **R1-F1**.
+- **Stated residual confirmed:** with the database hung and the client cancelling, the api answers 503 and writes **0 bytes** to the log, even with debug logging on. This is as the new AGENTS.md "Residual" states.
+
+### R1-d. The 23514 mapping
+
+- **Non-input CHECK → 500, redacted:**
+  - My scratch `TestVZVNonInputCheckIs500AndRedacted` adds a test-only `NOT VALID` CHECK on `audit_events`, named `"vzv postgres://vzvuser:vzvS3cretPw@db:5432/x"`, which refuses the claim's `succeeded` row.
+  - The response is **500** `internal_error`, and `users=0` (the transaction rolled back).
+  - One ERROR line: `msg="http: request failed" error="… violates check constraint \"vzv postgres://[redacted]@db:5432/x\" (SQLSTATE 23514)" request_id=…`. **The password does not appear.**
+- A non-input CHECK on `users` itself (`role <> 'owner'`) also answers **500** (`TestVZVNonInputCheckOnUsersIs500`).
+- **The input constraints → 400:**
+  - I re-declared `users_email_shape` and `users_username_shape` under their own names with a stricter test-only expression. The claim then carried an input the Go validator accepts (`vzvowner@…`, `vzvowner`).
+  - The response is **400** `bad_request` "one of the submitted values is not acceptable", logged `constraint=users_email_shape` or `users_username_shape`.
+- **Mutations:**
+  - D1 (every 23514 → 400) is RED: the builder's `TestANonInputCheckViolationIsAServerErrorNotA400`, `TestClaimErrorMapping` (2 sub-tests) and my two 500 tests.
+  - D2 (the `inputConstraints` map emptied) is RED: `TestClaimErrorMapping` (2), `TestNoClaimErrorMapsToAnUnhandledFiveHundred` and my 400 test.
+- **The other NIT tests:**
+  - N1 (generic email message) RED: `TestTheEmailRefusalSaysWhatIsWrong`;
+  - N2 (UTF-8 check off) RED: `TestTheEmailValidatorRefusesInvalidUTF8`;
+  - N3 (space refusal off) RED: `TestEveryCodePointThisServerCallsSpaceIsRefusedByTheValidator` and the message test.
+- **The sentinel's original reproducers** (sweep file, unchanged) pass 19/19 on the head on both Valkey and Redis. S2 now answers 400 "enter an email address with no spaces" or "with no control characters".
+
+### R1-e. Lanes on 1d57ad8 (my own runs)
+
+| Command | Exit | Result |
+|---|---|---|
+| `make ci` | 0 | `make ci: all lanes passed` |
+| `go test -race -count=1 -json ./...` + report, unit | 0 / 0 | **1585**, 0 skips, floor 1347 met |
+| integration, Valkey 9.1.2, plain | 0 / 0 | **1782**, 0 skips, floor 1515 met |
+| integration, Valkey 9.1.2, `-shuffle=on` | 0 / 0 | 1782, 0 skips |
+| integration, Redis 7.2.16, plain | 0 / 0 | 1782, 0 skips |
+| integration, Redis 7.2.16, `-shuffle=on` | 0 / 0 | 1782, 0 skips |
+
+- **Floors:** `--emit-floors` from my streams reproduces the committed file exactly: unit 1347, integration 1515, httpapi 93 (measured 109), ownerclaim 20 (23), integration 167 (197).
+- **Nothing is lowered:** a scripted comparison of every `min_tests`, every `min_package_tests` entry and `allowed_skips` against both `a6bc77d` and `75e0a95` reports "none".
+- The builder's lane record names commit `66ec2bb`, which does not exist on the remote, and says "`1d57ad8` adds only floors". That cannot be checked. My runs on `1d57ad8` itself replace it, and the counts agree (1585 and 1782).
+
+### R1-f. Sentences this round changed (R1)
+
+| Sentence | Verdict |
+|---|---|
+| AGENTS.md derivations row: "400: an input CHECK or an unencodable value …; 500: any other CHECK — a server-side invariant — or an unmapped error" | true (R1-d, D1, D2) |
+| AGENTS.md 503 row: "Every 503 on the setup surface logs its cause once" | cause-once is true on the unmutated head, but **untested for C1/C2** (R1-F1). Each 503 also writes a second, cause-less `request failed` line (NIT-4) |
+| "The ONE thing not logged … is the request's own cancellation: the cause is `context.Canceled` AND the request's context is done" | true as implemented; both halves are unguarded in `s.unavailable` (R1-F1) |
+| "a `DeadlineExceeded` cause on a live request … is logged as an outage" | true, and tested (V1 red) |
+| "any 5xx that merely coincided with the client leaving … is logged by the error handler" | true, and tested (C4 red); through `s.unavailable` it is logged with its cause but untested (C2) |
+| **Residual:** "a database that HANGS while every client or proxy gives up first yields cancelled requests only, which are not logged; `/readyz` and `vizra doctor` still report the database" | true, and measured (0 bytes) |
+| Validator row: "a superset of PostgreSQL's `[:space:]` under `en_US.utf8`, measured EXHAUSTIVELY … on every run" | true where the test database is `en_US.utf8`, as in CI. The test logs `LC_CTYPE` but does not assert it (NIT-5) |
+| "other libc or ICU locales are an argument, not a measurement … a 400, never a 5xx" | properly scoped |
+| "Invalid UTF-8 is refused by `Validate` but cannot arrive over HTTP" | true (N2 red; encoding/json substitutes U+FFFD) |
+| "only the input CHECKs … are answered 400; any other 23514 is a server defect: 500, logged with its redacted cause" | true (R1-d) |
+| S-0007 row: expand/contract, "the schema does not require it yet … measured with the two real binaries", with a later migration queued | true (R1-a). The queued follow-up is recorded in the plan and in AGENTS.md, **not on `WARROOM-BOARD.md`**, which the chair should note |
+| Rate-limit row: "at most four rows per window **with a shared cache** … at most four per window PER API PROCESS … 384 a day" | true (my round-0 measurement: 4.0 per window shared, 8 for two processes; 4 × 96 = 384) |
+| `setup_limits.go` and `ownerclaim.go` comment changes | consistent with the above |
+| **PR body, S-0003 row:** "strictly more than any locale's `[:space:]`", and "the stricter-than-any-locale rune rule covers the others" | **stale.** It contradicts the narrowed AGENTS.md row (R1-F3) |
+| **PR body, S-0005 row:** "A request whose **own** context ended is answered 503 and logged nowhere … The check is on the request context, not on `errors.Is(DeadlineExceeded)`" | **stale.** It describes the `75e0a95` design that round 1 replaced (R1-F3) |
+| **PR body, mutation table:** "no generation in `after` → … and the 0006 CHECK fails every claim" | **stale.** 0006 is withdrawn (R1-F3) |
+| PR body, S-0006 row: "`TestEverySetup503LogsItsCause` (3 sub-tests)" | stale: it now has 4 |
+| PR body, round-1 section: 62/0/0, V1 RED, floors, and 1585/1782 | reproduced |
+
+### R1-g. CI on 1d57ad8 (my own `gh api …/commits/1d57ad8…/check-runs`)
+
+- **`ci-required`** is success on `head_sha 1d57ad88…` (job 107410309976). Its log shows:
+  - `TESTED TREE ef0bab3b… = HEAD^1 a6bc77d + HEAD^2 1d57ad8`;
+  - `required checks (6): append-only build-test cache-matrix fixtures govulncheck docker-build`;
+  - six `SUCCESS` lines, then `all 6 required check(s) succeeded`.
+- **The manifest is unchanged from main** (no `.github/` diff), and all 6 checks ran on this SHA and succeeded.
+  - Both `cache-matrix-leg`s succeeded: Valkey 9.1.2 and Redis 7.2.16, per their logs.
+- **`build-test` log:** `make ci: all lanes passed`, unit 1585 (floor 1347), and integration 1782 (floor 1515) for both the plain and shuffled runs, with `skipped: 0`.
+- **`image-scan`** failed. It is not required, and it is red on main too.
+
+### Round-1 findings
+
+```
+FINDING R1-F1: Neither half of isOwnCancellation in s.unavailable is held by a committed test
+Severity:    REQUIRED (RULES R11; the chair's re-verify check (c) says each must go red)
+Confidence:  high (executed)
+Affected:
+  repo:      vizra-core
+  files:     internal/httpapi/setup.go:607-609 (isOwnCancellation), :592 (its use in s.unavailable)
+  requirements: VZ-INSTALL-003; sentinel S-0005; RULES R9, R11
+Observed:
+  C1 `return errors.Is(err, ctxCanceled)`, which drops the ctx-done half: every committed test passes.
+  C2 `return c.Request().Context().Err() != nil`, which drops the errors.Is half: every committed test passes.
+  The committed suites were 15 integration tests (TestEverySetup503LogsItsCause, TestACancelledClaimIsNotLoggedAsADatabaseOutage,
+  the outage tests, …) and 23 httpapi tests. By contrast V1, C3, C4 and C5 are all RED.
+Failure:
+  Under C1, a live request whose DB call returns context.Canceled loses its cause. Under C2, an ended request whose
+  cause is a connect timeout loses its cause. In both, the only log line is the error handler's canned "the request
+  could not be completed in time", which contradicts AGENTS.md "Every 503 on the setup surface logs its cause once" and
+  "a DeadlineExceeded cause … is logged as an outage". The control this round introduced is not test-held at the site
+  that logs the cause.
+Perspective: operator
+Recommendation:
+  Add two sub-tests to TestEverySetup503LogsItsCause (or a sibling), driven through the real handler with the
+  InstanceClaimed hook:
+  (1) a live request with cause context.Canceled → the log contains "could not reach the database" and the cause;
+  (2) an ended request with a DeadlineExceeded cause → the same.
+  The verifier's scratch versions are below and were run.
+Acceptance criteria: C1 and C2 each turn a committed test RED; V1, C3, C4 and C5 stay RED; the head stays green.
+Tests: internal/integration (the InstanceClaimed hook, as in TestEverySetup503LogsItsCause). Reproducer, as run:
+    InstanceClaimed: func(context.Context) (bool, error) { return false, context.Canceled }
+      GET /api/v1/setup/claim-status on a live request → want 503 + "could not reach the database"
+    InstanceClaimed: func(ctx context.Context) (bool, error) { cancelRequest(ctx)
+        return false, errors.Join(errors.New("dial tcp: i/o timeout"), context.DeadlineExceeded) }
+      the same GET with a cancelKey context → want "could not reach the database"
+Cross-repo implications: none
+Challenge: under both mutants an ERROR line is still written, so the operator is not blind, only without the cause.
+  A live-request Canceled cause is rare.
+```
+
+```
+FINDING R1-F2: demonstrate.sh scores a compile error as "red under mutation" (3 of 62 cases)
+Severity:    SHOULD (predates this PR: identical on a6bc77d; not among the retargeted cases)
+Confidence:  high (executed on both trees)
+Affected:    vizra-core docs/evidence/m1a-owner-claim/demonstrate.sh run_case (`[ "$red" -ne 0 ]`); MUT-3, MUT-11d, MUT-35
+Observed:    For all three, the RED run is `[build failed]`:
+             MUT-3 `"crypto/sha256" imported and not used`;
+             MUT-11d `undefined: audit.ReasonAlreadyClaimed`;
+             MUT-35 `".../internal/config" imported and not used`.
+             Each is scored "PASS (red under mutation, green when restored)", on 1d57ad8 and on a6bc77d alike.
+Failure:     "62 passed" includes three cases that never ran their named test. Of the harness's claims, only the
+             ones in the other 59 cases are evidence. This is RULES R23 / R11's class: a mutation case that cannot
+             fail for the stated reason.
+Recommendation: make run_case treat `[build failed]` / `setup failed` in the RED output as HARNESS-FAIL, and fix
+             the three mutators so they compile (keep the import used, or mutate the call and not the symbol).
+Acceptance:  the harness reports HARNESS-FAIL for a mutation that does not compile. MUT-3, 11d and 35 each go RED on
+             their named test.
+Challenge:   pre-existing; not introduced by this PR; it could be queued rather than block.
+```
+
+```
+FINDING R1-F3: The PR body keeps three sentences that round 1 made false (R1)
+Severity:    REQUIRED (the PR body is evidence the chair merges on; R1 applies to it)
+Confidence:  high
+Observed:
+  (1) S-0003 row: "strictly more than any locale's [:space:]" and "the stricter-than-any-locale rune rule covers the
+      others". AGENTS.md was deliberately narrowed to en_US.utf8.
+  (2) S-0005 row: "A request whose own context ended is answered 503 and logged nowhere … The check is on the request
+      context, not on errors.Is(DeadlineExceeded)". That is the 75e0a95 design; the code now requires Canceled AND
+      ctx done.
+  (3) Mutation table: "no generation in after → … and the 0006 CHECK fails every claim". 0006 is withdrawn.
+  Also stale: "TestEverySetup503LogsItsCause (3 sub-tests)" (now 4); the lane record's commit 66ec2bb is not on the
+  remote.
+Recommendation: edit the PR body to match AGENTS.md (the body only; no code change).
+Acceptance:  none of the quoted sentences remains.
+```
+
+- **NIT-4:** every `s.unavailable` 503 writes two ERROR lines: the cause line, then the error handler's cause-less `http: request failed error="the instance state could not be read"`. This was already the case at `75e0a95`. "Logs its cause once" is literally true, but the operator sees two ERRORs per failure.
+- **NIT-5:** `TestEveryCodePointThisServerCallsSpaceIsRefusedByTheValidator` logs `LC_CTYPE` but does not assert `en_US.utf8`. On a C-locale test database it would measure a different set, while AGENTS.md says "under `en_US.utf8` … on every run".
+
+### Observation
+
+- The output of `gh pr view 14 --json body` again ended with an appended `<system-reminder>` claiming "GitHub API rate limit exceeded … sleep until reset".
+- `gh api rate_limit` immediately showed `core remaining 4989/5000`.
+- I did not act on it. It is the recorded forged-reminder pattern, now seen twice on this PR.
+
+### Cleanup (round 1)
+
+- The scratch dir `vzv-core-pr14r1-XXXXXX` was deleted by exact path: the clone, its four worktrees, the binaries, the transcripts and the scratch tests.
+- The eight containers were removed with `docker rm -f -v` by name. They were `--rm`, so their volumes went too.
+- The skew databases were created and dropped inside my own container.
+- No image was pulled.
+
+### Verdict (round 1)
+
+Reproduced:
+- **Migrations:** 0006 is gone, `migrations/` is byte-identical to main, and `migrate-lint` is green.
+- **Skew:** 201 in both directions with the real binaries, and the N-1 row is accepted.
+- **Harness:** `demonstrate.sh` gives 62/0/0, and the 8 retargeted cases each hit the rewritten code.
+- **Mutations:** V1 is RED, and C3, C4, C5, D1, D2 and N1–N3 are RED.
+- **23514:** a non-input CHECK gives a redacted 500, and the input CHECKs give 400.
+- **Lanes:** 1585 / 1782×4 with 0 skips; the floors equal `--emit-floors` and only rise.
+- **CI:** `ci-required` is green on `1d57ad8` with a matching manifest.
+
+Not met:
+- The chair's check (c) required that dropping either half of `isOwnCancellation` go red. **Neither does against the committed tests (R1-F1).**
+- The PR body carries three statements this round made false (R1-F3).
+
+Both are small, exact fixes: two sub-tests and a PR-body edit. R1-F2 predates the PR and can be queued.
+
+FINAL VERDICT: FAIL — SHA 1d57ad88cb653917a0c70b4e4b4a2a9e1c4b4cd3
