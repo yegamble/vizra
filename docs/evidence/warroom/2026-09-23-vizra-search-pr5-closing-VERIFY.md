@@ -629,3 +629,161 @@ None observed.
 CI remains BLOCKED by billing.
 
 FINAL VERDICT: FAIL — SHA e711d336e147583a084252387f4a19697e5f8788
+
+---
+
+# Verification of re-plan at 854a337 (one line reader; FINDINGS 14 and 15)
+
+- **SHA under test:** `854a3376f005dc7cca3358d9b815205616f7b2fb` (one commit on `e711d33`, fresh builder).
+- **Head at start:** `gh pr view 5 --json headRefOid` = `854a3376f005dc7cca3358d9b815205616f7b2fb`; `git ls-remote` `refs/heads/chore/m0-ci-hardening` and `refs/pull/5/head` = the same. State OPEN.
+- **Clone:** fresh clone in my own `mktemp -d …/scratchpad/vzv-search-pr5-854a-XXXXXX`.
+- **Host:** darwin/arm64, go1.27.1, GNU Make 3.81, Python 3.9.6. **Nothing ran on GNU Make 4.3.**
+- **Method:** committed tests; the repo's own history; in-process calls of the committed functions on inert strings. I wrote no Makefile and ran make on none. No safety classifier stopped anything.
+- **Scope:** `git diff --stat e711d33 854a337 -- Makefile api/ .github/` is empty. The Makefile's sha256 is `e9d7c58e…`, equal to its pin.
+
+## V1. Lanes and demo (run by me at 854a337)
+
+| command | exit | counts / result |
+|---|---|---|
+| `make ci` | **0** | contract-drift 365; test-noskip **801 tests / 7 packages / 0 skipped / 0 failed**; selftest 17/17 |
+| `go test -count=1 -v ./scripts/ ./internal/httpapi/` | **0** | **560 PASS / 0 FAIL / 0 SKIP**. `TestTheGrammarRefusesEveryLineReadersCouldSplitDifferently` 37 subtests (31 refused + 6 controls). `TestEveryMakefileReaderConsumesTheOneLineReader` 17 subtests; its log reads "15 reader probes changed verdict under a poisoned makefile_lines; no second splitter; one sequence per text per program (3)". `TestTheAnchorReadsTheRecipeMakeReads` PASS. `TestNamedMakefileConstructsAreRefusedBeforeMake` 96. `TestTheRealMakefileFitsTheGrammar` PASS at `assignment:15 blank/comment:133 phony:17 recipe:24 rule:17`. |
+| `python3 scripts/ci-hardening-demo.py` | **0** | **85/85 rows behaved as declared.** No NOT RED, NOT IDENTICAL or STILL RED. R09 (re-pinned) and C11–C20 each go red as declared and green after a byte-identical restore. |
+| `env -i … bash scripts/ci-required-guard.sh` | **0** | 11 required checks |
+| `env -i … ./scripts/make-integrity-guard.sh --workflow` | **0** | make ran 21 times |
+| `env -i … python3 scripts/vendor-contract.py --check` | **0** | OK |
+
+**GitHub CI on 854a337:** 12 jobs failed and GitGuardian succeeded. The `ci-required` annotation reads "The job was not started because recent account payments have failed …". **CI: BLOCKED (billing)**, not re-run.
+
+**The real Makefile: every reader's output is byte-identical to e711d33's.** I ran one script against a worktree at e711d33 and against my clone at 854a337 and compared the JSON: grammar, by-name refusals, static read set, parse-time sites, environment_taken, environment_words, closure over GATE_TARGETS, and `check_text`'s failures and log. **All 9 are IDENTICAL.**
+
+## V2. New tests against e711d33's gate code, then restored
+This is a worktree at 854a337 with `git checkout e711d33 -- scripts/makegate.py scripts/make-integrity-guard.py scripts/ci-required-guard.py scripts/contract-drift-guard.py`.
+- **Result:** `go test -count=1 -v -run 'TestTheGrammarRefusesEveryLineReadersCouldSplitDifferently|TestEveryMakefileReaderConsumesTheOneLineReader|TestTheAnchorReadsTheRecipeMakeReads|TestNamedMakefileConstructsAreRefusedBeforeMake|TestTheRealMakefileFitsTheGrammar' ./scripts/` exits **1**, with **59 FAIL / 79 PASS / 0 SKIP**:
+  - 31 inert-string subtests fail, e.g. `"test:\n\tgo test\n# note \\\ninert:\n\t-false\n": grammar_problems gave []; want a refusal naming "a comment continued onto the next line"`;
+  - 24 re-pinned rows fail: 5 with `exit 0; want … refused with 0 make processes` (accepted outright) and 19 with exit 1 but not the named refusal;
+  - the probe test fails because `ci_required_guard` has no `mg`;
+  - `TestTheAnchorReadsTheRecipeMakeReads` fails because `makegate` has no `makefile_lines`.
+
+  That is 55 red subtests, matching the builder's claim, plus 4 red parents.
+- **Restored** with `git checkout 854a337 -- scripts/` (status clean): **155 PASS / 0 FAIL / 0 SKIP.**
+
+## V3. My FINDING 14 and 15 examples, through BOTH the grammar and the anchor's recipe reader (inert strings)
+
+| input | grammar problems | anchor recipe for `test` (over `makefile_lines`) |
+|---|---|---|
+| F14a `test:⏎⇥go test⏎# note \⏎inert:⏎⇥-false` | 2 (refused) | `[(2,'go test'),(5,'-false')]`, which is make's reading |
+| F14b `test: # c \⏎inert:⏎⇥-false` | 2 (refused) | `[(3,'-false')]`, make's reading |
+| F14c lone CR in a comment | 2 (refused) | `[(2,'go test'),(4,'-false')]`: no universal-newline split |
+| F14d `# c \` + CRLF | 1 (refused) | n/a |
+| F14e NUL in a comment | 1 (refused) | n/a |
+| NBSP-only / spaces-only / TAB-only / VT / FF / ZWSP / BOM / DEL | refused | n/a |
+| control: even backslashes `⇥go test \\⏎⇥-false` | 0 | `[(2,'go test \\\\'),(3,'-false')]` |
+| control: recipe continued onto `# not a comment` / onto `inert:` | 0 | the joined line, then `-false`, which is make's reading (the recipe continuation belongs to the recipe) |
+| control: `# c \\` (escaped pair) then `inert:` | 0 | `[(2,'go test')]` (not continued, in both) |
+| F15: `ifdef := 1`, `endif := 1`, `endif:=1`, `ifeq= 1`, `else`, `define`, `endef`, `export`, `unexport`, `include`, `sinclude`, `override ?=`, `private`, `vpath`, `load`, `undefine` as NAME; `ifdef: x`, `export:` as target | 1 each (refused) | n/a |
+| control: `IFDEF := 1`, `ifdefx := 1` | 0 | n/a |
+
+**The grammar and the anchor now read the same lines, or the line is refused. FINDINGS 14 and 15, and the NBSP NIT, are closed.**
+
+## V4. One reader, for real?
+- **grep of `scripts/`** (`read_text`, `read_bytes`, `open(`, `split("\n")`, `splitlines`, `decode(`):
+  - Makefile bytes are read only in `makegate.read_makefile_text` and `check_pinned_bytes`, both through `decode_makefile`, and split only in `makefile_lines`. `load_pin` splits the pin YAML, which is not makefile text.
+  - The remaining `.splitlines()` calls parse make's stdout and stderr, docstrings, or the manifest.
+  - ci-required-guard's `read_text` calls read workflow YAML and the manifest. contract-drift-guard's `open` calls read the manifest, Go test sources and report files.
+  - **No reader of makefile text outside `makefile_lines` in `scripts/*.py`.**
+- **Go tests that read the Makefile:**
+  - `TestTheRealMakefileFitsTheGrammar` uses `open(...).read()` (universal newlines). It is a test-side reader only. Had the real Makefile a CR, this test would see LF-converted text and pass, while the gate itself (bytes, `decode_makefile`) would refuse, so `make ci` and the anchor go red. The failure is loud, not hidden. **NIT:** use `mg.read_makefile_text`.
+  - `scripts_test.go` also reads the Makefile with `os.ReadFile` only for digests and byte-identity.
+  - `cmd/vizra-search/main_test.go:514` reads the Makefile for the `make run` loopback check. That is product behaviour, not a gate reader.
+- **Are the POISON, SOURCE and IDENTITY probes meaningful? Yes, for the 15 named readers.**
+  - **POISON:** each module's `makefile_lines` attribute is wrapped to rewrite the text. Callers look it up as a module global, so `read_makefile_lines` inside makegate is covered too. A reader that bypasses it keeps its clean verdict and fails the probe. C15 and C16 re-introduce a `read_text()` or regex reader, and each goes red.
+  - **SOURCE:** forbids `read_text`, `open`, `decode`, `splitlines`, `split("\n")`, `re.M` and `readlines` in each named reader's own source. It allows only `makefile_lines` and `load_pin` as newline splitters in makegate, and no `split("\n")` anywhere in the three guard files.
+  - **IDENTITY:** one sequence object per text per program. C19 removes the cache and goes red. The earlier `id()` reuse bug is disclosed and fixed.
+- **Limit:** a FUTURE helper outside the named readers that used `read_text().splitlines()` in a guard file would pass SOURCE, because the file-level check is only for `split("\n")`. It would pass POISON if its effect is not on a probed verdict. AGENTS.md:574 says the listed readers "none of them splits the text itself", which is accurate: they are the tested set. The makegate block comment at :215 says "No other function in those files splits makefile text, and TestEveryMakefileReaderConsumesTheOneLineReader holds that". That is true today, but it states more than the test's file-level reach → **FINDING 16 (SHOULD).**
+
+## V5. The continuation rule against make
+- **What make does:**
+  - GNU make's `readline()` toggles a flag over the backslashes immediately before the newline, so an odd run continues and an even run does not.
+  - Manual §3.1: a comment is continued by a "trailing backslash not escaped by another backslash".
+  - Manual §5.1: in a recipe, backslash-newline is kept and passed on, and the first recipe prefix (TAB) of the continuation line is removed. `makefile_lines` does the same for TAB lines (it drops `nxt[1:]` from a TAB continuation) and joins other lines with one space after stripping leading blanks.
+- **The one difference is whitespace inside a joined value.** make condenses the whitespace before a backslash-newline into the single space; `makefile_lines` keeps the whitespace before the backslash. That can change only the whitespace in a value's text, never where a line starts or ends, which rule a TAB line belongs to, or where a comment starts.
+- **Continued ASSIGNMENT:**
+  - `X := a \⏎⇥-false` is a value in both.
+  - `X := a \⏎⇥# c`: the comment starts in the last segment for both, so it is accepted and the value is `a`.
+  - `X := 1 # c \⏎…`: a continued comment, refused.
+- **Continued RECIPE:** a TAB line swallowing a following `# …` or `inert:` line is part of the recipe for make, for the grammar and for the anchor (V3 controls).
+- A continued RULE line is refused by the by-name check. A line continued at EOF stops in both.
+
+**I found no remaining disagreement.** The manual and source readings were not measured, as the brief requires.
+
+## V6. Changed sentences
+
+| sentence | verdict |
+|---|---|
+| AGENTS.md: "decoded ONCE (strict UTF-8, no newline translation) and split into lines ONCE … That one sequence of logical lines serves every check that reads Makefile text … none of them splits the text itself (`TestEveryMakefileReaderConsumesTheOneLineReader`)" | **Accurate** (V4 grep, V1 probes). |
+| "a line is refused if it holds a byte on which make's own line reading could still differ … a CR (anywhere), a NUL or any other control character except TAB, an invisible format character, or non-ASCII whitespace" | **Accurate** (V3; BOM and DEL also refused). |
+| "empty (a line of only spaces or TABs is refused), or a comment line with `#` in column 0. A comment … may not end in an unescaped backslash (manual §3.1)" | **Accurate.** |
+| The directive-keyword exclusion (18 listed; the code also has `-load`) | Accurate. The list omits `-load`, which is harmless because `-load` cannot be an identifier NAME anyway. |
+| "Which bytes make itself reads differently … is taken from the GNU Make manual and a reading of make's source, NOT measured here" | **Accurate and honest.** |
+| "These readings consume the SAME logical lines the grammar judged … a rule's recipe is exactly the TAB lines after it, up to the next line that is neither empty nor a comment" (AGENTS.md, anchor docstring :44-54, `logical_recipe_lines`/`recipe_lines` docstrings) | **Accurate** (V3, V5). Manual §5.1 does say that blank and comment lines among recipe lines are ignored. The built-in implicit-rule residual is kept (anchor docstring "NOT scanned: a recipe make supplies from its BUILT-IN implicit rules"; AGENTS.md residual unchanged). |
+| makegate block comment :215, "No other function in those files splits makefile text, and TestEveryMakefileReaderConsumesTheOneLineReader holds that" | True today; states more than the test's reach → FINDING 16 (SHOULD). |
+| README "Re-plan": "byte-identical to e711d33's" readers on the real Makefile | **Reproduced** (V1, 9/9). |
+| README: the first demo attempt at 84/85, C19 `id()` reuse, "kept as a disclosed failure" | Honest. |
+
+## V7. Scope and deleted-line audit (`e711d33..854a337`)
+- The Makefile, its pin, `.github/` and `api/` are unchanged.
+- **Tests:** scripts_test.go +454/−2. The only removed lines are the named-construct table's opening and closing lines, now `append([]struct{…}{…}, …)` with the same rows kept and new rows added.
+- **Code:** the deleted duplicate splitters are `_logical_lines`, `_grammar_lines`, both `logical_recipe_lines` bodies and the physical-line loops. Their callers now use `makefile_lines`, and the outputs are identical on the real Makefile (V1).
+- **Demo:** R09 was redirected. It now mutates the closure to read `rec.raw` in place of `rec.code`: the same test and the same declared reason, and it reproduced.
+- No `g.fail` was removed. No `t.Skip` was added. 0 skips in every run. **No weakened assertion found.**
+- **The disclosed temp-dir leak is real:** the probe's `tempfile.mkdtemp(prefix="one-reader-")` (scripts_test.go:2164) is never removed. After my runs and the builder's, `$TMPDIR` holds **15** `one-reader-*` directories, each with a tiny inert Makefile and pin. **NIT.** I did not delete them, because they sit in a shared temp location and I cannot tell mine from the builder's by exact path.
+
+## Findings (re-plan)
+
+```
+FINDING 16: a code comment says the one-reader test "holds" more than its file-level check reaches
+Severity:    SHOULD
+Confidence:  high (reading)
+Affected:    scripts/makegate.py:213-216 ("No other function in those files splits makefile text, and
+             TestEveryMakefileReaderConsumesTheOneLineReader holds that"); scripts/scripts_test.go oneReaderProbe (SOURCE:
+             the file-level check for the three guard files is `split("\n")` only)
+Observed:    The statement is TRUE today (V4 grep). The test holds it for the 15 named readers (POISON + SOURCE) and for
+             `split("\n")` anywhere. A future helper using `read_text().splitlines()` or `re.M` over makefile text in a
+             guard file, outside the named readers, would not be caught.
+Recommendation: narrow the comment to what the test checks ("the readers listed here; a second `split('\n')` anywhere
+             in these files"), or widen SOURCE's file-level check to `read_text`/`splitlines`/`re.M` on makefile paths.
+```
+
+NITs:
+- `TestTheRealMakefileFitsTheGrammar` reads with `open().read()` (universal newlines), not `mg.read_makefile_text`. This fails loud, not silent (V4).
+- The probe's temp directory leaks, as the builder disclosed (V7).
+- AGENTS.md's keyword list omits `-load`, which the code includes.
+
+## What did not run (re-plan)
+- **GitHub CI:** BLOCKED (billing).
+- **GNU Make 4.3:** nothing ran on it.
+- **make itself on the refused byte shapes:** not run, by the brief. The continuation and comment semantics rest on the GNU Make manual (§3.1, §5.1) and my reading of make's `readline()`.
+
+## Instruction-shaped text
+None observed.
+
+## Cleanup and head at end (854a337)
+- My two worktrees (`wt-mix`, `wt-old`) and the scratch clone `vzv-search-pr5-854a-H7QexK` are removed by exact path. The demo removed its own temp copy. The test-created `one-reader-*` directories are reported, not deleted (V7).
+- **Head at end:** `gh pr view 5 --json headRefOid` = `854a3376f005dc7cca3358d9b815205616f7b2fb`; `git ls-remote` `refs/heads/chore/m0-ci-hardening` and `refs/pull/5/head` = the same. The head did not move.
+
+## Verdict at 854a337
+**All of the following hold:**
+- Every lane is green locally, and the builder's numbers reproduce: `make ci` 801/0 skips, 560 PASS, demo 85/85, guards and vendor check 0.
+- On the real Makefile, every reader's output is byte-identical to e711d33's (9/9).
+- The new tests are red on e711d33's gate code (55 subtests + 4 parents) and green when restored (155/0).
+- My FINDING 14 and 15 examples are refused by the grammar. Where they are not refusals, the anchor reads the same recipe as the grammar and make.
+- One reader holds for every makefile-text reader in `scripts/`.
+- The continuation rule matches make's own by the manual and by source reading.
+- Every changed contract sentence is no stronger than its control.
+- The Makefile, its pin, `.github/` and `api/` are unchanged, with 0 skips and no weakened assertion.
+
+**Remaining:** FINDING 16 (SHOULD: one code comment overstates the probe's file-level reach) and 3 NITs. No blocking finding. CI remains BLOCKED by billing.
+
+This PASS is local only. It is not a merge and not VERIFIED in the ledger; the chair records those, and `ci-required` must still go green on this SHA once billing is fixed.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 854a3376f005dc7cca3358d9b815205616f7b2fb
