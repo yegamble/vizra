@@ -1644,3 +1644,221 @@ Fresh `mktemp -d` clone at `56504c1` (clean); `655f46a8` and `59a19c5c` also pre
 | `vzv11-redis` | `redis@sha256:0637954999d0…` (the CI-pinned Redis 7.2 digest) | 63942 | see below |
 
 Volumes: `vzv11-pg` → `1b89a41912015cf96d5006e522037cf7786d0e6eeb8804dded86385ce55298c0`; `vzv11-redis` → `c0431f176cd8b42f1b7c0b18b8119ff29b9984040f7fdafeed7fce14470f775a`. Server versions read back: PostgreSQL 18.6, `valkey_version:9.1.2`, `redis_version:7.2.16`. Go 1.27.1, sqlc 1.31.1.
+
+## R3-2. `classifyRefusal` attacked with MY OWN timing control (PostgreSQL table locks — not the builder's seam)
+
+Technique: a second session holds `LOCK TABLE owner_claim_tokens IN ACCESS EXCLUSIVE MODE`. The claimant passes its first `AnyUserExists` and then blocks on the token read (detected via `pg_stat_activity.wait_event_type='Lock'`). While it is blocked I change the world and commit. The hasher's derivation counter shows which stage decided: **0 derivations = the read phase refused; 1 = after the hash.** Charges = the global failure-budget counter read directly from the cache. Probe file `zzvzv3_branch_test.go`, verifier scratch only. Own database `vizra_probe`, own cache `vzv11-cache4`.
+
+| Probe | World change while the claimant is paused | Observed | Verdict |
+|---|---|---|---|
+| B1 | a winner consumes the token AND inserts the owner, commits | **409 conflict**, 0 refused rows, 0 charges, **0 derivations** (read-phase branch), owners=1 | the 655f46a defect class, now **409** ✓ |
+| B2 | token digest rotated (superseded), no user anywhere | **403 forbidden**, exactly **1** row, **1** charge, 0 derivations | genuine refusal ✓ |
+| B3 | token rotated, then `users` locked so the classification re-read waits, then that backend is `pg_terminate_backend`ed | **503 unavailable**, 0 rows, 0 charges | lookup error is never a 403 ✓ |
+| **B4** (coordinator's attack) | token rotated, AND a user **inserted but not committed** when the classification re-reads; committed afterwards | **403 forbidden, 1 refused row, 1 charge**, 0 derivations; users afterwards = 1 | READ COMMITTED residual — see below |
+| B5 | a winner's full claim CTE (consume + insert owner) **uncommitted**, holding the token row lock; the claimant with the correct token passes the read phase, hashes, and blocks in `ClaimOwner`; winner commits | **409 conflict**, 0 rows, 0 charges, **1 derivation**, owners=1 | post-redeem `ErrNoRows` → classification → claimed ✓ |
+| B6 | token `superseded_at` set while the claimant is blocked inside the hasher | **403 forbidden**, 1 row, 1 charge, 1 derivation | matches the builder's "superseded during the hash → 403" ✓ |
+| B7 | CLAIMED instance, **cold cache** (fresh server = restarted process), 12 POSTs each: malformed token / wrong 64-hex / bad username / the consumed real token | **12 × 409 every time; 0 audit rows; 0 charges** | **R2-C CLOSED** ✓ |
+
+**B4, the residual, reasoned from the code:** `classifyRefusal` issues a fresh autocommit `AnyUserExists`, whose READ COMMITTED snapshot cannot see an uncommitted insert. So a claimant whose token is genuinely not accepted is refused as a token problem — with a row and a charge — if a user commits a moment later. This cannot reach a claimant holding the *correct* token. A winner's token consumption and its owner insert commit atomically, in one statement and one transaction. If the correct-token claimant sees the token consumed, the next statement's snapshot sees the owner (B1). If it sees the token still live, it proceeds and is decided at the redeem (B5). The residual therefore affects only *wrong/dead-token* requests arriving within the commit window of an owner creation, and at that instant the instance is not yet claimed. The AGENTS.md wording is checked in R3-8.
+
+Earlier contaminated run: the first attempt at B4–B7 failed with `FATAL: sorry, too many clients` because my own race harness leaked pools (below). Those results were discarded. The table is the clean re-run (`BRANCH_EXIT=0`).
+
+## R3-1a. The race defect REPRODUCED at 655f46a with my own harness
+
+`zzvzv3_race_test.go` (verifier scratch only; compiles unchanged at both SHAs): n=24 concurrent **valid-token** claims through the real handler. Each iteration is its own subtest: fresh migrated schema, the SERVER pool's `SHOW default_transaction_isolation` asserted equal to the level under test, 16 CPU-burning goroutines, and a host already at load ~150–200. A run is **clean** only if all of these hold: exactly one 201, 23 × 409, 0 `refused` audit rows, 0 failure-budget charges (the global bucket read from the cache), and users/credentials/consumed-tokens/`succeeded` rows each exactly 1. Own database `vizra_race`, own cache `vzv11-cache3`.
+
+```
+655f46a  busy=16  (40 iterations per isolation)
+ANOMALY iso=repeatable read iter=19 status=map[201:1 403:3 409:20] refusedRows=3 charges=3 rowsOK=true
+ANOMALY iso=serializable    iter=27 status=map[201:1 403:2 409:21] refusedRows=2 charges=2 rowsOK=true
+SUMMARY read committed   runs=40 clean=40 | loser-403s=0
+SUMMARY repeatable read  runs=40 clean=39 | loser-403s=3 refusedRows=3 budgetCharges=3
+SUMMARY serializable     runs=40 clean=39 | loser-403s=2 refusedRows=2 budgetCharges=2
+```
+
+**2 of 120 runs defective (1.7%).** This is the CI signature ("claimant 22 got an unexpected 403"): losers of a real race refused as a TOKEN problem, each writing a permanent `refused` row and spending failure budget. The single-owner invariant itself held in every run.
+
+Harness note, for honesty: my first baseline attempt called `newClaimEnv` repeatedly inside one test, so pools accumulated until PostgreSQL refused connections. It still logged one clean defect instance (`iter=15 status=map[201:1 403:4 409:19] refusedRows=4 charges=4`) before exhaustion, but that run is discarded. The numbers above come from the fixed harness, with connections observed at ≤ 9 on the race database.
+
+## R3-3. The merge of main at 8b54916, core #9's guards, the floors, check 5
+
+- `8b54916`'s parents are `a42ca76` (PR) and `eeeea068` (main = core #9). Relative to main, the PR's diffs to gate files are **only** `Makefile` (1 line, the `openapi-verify` `-run` regex) and `scripts/test-floors.json` (the three new floors + a comment). `git diff eeeea068 56504c1 -- .github/` is **empty**: **no pinned step, workflow or required-checks line changed.** `Dockerfile` is untouched.
+- **#9's guards on the merge result:** `make ci` at `56504c1` (which contains the merge) printed `ci-required-guard: passed (6 required check(s))` and `make-integrity-guard: passed (8 gate target(s))`; `make ci: all lanes passed`, exit 0.
+- **Check 5 (SELECTION) vs the regex edit.** `scripts/ci-required-guard.py` check 5 only asserts that every `-run` pattern is non-empty. **It does not check that each alternative names an existing test**, so it cannot catch a stale name. I checked that myself. `go test -list '.*' ./internal/httpapi/` contains each of the seven names exactly once: `TestEveryRouteHasASpecOperation`, `TestEverySpecOperationHasARoute`, `TestSpecOperationIDsAreUniqueAndPresent`, `TestPublicContractIsTheProbesPlusTheSetupOperations`, `TestInternalSearchContractIsValid`, `TestInternalOperationsAreNotInThePublicContract`, `TestHMACTestVectorsArePublished`. Running the lane's exact `-run` with `-v` gives **7 top-level PASS**. The edit swaps the renamed `TestM0ContractIsTheFourProbes` for its successor; nothing is deselected.
+- **Floors, via the generator.** My own unit run: `go-test-report.py … --emit-floors` prints `internal/audit: 14 // measured 17`, `internal/credential: 4 // measured 6`, `internal/ownerclaim: 16 // measured 19`. That is **byte-for-byte the committed floors** (14/4/16) and the measured counts the comment states (17/6/19). The generator's rule is 15% headroom with a minimum slack, not a hand-chosen number. The integration-suite floors are checked in R3-5.
+- **No test skips.** `grep -rnE 't\.Skip|Skipf|SkipNow|testing\.Short' --include='*_test.go'` at 56504c1 → only the pre-existing `internal/jobs/jobs_test.go:23-24` (`-short`; no lane passes `-short`). **R2-E's `t.Skipf` is gone.** Every go-test-report run below reports 0 skipped.
+
+## R3-4. The 58 builder mutations — ALL REPRODUCED; MUT-id audit reproduced
+
+`docs/evidence/m1a-owner-claim/demonstrate.sh`, run from a pristine clone at 56504c1 on its own database (`vizra_demo`) and cache (`vzv11-cache4`):
+
+```
+passed:       58
+failed:       0
+harness-fail: 0
+```
+
+Every one of the 58 ids reddens under its mutation and is green restored. Afterwards: `git status --porcelain` empty, `git diff --stat HEAD` empty, `git diff --name-only HEAD -- internal/store/sqlcgen/` empty, HEAD unchanged — **byte-identical restore, sqlc output included.** The new and retargeted cases go red for the declared reasons:
+
+- **MUT-56** (bypass the classification — the defect itself): every sub-test of `TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409`, e.g. `not_live_(consumed_by_the_winner): A answered 403 … want 409 conflict`.
+- **MUT-57**: `TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403/digest_mismatch: A answered 409 … want the uniform 403`.
+- **MUT-58**: `TestTheClaimSeamCannotBeSetFromAProductionBuild: SetAfterClaimedCheckHookForTest is not declared in any file a production build EXCLUDES`.
+- **MUT-59**: `TestTheHandlerDoesNotDecideBetween409And403: a bare pgx.ErrNoRows mapped to 403/forbidden`.
+- **MUT-43**: `TestAFailedClassificationReadAnswers503AndChargesNothing: … answered 403`.
+- **MUT-52**: `TestTheClaimTransactionPinsReadCommitted: claimant 0 got 403 … want 201 or 409`.
+
+**Mechanical MUT-id audit, reproduced.** `git grep -hoE 'MUT-[0-9]+[a-z]*' 56504c1` gives **63 distinct ids**. `run_case` gives 58. The REVIEW-ONLY block names MUT-4, 4b, 14, 36 and 53 (plus MUT-14b as a cross-reference, which is also scored). **Cited but neither scored nor review-only: none. PR-body ids absent from the harness: none.** This matches the builder's "63 cited = 58 scored + 5 review-only, 0 dangling".
+
+**The seam is absent from production builds — at exactly the strength the repo claims.**
+- `go list -f '{{.GoFiles}}' ./internal/ownerclaim` gives `[announce.go ownerclaim.go]`; with `-tags=integration` it adds `seam_integration.go`.
+- Outside `seam_integration.go`, no code contains `afterClaimedCheck.Store(`.
+- In binaries built from a pristine clone (`go tool nm`), `SetAfterClaimedCheckHookForTest` has 0 symbols in `vizra-api` and in `vizra`.
+- The seam **variable** `ownerclaim.afterClaimedCheck` IS present in `vizra-api` (1 symbol). It is an `atomic.Pointer` that nothing in a production build can set, so it is always nil there. The repo's wording is exactly that: AGENTS.md "a test seam (`afterClaimedCheck`) that is nil in production; its only setter is compiled under `-tags=integration` alone"; README.md:169-171 likewise.
+- (The coordinator's summary, "compiled only under `//go:build integration`", is looser than the repo's text. The repo's text is the accurate one.)
+- Caveat on method: the linker drops the unreferenced setter even from an integration-tagged `cmd/api` build (0 symbols there too). So the symbol check proves absence but cannot by itself distinguish the tags. The `go list` file sets and the absence of any `.Store(` do.
+
+## R3-CI. GitHub CI on 56504c1: NOT RUN (billing) — what this verdict therefore lacks
+
+`gh api …/commits/56504c14…/check-runs`: `append-only`, `build-test`, `cache-matrix` and both legs, `docker-build`, `fixtures`, `govulncheck`, `image-scan` and **`ci-required`** all show `completed / failure`. build-test run 35835247488: every job `steps=0`, annotation "**The job was not started because recent account payments have failed or your spending limit needs to be increased.**" `c79c4d2` is the same. `a42ca76` has no checks at all. **`GitGuardian Security Checks` (an external app, not Actions): success on 56504c1** (and on c79c4d2).
+
+For contrast, `655f46a` ran and failed for real: `cache-matrix-leg (valkey)` = failure, `ci-required` = failure. That is the read-phase defect reproduced in R3-1a.
+
+**The PR body is truthful about this.** Its first line is "Status: BLOCKED on CI — not READY_FOR_REVIEW". Its history table marks `c79c4d2`/`b2f0d22`/`56504c1` as "refused (billing), 0 steps". Its "Did not run locally" line names `docker-build`, `image-scan`, `append-only`, `govulncheck`, and the `fixtures`/`cache-matrix` workflows *as workflows*.
+
+**Evidence that would normally come from CI and that I did NOT obtain (the merge must wait for these):**
+
+| Normally from CI | Status here |
+|---|---|
+| `ci-required` green on this SHA, and its collection matching `.github/required-checks.txt` | **NOT OBTAINED** |
+| Provenance: the tested merge tree named by `scripts/provenance.sh` (`refs/pull/8/merge`) | **NOT OBTAINED** — I tested the PR head, which already contains main `eeeea06` via `8b54916`, not a GitHub-computed merge ref |
+| `build-test` on ubuntu-24.04 / GNU Make 4.3 (the pinned-step shapes, "Refuse a neutered Makefile", the direct unit step, both integration steps) | **NOT OBTAINED**; run locally on darwin/arm64 with the same commands (R3-5) |
+| `cache-matrix` legs as jobs (Valkey + Redis, digest-pinned service images, CI's clean runners) | **NOT OBTAINED** as jobs; the commands ran locally against the same pinned images (R3-5) |
+| `append-only` (merged-migrations-frozen check against the base) | **NOT OBTAINED** as a job; the manifest recompute and the SQL-identity proof are in R3-6 |
+| `govulncheck` | **NOT OBTAINED** (not run locally either) |
+| `docker-build` (image builds, runtime-image assertions) | **NOT OBTAINED** (not run) |
+| `fixtures` workflow (incl. the "No image is fetched" step) | **NOT OBTAINED** as a workflow; `make fixtures-verify` passed inside local `make ci` |
+| `image-scan` | not required; not obtained |
+| An uncontended Linux run of the race test (CI is where 655f46a's defect surfaced) | **NOT OBTAINED**; replaced by the local contended campaign (R3-1b) |
+
+## R3-7. My own mutations at 56504c1 (digest-gated, restored, each run against the WHOLE integration package)
+
+| id | mutation | wanted | observed |
+|---|---|---|---|
+| V-D | delete the handler's early `instanceClaimed` check (the R2-C cold-cache fix) | RED | **RED** — `TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody` ("[empty body] … a CLAIMED instance answered 400, want 409"; "[not JSON at all] … 415"), `TestRepeatedClaimsOnAClaimedInstanceDoNotGrowTheAuditTrail` ("100 refused claims acquired 100 pooled connections") |
+| V-F | re-add a per-request `already_claimed` refusal row in `mapClaimError` (round-2 **W6, which stayed green**) | RED | **RED** — the race test ("31 `refused` audit rows were written by losers of the race, want 0", once per isolation), `TestAClaimRefusesWhenAUserAppearsDuringTheHash`, `TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409` |
+| V-G | delete ONLY the in-transaction Go gate (= the builder's MUT-53, declared review-only) | GREEN | **green** (`ok … 134.5s`). This agrees with the declaration: the redeem statement's own `AND NOT EXISTS (SELECT 1 FROM users)` then refuses with an empty result, which `classifyRefusal` answers 409. The builder's MUT-54 (both layers) and MUT-46 (the statement guard alone, via a direct store call) are scored and reproduced red in R3-4 |
+
+Two of my attempts are void and not scored:
+- A first V-F went "red" only because my edit referenced a reason constant that no longer exists, so the package did not compile. It was redone with a compiling edit (the table row above).
+- A planned V-B ("classify on a live owner rather than the claimed state") could not be written faithfully: the `LiveOwnerExists` query it needs no longer exists. It was dropped rather than replaced by a stand-in. R2-D's substance is covered by `TestAClaimRefusesWhenAUserAppearsDuringTheHash` and MUT-54.
+
+## R3-5. The full local lane set at 56504c1 (my containers; CI's pinned `-json` + `go-test-report.py` shapes)
+
+These are the exact commands of the pinned `build-test` steps, run locally: `go test … -json > events.json; echo $? > exit.txt; python3 scripts/go-test-report.py --events … --suite … --floors scripts/test-floors.json --go-exit-file …`. Host load average climbed from ~120 to ~350 during the run, because other agents' workloads shared the machine with my race campaign.
+
+| Lane | go test exit | report exit | Executed / skipped (my count and the report's agree) | Notes |
+|---|---|---|---|---|
+| `make ci` (10 lanes incl. both #9 guards, fixtures-verify, test-race) | — | — | — | **exit 0**, `make ci: all lanes passed` |
+| `make tidy-check`, `sqlc diff` | 0, 0 | — | — | |
+| unit (`go test -race -count=1 -json ./...`) | **0** | **0** | **1184 executed / 0 skipped**, 233 top-level, 17 packages all at or above floor | = builder's "1184, 0 skipped" |
+| integration, Valkey 9.1.2 (`-tags=integration ./...`) | **0** | **0** | **1349 / 0 skipped**; `internal/integration` **165** | = builder's "1349 / 0 skipped, 165" |
+| integration shuffled, Valkey | 1 | 1 | 1327 passed / 0 failed / 0 skipped; `internal/integration` **165 pass** | **only** `internal/fixtures` failed: `panic: test timed out after 10m0s` in `TestManifestDetectsEveryClassOfDrift` (no failing test; the package does not import `internal/ownerclaim`) |
+| integration, Redis 7.2.16 (CI digest) | 1 | 1 | 1321 passed / 0 failed / 0 skipped; `internal/integration` **165 pass** | **only** `internal/fixtures`, the same 10-minute timeout panic |
+| integration shuffled, Redis | 1 | 1 | 1340 passed / 0 failed / 0 skipped; `internal/integration` **165 pass** | **only** `internal/fixtures`, the same timeout |
+| `internal/fixtures` **re-run alone**, the failing shuffle seed `1790152312229751000`, `-timeout 60m` | **0** | — | **42 / 42 pass**, package time **958.8 s** | the package needs ~16 min under this load, so the 10-min default is an infrastructure limit here, as the coordinator anticipated. Fixtures uses neither database nor cache, so one isolated re-run covers all three legs |
+
+In **all four** integration legs, `internal/integration` passed **165/165**, `internal/ownerclaim` 19/19, `internal/audit` 17/17 and `internal/credential` 6/6, each at or above its floor. **Zero skips in any lane.** The integration floors for the three new packages (14/4/16) are met in every leg.
+
+**The CI failing seed `1790134723139270269` (Valkey leg of run 35814919455).** The first attempt, inside the lane runner at default timeout, reached 98 of 104 top-level tests and then hit the 10-minute package timeout. `TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation` had **passed** in all three sub-tests before the timeout (`read_committed`, `repeatable_read`, `serializable`: pass); the test running when the timer fired, `TestUsersOneOwnerFiresThroughTheHandler`, had been running 1 s. A full re-run with `-timeout 60m` is recorded in R3-5b.
+
+### R3-5b. The CI failing seed, run to completion
+
+`go test -race -count=1 -shuffle=1790134723139270269 -tags=integration -timeout 60m -json ./internal/integration/` (Valkey 9.1.2): **exit 0**; `-test.shuffle 1790134723139270269` echoed; **104 of 104 top-level tests pass, 0 fail, 0 skip**; package time **804.8 s**, above the 10-minute default under this load, which explains the timeout of the in-lane attempt. `TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation`: `read_committed` pass, `repeatable_read` pass, `serializable` pass. This is the exact seed and leg on which CI run 35814919455 failed `655f46a` with "claimant 22 got an unexpected 403".
+
+## R3-1b. The defect cannot recur at 56504c1 — my own n=24 harness, many runs
+
+Same harness, database and cache as R3-1a (the baseline that reproduced the defect at 655f46a). Only the SHA differs.
+
+```
+56504c1  Valkey 9.1.2  busy=16  host load ~150-310  (150 iterations per isolation)
+SUMMARY read committed   runs=150 clean=150 | loser-403s=0 5xx=0 other=0 badRowRuns=0 refusedRows=0 budgetCharges=0
+SUMMARY repeatable read  runs=150 clean=150 | loser-403s=0 5xx=0 other=0 badRowRuns=0 refusedRows=0 budgetCharges=0
+SUMMARY serializable     runs=150 clean=150 | loser-403s=0 5xx=0 other=0 badRowRuns=0 refusedRows=0 budgetCharges=0
+```
+
+**450 of 450 clean.** In every run: one 201, 23 × 409, zero 403s, zero 5xx, zero `refused` rows, zero budget charges, one row each in users/credentials/consumed-tokens/`succeeded`. At the baseline's measured 1.7% per-run defect rate (2 of 120), 450 runs would be expected to show about 7–8 defective runs if the defect were still present; the probability of 0 by chance is under 0.1%. The mechanism is additionally proven deterministically in R3-2 (B1: the exact window, forced with a lock → 409, 0 rows, 0 charges, 0 derivations). The builder's `07-race-stress.txt` reports the same pattern: 655f46a at 200/0, 199/1, 199/1 across RC/RR/SER; the fix at 200/0 in every cell.
+
+(The configuration list I planned originally — Redis 100 per isolation, no-busy 100, `-race` 20 — was cut to 50/50/10 because the host sat at load ~300 for over an hour. Results below.)
+
+## R3-6. Round-3 items never verified before (fixed at 655f46a; checked here at 56504c1)
+
+| Item | Status | Evidence (mine) |
+|---|---|---|
+| **R2-A** undeclared 429 on `getSetupClaimStatus` | **CLOSED** | `api/openapi.yaml` claim-status now declares `200`, `429`, `503`. `TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs` iterates `spec.Paths.Map()` × `item.Operations()`, i.e. every operation, not one. Measured: claim-status answers 429 from request #3001 |
+| **R2-B** shared ceiling bucket | **CLOSED** | Separate keys `ceiling.claim` (600) and `ceiling.status` (3000); a unit test asserts they differ. Measured (`TestVZV3_CeilingsArePerRoute`): 3010 GET claim-status → `200:3000 429:10`, **then the valid-token POST → 201** |
+| **R2-C** cold cache writes audit rows on a claimed instance | **CLOSED** | B7 (R3-2): each of four bodies on a fresh cold server → 12 × 409, 0 rows, 0 charges. My mutation V-D (delete the early `instanceClaimed`) reddens `TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody` |
+| **R2-D** authoritative gate unobserved | **CLOSED** (at the stated strength) | `TestAClaimRefusesWhenAUserAppearsDuringTheHash` exists and passes. Deleting both layers (MUT-54) is red; the statement guard alone is caught by a direct store call (MUT-46, red); deleting only the Go gate (MUT-53) is declared review-only with a measurement, and my V-G reproduces it green for the declared reason |
+| **R2-E** `t.Skipf` in the DB-down test | **CLOSED** | No `Skipf` in `owner_claim_test.go`. The only skip in the tree is the pre-existing `internal/jobs` `-short` guard. 0 skips in every lane |
+| **R2-F** frozen-text citations | **CLOSED** | down.sql no longer attributes the restore routing to ADR-002; up.sql reads "A future `display_name` (VZ-ACCOUNT-001) is where the Unicode identity belongs; this migration does not add it". Executable SQL is unchanged (stripped-SQL hash identical 32b616d → 56504c1) and the manifest recomputes (R3-6b) |
+| **R2-G** "the ONE exception"; `doctor --env` origin | **CLOSED** | AGENTS.md:274 now states "at most one derivation per request, and only for a request that presents a live token and a valid body", and enumerates every post-hash non-201 (409 / 403-if-still-unclaimed / 503 / 400-500 backstops). That matches B5 (409 after 1 derivation) and B6 (403 after 1 derivation). The doctor fix is scored by MUT-55 (reproduced red in R3-4) |
+| Round-1 **#12(a)** "fails the build" | **CLOSED** | AGENTS.md:271 "fails `make test-race`, and with it `make ci` and the `build-test` job" |
+| Round-1 **#12(b)** TRUNCATE sentence | **CLOSED** | up.sql:202 "no production code path truncated this table" |
+| Round-1 **#12(d)** "Three properties" | **CLOSED** | README no longer says it; the review-only count is stated as exactly 5 and matches the harness |
+| Round-2 #4 residual (stderr coverage attributed to tests that don't take the path) | **CLOSED** | AGENTS.md:272 "The `stderr` opt-in is covered BY CONSTRUCTION, not by those tests" |
+
+### R3-6b. Migrations and API are untouched by the closing slice
+`git diff --stat 655f46a 56504c1 -- migrations/ api/` → **empty**. Across the whole PR (32b616d → 56504c1), the 0005 SQL with comments stripped is identical (hash `1f4e3d932403` up, `bac9e4d232bf` down) at every round; the one changed line containing SQL is a trailing-comment edit on the `secret` column. 0001–0004 are unchanged from main, and all 10 digests in `manifest.sha256` recompute.
+
+## R3-8. Truthfulness — AGENTS.md, the evidence README, the PR body
+
+- **AGENTS.md:277 (new row, `classifyRefusal`) is true at exactly its stated strength.** Each branch it lists was reproduced by my own lock-based timing control: claimed → 409, no row, no charge (B1); read fails → 503, no charge, no row (B3); still unclaimed → 403, one row, one charge (B2, B6). Its **snapshot residual** ("an instance that becomes claimed AFTER [the re-read] can still answer a 403 decided just before — correct as of its decision"; unreachable for valid-token claimants because consumption and the user row commit together) is precisely what B4 measured (user uncommitted at the re-read → 403, 1 row, 1 charge), and what B1/B5 show cannot happen to a valid-token claimant.
+- **AGENTS.md:276, 281, 287**: each matches my B7/V-D, V-G/MUT-53/54 and race-test reading respectively. Row 287's "zero `refused` rows or failure-budget charges from the losers" is asserted in the test (`owner_claim_test.go`, lines "…written by losers of the race, want 0" and "…charged the failure budget … want 0"), and my V-F reddens exactly those lines.
+- **Seam wording**: AGENTS.md and README.md say the seam is "nil in production; its only setter is compiled under `-tags=integration`". That is true (R3-4). No repo text claims the seam variable itself is absent from production.
+- **Evidence README**: every claim in the closing-slice section matches what I reproduced: the defect class, the fix, the four claimed branches, the three controls, MUT-56…59 and the retargeted MUT-43/52, the review-only membership (MUT-4, 4b, 14, 36, 53), and the tightened race test. Its transcripts were taken at `c79c4d2` (`HEAD:` lines). `git diff c79c4d2 56504c1` touches only `docs/evidence/m1a-owner-claim/`, so they describe this head's code.
+- **PR body**: its figures match my measurements: unit 1184/0 skipped; integration 1349/0 skipped with 165 in `internal/integration`; 58/58 mutations; 63 ids with 0 dangling; both #9 guards exit 0; floors 14/4/16 from `--emit-floors`; the 655f46a baseline at "2 of 200"; the CI seed green. It states the CI block plainly ("Status: BLOCKED on CI — not READY_FOR_REVIEW"; commits marked "refused (billing), 0 steps") and lists what did not run locally. **I found no over-claiming sentence.**
+- **One looseness outside the repo:** the coordinator's brief described the seam as "compiled only under `//go:build integration`". The repo says the *setter* is; the variable ships nil. The repo text is the accurate one, so there is no finding.
+
+```
+56504c1  Redis 7.2.16 (CI digest)  busy=16  host load ~300-370  (50 per isolation)
+SUMMARY read committed   runs=50 clean=50 | loser-403s=0 5xx=0 other=0 badRowRuns=0 refusedRows=0 budgetCharges=0
+SUMMARY repeatable read  runs=50 clean=50 | loser-403s=0 5xx=0 other=0 badRowRuns=0 refusedRows=0 budgetCharges=0
+SUMMARY serializable     runs=50 clean=50 | loser-403s=0 5xx=0 other=0 badRowRuns=0 refusedRows=0 budgetCharges=0
+ok  github.com/yegamble/vizra-core/internal/integration  1424.269s
+```
+
+Redis: **150 of 150 clean.** The no-contention configuration was dropped to bound the wall time; the contended runs are the stronger test, and the builder's transcript covers no-contention runs.
+
+```
+56504c1  Valkey 9.1.2  -race  busy=16  (10 per isolation)
+SUMMARY read committed   runs=10 clean=10 | loser-403s=0 5xx=0 other=0 badRowRuns=0 refusedRows=0 budgetCharges=0
+SUMMARY repeatable read  runs=10 clean=10 | …0…
+SUMMARY serializable     runs=10 clean=10 | …0…
+ok  …/internal/integration  937.168s        DATA RACE reports: 0
+```
+
+**Campaign total at 56504c1: 630 of 630 runs clean** (Valkey contended 450, Redis contended 150, `-race` contended 30), with 0 loser 403s, 0 `refused` rows, 0 budget charges, 0 5xx and 0 data races. Against it: **655f46a, 2 of 120 defective** on the same harness and host.
+
+# Findings (round 3)
+
+No new BLOCKER or REQUIRED finding. Every finding from rounds 1–3 is **CLOSED** (R3-6, and the round-2 status table as updated here). Observations for the record; none blocks this PR:
+
+- **O-1 (for core #9, not #8):** `ci-required-guard.py` check 5 ("SELECTION") only asserts each Makefile `-run` pattern is non-empty. It does not check that each `|`-alternative names an existing test, so a renamed test inside a multi-name `-run` would be silently deselected. For #8 I verified the seven `openapi-verify` names by hand (R3-3).
+- **O-2 (infrastructure):** under this host's load (100–370), `internal/fixtures` (958.8 s alone) and the shuffled `-race` `internal/integration` (804.8 s) exceed `go test`'s 10-minute default timeout, and `make test-integration` sets no `-timeout`. Every such failure in my runs was a `panic: test timed out after 10m0s` with no failing test, and each package passed when re-run with a longer timeout. On CI's runners the same packages have fit inside 10 minutes. Worth a `-timeout` in the Makefile or #9's pinned steps if the runner class ever changes.
+- **O-3 (documented, not a defect):** the seam **variable** `ownerclaim.afterClaimedCheck` ships in `vizra-api` as a permanently nil `atomic.Pointer`, with a nil-check load per claim. The repo text says exactly that.
+- **O-4 (documented residual, not a defect):** B4 — a wrong/dead-token request whose classification re-read runs while another user's insert is uncommitted is answered 403, with one row and one charge, even though the instance becomes claimed a moment later. AGENTS.md:277 states this residual at exactly this strength, and it cannot reach a valid-token claimant (B1, B5).
+
+# Verdict (round 3)
+
+Every in-scope item reproduced locally at `56504c1`:
+- **Race defect**: reproduced at 655f46a (2/120), absent at 56504c1 (0/630, contended, two caches, `-race`). The CI failing seed runs 104/104 green.
+- **`classifyRefusal`**: every branch confirmed with my own lock-based timing control, independent of the builder's seam.
+- **Seam**: its setter is absent from production builds.
+- **Mutations**: 58/58 reproduced with byte-identical restores; 63 MUT ids, 0 dangling. My own mutations behave as declared.
+- **Merge and #9 guards**: the merge is clean, #9's guards pass on it, the floors are generator-exact, no pinned step changed, and no test skips.
+- **Round-3 items**: all CLOSED. Migrations and API are untouched by the closing slice.
+- **Lanes**: unit 1184 and integration 1349 are green with 0 skips on both caches; the only failures were `internal/fixtures` 10-minute timeouts, green on re-run.
+- **Text**: AGENTS.md, the evidence README and the PR body are truthful.
+
+**CI did not run** (billing), so `ci-required`, provenance and all six floor lanes on this SHA are **not obtained** (R3-CI). This is not a merge and not VERIFIED. The merge waits for the owner and a green `ci-required` on this SHA.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 56504c14683224cfd1fce0ecd7b826dcbf6de88d
