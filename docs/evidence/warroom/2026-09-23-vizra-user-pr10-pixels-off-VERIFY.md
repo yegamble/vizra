@@ -669,3 +669,184 @@ Challenge:
 **Why it still fails:** the new control is not what the PR says it is. A spec's `test.use` whose values serialise as the literals but record when Playwright reads them (N1 `toJSON`, N2 getters) passes the check. With lint, typecheck, guard, floor and stamps all green, Lane A then writes PNG, WebM and screencast frames into the uploaded directory (FINDING 6). The sentences "however it was produced" and "refuses the worker if the RESOLVED options are not…" are false as written.
 
 FINAL VERDICT: FAIL — SHA 96dd3ff553e1e230c62ad0e48d2d0b6a1261a5ed
+
+---
+
+## Re-verification at b68294b
+
+- **Verified SHA:** `b68294b027965b6df57e3705d3b15631bafd4873`, fix round 2 of 2, one commit on `96dd3ff`.
+- **Head:** confirmed with `gh api repos/yegamble/vizra-user/pulls/10` at the start and again at the end. It had not moved.
+- **Clone:** fresh, under the scratchpad (`vzv-user-pr10r2-XXXXXX`, via `mktemp -d`).
+- **Environment:** as before (Node 22.14.0, Playwright 1.63.0, Chromium 1243, Docker 29.8.0, macOS arm64).
+- **Cleanup:** the clone, the worktree, the local server on port 3904, the image `vzv-pr10r2-b68294b:demonstrate` and the detached writer process were all removed.
+
+### G1. Lanes, demos, ledger, CI
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm ci` / `npm run ci` | 0 / 0 | 21 files, **660 passed**, 0 skipped; hygiene 332 sources, 23 digest lines match |
+| `bash scripts/ci/require-checks_test.sh` | 0 | 246 cases, 253 assertions, 0 failed |
+| `bash scripts/ci/check-e2e-lane.sh .github/workflows/e2e.yml` | 0 | OK |
+| `E2E_LOCAL_PORT=3901 npm run e2e` | 0 | **18 passed**; floor 9/9 and 9/9; 18 stamps |
+| `npm run e2e:demos` (`DEMO_IMAGE=vzv-pr10r2-b68294b:demonstrate`) | 0 | **170 halves passed, 0 blocked, 0 failed**; all 16 D24 halves `ok` (d24a–f as the builder lists) |
+
+**The builder's unit claim, reproduced.**
+- With `96dd3ff`'s `recorders.ts` swapped into the head, `recorders.test.ts` gives **6 failed / 7 passed**: N1, the N1 variant, N2, Proxy, "class instance, null prototype…", and "does not use Array.prototype.filter".
+- Restored, `recorders.test.ts` and `upload-gate-pixels.test.ts` give **19/19**.
+- I also mutated the gate's `pixel_magic "$file"` to `false`. `upload-gate-pixels.test.ts` then gives **2 failed / 4 passed**: "an image whose name hides it is refused by its bytes" and "a trace archive with an image resource is refused, even with no extension".
+
+**Digest ledger.**
+- After my demos run, `mutation-digests.txt` is **byte-identical** to the committed file.
+- The committed change `96dd3ff..b68294b` is `+15/−9`:
+  - six `test.ts` lines move to `78db5fbe…`, and D15i MUTATED moves to `d9052eea…`;
+  - three `D23b recorders.ts` lines move to `4a260678…` / `5e63f733…`;
+  - seven new lines cover D24d `recorders.ts` and D24e `redact-artifacts.sh`, with `97627fe1…` before and restored.
+- `78db5fbe…`, `4a260678…` and `97627fe1…` are the sha256 of `test.ts`, `recorders.ts` and `redact-artifacts.sh` at b68294b.
+- Every other line is byte-identical. The change is as stated.
+
+**CI**, read with my own `gh api`:
+- **Check-runs:** `total_count` 8, all `completed/success`: ci-required, e2e, deps-scan, frontend, image-scan, guard, contract, GitGuardian.
+- **Workflow runs**, all `pull_request`, attempt 1: contract-ci, frontend-ci, e2e (35921131961), ci-guard, supply-chain, ci-required (35921132010).
+- **`ci-required`** printed "OK: every required check on b68294b… concluded success"; `docker-build` is optional and was not triggered.
+- **`e2e` log:** lane "18 passed", floor OK, canary OK on all 4.
+
+### G2. N1, N2 and R-a end to end, through the pinned gate
+
+Each spec was run against a local production server (port 3904), then `bash scripts/ci/redact-artifacts.sh test-results playwright-report`.
+
+| Route | Run | Pixel files before the gate | Gate | Pixels in the upload set |
+|---|---|---|---|---|
+| N1 (`toJSON`) | red: `resolved recorder option(s) screenshot, video, trace are not exactly …` | 0 png, 0 webm; `trace.zip` has no image member | rc 0 | **0** (the upload runs, carrying no pixels) |
+| N2 (getters) | red by name, `trace` | 0 / 0 | rc 0 | **0** |
+| R-a (both branded fixtures replaced, recorders on) | red, "succeeded WITHOUT the harness stamp" | **1 png, 1 webm**, `trace.zip` with `screencast/page@….jpeg` | **rc 4**, names the paths | **0: the upload is skipped** |
+
+FINDINGS 6 and 7 are closed in code: N1 and N2 are refused at runtime, and R-a's pixels are refused at the gate. FINDING 8 is closed: `--video on` was removed, and the docs note that 1.63.0 has no such flag.
+
+### G3. Trying to get pixels past the gate
+
+**Method.**
+- I used a byte-identical copy of the head's `redact-artifacts.sh`, verified with `cmp`, plus `redaction-patterns.json`.
+- Each case ran over a fresh `test-results/` + `playwright-report/results.json` tree.
+- Fixtures were a real 16×16 PNG and a `sips`-converted JPEG, a BMP, a TIFF and an ICO. `file` confirms each.
+- "CAUGHT" = non-zero exit, so nothing uploads.
+
+| Case | rc | Result |
+|---|---|---|
+| clean tree (inverse control) | 0 | passes, as it should |
+| `a.png` by name | 4 | CAUGHT |
+| PNG renamed `a.dat` (signature) | 4 | CAUGHT |
+| trace.zip member `resources/frame`, JPEG with no extension | 4 | CAUGHT |
+| trace.zip member renamed `page@x-1.bin` | 4 | CAUGHT |
+| deflate-compressed member inside a `.zip` | 4 | CAUGHT (the gate unzips) |
+| `results.json` attachment typed `image/png` with a base64 body | 4 | CAUGHT |
+| **PNG with 1 leading byte**, `a.dat` | 0 | **ESCAPED** |
+| **JPEG with 1 leading byte**, `a.dat` | 0 | **ESCAPED** |
+| **zip-in-zip**: `outer.zip` > `inner.zip` > `a.png` | 0 | **ESCAPED**: members named `*.zip` are skipped and never recursed into |
+| **a zip named `a.dat`** / **`trace.zip.bak`** holding `a.png` | 0 / 0 | **ESCAPED**: only `-name '*.zip'` is opened |
+| **gzip** `a.png.gz`, `a.dat.gz`; **tar** `a.tar` | 0 / 0 / 0 | **ESCAPED** |
+| **data-URI base64 PNG** in `error-context.md` | 0 | **ESCAPED** |
+| **base64 PNG in `results.json` stdout** | 0 | **ESCAPED** |
+| **`results.json` attachment typed `application/octet-stream`** with a base64 PNG body | 0 | **ESCAPED**: only `image/*` and `video/*` are checked |
+| **SVG with an embedded raster** (`<image href="data:image/png;base64,…">`) | 0 | **ESCAPED** |
+| **trace member with 1 leading byte** | 0 | **ESCAPED** |
+| **BMP renamed `.dat`**, **TIFF `.tif`**, **ICO `.ico`** | 0 / 0 / 0 | **ESCAPED**: no BMP, TIFF or ICO signature; `.tif` and `.ico` are not in the name list |
+| **symlink** `test-results/t1/s.dat` → a PNG outside the tree; **symlinked directory** | 0 / 0 | **ESCAPED**: `find -type f` skips links. The pinned `actions/upload-artifact@ea165f8…` (v4.6.2) uses `followSymbolicLinks = true` by default (`dist/upload/index.js:9721`, `:9770`), so the upload would carry the target's bytes |
+| hex dump of a PNG in `a.txt` | 0 | ESCAPED |
+
+**End to end, two routes that need no obfuscation step.**
+- **An image inlined as a data URI in page content.** This is the shape a `next/image` `placeholder="blur"` or any inline image produces. A harness spec serves an HTML document with `<img src="data:image/png;base64,…">` through `page.route`, then fails.
+  - The lane is red, and the gate prints **rc 0**, "no image or video is present". The upload would run.
+  - The full PNG is recoverable byte for byte, as base64, from `trace.zip::1-trace.trace` (the DOM snapshot) and `trace.zip::resources/<sha1>.html` (the response body).
+  - It is also in an attachment and in `error-context.md`, via the spec's own source frame.
+  - The app renders no image today, so a normal red run carries none. From the first slice that inlines one, it will.
+- **A file written after the gate.**
+  - A harness spec starts a detached `sh -c 'sleep 20; cp <png> test-results/late.bin'`, with eslint 0, and fails.
+  - The gate finishes at +11 s with rc 0.
+  - At +24 s, `test-results/late.bin` is a PNG.
+  - GitHub Actions kills orphan processes only at job end, and the upload step runs right after the gate. So this is a timing race the spec controls.
+
+**How the gate's scope should be stated.** The gate is a strong control for what Playwright and Chromium write. That covers the recorder PNGs, WebMs and JPEG screencast frames, `page.screenshot`, `toHaveScreenshot`, `recordVideo`, and a fetched PNG, JPEG, GIF, WebP or MP4 resource: refused by name or by signature, in files and first-level `.zip` members. It is **not** a detector of "any image or video". A precise statement:
+
+> The gate refuses the upload if a regular file under the uploaded directories, or a member of a `.zip` among them (one level), is named as an image or video (`.png .jpg .jpeg .webp .gif .avif .bmp .webm .mp4 .mov`), is a zip member whose path contains `screencast`, or begins with a PNG, JPEG, GIF, WebP, Matroska/WebM or ISO-BMFF signature; or if the JSON report types an attachment `image/*` or `video/*`. That covers everything Playwright's recorders and capture APIs write. It does not detect image data encoded as text (a `data:` URI or base64 — in a DOM snapshot, an HTML response in `resources/`, `results.json` or a log), SVG, BMP, TIFF, ICO or JPEG XL by content, archives nested in archives or not named `.zip`, gzip or tar streams, signatures not at byte 0, symbolic links (which the pinned upload action follows), or files written after it runs. It is a check on known shapes, not a proof that no pixels are present.
+
+### G4. The docs under "no false-guarantee merges"
+
+| Sentence at b68294b | Verdict |
+|---|---|
+| The upload table: `test-failed-1.png`, `video.webm`, "and any other image or video: **never uploaded** … if any image or video file, trace screencast frame or image resource is present, **whatever produced it**" | **False as written.** Data-URI images (measured end to end), other formats, encodings, nested or non-`.zip` archives, symlinks and post-gate writes are uploaded (G3) |
+| § "What PR A still guarantees": "Images and video are NOT published: the gate refuses the upload (exit 4) if any image or video file … is present, whatever produced it" | **False as written**, same evidence |
+| NOT-covered table: "DOM snapshots the trace viewer re-renders as the page's structure and text (**image bytes, whether fetched, screenshotted or recorded, are refused** at the upload gate)" and "a DOM snapshot … **with no image bytes behind it**" | **False** for inline (data-URI) images: the bytes are in `1-trace.trace` and `resources/*.html` after the gate |
+| "It does not ask how the pixels were produced, so it holds for a recorder turned on by any spelling, for a spec that leaves the harness, and for a spec's own capture API" | True for what those produce: recorder output, `page.screenshot`, `toHaveScreenshot`, `recordVideo` and R-a are all caught, by signature or name. It would be accurate with "for the files those write" added |
+| The runtime check: plain values only, N1 and N2 refused, stated as the early control with its in-process residual | **True, measured** (unit red on the old code, then green; runtime refused by name; 0 pixels) |
+| "What this does NOT stop": R-a and spec capture APIs write pixels on the runner, and the gate refuses them in uploaded paths | True for the shapes they write. It omits G3's encoded, nested, symlinked and late shapes |
+| "the app ships no raster image today, so a normal red run carries none" | True. It also means that from the first image slice, a red run that fetched any image will upload **nothing**, because the gate refuses the whole set. That diagnosability cost is implied, not stated |
+| `--video` removed; "Playwright 1.63.0 has no `--video` flag" | True, measured |
+
+### G5. Findings at b68294b
+
+Earlier findings 1–8 are all closed in code. FINDINGS 6 and 7 are closed by the plain-value runtime check and the gate; FINDING 8 by the edit.
+
+```
+FINDING 9: The upload gate is documented as refusing "any image or video … whatever produced it"; it detects known file shapes, and pixels in other shapes are uploaded — including inline data-URI images, the shape a photo app's pages produce
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     AGENTS.md (upload table row "never uploaded … whatever produced it"; § What PR A still guarantees "Images and video are NOT published"; NOT-covered row "image bytes, whether fetched, screenshotted or recorded, are refused"; "a DOM snapshot … with no image bytes behind it"), scripts/ci/redact-artifacts.sh (PIXEL_NAME_RE, pixel_magic, refuse_pixels `find -type f ! -name '*.zip'`, archives only `-name '*.zip'`)
+  requirements: VZ-FOUND-008 (security seat Q3/F14)
+
+Observed:
+  End to end: a harness spec serving `<img src="data:image/png;base64,…">` and failing → gate rc 0 → full PNG byte-for-byte
+  (as base64) in trace.zip::1-trace.trace and trace.zip::resources/<sha1>.html.
+  A detached writer started by a spec lands a PNG in test-results/ 13 s after the gate returned 0.
+  Fixture trees, gate rc 0: PNG/JPEG with 1 leading byte; zip-in-zip; zip named .dat / .zip.bak; .png.gz; .tar; base64 in
+  error-context.md / results.json stdout / an octet-stream attachment; SVG with embedded raster; BMP/TIFF/ICO; symlinked
+  file and directory (actions/upload-artifact v4.6.2 follows symlinks by default); hex dump.
+  Caught, rc 4: named PNG, renamed PNG, extension-less and renamed trace members, deflated members, image/* attachment, R-a.
+
+Failure:
+  Three sentences promise that no image is published whatever produced it. The control is signature-based and first-level.
+  Most escapes need deliberate encoding by spec code (the stated `run:` class), but the data-URI one needs only a page that
+  inlines an image — a normal Next.js shape (blur placeholders), and the first image slice will produce it.
+
+Perspective:
+  operator | photographer
+
+Recommendation:
+  Docs (required): replace the three sentences with the scope statement in G3, and state the diagnosability consequence (once
+  the app fetches any raster, a red run's upload is refused whole).
+  Code (optional, small): also refuse any file or archive member containing `data:image/` or `data:video/` (zero hits in
+  today's tree), recurse into nested archives or refuse them, and refuse symbolic links under the uploaded paths
+  (`find -type l`). Post-gate writes are the `run:` class and belong in § Residuals.
+
+Acceptance criteria:
+  No sentence says "any image", "never uploaded" or "whatever produced it" unless each G3 case is refused; the data-URI
+  end-to-end case is either refused (rc ≠ 0) or named as an uncovered channel in the NOT-covered table.
+
+Tests:
+  upload-gate-pixels.test.ts: add the data-URI-in-trace, symlink and nested-zip trees as refused cases if the code option is
+  taken, or as named residual cases asserting rc 0 if only the docs change.
+
+Cross-repo implications:
+  core: none | user: this PR and PR B (Lane B's upload rides the same gate) | search: none | meta: none
+
+Challenge:
+  Q3 asked for the recorders off, asserted; that is delivered and then some, and every escape but one needs spec code that
+  deliberately hides pixels — which a spec can always do. True; but the PR's contract text claims the stronger property,
+  and the one escape that needs no intent is the one a photo site will hit first.
+```
+
+### Re-verification verdict
+
+**What passed:**
+- Every code finding from both earlier rounds is closed.
+- The runtime check refuses N1 and N2, and the unit tests are red on the old code.
+- The gate refuses every pixel file Playwright's recorders and capture APIs write, R-a included. D24 reproduces (170/0/0).
+- The ledger change is exactly as stated.
+- The lanes reproduce (660/0, 246/253/0, Lane A 18).
+- CI is 8/8 green, with `ci-required` green and its manifest honest.
+
+**Why it still fails:** AGENTS.md states the gate's scope as "any image or video … never uploaded … whatever produced it". That is a guarantee the gate does not provide. Measured end to end, an inline data-URI image survives the gate byte for byte in the trace, and so do several other shapes. The blocking item is a documentation change: the G3 scope statement plus the data-URI row. An optional ~10-line gate addition would close the data-URI and symlink cases. No other code change is required for Q3.
+
+FINAL VERDICT: FAIL — SHA b68294b027965b6df57e3705d3b15631bafd4873

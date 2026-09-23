@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 231 — **meta #6 MERGED** `e4c7be8` → `e4f625e` (ledger status only from committed records, checked by an out-of-process output check with exact keys, duplicate-key refusal, canonical bytes and evidence-on-main byte identity, plus online GitHub facts and `ci-required`; final re-verification PASS after two fix rounds; 15 new escape attempts caught). **Merged today: 11.** Dispatched 2u (records onto main via a path-limited import + the CODEOWNERS wording sweep) to builder `a2e0c4efc60a7a6be`. In flight: user #10 last round, core test stability, core 2t, meta 2u. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 239 — **meta #7 MERGED** `939b32d` → `608ffbf` (war-room records on main + CODEOWNERS wording sweep; verifier PASS, `ci-required` green on the verified SHA, head unmoved, the body NIT corrected without a commit). **Merged today: 12.** Chair records now go by short PRs against main (branch `chore/warroom-records-2026-09-23b`); the old records branch is retired. Sentinel-pr on core #15 at `96b8999`: nothing blocks; 5 NIT (F-1/F-2 R1 `-timeout 8m` doc claims, F-3 non-unix compile break in `internal/testtmp`, F-4 floors not raised for the new leak tests, F-5 absolute temp path in evidence) + Q-1…Q-3; to be batched with the verifier's verdict. Core #14 fix-round builder had stopped before pushing; resumed. In flight: core #14 fix, core #15 verifier, user #10 re-plan builder, meta 2j (builder `a2e0c4efc60a7a6be`). History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -144,6 +144,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-09-23 | vizra (meta) | #7 war-room records onto main (queue 2u) + CODEOWNERS wording sweep | `939b32d` → `608ffbf` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-meta-pr7-records-VERIFY.md`, FINAL VERDICT PASS — SHA 939b32d…); chair's own check-runs: `ci-required` success on `939b32d`. Verifier NIT (`.github/required-checks.txt:10` CODEOWNERS claim) corrected in the PR body without a commit → queue 2j. | Records on main; ledger VERIFIED entries now possible from evidence on main. |
 | 2026-09-23 | vizra (meta) | #6 ledger status only with mechanical evidence (queue 2i; carries meta #5 NITs R-N1/R-N2) | `e4c7be8` → `e4f625e` (squash, `--match-head-commit`) | Verifier PASS after two fix rounds (`docs/evidence/warroom/2026-09-23-meta-pr6-ledger-status-VERIFY.md`: FAIL `36913d2`, FAIL `b694813`, PASS `e4c7be8`); `validate` + `ci-required` + GitGuardian green. NITs → folded into 2u's wording commit. | 0 status records; VERIFIED now requires evidence on main (2u). |
 | 2026-09-23 | vizra-core | #12 hardening B3: HTTP-path redaction (N-7/F-1), log-site coverage checker, L-2 cancelled ctx | `25f62ac` → `a6bc77d` (squash, `--match-head-commit`) | Verifier PASS after one fix round (`docs/evidence/warroom/2026-09-23-vizra-core-pr12-b3-redaction-VERIFY.md`: FAIL at `6edaf83` on a redaction overclaim, PASS at `25f62ac`); six required checks + `ci-required` green; `image-scan` pre-existing red. Follow-ups → 2w. | Hardening; no ledger item. |
 | 2026-09-23 | vizra-core | #13 hardening B5d: allowlist Makefile grammar + one line reader (ported from search `4810048`) | `66fcb2e` → `3994893` (squash, `--match-head-commit`) | Verifier PASS (`docs/evidence/warroom/2026-09-23-vizra-core-pr13-b5d-allowlist-grammar-VERIFY.md`: PASS at `54a1376`, comment-only re-confirmation PASS at `66fcb2e`); `ci-required` + six required checks green; `image-scan` pre-existing red. F-1 (non-closure recipe lines not refused pre-make) → queue 2o. | CI control; no ledger item. |
@@ -175,6 +176,14 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 239 (2026-09-23) — meta #7 merged (`608ffbf`); 12 merges today; sentinel-pr core #15: 5 NIT, none blocking; core #14 fix builder resumed.
+- Tick 238 (2026-09-23) — core #14 verifier PASS; sentinel findings consolidated into fix round 1 of 2.
+- Tick 237 (2026-09-23) — core #15 (test stability) → verifier + sentinel-pr.
+- Tick 236 (2026-09-23) — quiet.
+- Tick 235 (2026-09-23) — sentinel-pr on core #14: 4 confirmed (rolling-deploy claim break, dead mutation cases, 0006 wording, 5xx log drop); held for the verifier's verdict.
+- Tick 234 (2026-09-23) — user #10 FAIL at `b68294b` (gate scope overclaimed) → re-planned; meta #7 (records) → verifier.
+- Tick 233 (2026-09-23) — meta #7 and core #15 opened.
+- Tick 232 (2026-09-23) — core #14 (2t) → verifier + sentinel-pr; user #10 last round → re-verifying.
 - Tick 231 (2026-09-23) — meta #6 merged (`e4f625e`); 11 merges today; 2u dispatched.
 - Tick 230 (2026-09-23) — quiet.
 - Tick 229 (2026-09-23) — core #12 merged (`a6bc77d`); 10 merges today; user #10 FAIL (runtime check fooled) → last round: gate pixels at upload.
