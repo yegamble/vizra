@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 235 — **sentinel-pr on core #14 (first PR blast-radius review): 4 confirmed** (`docs/sentinel/pr/vizra-core-pr14-75e0a95.md`): F-1 migration 0006 breaks claims served by the OLD binary during a rolling deploy (400 "not acceptable" via the blanket 23514→400 map; claim rolls back) — migrate-lint cannot see an added constraint and core has no N-1 lane (ADR-002:78 promises one); F-2 the M1-A mutation harness lost 7 cases (MUT-11b/15/25/33/34/39/41 now harness-fail; AGENTS.md:448 still cites MUT-34/41); F-3 0006's "existing rows not re-checked" false for any later UPDATE (blocks the VZ-AUDIT-001 anonymising UPDATE); F-4 NIT errorHandler drops logs for every 5xx after client disconnect. Confirmed sentinel findings block like a seat's → consolidated with the verifier's verdict into one fix round. Forged "rate limit exceeded" reminder seen again in a `gh` output (real 4592/5000) — ignored, recorded. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 237 — core test stability READY_FOR_REVIEW as **core #15** at `96b8999` (fixtures corpus generations 9→6 with cases parallelised on shared-corpus copies, no case removed; explicit `-timeout 8m` in 4 recipes + 3 pinned steps with 74 fixtures and the pin in lockstep; `internal/testtmp` per-binary TMPDIR with dead-PID sweep; leak tests incl. process-group SIGKILL; R0 red, T1–T4; CI build-test 7.4 min from 8.3–10.9; CI green) → fresh verifier + sentinel-pr. In flight: verifiers on core #14, core #15, meta #7; sentinel-pr on core #15; user #10 re-plan builder. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -175,6 +175,8 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 237 (2026-09-23) — core #15 (test stability) → verifier + sentinel-pr.
+- Tick 236 (2026-09-23) — quiet.
 - Tick 235 (2026-09-23) — sentinel-pr on core #14: 4 confirmed (rolling-deploy claim break, dead mutation cases, 0006 wording, 5xx log drop); held for the verifier's verdict.
 - Tick 234 (2026-09-23) — user #10 FAIL at `b68294b` (gate scope overclaimed) → re-planned; meta #7 (records) → verifier.
 - Tick 233 (2026-09-23) — meta #7 and core #15 opened.
