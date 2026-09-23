@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 232 — core 2t READY_FOR_REVIEW as **core #14** at `75e0a95` (S-0002…S-0007, S-0009, S-0010 fixed test-first, each red on `a6bc77d`; migration 0006 adds a `NOT VALID` CHECK for `token_generation`; M1–M16; unit 1575, integration 1769 on both caches; CI pending) → fresh verifier + `vizra-sentinel-pr` (migration PR; post: no). user #10 last round at `b68294b` (pinned upload gate refuses image/video/screencast by name, member and magic bytes; runtime check plain-values only; D24 16 halves; CI 8/8) → re-verifying. In flight: verifier + sentinel-pr on core #14, verifier on user #10, core test stability, meta 2u. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 234 — user #10 last round **FAIL at `b68294b`** (round cap): code findings 1–8 closed (N1/N2 refused, R-a pixels refused at the gate, 170/0 demos, ledger exact, CI 8/8), but FINDING 9: AGENTS.md says the gate refuses any image "whatever produced it"; escapes measured — inline `data:image` DOM snapshot recoverable from a trace, nested archives, symlinks (upload-artifact follows them), BMP/TIFF/ICO, offset headers, a post-gate write. **Re-planned** with a fresh builder: data-URI + symlink + nested-archive refusals at the gate, the verifier's G3 scope statement, residuals named. meta 2u READY as **meta #7** at `939b32d` (68 record paths imported unedited from `cff8f9b` + CODEOWNERS wording sweep; CI and GitGuardian green) → fresh verifier. In flight: verifiers on meta #7 and core #14, sentinel-pr on core #14, core #15 builder report pending, user #10 re-plan builder. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -175,6 +175,8 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 234 (2026-09-23) — user #10 FAIL at `b68294b` (gate scope overclaimed) → re-planned; meta #7 (records) → verifier.
+- Tick 233 (2026-09-23) — meta #7 and core #15 opened.
 - Tick 232 (2026-09-23) — core #14 (2t) → verifier + sentinel-pr; user #10 last round → re-verifying.
 - Tick 231 (2026-09-23) — meta #6 merged (`e4f625e`); 11 merges today; 2u dispatched.
 - Tick 230 (2026-09-23) — quiet.
