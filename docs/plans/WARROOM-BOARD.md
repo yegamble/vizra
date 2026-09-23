@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 221 — meta #6 (ledger status gate) **FAIL at `36913d2`**: builder's refusals confirmed correct and all lanes reproduced, but a status reaches `features.json` from a section source with every lane green (extra `"status"` key; `str` subclass; wrapped DSL check); two online guards (non-main base, non-Actions `ci-required`) untested; four sentences overclaim; free-text verdict qualifiers admitted. Ruling (R5/R7): an out-of-process check over the generated `features.json` (exact keys; status/evidence ids == record ids), tests for the two guards, docs narrowed, qualifier allowlist → round 1 of 2. In flight: fixes on meta #6, core #12, user #10; core 2p. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 222 — core 2p READY_FOR_REVIEW as **core #13** at `54a1376` (allowlist Makefile grammar as the primary pre-make control + one line reader, ported from search `4810048`; T0 red on `96d19b3`; with the grammar removed 47/80 out-of-grammar lines are accepted; C33–C41 red → green on 3.81/4.3; real Makefile fits unchanged; CI green, `image-scan` pre-existing red; local unit report timed out under load, package alone passes) → verifier `a831939d77bb63407`. Pre-existing finding (false refusal only): a multi-line env var with a rule-looking line makes the anchor's `-pn` parse fail closed → register S-0021. In flight: verifier on core #13; fixes on meta #6, core #12, user #10. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -171,6 +171,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 222 (2026-09-23) — core #13 (B5d allowlist grammar) → verifier.
 - Tick 221 (2026-09-23) — meta #6 FAIL at `36913d2` (status reaches the output from a section source); output-side check ruled, round 1 of 2.
 - Tick 220 (2026-09-23) — sentinel spot-check: 2 MAJOR confirmed, 2 lowered to MINOR; workflow sentinel severity rule tightened.
 - Tick 219 (2026-09-23) — quiet.

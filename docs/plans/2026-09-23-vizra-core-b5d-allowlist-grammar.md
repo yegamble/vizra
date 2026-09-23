@@ -30,4 +30,9 @@ Test-first; red rows for every out-of-grammar form search covered; C-rows (gramm
 - Measurement: with the grammar removed, 47 of 80 out-of-grammar rows are ACCEPTED outright by the anchor (make run, exit 0); 33 are still refused by another check.
 - FINDING (pre-existing, not changed here): a multi-line environment variable whose lines look like `x:` makes the anchor's `-pn` database parse fail CLOSED ("target entr(ies) this guard cannot read as ONE name"). Reproducer: `VZ_B5D_INERT_MULTILINE=$'a\nfor x in y:\n' ./scripts/make-integrity-guard.sh --targets ci` → FAILED; without it → exit 0. False refusal, not a bypass. Hit by exported bash functions in the demo harness; worked around there.
 
+- Local lanes on tree `c6170f0` (scripts tree `925bdc1c…`): `make ci` 0; anchors as pinned 0/0 (8 gate, 17 closure targets, 62 recipe lines); ci-required-guard 0; db-scan-probe 0 (26 rows); `go test -race -count=1 -v ./scripts/` 0 (39 top-level, 493 PASS lines, 0 fail/skip); direct unit step + report **exit 1**: `internal/fixtures` 10m timeout at load avg ~315 (1459 executed, 0 failed, 0 skipped); re-run alone with `-timeout 30m` exit 0 (1015.9s). Recorded as FAIL locally.
+- Commit `54a1376` records the lanes in COMMANDS.md. Pushed; PR https://github.com/yegamble/vizra-core/pull/13, head `54a137680cb8c7f9be28fd6c8befd1078d32145e`.
+- CI on `54a1376`: ci-required, build-test (unit 1488 executed/0 failed/0 skipped; integration 1657/0/0; scripts 493), cache-matrix + both legs, fixtures, govulncheck, append-only, docker-build, GitGuardian all SUCCESS. image-scan (not required) FAILURE: 49 HIGH in Debian 13.7 base packages; also failing on main at 96d19b3, 36a72df, f1972e8.
+
 ## Blockers and handoff
+State READY_FOR_REVIEW. Next: independent verifier on PR #13 at `54a1376`. Queue 2o not started.
