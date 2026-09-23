@@ -101,7 +101,179 @@ other verifications.
 | GitHub `ci-required` on the head SHA | merge gate |
 
 ## Progress and evidence
-(appended below as it happens)
+
+### Decision on item 3 (the flush window): a bounded 250 ms settle, ADOPTED
+
+Measured on this machine (macOS arm64, Node v22.14.0, @playwright/test 1.63.0,
+Chromium 1243) against the local production server, with faults scheduled at
+0 / 50 / 150 / 250 / 400 / 600 ms after the test body returns:
+
+| Settle | Caught | Missed |
+|---|---|---|
+| 0 ms (the behaviour before this slice) | 0 | 50, 150, 250, 400, 600 |
+| 100 ms | 0, 50 | 150, 250, 400, 600 |
+| **250 ms (shipped)** | 0, 50, 150, 250 | 400, 600 |
+| 400 ms | 0, 50, 150, 250, 400 | 600 |
+
+The 0 ms row reproduces the verifier's measurement exactly (0 caught, 50 and 150
+missed). Cost, on the real 18-test lane against the production server:
+
+| Configuration | Before | After | Delta |
+|---|---|---|---|
+| local worker count | 3.2 s (3 runs: 3.74/3.68/3.71 s wall) | 4.4 s (4.88/4.75/5.39 s wall) | +1.2 s |
+| `--workers=2` (the CI shape, 9 tests/worker) | 4.8 s | 6.9 s | +2.1 s ≈ 250 ms × 9 |
+
+Determinism: **20 consecutive runs at `--workers=2`, every one `18 passed`,
+`coverage floor: OK (9/9 9/9)`, `harness stamp: OK (18 …)`, exit 0**, 6.3–7.0 s.
+
+**Adopted** because the window it replaces was effectively "whatever the driver
+had already delivered" — a Next.js hydration effect or deferred fetch that
+throws just after the last assertion was invisible — and the cost is a constant
+250 ms per test on a lane that already builds a Docker image. It **widens** the
+window; it does not close it. 400 ms is still missed, and D14 pins both ends so
+the number in AGENTS.md cannot drift from the code.
+
+### What ran
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run ci` | 0 | 14 files / **341 tests** / 0 skipped (baseline on `main`: 13 / 316) |
+| `npx playwright test` (local prod server) | 0 | 18 passed, floor OK (9/9 9/9), stamp OK (18) |
+| 20× `npx playwright test --workers=2` | 0 ×20 | 18 passed every run |
+| `node scripts/ci/harness-canary.mjs` | 0 | failed all **4** fixtures with the exact kind sets |
+| `bash scripts/ci/check-e2e-lane.sh` | 0 | — |
+| `bash scripts/ci/require-checks_test.sh` | 0 | 102 cases / 109 assertions / 0 failed |
+| `npm run e2e:demos` | 0 | see the evidence README for the half count |
+
+### A defect my own demonstration found
+
+The first version of the two new `check-e2e-lane.mjs` checks used
+`guard.includes("armCreationGuard")`. D13q's controlled mutation removed the
+CALL and left the import — and the check passed (exit 0, measured). Both now
+require a call (`/armCreationGuard\s*\(/`). Noted for the chair: the
+pre-existing checks in that same block (`guardBrowser`, `validatePolicy`,
+`unallowedRecords`, `claimSigner`) have the same weakness, since each name also
+appears on an import line. Not changed here — outside this slice — and reported
+rather than silently fixed.
+
+## Round 7 — the fix round (verifier FAIL on FINDING 1 at `7730500`)
+
+Verdict on round 6: **FAIL**, one blocking ground. F12 and F14 CLOSED, every
+count reproduced, the 250 ms table reproduced under CPU contention, nothing
+weakened. The blocker: a page opened and navigated in `test.beforeAll` was never
+observed — lint-green, type-green, **1 passed** on a page that 404s and throws,
+with the fixture's attachment reading `{ contextsGuarded: 2,
+contextsUnguarded: 0, creationViolations: [], records: [] }`. The listeners were
+installed by the TEST-scoped fixture, which Playwright sets up after `beforeAll`.
+
+### Runtime facts measured for this round (installed 1.63.0, probes, not assumed)
+
+```
+worker-auto SETUP
+  beforeAll
+  test-auto SETUP → beforeEach → body → afterEach → test-auto TEARDOWN
+  test-auto SETUP → beforeEach → body → afterEach → test-auto TEARDOWN
+  afterAll
+worker-auto TEARDOWN
+```
+
+- A worker-scoped AUTOMATIC fixture **is** set up before the first `beforeAll`.
+- A throw from a worker-fixture teardown gives `npx playwright test` **exit 1**
+  with "1 error was not a part of any test", even when every test passed.
+- Playwright refuses to redefine an auto worker fixture as non-auto; the attack
+  shape is `{ scope: "worker", auto: true }`, which the brand check refuses.
+
+### What changed
+
+1. **`e2e/harness/worker-guard.ts` (new)** — `vizraWorkerGuard`, worker-scoped
+   and automatic, installs `guardBrowser` + the creation guard for the worker.
+   The record buffer is append-only, so an index is a monotonic sequence number.
+2. **`vizraHarnessGuard`** keeps only the ACCOUNTING: phase 1 = everything since
+   the previous test finished, phase 2 = everything during the body; both judged
+   under the same allow-list; the failure names the phase.
+3. **The late edge for hooks** — decided: fail from the worker fixture's
+   teardown (measured exit 1), not a second per-run record. The lane guard greps
+   the assertion by call so deleting it is not silent.
+4. **Stamped ⟹ guarded, one scope up** — `createWorkerHarness` brands what it
+   builds in a module-private `WeakSet`; `vizraHarnessGuard` throws before
+   stamping if what it was handed is not branded.
+5. **FINDING 2** — `browser.newBrowserCDPSession()` refused at runtime and added
+   to the lint ban; `context.newCDPSession(page)` stays legal.
+6. **FINDING 3** — all eight `check-e2e-lane.mjs` harness checks now require a
+   CALL, with comments stripped first (the first version of that fix was
+   satisfied by a sentence in the fixture's own header comment).
+7. **FINDINGS 4 and 5** — the stamp-key prose corrected to what was measured; a
+   transcript normaliser (path, durations, Playwright completion order, browser
+   record-delivery order) plus a `mutation-digests.txt` ledger.
+
+### What ran (round 7)
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run ci` | 0 | 15 files / **355 tests** / 0 skipped |
+| `npx playwright test` (local prod) | 0 | 18 passed, floor OK (9/9 9/9), stamp OK (18) |
+| `node scripts/ci/check-coverage-floor-ran.mjs` | 0 | 18 verified |
+| `node scripts/ci/harness-canary.mjs` | 0 | all 4 fixtures, exact kind sets |
+| `bash scripts/ci/check-e2e-lane.sh` | 0 | — |
+| 20 × `npx playwright test --workers=2` | 0 ×20 | 18 passed every run, 7.1–9.7 s (round 6: 6.3–7.0 s) |
+| `npm run e2e:demos` | 0 | **123 halves passed, 0 blocked, 0 failed** (104 in round 6) |
+
+### Self-found during this round
+
+D13q's first version mutated `test.ts` for `armCreationGuard`, which had moved
+to `worker-guard.ts`; the half went green and the suite failed by name. The
+`unallowedRecords` mutation removed one of two call sites and the check rightly
+still passed. Both were fixed by the demonstration failing, which is what the
+demonstrations are for.
+
+## Round 8 — docs and comments only (chair HOLD on false guarantees, PASS at `07f2c6e`)
+
+Head `f0ee8f1`. No code, test, lint-rule, workflow, fixture or manifest change.
+
+**FINDING 7.** `withoutComments` measured directly, call removed in each case:
+nothing → RED; line comment starting a line → RED; block comment / JSDoc → RED;
+**trailing `//` comment → GREEN**; **string literal → GREEN**;
+**call-and-discard → GREEN**. Corrected in AGENTS.md § Residuals (with the table
+and the note that for the late edge this grep is the ONLY compensating control),
+in `scripts/ci/check-e2e-lane.mjs`'s header (which had asserted "this can only
+make the patterns match LESS, i.e. fail closed" — false), and in the evidence
+README. Count corrected: **eleven** checks, ten call + one presence, not eight.
+
+**FINDING 6.** `globalSetup`/`globalTeardown` named in § Residuals with the
+verifier's measurement (exit 0, `3 passed`, no guard message, module provably
+ran), the reasoning that it needs a `playwright.config.ts` edit so it is
+config-level and review-only, and the contrast that a setup PROJECT is covered.
+
+**FINDING 8.** PR body rewritten via `gh pr edit` to the verified state
+(355 tests / 0 skips, 18 e2e, 123 halves, what rounds 6–8 changed, the late
+edge's stated cost, both new residuals, artifact privacy untouched). A
+correcting comment posted; round-7 comment left in history.
+
+Both fixes are QUEUED as controls for the next slice, and neither is implemented.
+
+### Conflict flagged rather than worked around
+
+`e2e/harness/worker-guard.ts:70-71` carries the same overstatement ("greps for
+the assertion by call, so deleting it is not silent"). Its bytes are pinned by
+`docs/evidence/VZ-FOUND-008/mutation-digests.txt` (sha256
+`4fc5c024…06e9e8`, recorded BEFORE and RESTORED by D13q). Editing it would make
+a committed evidence ledger stale in a docs-only round, so it was left alone and
+AGENTS.md names the sentence, says it overstates, and says the correction lands
+with the control. **Chair's call whether to regenerate the ledger instead.**
+
+### Diff and verification
+
+`git diff 07f2c6e..f0ee8f1 --stat`: `AGENTS.md` +65/-10,
+`docs/evidence/VZ-FOUND-008/README.md` +12/-1,
+`scripts/ci/check-e2e-lane.mjs` +26/-3 — 3 files, +100/-17. The one non-markdown
+file is comment-only: both revisions stripped of every block and line comment
+are **identical over 425 lines** of executable content. All five digest-pinned
+files still match their recorded sha256.
+
+`npm run ci` 0 (15 files / 355 tests / 0 skipped); `check-e2e-lane.sh`,
+`require-checks_test.sh` (102 cases / 109 assertions), `check-required-floor.sh`,
+`check-image-pins.sh`, `check:contract` all 0. CI on `f0ee8f1`: all 8 check-runs
+pass; `OK: every required check on f0ee8f15… concluded success.`
 
 ## Blockers and handoff
-(none yet)
+None. Nothing was BLOCKED; every command above ran.

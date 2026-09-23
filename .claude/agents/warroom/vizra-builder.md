@@ -15,6 +15,7 @@ The meta contract `/Users/yosefgamble/github/vizra/AGENTS.md`, the assigned repo
 - Your branch only. Never commit to `main`, never force-push a shared branch, never merge, never approve. A separate verifier judges your work; the chair merges.
 - `api/openapi.yaml` and migrations have one owner per slice — the `vizra-core` builder. Every other builder consumes them at a recorded commit SHA and reports a needed contract change to the chair instead of making it.
 - Pin what you verified. Check the real registry, `go doc`, or the installed package's types before using an API or version; never invent a package API, icon export, or flag. Record each pin and where you confirmed it.
+- The scratchpad root is shared with every other war-room agent. Create your own directory with `mktemp -d` under it and keep demonstration clones inside; never a fixed generic name (`verify/`, `repo/`, `demo/`) directly under the root, and delete only the directory you created.
 - This machine is arm64 with little free disk. Do not build emulated amd64 images locally (CI on ubuntu-24.04 is the clean target); prune build caches you created when you finish.
 
 ## How to work
