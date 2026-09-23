@@ -1800,3 +1800,503 @@ headline privacy control can still be switched off without the guard noticing, a
 is the one thing this area is not allowed to ship.
 
 FINAL VERDICT: FAIL — SHA 4158b10f8291e23cd726e2499db760aead195f4a
+
+---
+---
+
+# Re-verification at `11f8975` (2026-09-23) — fix round 2 of 2
+
+- **SHA verified:** `11f8975ae6af08a5a0790546efd63151f5c1d6ae` — four commits on top of
+  `4158b10` (`8cc6984 38f22f3 b998d72 11f8975`), no force-push (`4158b10` still in the
+  PR's commit list). Confirmed unmoved at start and end.
+- **Environment:** macOS arm64, node v22.14.0, npm 10.9.2, Playwright 1.63.0; fresh clone
+  under a private `mktemp -d`; `npm ci` exit 0. **Host load at start: 1/5/15-min
+  101 / 219 / 296** from other work. I created no containers or images.
+
+## R3-1. `npm run ci` at the head
+
+exit 0 — **18 files / 527 tests / 0 skipped**; hygiene `OK: 289 text source(s) … 13
+mutation-digest line(s)`; **no lint warning** (the `redact.ts` leftover is gone).
+
+## R3-2. Layer 1 (static) — 38 mutations of mine, sandbox copy, restored between cases
+
+Refused by name (**RED**): my round-2 `.npmrc` `node-options=…` line; any other `.npmrc`
+key (`registry=`); `NODE_OPTIONS`, `NPM_CONFIG_NODE_OPTIONS`, `npm_config_userconfig`,
+`NPM_CONFIG_USERCONFIG`, `CI: ''`, `CI: false` in env maps; `$GITHUB_ENV` in `run:`,
+through a shell variable, and through an env-map value `${{ env.GITHUB_ENV }}`;
+`$GITHUB_PATH`; the round-2 env-map `$GITHUB_STEP_SUMMARY` indirection (my R2-FINDING A —
+**closed**); a YAML merge key in `e2e.yml` **and in another workflow file** (R2-B —
+**closed**); a duplicate key; `pree2e --require`; `continue-on-error` on the redact step;
+the upload gated on `conclusion` or `always()`. Regressions from earlier rounds all still
+RED: step-level `PLAYWRIGHT_NO_COPY_PROMPT: ""`, workflow `DEBUG`, `index.html`
+re-added, `globalSetup`, retention 14.
+
+Green, classified:
+
+| Mutation | Classification |
+|---|---|
+| `.npmrc` with a comment only | harmless |
+| `node_options` / `Node_Options` in an env map | harmless on the `ubuntu-24.04` runner — Node reads only `NODE_OPTIONS`, and it is case-sensitive there |
+| `package.json` `config` key | harmless — becomes `npm_package_config_*`, which neither Node nor Playwright reads |
+| `XDG_CONFIG_HOME` | harmless — npm does not read it |
+| `use.launchOptions.env` in the Playwright config | harmless — that is the BROWSER's environment, not the worker's |
+| `HOME` in a job or step env map (+ a committed `.ci-home/.npmrc`) | static-green; npm WOULD read `$HOME/.npmrc`, but the pinned browsers live under the original `$HOME` cache, so the lane cannot launch; layer 2 would still catch it if it did. Not a finding; worth one line in § Residuals |
+| `$GITHUB_ENV` whose NAME is built at runtime (`printenv | grep`) | the stated `run:` class |
+| top-level `process.env` mutation in `playwright.config.ts` | static-green — examined at runtime in R3-3 |
+| **redact step `run:` laundered or replaced** | **R3-FINDING H below** |
+
+### The redaction step is recognised by a substring
+
+`check-e2e-lane.mjs:320`: `const redactStep = steps.find((step) => runOf(step).includes(REDACT_SCRIPT));`
+with `REDACT_SCRIPT = "redact-artifacts.sh"`. Every one of these is **guard-green**:
+
+```
+run: bash scripts/ci/redact-artifacts.sh test-results playwright-report || true
+run: bash scripts/ci/redact-artifacts.sh test-results playwright-report; exit 0
+run: set +e; bash scripts/ci/redact-artifacts.sh test-results playwright-report; true
+run: bash scripts/ci/redact-artifacts.sh test-results playwright-report > /dev/null 2>&1 || echo skipped
+run: bash scripts/ci/redact-artifacts.sh test-result playwright-reports     # typo: "does not exist, nothing to redact", exit 0
+run: bash scripts/ci/redact-artifacts.sh test-results                      # results.json (uploaded) never redacted or gated
+run: bash scripts/ci/redact-artifacts.sh /tmp/empty
+run: echo redact-artifacts.sh                                              # the redactor never runs at all
+```
+
+Each leaves `steps.redact.outcome == 'success'`, so the upload — correctly gated on
+that — publishes whatever the lane wrote, with no URL redaction and **no page-snapshot
+gate**. The same guard already refuses `continue-on-error` on this step, with the reason
+"would report `success` however it exited — the gate below would then always…"; the
+spellings above have exactly that effect. The substring match is identical at
+`6bf0a0e`, `e096053`, `4158b10` and `11f8975` — it **predates this round, and I missed it
+in rounds 1 and 2.** It matters more now because this round's answer to the R2-E class
+names the upload gate as the layer that "does not depend on the variable at all, so for
+the page snapshot specifically it still holds". → R3-FINDING H.
+
+## R3-3. Layer 2 (runtime) — eight variants in a probe spec, `CI=1` and `PLAYWRIGHT_NO_COPY_PROMPT=1` set as the job sets them
+
+Localhost fixture server, runtime markers, shipped config; then the SHIPPED
+`redact-artifacts.sh` (layer 3) on the result.
+
+| Variant (inside a spec under `e2e/specs/`) | Layer 2 | `# Page snapshot` written | typed value on disk | Layer 3 (redactor exit) |
+|---|---|---|---|---|
+| (z) control, untouched | silent (correct) | no | no | 0 |
+| (a) module scope: `PLAYWRIGHT_NO_COPY_PROMPT = ""` | **fires at worker start**, before any page | no | no | 0 |
+| (d) body blanks it, restores `"1"` before the end | silent | no — the recorder read `"1"` | no | 0 (harmless) |
+| (c) body blanks it | fires "after the test body" | **yes (2 files)** | **yes** | **1 — blocks** |
+| (e) `test.afterEach` blanks it | fires "after the test body" | **yes** | **yes** | **1 — blocks** |
+| (g) `test.extend` auto fixture blanks it in teardown | fires "after the test body" | **yes** | **yes** | **1 — blocks** |
+| (b) module scope: `delete process.env.CI` + blank | **silent** | **yes** | **yes** | **1 — blocks** |
+| (f) body: `delete process.env.CI` + blank | **silent** | **yes** | **yes** | **1 — blocks** |
+
+Two things this establishes that AGENTS.md does not say:
+
+1. **Layer 2 after the body is detection, not prevention.** For (c), (e) and (g) it
+   fails the run by name, but the snapshot has already been written by the time the
+   context closes — and a failed run is exactly the condition under which the workflow
+   uploads. For every route after worker start, **layer 3 alone** protects the artifact.
+2. **Layer 2 is off whenever `CI` is unset, and a spec can unset it.**
+   `pageSnapshotProblem` begins `if (!env.CI) return undefined;`. A spec under
+   `e2e/specs/` with
+   ```ts
+   delete process.env.CI;
+   process.env.PLAYWRIGHT_NO_COPY_PROMPT = "";
+   ```
+   passes `eslint` (exit 0), the credential tripwire (11/11), `tsc`, the lane guard and
+   the hygiene check, and layer 2 never fires. This is not the stated residual ("code
+   that runs BEFORE the harness module loads … that replaces `process.env` itself, or
+   patches Playwright's recorder"): it runs after the harness loads and replaces nothing.
+   AGENTS.md's "Anything but exactly `"1"` fails the run by name, **whatever route
+   changed it**" is false for it.
+
+## R3-4. All three layers, defeated together — every check green
+
+A faithful local simulation of the job, one step at a time, with the probe spec (b)
+committed under `e2e/specs/` and ONE edit to `.github/workflows/e2e.yml`:
+`run: bash scripts/ci/redact-artifacts.sh test-results playwright-report || true`.
+
+```
+1. static:   check-e2e-lane exit=0   eslint exit=0   hygiene exit=0
+2. lane:     CI=1 PLAYWRIGHT_NO_COPY_PROMPT=1 npx playwright test …   exit 1  (failure() is true)
+             runtime-assertion lines in the log: 0
+3. redact:   bash -e -c 'bash scripts/ci/redact-artifacts.sh test-results playwright-report || true'
+             exit 0  -> steps.redact.outcome == 'success' -> the upload runs
+             (the gate DID print "a PAGE SNAPSHOT is present" — and `|| true` discarded it)
+4. upload set: 2 files with a '# Page snapshot' line under test-results/
+               error-context.md:25   - textbox [active] [ref=e2]: <TYPED-MARKER>
+```
+
+I did not run GitHub Actions; steps 1–3 are the job's own commands and conditions, run
+as the runner runs them (`bash -e`). Sandbox restored, `git status` clean.
+
+## R3-5. Layer 3's own precision
+
+The gate is `grep -rlxF -- '# Page snapshot'` over the plain tree and over every unpacked
+`*.zip`. Planted into a `test-results/` copy and run through the shipped script:
+
+| Planted | Gate |
+|---|---|
+| `# Page snapshot` as its own line — what Playwright writes (`errorContext.js:78`) | **exit 1** |
+| `# page snapshot`, `## Page snapshot`, trailing space, CRLF, heading inside a JSON string | exit 0 |
+| the exact heading in a zip nested inside a zip; in a `.gz` | exit 0 |
+
+The gate is exact to what Playwright writes, and that heading is pinned against
+Playwright's source (`redaction-corpus.test.ts:121` reads `errorContext.js` and expects
+`"# Page snapshot"`), so a Playwright rename turns a test red. Playwright produces none
+of the other forms, so these are not findings. In my runs the snapshot was always in
+`error-context.md` and its trace attachment, and never in `results.json`. **The gate is
+sound when it runs; R3-FINDING H is that nothing guarantees it runs.**
+
+## R3-6. The shared redaction programs
+
+**One source, confirmed.** `redact.ts:50` imports `./redaction-patterns.json` and builds
+`new RegExp(pattern, flags)` from it. `redact-artifacts.sh` decodes the same file with
+perl's core `JSON::PP` (it exits 2, BLOCKED, if the file or `JSON::PP` is missing). No
+URL program is duplicated inline in either redactor; the shell's separate HAR
+`queryString` program is not a URL shape. `redaction-corpus.test.ts` runs as part of
+`npm run ci` (527/527 green).
+
+**Out-of-corpus shapes** — runtime marker, BOTH shipped redactors, identical results
+every time (they really are one program now):
+
+| Shape | Both redactors | In the NOT-covered list? |
+|---|---|---|
+| `&` for `&` (Go), `&amp;` for `&`, `&#63;` for `?`, `%20` in the query, mixed-case `Https`, URL in backticks, after `|`, after `url:` | redacted | — |
+| `//host?q` (no path) | redacted | listed as NOT covered — safe direction |
+| `host:3000?q` (no path), `myhost/p?q` (single label) | survive | **listed** |
+| query split by a line wrap (`…?a=1&s⏎ig=<M>`) or before `?` | survive | the list names splits "across two JSON fields or two archive members", not a wrap within one field — adjacent |
+| **`https://h.example/p?q`** (`\u`-escaped slashes) | **survive** | **no** — and the Covered text says "a `\uXXXX` escape may appear inside the URL" |
+| **`…/p?sig=<M>`** (`\u`-escaped `?`) | **survive** | **no** — same sentence |
+| `https:%2F%2Fh%2Fp?q`, a fully percent-encoded URL standing alone, `\x2F`, `&#47;`, `&#x2F;`, `&sol;` | survive | no |
+| `url:h.example:3000/p?q`, `GET:/p?q`, `a;/p?q` (a `:` or `;` just before a scheme-less or relative URL) | survive | no |
+
+The programs allow `\uXXXX` in the host, path and query body, but not in place of the
+`//` after the scheme, nor as the `?` separator. The Covered sentence is broader than
+that. Reachability is low — Go, JS, PHP (default) and Python do not emit `/` or
+`?` — so this is not the round-1/round-2 class at blocking strength. → R3-FINDING I.
+
+## R3-7. Per-commit truth, and my round-2 FINDING D
+
+`npm run ci` cold at each new commit (separate clone; `git clean -fdx -e node_modules`;
+caches removed; no lockfile change in this round). Load averages 163–209 throughout.
+
+| Commit | Exit | Files | Tests | Skipped | Lint |
+|---|---|---|---|---|---|
+| `8cc6984` | 0 | 17 | 518 | 0 | clean |
+| `38f22f3` | 0 | 18 | 526 | 0 | clean |
+| `b998d72` | 0 | 18 | 527 | 0 | clean |
+| `11f8975` | 0 | 18 | 527 | 0 | clean |
+
+These match the builder's claim exactly (17/518, 18/526, 18/527, 18/527).
+
+**Round-2 FINDING D — closed.** The expected labels are now read from `demonstrate.sh`:
+an emptied ledger, a deleted first line, a label renamed `D12 → D99` and a zeroed digest
+are each **RED by name**. A duplicated *valid* line passes ("14 lines match") —
+harmless.
+
+## R3-8. `npm run e2e:demos` — two consecutive runs, clean quiescent tree
+
+Dedicated clone, production build (`PUBLIC_ORIGIN=http://127.0.0.1:3211`), tree reset
+between runs, nothing else of mine running, nothing edited during either run. The host
+was far from quiet (other work).
+
+**Run 1:** 01:57:56 → 02:38:38, load (1/5/15) 130 / 169 / 205 → 159 / 235 / 265 —
+**133 passed, 0 blocked, 0 failed, exit 0.** Among them:
+
+```
+ok   d14-late-fault-150ms-RED                                   (exit 1, 'late fault demonstration (D14)')
+ok   d14-late-fault-after-the-window-is-not-charged-GREEN       (exit 0, '1 passed')
+ok   d11f-in-process-reporter-deleted-GREEN                     (exit 0, '20 passed')
+ok   d16a-page-snapshot-without-the-variable-RED                (exit 1, 'PAGE SNAPSHOT is present')
+ok   d16a-no-page-snapshot-with-the-variable-GREEN              (exit 0, 'and no page snapshot is present')
+ok   d16b-npmrc-node-options-refused-by-the-lane-guard-RED      (exit 1, '.npmrc sets `node-options`')
+ok   d16b-npmrc-node-options-refused-at-RUNTIME-RED             (exit 1, 'PLAYWRIGHT_NO_COPY_PROMPT is not')
+ok   d16c-variable-blank-in-the-environment-RED / -unset-RED   (exit 1)
+ok   d16c-variable-exactly-1-with-CI-set-GREEN                  (exit 0, 'harness stamp: OK')
+ok   d16d-escaped-url-reaches-the-upload-set-RED                (exit 1)
+ok   d16d-escaped-url-redacted-by-the-shipped-path-GREEN        (exit 0, 'members containing the sentinel: 0')
+ok   d16d-error-context-carries-test-source-GREEN               (exit 0, '# Test source')
+```
+
+(The last line answers the `# Test source` nit I carried from round 1: the section IS
+written when the failing error's stack points at a readable file, and AGENTS.md now says
+exactly that. Closed.)
+
+**Run 2** (immediately after, tree reset): 02:38:38 → 03:14:18, load 159 / 235 / 265 →
+195 / 162 / 212 — **133 passed, 0 blocked, 0 failed, exit 0.** `d14-late-fault-150ms-RED`,
+`d14-late-fault-after-the-window-is-not-charged-GREEN` and
+`d11f-in-process-reporter-deleted-GREEN` all passed again.
+
+**The builder's 133 / 0 / 0 reproduces, twice in a row, at load averages above anything
+in earlier rounds.** My round-2 FINDING G is closed.
+
+**D14, stated honestly.** The LIMIT half no longer demonstrates "a late fault is missed";
+it fires the fault 20 s after the body and asserts only that such a fault is **not charged
+to the test**. That is an invariant as long as worker teardown finishes inside 20 s. It
+did in all four of my D14 runs, at loads up to 265. It is a margin, not a proof — the
+builder says the same ("teardown > 20 s" would break it), and I agree with that wording.
+
+## R3-9. Lanes at `11f8975`, run by me
+
+| Lane | Result |
+|---|---|
+| `npm run ci` | exit 0 — 18 files / 527 tests / 0 skipped; 0 lint warnings; hygiene 289 / 13 |
+| `bash scripts/ci/require-checks_test.sh` | exit 0 — **182 cases, 189 assertions, 0 failed** (matches) |
+| `check-e2e-lane.sh`, `check-required-floor.sh`, `check-image-pins.sh`, `check:contract` | exit 0 each |
+| `CI=1 PLAYWRIGHT_NO_COPY_PROMPT=1 npx playwright test` | exit 0 — **18 passed**, floor OK (9/9 9/9), **18 stamps** — so layer 2 is active and quiet on the honest lane |
+| `node scripts/ci/harness-canary.mjs` (same env) | exit 0 — failed all 4 fault-injection fixtures, each for its own kind |
+| tripwire + `redaction-corpus.test.ts` | 105/105 |
+| `npm run e2e:demos` | 133 / 0 / 0, twice (R3-8) |
+
+**Regression:** tokenising call check — trailing comment RED `absent`, string RED `absent`,
+`void` RED, shadowed RED, real call GREEN. Sanitiser — `"  ::"` and `"\t::"` broken with
+U+200B, `\n` → `⏎`, `%0A` → `%250A`, `Foo::bar` untouched. `index.html` re-add,
+`globalSetup`, retention 14, step-level and workflow-level env — all RED (R3-2). F10 pair —
+D16a. No credential-format literal in the four commits' added lines (0 hits); the one spec
+change (`home.spec.ts`) is a `networkidle` and visibility wait — nothing that
+authenticates, fills a credential or touches a signed URL. The hard rule stands.
+
+## R3-10. CI on `11f8975` (read with `gh`)
+
+All **9** check-runs `completed` / `success`; `ci-required` finished last (05:31:57Z,
+after `e2e` at 05:31:27Z). `.github/required-checks.txt` blob `f2f23454…` — byte-identical
+to main's; `frontend`, `contract`, `?guard`, `?docker-build`, `e2e` all ran and succeeded.
+`e2e` run `35822597458`: `18 passed`, floor OK 9/9 9/9, `harness stamp: OK (18 …)`, canary
+4/4; artifacts **0** (a green run). **There has still never been a RED CI run on any SHA of
+this PR**, so the upload path has never been exercised in GitHub.
+
+## R3-11. Truthfulness — sentences stronger than their control
+
+1. AGENTS.md (layer 3) and the PR body: "`redact-artifacts.sh` refuses — exits non-zero,
+   **so the gated upload publishes nothing**" and "Layer 3 does not depend on the variable
+   at all, **so for the page snapshot specifically it still holds**". True of the script;
+   not of the lane, whose guard accepts a redaction step that does not run the script, or
+   discards its exit code. → R3-FINDING H.
+2. AGENTS.md's Commands table: the guard ensures "EVERY upload step is gated on the
+   redaction having succeeded". The upload is gated on a step whose `run:` merely
+   CONTAINS `redact-artifacts.sh`. → R3-FINDING H.
+3. AGENTS.md and the PR body (layer 2): "Anything but exactly `"1"` fails the run by
+   name, **whatever route changed it**". Not when the route also deletes `CI`. And the
+   stated residual ("code that runs BEFORE the harness module loads … that replaces
+   `process.env` itself, or patches Playwright's recorder") does not describe that route.
+   → R3-FINDING J.
+4. AGENTS.md: "a `\uXXXX` escape may appear inside the URL". Not in place of the `//` or
+   the `?`. → R3-FINDING I.
+
+Accurate, and verified: the four-program table and its examples; "one program in
+behaviour, by construction"; the NOT-covered list (every item on it measured as stated,
+one in the safe direction); the file-by-file publication table; D16a–d as described; the
+per-commit counts; the D14 wording; the two process notes in the PR body; "0 warnings"; 289 sources.
+
+## Status of my round-2 findings at `11f8975`
+
+| # | Round-2 finding | At `11f8975` |
+|---|---|---|
+| E | `.npmrc` `node-options` blanks the variable, guard green (BLOCKER) | **closed as stated** — any committed `.npmrc` key is refused (my line is RED), `NODE_OPTIONS`/`npm_config_*`/`CI` refused in every env map, and layer 2 catches it at runtime (D16b, and my own probes). The CLASS is not closed: R3-FINDING H and J below |
+| C | shell redactor ≠ `redact.ts`; realistic escaped URL survives | **closed** — one pattern file, one behaviour, measured identical on 26 out-of-corpus shapes; D16d reproduces my real-lane survivor and its fix. A residue of sentence breadth is R3-FINDING I |
+| A | `$GITHUB_STEP_SUMMARY` via an env map | **closed** |
+| B | `$GITHUB_ENV` unmodelled; merge keys | **closed** — refused in `run:` text and env values, and merge keys refused in every workflow; a runtime-built NAME remains the stated `run:` class |
+| D | empty/trimmed ledger passes | **closed** |
+| G | demos not reproducible under load; D14 timing | **closed as far as I can measure** — see R3-8 |
+| F | stale counts, lint warning, sources count | **closed** — per-commit counts match exactly; 0 lint warnings; 289 sources |
+| round-1 9(b) | no F10 red/green pair | **closed** — D16a |
+
+## Findings at `11f8975`
+
+```
+R3-FINDING H: the redaction step is recognised by a SUBSTRING, so the upload gate —
+              and all URL redaction — can be switched off with the guard green
+Severity:    BLOCKER
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     scripts/ci/check-e2e-lane.mjs:320
+               const redactStep = steps.find((step) => runOf(step).includes(REDACT_SCRIPT));
+             (REDACT_SCRIPT = "redact-artifacts.sh"; the step's `run:` text is otherwise unread)
+             AGENTS.md: "EVERY upload step is gated on the redaction having succeeded";
+             "redact-artifacts.sh refuses — exits non-zero, so the gated upload publishes
+             nothing"; "Layer 3 does not depend on the variable at all, so for the page
+             snapshot specifically it still holds". PR body: layer 3 "so the gated upload
+             publishes nothing".
+  requirements: VZ-FOUND-008
+
+Observed:
+  Guard-green spellings of the redaction step (each leaves steps.redact.outcome ==
+  'success', so the correctly-gated upload runs):
+      run: bash scripts/ci/redact-artifacts.sh test-results playwright-report || true
+      run: bash scripts/ci/redact-artifacts.sh test-results playwright-report; exit 0
+      run: set +e; bash scripts/ci/redact-artifacts.sh …; true
+      run: bash scripts/ci/redact-artifacts.sh … > /dev/null 2>&1 || echo skipped
+      run: bash scripts/ci/redact-artifacts.sh test-result playwright-reports   (typo -> "nothing to redact", exit 0)
+      run: bash scripts/ci/redact-artifacts.sh test-results                     (results.json never redacted or gated)
+      run: echo redact-artifacts.sh                                             (the redactor never runs)
+  The same guard refuses `continue-on-error` on this step BECAUSE it "would report
+  `success` however it exited". Every spelling above has that effect.
+
+  End to end (R3-4): a two-line spec under e2e/specs/
+      delete process.env.CI; process.env.PLAYWRIGHT_NO_COPY_PROMPT = "";
+  plus `|| true` on the redaction step. Lane guard exit 0, eslint exit 0, hygiene exit 0,
+  tripwire 11/11. The lane fails (so the upload condition is met), layer 2 never fires,
+  the shipped gate prints "a PAGE SNAPSHOT is present" and `|| true` discards it (step
+  exit 0), and the upload set holds 2 files with a `# Page snapshot` line —
+  error-context.md:25 `- textbox [active] [ref=e2]: <TYPED-MARKER>`.
+
+Failure:
+  All three layers of the answer to the R2-E class fail together, and every check this
+  repository runs stays green. Separately from the page snapshot, `run: echo
+  redact-artifacts.sh` turns off ALL URL redaction on a red lane — the control this
+  whole lineage (PR #3 onward) exists for. The substring match predates PR #8
+  (identical at 6bf0a0e, e096053, 4158b10 and 11f8975) and I missed it in rounds 1 and 2;
+  it becomes blocking now because this round names layer 3 as the backstop that "still
+  holds" when layers 1 and 2 do not.
+
+Perspective: developer, then member (from M1 the page is the product)
+
+Recommendation:
+  Pin the redaction step's `run:` EXACTLY, as the guard already does for the lane step
+  (`npm run e2e`) and the canary: `bash scripts/ci/redact-artifacts.sh test-results
+  playwright-report` and nothing else. That one change closes every spelling above.
+  Keep the existing continue-on-error, if:, id and ordering checks.
+
+Acceptance criteria:
+  require-checks_test.sh: each of the seven spellings above is RED by name, and the
+  exact literal stays green.
+
+Tests: scripts/ci/require-checks_test.sh (seven cases).
+Cross-repo implications: core: none | user: as above | search: none | meta: the same
+  exact-match rule for any privacy-bearing step in a future CI fan-in.
+Challenge:
+  "It needs an edit to e2e.yml, a CODEOWNERS path." So did round-1 FINDING 2 (a
+  step-level env line) and round-2 FINDING E (a committed `.npmrc` line), both ruled
+  blockers on the same reasoning: the guard exists because these properties are
+  invisible in a green run, and it already refuses `continue-on-error` here for exactly
+  this outcome.
+```
+
+```
+R3-FINDING J: layer 2 is off whenever `CI` is unset, a spec can unset it, and after the
+              body it detects rather than prevents
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     e2e/harness/ci-environment.ts (`if (!env.CI) return undefined;`)
+             eslint config / e2e/harness/no-credentials-in-specs.test.ts (neither refuses
+             `process.env` writes in e2e/specs)
+             AGENTS.md: "Anything but exactly "1" fails the run by name, whatever route
+             changed it"; the stated residual ("code that runs BEFORE the harness module
+             loads … that replaces `process.env` itself, or patches Playwright's recorder")
+  requirements: VZ-FOUND-008
+
+Observed (R3-3):
+  - `delete process.env.CI; process.env.PLAYWRIGHT_NO_COPY_PROMPT = "";` at a spec's
+    module scope or in its body: layer 2 silent; snapshot and typed value written.
+    eslint exit 0, tripwire 11/11, tsc exit 0, lane guard exit 0.
+  - Blanking the variable in the body, in `afterEach`, or in a `test.extend` fixture's
+    teardown: layer 2 fires by name "after the test body" — but the snapshot has already
+    been written (2 files, typed value present). A failed run is precisely when the
+    workflow uploads, so for every route after worker start, only layer 3 protects.
+  - Blanking at module scope is caught at worker start, before any page opens (the one
+    route where layer 2 prevents).
+Failure:
+  The residual is misstated (this route runs AFTER the harness loads and replaces
+  nothing), "whatever route changed it" is false for a route that changes `CI`, and the
+  layer's after-body check is described as if it stopped the snapshot.
+Recommendation:
+  - Capture `CI` and the variable once, at harness module load (config evaluation), and
+    compare the worker's live values against that capture — deleting `CI` later is then
+    itself a failure.
+  - Refuse writes to `process.env` in e2e/specs/** and e2e/demos/** (lint rule or the
+    tripwire), with the harness exempt.
+  - Say in AGENTS.md that the after-body check makes the run red with the snapshot
+    already on disk, and that the upload gate is what keeps it off the runner.
+Acceptance criteria: the probe spec above FAILS at runtime by name (or is refused by
+  lint); AGENTS.md's sentence matches.
+Tests: e2e/harness/ci-environment.test.ts; one demonstrate.sh half.
+Challenge: "Layer 3 catches it." Only while R3-FINDING H stays open — which is the point
+  of defence in depth.
+```
+
+```
+R3-FINDING I: the Covered text says a `\uXXXX` escape may appear inside the URL; a
+              `\u`-escaped `//` or `?` survives both redactors
+Severity:    SHOULD
+Confidence:  high
+Affected: vizra-user; e2e/harness/redaction-patterns.json; AGENTS.md "JSON escaping, at up
+  to three levels … and a `\uXXXX` escape may appear inside the URL"; the NOT-covered list
+Observed (R3-6), identical in both shipped redactors:
+  survive: `https://h.example/p?q`, `…/p?sig=`, `%2F`-encoded slashes,
+  a fully percent-encoded URL standing alone, `\x2F`, `&#47;`, `&#x2F;`, `&sol;`,
+  `url:host:3000/p?q` / `GET:/p?q` / `a;/p?q` (`:` or `;` just before a scheme-less or
+  relative URL), and a query split by a line wrap inside one field.
+  None of these is in the NOT-covered list. Low reachability: Go, JS, PHP (default)
+  and Python do not emit `/` or `?`.
+Recommendation: narrow the sentence to "`\uXXXX` inside the host, path or query", and add
+  the unmatched shapes to the NOT-covered list, in the same voice as the no-path ones.
+Acceptance: each shape either redacts in the corpus, or is named in the list.
+```
+
+```
+R3-FINDING K: a user-level npmrc via `HOME` is not refused statically
+Severity:    NIT
+Observed: `HOME: …` in a job or step env map is guard-green, and npm reads `$HOME/.npmrc`.
+  In practice the lane cannot launch Chromium under a changed HOME (the browsers live in
+  the original HOME's cache), and layer 2 would catch the blanked variable at worker start
+  if it did. One line in § Residuals, or add HOME to the refused env keys.
+```
+
+## Verdict at `11f8975`
+
+This round did a great deal right. Every finding I raised in round 2 is closed as stated:
+
+- **E** — my `.npmrc` line and every sibling spelling are refused, and layer 2 catches the
+  line at runtime.
+- **C** — the two redactors are genuinely one program; I measured 26 out-of-corpus shapes
+  with byte-identical behaviour.
+- **A, B, D, F** — closed.
+- **G** — the demo suite reproduced **133 / 0 / 0 twice in a row** at load averages up to 265.
+- The F10 red/green pair is committed at last (D16a).
+
+The per-commit counts match exactly, CI is green 9/9 with the manifest unchanged, and
+nothing credential-shaped was added.
+
+I am nonetheless returning **FAIL**, on one blocker of the same class as the previous two.
+
+**R3-FINDING H.** The guard recognises the redaction step by
+`run.includes("redact-artifacts.sh")`. So seven guard-green spellings all leave
+`steps.redact.outcome == 'success'` and let the upload run:
+
+- `… || true`
+- `…; exit 0`
+- `set +e; …`
+- output discarded with `|| echo`
+- a typo'd directory
+- dropping `playwright-report`
+- `echo redact-artifacts.sh`
+
+With any of them, the upload publishes with **no URL redaction and no page-snapshot
+gate**. Together with the two-line spec of R3-FINDING J, which deletes `CI`, I drove all
+three layers to fail at once, with every check this repository runs green. A page snapshot
+carrying a typed value lands in the upload set.
+
+The guard already refuses `continue-on-error` on this very step for exactly this outcome.
+The fix is one line: match the step's `run:` exactly, as it already does for `npm run e2e`
+and the canary.
+
+In fairness, the substring match is older than this PR, and I missed it in rounds 1 and 2.
+It is blocking now because this round's answer to the R2-E class names layer 3 as the
+backstop that "still holds" when layers 1 and 2 do not. It does not, while the step that
+runs it can be rewritten unseen.
+
+**R3-FINDING J** (required): layer 2 is off whenever `CI` is unset, and a spec can unset
+it. After the test body, layer 2 detects rather than prevents. The docs overstate both
+points.
+
+**R3-FINDING I** (should-fix): the `\uXXXX` sentence is broader than the programs.
+
+**R3-FINDING K** (nit): changing `HOME` in an env map is not refused.
+
+Nothing I found is a live disclosure. Nothing authenticates, the hard rule stands and is
+asserted, and no RED CI run has ever uploaded anything for this PR.
+
+FINAL VERDICT: FAIL — SHA 11f8975ae6af08a5a0790546efd63151f5c1d6ae
