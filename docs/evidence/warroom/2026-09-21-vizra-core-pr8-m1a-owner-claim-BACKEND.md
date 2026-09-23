@@ -876,3 +876,246 @@ Keep the Go gate for the *answer* (409 vs 403); this is the *guarantee*. Query-o
 ---
 
 **BLOCKING FINDINGS OPEN AT 59a19c5:** NEW-1 (`getSetupClaimStatus` can return 429 but `api/openapi.yaml` declares only 200 and 503, and `TestEveryStatusTheContractDeclaresIsProducedAndNoOtherIs` covers only the POST).
+
+---
+
+## Chair note (2026-09-23, tick 136)
+
+Two blockers open at `56504c1`, both cheap. NEW-A (0005 cites a ledger ID for audit retention that does not exist) is made TRUE without touching core: the chair dispatched a meta PR adding the ledger entry through the generator; core #8 merges only after it. NEW-B (`internal/integration` floor 40 vs 165 measured, `internal/httpapi` 26 vs 56) → the closing builder stages regenerated floors plus a demonstration; with the security seat's F-2 doc NIT. NEW-C left (0005 bytes final). The seat's re-review follows verbatim.
+
+---
+
+# Re-review at 56504c1: `vizra-core` PR #8 (M1-A owner claim, VZ-INSTALL-003)
+
+**Reviewer:** `vizra-core` backend seat · **Date:** 2026-09-23
+**Tree:** HEAD is `56504c14683224cfd1fce0ecd7b826dcbf6de88d` and the worktree is clean. Commits since my last look at `59a19c5`: `655f46a` (fix round 2), `a42ca76` (closing slice), `8b54916` (merge of main `eeeea06`), `c79c4d2` (floors), `b2f0d22` and `56504c1` (evidence only).
+
+**Could not check:** I had no access to a PostgreSQL 18 and did not run `make ci`, `sqlc diff` or either suite. Everything below comes from reading the files at this SHA plus two local checks: a comparison of the migration SQL with comments stripped, and the floor formula.
+
+**Verdict:** the transaction design is right and there is exactly one place that decides 409 versus 403. Two blockers remain, both cheap. One is a frozen sentence in 0005 that is currently false and can be fixed in the meta repo alone. The other is two per-package test floors that were not regenerated.
+
+---
+
+## Status table
+
+| Item | Status | Evidence |
+|---|---|---|
+| **NEW-1** claim-status 429 not declared | **CLOSED** | `api/openapi.yaml` now declares `"429"` on `getSetupClaimStatus`. The status-coverage test now walks every `/api/v1/setup/` operation in the spec against a per-path map of produced statuses (`internal/httpapi/setup_test.go:257-300`). The two routes have separate ceilings, `claimStatusCeiling = 3000` and `claimOwnerCeiling = 600`, so a flood of status reads cannot use up the claim's budget. |
+| **NEW-2** the 409-vs-403 re-read turned a database error into a 403 | **CLOSED (superseded)** | The handler's re-read is deleted. `classifyRefusal` wraps every lookup failure, including a `*pgconn.PgError`, as `ErrUnavailable`, which answers 503 and charges nothing (`internal/ownerclaim/ownerclaim.go:600-609`). `ownerclaim.IsServerUnavailable` also sends server-side unavailability codes to 503. Test: `TestAFailedClassificationReadAnswers503AndChargesNothing`. |
+| **NEW-3** `t.Skipf` in a required test | **CLOSED** | There is no `Skip` left in `internal/integration/owner_claim_test.go` or `claimtoken_cli_test.go`. |
+| **FU-1** Boot reported `ErrHasUsers` as degraded | **CLOSED** | `internal/ownerclaim/announce.go:89-95` now returns `BootOutcome{Claimed: true}`. |
+| **FU-2** "users exist" guard in the redeem SQL | **CLOSED** | `store/queries/owner_claim.sql` adds `AND NOT EXISTS (SELECT 1 FROM users)` to the redeem, and the generated code has it at `internal/store/sqlcgen/owner_claim.sql.go:58`. Test: `TestTheRedeemStatementRefusesAClaimedInstance` (`owner_claim_test.go:2247`). Mutations: MUT-46, MUT-54. |
+| **FU-3** MUT-6 and MUT-1b scored | **CLOSED** | `TestTheRedeemStatementRefusesADeadToken` (`owner_claim_test.go:2193`) calls the generated `ClaimOwner` directly, bypassing the Go pre-check. Both are now real cases (`demonstrate.sh:327,331`). |
+| Migration 0005 citations corrected | **PARTIAL** | Four corrections are accurate. One frozen claim is still false; see NEW-A. |
+| Merge `8b54916` | **CLOSED** | `git show --cc 8b54916` shows only `README.md` differing from both parents, and that resolution keeps both sides whole: main's "Reproducing what CI asserts" section and this PR's "Claiming a new instance". Everything else came in from one side unchanged. |
+| The three new floors (`c79c4d2`) | **CLOSED as generated, but incomplete** | They match the generator's formula `max(1, n − max(2, round(0.15·n)))` exactly: audit 17→14, credential 6→4, ownerclaim 19→16 (measured in `06-unit.txt:20,24,31`). But the packages whose counts moved were not regenerated; see NEW-B. |
+| **B-R8** evidence taken on PostgreSQL 18 | **not checked by me** | `07-race-stress.txt` records PostgreSQL 18.6, Valkey 9.1.2 and Redis 7.2.16. Reproducing it is the verifier's job. |
+
+---
+
+## How the classification behaves inside and outside transactions
+
+**1. The fresh `AnyUserExists` is a separate statement outside any transaction. That is correct.**
+`classifyRefusal(ctx, q)` is called with `q := sqlcgen.New(pool)`, which is bound to the pool, not the transaction, at both call sites (`ownerclaim.go:443,499`). So the re-read is its own autocommit `SELECT EXISTS (SELECT 1 FROM users)` on a pooled connection. That is the right design for three reasons:
+- **It is as fresh as possible.** The question is "is this instance claimed now". An autocommit statement reads the latest committed state as of the moment it starts.
+- **A transaction would add nothing.** A READ COMMITTED transaction would also take a new snapshot per statement.
+- **It cannot run inside the claim transaction anyway.** After a failed redeem, that transaction is unusable.
+
+**2. What the stated snapshot residual actually permits.**
+The builder's wording in `AGENTS.md:277` is accurate. Tracing it through:
+- **A loser holding the valid token can never get a 403 because of the winner.** The winner marks the token consumed and inserts the owner in one transaction (`ClaimOwner` plus the audit insert, then commit), so both become visible at the same instant. A loser whose token read saw the token consumed read after that commit. Its classification statement runs later in the same request, so it also sees the user row and answers 409. PostgreSQL makes a commit visible to every later snapshot on every connection, so it does not matter which pooled connection runs the re-read.
+- **What the residual does permit** is a 403 for a token that was genuinely bad (wrong, malformed, expired, superseded or never minted) when a winner commits after the re-read. That answer was true when it was decided, and it matches running the loser just before the winner. The audit row and the budget charge are correctly the caller's.
+- **It cannot produce a wrong 409**, because the claimed state only ever goes from false to true.
+
+**3. The post-redeem path rolls back before it classifies. Correct.**
+When the redeem returns no rows, the code calls `_ = tx.Rollback(ctx)` and then `classifyRefusal(ctx, q)` (`ownerclaim.go:498-499`).
+- Rolling back first releases the claim transaction's connection before a second one is taken. No request ever holds one pooled connection while waiting for another, which would be a deadlock risk on a small pool.
+- The deferred second `Rollback` returns `ErrTxClosed` and is ignored.
+
+The empty-redeem cases all come out right:
+- a concurrent winner committed (the loser waited on the row lock, then re-checked `consumed_at IS NULL` against the committed row) → 409;
+- the redeem's own `NOT EXISTS users` check fired → 409;
+- the token expired or was re-minted during the hash → 403 (`TestATokenSupersededDuringTheHashIsTheUniform403`).
+
+**4. There is now exactly one place that chooses between 409 and 403. Confirmed.**
+`ErrTokenNotAccepted` is created in only two places:
+- `Validate` (`ownerclaim.go:196`). Its only caller is `examineToken` (`:548`), which turns it into `accepted = false`; `grep -rn '\.Validate()' internal cmd` finds no other caller.
+- `classifyRefusal` (`:608`).
+
+The handler's old empty-redeem branch is gone, and `mapClaimError` just passes `ErrTokenNotAccepted` on to `refuseToken`.
+
+The other 409 sources — the handler's claimed check, the read-phase check, the in-transaction check, and a unique-index violation on `users_one_owner` — each come from direct evidence that a user or owner exists, so none of them could ever answer 403. That is the right meaning of "one decision point": the one function that turns an *ambiguous* refusal into an answer. `examineToken` never returns `ErrTokenNotAccepted` itself, so an unclassified refusal cannot escape.
+
+**The test seam.** `afterClaimedCheck` is an `atomic.Pointer[func()]`. In production builds it is always nil, so each claim pays one atomic load. Its only setter is in `seam_integration.go`, which is compiled only under `//go:build integration`. `TestTheClaimSeamCannotBeSetFromAProductionBuild` checks both that the setter lives only in a file production builds exclude, and that no production-compiled file contains `afterClaimedCheck.Store(`. MUT-58 covers it.
+
+The tests that use the seam are deterministic and cover every read-phase refusal path:
+- `TestAReadPhaseRefusalOnAnInstanceThatBecameClaimedAnswers409` asserts 409, no audit row, no budget charge, no password hash, and that the claimed bit was set.
+- `TestAReadPhaseRefusalOnAnUnclaimedInstanceIsStillTheUniform403` is the negative half, and stops the classification from quietly becoming "always 409".
+
+**The stress evidence holds together** (`07-race-stress.txt`):
+- `655f46a` reproduces the CI defect: 2 failures in 200 iterations, with the same "unexpected 403" lines.
+- `a42ca76` passes 200 of 200 in each of four runs (Valkey and Redis, with and without 16 busy-loop processes), plus 20 of 20 in each of two `-race` runs.
+- The file states that product and test code are identical between `a42ca76` and `c79c4d2`.
+
+---
+
+## Migration 0005: last look
+
+**Only comments changed since I reviewed `59a19c5`, and I checked the bytes.** With comments and trailing whitespace stripped, the up file hashes to `a9eae820…` at both `59a19c5` and HEAD, and the down file to `bac9e4d2…` at both. `migrations/manifest.sha256` matches the files on disk (`49ad3a9c…` up, `3fafacb3…` down). The migration's statements are the ones I already reviewed.
+
+Four of the corrections are accurate and improve the file:
+- **`display_name`** is now "a future `display_name` (VZ-ACCOUNT-001)". This fixes a false sentence: 0005 has no such column.
+- **`credentials`**: ADR-003 reserves TOTP tables (`ADR-003…md:158-159`), so whether TOTP ever becomes a credential kind is left to that slice. This also corrects my own earlier assumption. OAuth is cited to VZ-AUTH-006, and the 1024-octet bound is now justified by what the column actually holds.
+- **Down file**: the unsupported ADR-002 citation is gone (ADR-002 § Rollback floor is about image and schema versions, not restore). What remains is the file's own statement of its scope, which is fine.
+- **TRUNCATE comment**: it now reads "no production code path truncated this table", which is true. The old "no TRUNCATE appears in any Go, SQL or shell source" was not: migrate-lint's own pattern contains the word.
+
+One sentence is still false (NEW-A below). Otherwise I would change nothing before it freezes. The extension paths I traced for M1-B, M1-C and M2 still hold.
+
+---
+
+## Open findings
+
+```
+FINDING NEW-A: a frozen sentence in 0005 cites a ledger ID that does not exist
+Severity:    BLOCKER (the migration's bytes freeze on merge; the fix needs no core change)
+Confidence:  high
+
+Affected:
+  repo:      vizra (meta); vizra-core
+  files:     vizra-core migrations/0005_users_credentials_owner_claim.up.sql, ERASURE AND
+             RETENTION paragraph: "The audited retention / anonymisation path is still owed
+             and carries its own ledger ID."
+             vizra docs/quality/features.json at meta HEAD 96fa7a6
+             vizra docs/plans/WARROOM-BOARD.md:120 (owner inbox 8c: "the chair will add a
+             ledger ID for it")
+  requirements: none yet. Propose VZ-AUDIT-001 (audit retention + actor anonymisation);
+             VZ-ACCOUNT-002 ("Account export (all data) and deletion") is the neighbouring
+             user-facing obligation.
+
+Observed:
+  A search of every ledger entry's id, title and outcome for "audit", "retention",
+  "erasure" and "anonymis" finds no entry for the audit retention / anonymisation
+  path. The board still records it as a promise. The builder corrected four other
+  citations in this migration; this is the one left.
+
+Failure:
+  0003's own house rule says a header promising something that does not exist is
+  worse than no header. If this merges first and the ledger entry never follows,
+  the one place that ties the append-only trigger to its owed retention path
+  points at nothing. That obligation is also what M2's erasure design depends on.
+
+Perspective: developer, instance-admin
+
+Recommendation:
+  Preferred, no vizra-core change: the chair adds the ledger entry through the
+  generator BEFORE merging PR #8. The sentence is then true as written. The entry
+  should state: retention and anonymisation of audit_events, added additively by
+  CREATE OR REPLACE FUNCTION audit_events_append_only(); erasure is
+  scrub-and-tombstone of users; depends on VZ-ACCOUNT-002.
+  Only if the chair will not add it before merge: change the sentence to
+  "...is still owed (owner inbox 8c; the chair has committed to a ledger ID)" and
+  regenerate the manifest. That costs a new commit in core.
+
+Acceptance criteria:
+  - At the merge SHA, features.json has an entry for audit retention/anonymisation,
+    or the 0005 sentence no longer claims one exists.
+
+Tests: none. This is ledger state.
+Cross-repo implications: meta: one generator run. core: none on the preferred path.
+Challenge:
+  "It is a comment." It is a comment in the one file that can never be edited
+  again, making a verifiable claim about another file. Making the claim true costs
+  one ledger entry.
+```
+
+```
+FINDING NEW-B: the floors of the two packages that grew were not regenerated, so the whole M1-A integration suite can be deleted with every floor green
+Severity:    BLOCKER (cheap: two numbers in one JSON file)
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     scripts/test-floors.json: "internal/integration": 40 and
+             "internal/httpapi": 26, unchanged by c79c4d2 ("No other floor changed");
+             docs/evidence/m1a-owner-claim/01-integration-pg18.txt:30 ("internal/integration:
+             165 test(s) (floor: 40)"); 06-unit.txt:28 ("internal/httpapi: 56 test(s)
+             (floor: 26)"); scripts/go-test-report.py:205-211 (the formula)
+  requirements: VZ-INSTALL-003 evidence_required; AGENTS.md (no false-positive CI)
+
+Observed:
+  - The floors file's own maintenance note says that in round 3 "only the packages
+    whose counts moved were regenerated", and gives the procedure "to regenerate
+    after the suites grow".
+  - This PR moves internal/integration from 45 measured on main to 165 (it adds
+    owner_claim_test.go with 68 test functions and claimtoken_cli_test.go with 5).
+    It moves internal/httpapi to 56.
+  - Only the three new packages got floors.
+  - The same file cites PR#9's FINDING 7: packages sitting inside the headroom,
+    internal/httpapi included, is exactly the defect per-package floors exist to catch.
+
+Failure:
+  Delete owner_claim_test.go and claimtoken_cli_test.go and internal/integration
+  drops to about 45 test events, still above its floor of 40. The whole-suite
+  floors (981 integration, 943 unit) are also far below the measured 1349 and
+  1184. Every test the council required for the one migration that freezes would
+  vanish with every floor green: the three-isolation race, users_one_owner, the
+  audit triggers, the 503 path, the classification seam tests. The same is true of
+  setup_test.go's route walk, error mapping and status coverage in internal/httpapi.
+
+Perspective: developer, operator
+
+Recommendation:
+  Regenerate the floors for the packages that grew, with --emit-floors, following
+  the file's own procedure (floors only rise):
+      "github.com/yegamble/vizra-core/internal/integration": 140    // measured 165
+      "github.com/yegamble/vizra-core/internal/httpapi":     48    // measured 56, in both blocks
+  Raise both whole-suite min_tests the same way from the same measured runs.
+  Record the measurement in the file's _why notes as round 3 did.
+
+Acceptance criteria:
+  - Deleting owner_claim_test.go makes the integration lane red on its
+    per-package floor.
+  - Deleting setup_test.go makes the unit lane red on internal/httpapi's floor.
+
+Tests:
+  A demonstrate.sh case: "delete owner_claim_test.go" → the integration floor goes
+  red. The report script already prints the floor verdict.
+
+Cross-repo implications: none.
+Challenge:
+  "Floors exist to catch a package being emptied, not to pin churn." Losing about
+  120 of 165 tests, including every test this PR exists to add, is emptying in
+  every sense that matters, and the file's own practice is to regenerate a package
+  whose count moved.
+```
+
+```
+FINDING NEW-C: a 0005 section heading undercounts what 0003 deferred
+Severity:    NIT (not blocking; fix only if 0005 is being edited anyway)
+Confidence:  high
+
+Affected: migrations/0005_users_credentials_owner_claim.up.sql, the heading "The two
+          obligations 0003_audit_events deferred to M1: the users FK and the
+          immutability trigger." Compare migrations/0003_audit_events.up.sql:22,29,53,84-93.
+
+Observed:
+  0003 deferred four things to M1: the users foreign key, the immutability trigger,
+  the audited retention path paired with it, and the ip_prefix writer. Two of those
+  are schema changes discharged here. The ip_prefix writer is Go (internal/audit).
+  The retention path is still owed, and the header's own ERASURE AND RETENTION
+  paragraph already says so.
+
+Recommendation: "The two SCHEMA obligations…". Worth taking only in a commit that
+  touches 0005 for another reason. NEW-A's preferred path does not.
+```
+
+---
+
+## Checked and correct
+
+- The handler now uses `s.instanceClaimed(c)` instead of peeking at a warm cache. A freshly started process on a claimed instance therefore answers 409 without entering `Claim`, and the unclaimed answer is cached for only 1 second (MUT-50).
+- The new `s.unavailable` helper logs the cause through `obs.Redact`.
+- `examineToken` now runs `Validate` after the read-phase claimed check. On a claimed instance a malformed body gets 409, consistent with "the claimed check strictly precedes any token examination" (OQ-4). On an unclaimed one, a bad username, email or password still gets 400 before the digest compare, so it reveals nothing about the token.
+- A malformed token costs two identical `EXISTS` reads, the read-phase check and the classification. That is the price of freshness, bounded by the ceiling and the failure budget. Fine.
+
+BLOCKING FINDINGS OPEN AT 56504c1: NEW-A (0005 header asserts a ledger ID for the audit retention/anonymisation path that does not exist in features.json; the chair can close it without touching core by adding the ledger entry before merge), NEW-B (`scripts/test-floors.json` leaves internal/integration at 40 against 165 measured and internal/httpapi at 26 against 56, so the M1-A integration and setup suites can be deleted with every floor green; regenerate to 140 and 48).

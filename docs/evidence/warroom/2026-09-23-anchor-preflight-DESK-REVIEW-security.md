@@ -122,3 +122,80 @@ ONE-LINE RECOMMENDATION TO THE CHAIR
 ===============================================================================
 For BOTH repos, replace the grammar-modelling parse-time scanner with a committed-Makefile-digest gate (FINDING 3): pin the Makefile bytes and refuse to run make unless they match a reviewed pin — this closes BLOCKERS 1 and 2 and the whole "constructs make evaluates that we forgot" class at once; do not merge search PR #5 as the sound control on the strength of the text scanner alone, and open a core BLOCKER because core main has no parse-time mitigation at all.
 
+
+---
+
+## Chair note (2026-09-23, tick 136)
+
+No blocker at `c3b2021`; BLOCKERS 1–2 closed by the digest. REQUIRED R-1 (two make invocations outside the digest gate in required lanes) and R-2 (the anchor starts make after its own environment/make checks fail; `MAKEFILES` reaches make) and the doc overclaims ("test-noskip runs WITHOUT make"; "refuses to invoke make at all" stated repo-wide) go into search #5's round 2 with the verifier's verdict. R-3 (lstat, case-folded names) taken if cheap. Core FINDING 4 stays open until core PR #10 merges; the same inventory question sent to the core #10 verifier. The re-review follows verbatim.
+
+---
+
+## Re-review at c3b2021 — 2026-09-23 (vizra-search PR #5, head c3b2021ee089a04dfbfce2a8cb0d3ee653e8b7fb)
+
+I only read code. I ran nothing except `git fetch`, `git show` and `git diff`, and I wrote no files. No tool output contained instructions.
+
+**Verdicts on the earlier findings**
+- **Earlier BLOCKER 1 (secondary expansion): closed as a merge-gate failure.** Nothing that can reach a merge will run those bytes unreviewed. `main()` calls `check_makefile_digests` (make-integrity-guard.py:983) before the anchor's first make call (`resolve_database`, :991), and it does so in both modes. Nothing earlier in the anchor starts make: `check_make_resolves_to_a_real_program` (:979) only asks bash about `make`. Separately, `ci-required-guard.py:788` checks the bytes against the pin in the `ci-required` job without running make. A Makefile edit with no matching pin edit is therefore red in `ci-required`. The weaker part is the claim "before ANY make invocation", which is false for the repository as a whole (R-1).
+- **Earlier BLOCKER 2 (`.RECIPEPREFIX`): closed by construction.** An assignment to it needs a pin edit, so a reviewer sees it. It executes nothing when make reads it. The refusals added after make runs (`.SECONDEXPANSION`, `.RECIPEPREFIX`) are correctly described as checks on reviewed bytes, not as a control.
+- **Earlier FINDING 4 (core): still open.** vizra-core origin/main is still eeeea06. It has no `.github/pinned-makefiles.yml` and no digest gate (a file with that name exists only in the local core working tree, not on main). The core anchor still runs `make -pn` on bytes nobody has pinned.
+
+```
+FINDING R-1: security — needs owner attention: vizra-search CI, two make reads outside the digest gate, REQUIRED
+Severity:    REQUIRED
+Confidence:  high (invocation sites read directly); impact bounded, see Challenge
+Affected:
+  repo: vizra-search
+  files: .github/workflows/ci.yml:135 (`contract-drift-guard.py recipe`, BEFORE the anchor), scripts/contract-drift-guard.py:142-155 (`make --dry-run contract-drift`, env keeps GITHUB_*), internal/httpapi/lane_selection_test.go:44-50 (exec `make --dry-run contract-drift` in repoRoot, `filteredEnv` :76-88 keeps GITHUB_*), reached by ci.yml:185 (test-noskip, no anchor)
+  requirements: propose VZ-CI-ANCHOR-DIGEST
+Observed: Two make calls in required lanes never go through check_makefile_digests. (a) The contract-drift job runs the drift guard's `recipe` step before the anchor step. (b) The test-noskip lane, which the docs call "without make", runs a Go test that runs make on the checked-out Makefile. Neither scrubs the runner command-file variables.
+Failure: Unpinned bytes are executed in CI while make reads them, and the effects of those reads (runner command files, the working tree) persist into later steps of the same job, including the anchor's own hash and directory listing. Detail withheld. What stops this from becoming a merge bypass today is (i) ci-required's independent byte check and (ii) the anchors in the other make lanes, which run on separate runners. These are not the stated control. ci-required does not refuse an unpinned GNUmakefile or makefile placed next to a pinned Makefile; only the anchor's `os.listdir` check (:302) does. So the one guard for that case lives in steps that an earlier make read in the same job can affect.
+Perspective: operator, developer
+Recommendation: Make every make call in the repository go through one digest-gated helper. contract-drift-guard.py and lane_selection_test.go must check the pin (the same parser as load_makefile_pins) before they run make, and must scrub the GITHUB_* command-file variables. Add the unpinned-GNUmakefile/makefile refusal to ci-required-guard.py's check_makefile_pins so it matches the anchor.
+Acceptance criteria: With a Makefile that does not match the pin, the contract-drift `recipe` step and the lane_selection test fail before starting make. `ci-required` is red for an unpinned GNUmakefile or makefile placed next to a pinned Makefile. A meta-test lists every place the repository starts make and fails on any that is not digest-gated.
+Tests: scripts/scripts_test.go: a mismatched-digest mutation run through `contract-drift-guard.py recipe` and through the lane_selection helper, both expected to report "make was not invoked"; ci-required-guard with an unpinned GNUmakefile expected to fail. The existing harness is enough.
+Cross-repo implications: core: the same inventory is needed when the digest gate is ported | user: none | meta: none
+Challenge: Unreviewed Go test code in a PR already runs in CI, so unreviewed Makefile bytes running is the same level of trust. Answer: the threat here is not code execution but "a lane goes green while neutered", and today that is prevented only by jobs running on separate runners, which nobody documented as a guarantee.
+
+FINDING R-2: anchor keeps going to make after its own environment/`make` checks fail; MAKEFILES reaches make, REQUIRED
+Severity:    REQUIRED
+Confidence:  high (control flow); whether files named in MAKEFILES appear in MAKEFILE_LIST is UNVERIFIED and does not change the result
+Affected:
+  repo: vizra-search
+  files: scripts/make-integrity-guard.py:978-991 (failures from check_environment / check_make_resolves are recorded but make still runs), :197-207 (clean_env does not drop MAKEFILES), :318-320 (starts `make` by PATH name, not the path it just checked)
+Observed: If MAKEFILES is planted, check_environment records a failure, but the digest gate returns only on its own failures. The anchor then runs `make -pn` with MAKEFILES still in the environment, so make reads files that are not pinned. The same applies to a stub `make`.
+Failure: The anchor still exits red, so this is not a gate bypass. But the sentence "before make is invoked at all … make runs only on reviewed bytes" is false on this path. MAKEFLAGS, GNUMAKEFLAGS and MFLAGS are handled correctly: dropped from the anchor's make and refused in strict mode.
+Recommendation: Return before any make call if any check before make failed. Add MAKEFILES to clean_env's drop list. Start make by the realpath that check_make_resolves_to_a_real_program checked.
+Acceptance criteria: With MAKEFILES set, or with `make` resolving outside the approved directories, the anchor exits 1 and make is never started, in both modes.
+Tests: scripts_test.go: a MAKEFILES case that asserts make was not invoked.
+Cross-repo implications: core: the same order when the gate is ported | others: none
+Challenge: The earlier step that planted MAKEFILES could already run code. That is true, but it is exactly why the anchor should not start anything after it knows the environment has been tampered with.
+
+FINDING R-3: pinned files: symlinks, special files, case-folded names, SHOULD
+Severity:    SHOULD
+Confidence:  medium
+Affected: scripts/make-integrity-guard.py:290 (`read_bytes` follows symlinks), :302 (exact-case `os.listdir` comparison)
+Observed / Failure: The hash and make both follow symlinks, so a regular file gives both the same bytes. A committed symlink, or a special file such as a FIFO, opens a window between hashing and make's read. That window needs a concurrent writer, which is the declared "earlier step" scope, except for R-1's in-job make reads. On a case-insensitive filesystem, a case-variant GNUmakefile is not matched by the exact-name comparison. make would read it, and it would be caught only by the MAKEFILE_LIST check after the read. This cannot happen in CI (ubuntu-24.04, case-sensitive); it affects local macOS runs only.
+Recommendation: `lstat` each pinned path and require a regular non-symlink file. Compare directory names case-folded against MAKEFILE_NAMES.
+Tests: scripts_test.go: a symlinked Makefile is refused before make; a case-variant GNUmakefile is refused before make (a fixture that runs only on macOS, or the check simulated).
+Cross-repo implications: core: the same when ported
+Challenge: Both depend on a writer that is already out of scope or on a non-CI filesystem. The fix is two lines, so the cost is far below the risk.
+```
+
+**Q2: can make read bytes that are not pinned even though the digest matches?**
+- `MAKEFLAGS`, `GNUMAKEFLAGS`, `MFLAGS`: closed.
+- `MAKEFILES`: open. See R-2.
+- `-f`, `-C`, `--include-dir`: closed. `make_steps` are bare `make <target>` (pinned-steps.yml:57-71), steps may carry only the keys `name`, `run` and `id`, and `working-directory` is refused.
+- Symlink swap (TOCTOU) and case-insensitive names: R-3.
+- Include-path search and makefile remake rules: reachable only from reviewed bytes, and the MAKEFILE_LIST check catches them after make has read them. This belongs to the declared residual.
+
+**Q3: do the docs match the new control?**
+- The residual is stated: AGENTS.md:568-572, the pin-file header, and the guard docstring say that a malicious Makefile approved together with its pin runs, and that its four `$(shell)` calls run while make reads it. Good.
+- Overclaims to fix:
+  - Makefile:13-15 and AGENTS.md's "direct lane" text say test-noskip runs "WITHOUT make … whatever this file says". That is false: the suite itself runs make (R-1).
+  - ci.yml:11-16 and the pin-file header say the anchor "refuses to invoke make at all unless…". That is true of the anchor only, and the text should say so, because two other steps start make.
+  - The pin-file header says the format is "shared with vizra-core". core main has no such file (NIT).
+
+Recommendation to the chair: the digest is the right control for both repos. Before this PR is called verified, route every make call through it and bring ci-required to parity with the anchor (R-1, R-2). Keep the vizra-core finding open until core main has the gate.
+
+BLOCKING FINDINGS OPEN AT c3b2021: none
