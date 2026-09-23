@@ -316,3 +316,235 @@ Recommendation:
 - V-2 is a SHOULD for a follow-up. V-3 and V-4 are NITs.
 
 FINAL VERDICT: FAIL — SHA 6edaf83cc3035f3e5ae270556082897b527893dd
+
+---
+
+## Re-verification at 25f62ac (fix round 1 of 2)
+
+- **SHA verified:** `25f62ac6ff2bb2b0b203938c015c6f49a6cb130d`.
+  - It is a fast-forward from `6edaf83` (`git merge-base --is-ancestor` holds) and adds one commit.
+  - `gh pr view 12 --json headRefOid` returned `25f62ac…` and OPEN both at the start and at the end.
+- **Environment:** the same host and the same CI digests as before.
+  - A fresh clone in `mktemp -d …/scratchpad/vzv-core-pr12r1-XXXXXX`, with worktrees `prev` (6edaf83) and `mut` (25f62ac).
+  - Containers `vzv-pr12r1-44437-6312-{pg,valkey,redis72}`, bound to loopback. Removed with `docker rm -f -v`.
+  - Every run had `TMPDIR` set inside my scratch directory. No `vizra-healthcheck-bin-*` directory appeared in the system `$TMPDIR` after 16:10 (checked by birth time). The three my runs leaked stayed in my scratch directory, which I deleted.
+  - Host load average was 28–128 (other agents), with no timeouts.
+- **Diff read in full:** `internal/obs/log.go` (+ test), `internal/search/service.go` (+ test), `internal/httpapi/logsites_test.go`, `internal/cache/ratelimit.go` (comment only), `AGENTS.md` (4 rows), `scripts/test-floors.json`. No test assertion was removed. Every `-` line in a test file is a comment the new text replaces.
+
+### R1. Lanes
+
+| Command (at 25f62ac) | Exit | Result |
+|---|---|---|
+| `make ci` | 0 | `make ci: all lanes passed`. All 10 lanes ran, 19 `ok` packages |
+| unit `go test -race -count=1 -json ./...` + report | 0 / 0 | **1259** executed, 17 pkgs, 0 failed, 0 skipped, floor 1070 met. httpapi 100, obs 42, search 132, cache 9 |
+| integration, Valkey 9.1.2 | 0 / 0 | **1428**, 0 failed, 0 skipped, floor 1214 |
+| integration, Valkey, `-shuffle=on` | 0 / 0 | **1428**, 0 / 0 |
+| integration, Redis 7.2.16 (`redis_version:7.2.16`) | 0 / 0 | **1428**, 0 / 0 |
+| `--emit-floors` (unit, Valkey) | — | Equal to the committed floors (checked by script): unit 1070, integration 1214, httpapi 85, obs 36, search 112, no package differs. The diff's `-` lines are only 1028→1070, 1171→1214, 66→85, 14→36 and 110→112. Nothing was lowered. |
+
+### R2. Red on 6edaf83, and mutations
+
+**Red on 6edaf83.** Only the head's three test files were put on the old product code.
+- `TestRedactCoversEveryCredentialForm`: exit 1, **15 FAIL** (every row marked "B3"). The 8 pre-existing forms pass, which is correct because they were already covered.
+- `TestRedactLeavesLookalikesAlone` passes on both revisions. That is expected for a control.
+- `TestTheErrorHandlerRedactsEveryCredentialFormInA500`: **10/10 FAIL**.
+- `TestTheFallbackLogLinesAreRedacted`: **Search and Suggest FAIL**.
+- The 11 new planted checker shapes, added to 6edaf83's CHECKER: **11/11 FAIL**, meaning the old checker accepted every one.
+
+**Mutations I chose myself on 25f62ac.** Each was restored with `git checkout`.
+
+| Mutation | Red |
+|---|---|
+| userinfo `*` → `+` (no empty user) | the redis requirepass row |
+| Cookie pattern disabled | both "whatever the cookie is called" rows (the other cookie rows are also caught by the key pattern, by design) |
+| `x-(?:amz\|goog)-signature` → `x-amz-signature` | the GCS X-Goog-Signature row. X-Goog-Credential stays green through `credential` |
+| the key pattern's left-boundary guard removed | `TestRedactLeavesLookalikesAlone` |
+| bare `key` dropped from the alternation | the 500 handler's `&key=` row |
+| raw `err.Error()` restored in `Service.Search` / `Service.Suggest` | the Search / Suggest sub-test respectively |
+| checker: panic check disabled | "panic with a non-literal argument" |
+| checker: shadow check disabled | the 3 obs-shadowing planted rows |
+| checker: method-value check disabled | "a logger method value" |
+
+### R3. My V-1 forms through the shipped 500 handler
+
+Inert probe in `mut`, then removed. Under both a plain `slog.JSONHandler` and `obs.NewLogger(production)`, **all 8 causes are REDACTED**:
+- redis empty user;
+- keyword/value DSN;
+- `?password=`;
+- GCS signature;
+- `user:pw@`;
+- `?key=`;
+- session cookie;
+- a multi-line cause.
+
+Status was 500 every time, and no secret reached the body.
+
+### R4. Trying to break the widened redactor (fake values, direct `obs.Redact`)
+
+**REDACTED:**
+- mixed case (`PassWord=`, `X-GOOG-SIGNATURE=`, `COOKIE:`);
+- multi-line (a secret on line 2, a URL on line 2, a cookie between CRLF lines);
+- `postgres://user:pw@host/db?sslpassword=`: both the userinfo and `sslpassword`;
+- `api-key=` and `x-api-key=`;
+- `aws_secret_access_key=`;
+- a quoted value containing `&`;
+- a double-quoted DSN value;
+- ADO `Password=…;`;
+- `#sig=`;
+- a password percent-encoded with `%40`;
+- lowercase `bearer`.
+
+**LEAKS:**
+- Named residuals:
+  - JSON `"password":"x"`, `"password": "x"` and `"access_token":"x"`: the named residual "a secret under a JSON key";
+  - a URL password with a raw `@` (partial) or `/`: named;
+  - `vizra:pw@db:5432` with no scheme: arguably "no recognisable prefix".
+- **Not named:**
+  - **`Authorization: Basic …` and `Authorization: Digest …`**;
+  - a URL-encoded key (`pass%77ord=`, `api%5Fkey=`);
+  - `password: x` and `token: x` (colon), and `password = x` (spaced);
+  - `X-API-Key: x` (header colon form);
+  - `private_key=x`, which is a `secretKeys` entry but has no value pattern;
+  - `pass_word=x`;
+  - `/reset/token/<value>`, a path segment.
+
+  The rows begin "removes exactly these value forms and no others", so none of these makes a sentence false. The residual lists read as complete, though, and do not include them. See R1-1.
+
+**Over-redaction, and the lookalike control.**
+- Unchanged:
+  - pgx's `password authentication failed` line;
+  - `Key (email)=(…)`;
+  - `duplicate key value …`;
+  - `path=… method=…`;
+  - `dial tcp …`;
+  - `ssh://git@…`;
+  - `mailto:`;
+  - `https://example.test/a:b@c`;
+  - `http://[::1]:8080/`;
+  - logfmt `time=… level=…`.
+- **Changed:**
+  - `tokens=5`, `sessions=3`;
+  - `VIZRA_OWNER_CLAIM_TOKEN_TTL=1h`;
+  - `sort key=created_at`, `cache key=vizra:rl:…`;
+  - `signature=valid`;
+  - `csrf_token_missing=true`;
+  - and `postgres://vizra:[redacted]@db` now also loses the username.
+- These are inside the stated key rule ("CONTAINS token/session", or exactly `key`/`signature`), so they fail safe.
+- I grepped every production log call in `cmd/` and `internal/`. **None of their literal messages or non-error values carries such text today.** Only error text passed through `Redact`, and a job's `last_error`, could lose diagnostic detail this way. The lookalike control does not test this class. See R1-3.
+
+### R5. The new checker refusals (inert planted files in real `internal/httpapi`, one at a time)
+
+| Shape | Result |
+|---|---|
+| method value `f := s.deps.Logger.Error` | red by name: "takes the method Error as a value" |
+| method value stored in a struct field `vzvT{f: s.deps.Logger.Warn}` | red by name |
+| `Handler().Handle(ctx, r)`, including `slog.Default().Handler().Handle` | red: "calls Handler().Handle directly" |
+| `Record.AddAttrs` | red |
+| `Handler().WithAttrs(...)` | red |
+| `slog.NewRecord` | red |
+| `slog.NewLogLogger(...).Printf` | red |
+| `os.NewFile(2, …)` | red |
+| `panic("…" + p)`, `panic(err)` | red: "panics with a non-literal value" |
+| `obs` shadowed: `:=` at a non-log site, parameter, func-literal parameter, type-switch binding, `select` receive | red: `declares "obs"` |
+| `panic("unreachable")` (a literal) | passes, correctly |
+| `return err.Error` (a method value that is not a logger) | red, a fail-closed false positive. Acceptable, and the comment says the name match fails closed |
+| **`var r slog.Record; r.Add("path", p); h := s.deps.Logger.Handler(); _ = h.Handle(ctx, r)`**, including inside a goroutine | **ESCAPED**. `Handler()` bound to a variable and `Record.Add` are not refused (R1-2) |
+
+- **False positives on the real package:** none. `TestEveryLogSiteInTheAPIIsRedacted` passes at 25f62ac (`make ci`, the unit and all 3 integration lanes) with the count at 6.
+
+### R6. Rewritten sentences against measured strength
+
+| Sentence | Verdict |
+|---|---|
+| AGENTS `obs` row, "removes exactly these value forms and no others: …" | TRUE as an exhaustive positive list (R4). Its "Not covered" list names the JSON key, a raw `/`/`@`, "no recognisable key or prefix", private metadata and other handlers. It omits Basic/Digest, colon/space `key: value`, URL-encoded keys and `private_key=` (R1-1). |
+| worker row, "every `"error"` attribute passes `safeError` … removes `obs.Redact`'s pattern set, nothing broader" | TRUE (unchanged mechanism; the absolute claim was removed) |
+| API row: every value at every httpapi site and at search's two fallback sites passes `obs.Redact` at the call site | TRUE (the diff; R2 S-mutations). The named residuals are panics deeper than httpapi, helpers in another package, and other api-process sites except where tested. **These are exactly my round-0 gaps that were not fixed**: panic, the other-package helper, the raw `/`/`@` password, and a non-`vzk_` key. Everything else from V-1 is fixed and has a test row. The checker list "refuses BY NAME … `Handler().Handle(...)`" is accurate. The split form in R5 is an "output channel not named here", which the row says it cannot see. |
+| L-2 row + `ratelimit.go` comment | TRUE; matches my V-3 measurement |
+| `internal/obs` package comment and `Redact` doc | TRUE as exhaustive statements. The `Redact` "does NOT remove" list has the same omissions as the obs row |
+| plan V-4 correction | TRUE (`6edaf83`'s CI merged into `36a72df`) |
+| PR body "What this guarantees, at exactly this strength" | Matches the AGENTS rows (same caveat as R1-1) |
+
+### R7. CI on 25f62ac (own `gh api`)
+
+- All check-runs have head_sha `25f62ac` and are completed:
+  - `ci-required` success (job 107361185096);
+  - `append-only`, `build-test`, `cache-matrix` (+ both legs: `redis_version:7.2.16`; `valkey_version:9.1.2`), `fixtures`, `govulncheck`, `docker-build` and GitGuardian: success;
+  - `image-scan`: failure. It is not required and is explained in `required-checks.txt`.
+- The ci-required log shows:
+  - all 6 floor lanes present and non-optional;
+  - each of the 6 manifest names resolves to a job;
+  - the final poll `SUCCESS` for all six;
+  - "all 6 required check(s) succeeded".
+  - No listed lane went unrun.
+- **Provenance:** tested tree `98242915` = HEAD^2 `25f62ac` merged into HEAD^1 **`96d19b3`**, the current main. This round's CI covers the tree that would merge.
+- build-test's own report: unit 1403 (floor 1070), integration 1572 and shuffled 1572 (floor 1214), 0 skipped, go exit 0 on all three.
+
+### Round-1 findings (none blocking)
+
+```
+FINDING R1-1: the "Not covered" lists omit credential forms with a recognisable prefix or key that Redact does not remove
+Severity:    SHOULD
+Confidence:  high
+Affected:    vizra-core AGENTS.md (obs row), internal/obs/log.go (Redact doc, valuePatterns); VZ-OPS-005
+Observed:    obs.Redact leaves, verbatim:
+               - "Authorization: Basic dXNlcjpQV0JBU0lD"
+               - `Authorization: Digest … response="…"`
+               - "password: x", "token: x", "password = x"
+               - "X-API-Key: x"
+               - "/x?pass%77ord=x"
+               - "private_key=x"
+               - "pass_word=x"
+             (R4, direct calls with fake values). Each row's positive list is framed "exactly these value
+             forms and no others", so no sentence is false. The "Not covered" lists read as complete and do
+             not name these. No current log site is known to carry them: pgx, go-redis and url.Error do not
+             quote Authorization headers.
+Failure:     A reader can take Basic auth or a colon-separated secret as covered.
+Recommendation: Either add patterns for `Authorization: (Basic|Digest) …` and `<credential-key>\s*[:=]\s*value`,
+             with rows in TestRedactCoversEveryCredentialForm, or name these in both "Not covered" lists.
+Acceptance:  Each form above is either redacted by a table row or named as not covered.
+Challenge:   "Exactly these and no others" already makes every omission explicit. Listing more negatives is
+             documentation hygiene, not a correctness fix.
+```
+
+```
+FINDING R1-2: the checker refuses Handler().Handle only when chained; a bound handler plus Record.Add escapes
+Severity:    SHOULD
+Confidence:  high
+Affected:    internal/httpapi/logsites_test.go (checkLogSites)
+Observed:    `var r slog.Record; r.Add("path", p); h := s.deps.Logger.Handler(); _ = h.Handle(ctx, r)` planted
+             in internal/httpapi: TestEveryLogSiteInTheAPIIsRedacted passes with the count at 6 (R5). AddAttrs
+             is refused; Add is not. The AGENTS row says "Handler().Handle(...)" and "cannot see … an output
+             channel not named here", so the text is accurate.
+Recommendation: Refuse any call of `.Handler()` or any `.Handle(` selector in the package (fail closed; httpapi has
+             neither today), or refuse the `slog.Record` type name.
+Acceptance:  The shape above, added to the planted table, is reported.
+Challenge:   Deliberate evasion shapes are code-review territory, and the chained forms were the realistic ones.
+```
+
+```
+FINDING R1-3 (NIT): the key rule over-redacts diagnostic key=value text
+Severity:    NIT
+Observed:    tokens=5, sessions=3, *_TOKEN_TTL=1h, sort key=created_at, cache key=…, signature=valid,
+             csrf_token_missing=true are all rewritten (R4), and userinfo now drops the username too. This is
+             within the documented rule and fails safe. No current production log literal carries such text,
+             but error text and jobs' last_error can lose detail. TestRedactLeavesLookalikesAlone covers
+             word-boundary lookalikes only, not credential-named keys holding non-secrets.
+Recommendation: Optional. Leave it as is and add one control row that pins the intended behaviour
+             (e.g. `tokens=5` → redacted, by design), so a future narrowing is a deliberate change.
+```
+
+### Round-1 verdict
+
+- Every claim in the round-1 hand-off reproduced:
+  - the 15 obs rows, 10 handler rows and 2 search rows are red on `6edaf83` and green at the head;
+  - the 11 checker shapes are red against the old checker and green now;
+  - my own 9 mutations each turn the intended row red;
+  - `make ci`, unit 1259, and integration 1428 on Valkey, Valkey shuffled and Redis 7.2.16 all pass;
+  - the floors equal `--emit-floors`, and none was lowered;
+  - `ci-required` and all six required checks are green on `25f62ac`, tested as a merge into current main `96d19b3`.
+- V-1 to V-4 are closed:
+  - every V-1 form now goes through the shipped 500 handler redacted, under both handlers;
+  - the sentences state measured strength, with my unfixed gaps named as residuals.
+- R1-1 and R1-2 are SHOULDs for a follow-up. R1-3 is a NIT. None of them is blocking.
+
+FINAL VERDICT: PASS — SHA 25f62ac6ff2bb2b0b203938c015c6f49a6cb130d

@@ -394,3 +394,278 @@ It FAILS on its own claims of strength. The reader it calls fail-closed says OK 
 This is not a merge and not VERIFIED in the ledger.
 
 FINAL VERDICT: FAIL — SHA a01a396bcaa3820e2bd89537461bc587aabc452b
+
+---
+
+## Re-verification at 96dd3ff
+
+- **Verified SHA:** `96dd3ff553e1e230c62ad0e48d2d0b6a1261a5ed`, fix round 1, one commit on `a01a396`.
+- **Head:** confirmed with `gh api repos/yegamble/vizra-user/pulls/10` at the start and again at the end. It had not moved.
+- **Clone:** fresh, under the scratchpad (`vzv-user-pr10r1-XXXXXX`, via `mktemp -d`).
+- **Environment:** as before (Node 22.14.0, Playwright 1.63.0, Chromium 1243, Docker 29.8.0, macOS arm64).
+- **Cleanup:** the clone, the worktree, the local server on port 3894 and the image `vzv-pr10r1-96dd3ff:demonstrate` were all removed afterwards.
+
+### R1. Lanes
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm ci` | 0 | — |
+| `npm run ci` | 0 | 20 files, **647 passed**, 0 skipped; hygiene 316 sources, 19 digest lines match |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **246 cases, 253 assertions, 0 failed**; 110–122 all `ok` (118 = `recorderProblems` call, 119–121 = S6, 122 = inverse control) |
+| `bash scripts/ci/check-e2e-lane.sh .github/workflows/e2e.yml` | 0 | OK |
+| `E2E_LOCAL_PORT=3891 npm run e2e` | 0 | **18 passed**; floor 9/9 and 9/9; 18 stamps |
+| `npm run e2e:demos` (`DEMO_IMAGE=vzv-pr10r1-96dd3ff:demonstrate`, ports 3211/3212) | 0 | **155 halves passed, 0 blocked, 0 failed** |
+
+**D23, as recorded by my run:**
+- `d23a`: E6 refused by name; `pixel files: png=0 webm=0 screencast-frames=0`.
+- `d23b`: with the check off, `1 passed` and `png=1 webm=1 screencast-frames=3`.
+- `d23c`: restored, refused again, with 0 pixels.
+
+**Digest ledger.** After my `e2e:demos` run, `mutation-digests.txt` is byte-identical to the committed file.
+- The committed change `a01a396..96dd3ff` is `+9/−6`. Six `test.ts` lines move from `a0650a88…` to `c6fa94b9…`: D13q BEFORE/RESTORED, D15i BEFORE/MUTATED/RESTORED and D15j RESTORED.
+- Three `D23b recorders.ts` lines are new.
+- Every other line is byte-identical.
+- `c6fa94b9…` and `439262c1…` equal the sha256 of `test.ts` and `recorders.ts` at `96dd3ff`.
+
+**Transcripts.** After regeneration, the only files that show `attachment #n: screenshot|video` are the three that carry the "HISTORICAL, pre-#10" header:
+- `round6-lane-local.txt`;
+- `round7-lane-local.txt`;
+- `d12-requestfailed-listener-neutered-GREEN.txt`.
+
+My re-run changed 80 transcript files, but only in noise. The builder recorded on port 3391; mine used the default 3211. The remaining differences are build and timing noise, with no content change.
+
+**CI.** Read with my own `gh api`:
+- **Check-runs:** `total_count` 8, all `completed/success`: deps-scan, image-scan, contract, guard, e2e, frontend, ci-required, GitGuardian.
+- **Workflow runs**, all `pull_request`, attempt 1: contract-ci, frontend-ci, supply-chain, e2e (35913526543), ci-required (35913526413), ci-guard.
+- **`ci-required`** printed "OK: every required check on 96dd3ff… concluded success". Its manifest lists frontend, contract, ?guard, ?docker-build and e2e; `docker-build` is optional and was not triggered.
+- **`e2e` log:** lane "18 passed", floor OK, canary OK on all 4. The canary's attachments are `trace` ×4 only.
+
+### R2. My earlier routes, re-run end to end
+
+Each route was re-run against a production server on port 3894, followed by a pixel count.
+
+| Route | Lane guard | Run | Pixels |
+|---|---|---|---|
+| E1, second `defineConfig` argument | rc 0 (the early-warning reader still cannot see it) | demo red: `Lane A records NO PIXELS, but in this worker … screenshot, video, trace` | **0 / 0 / 0** |
+| E2, `config.use = …` | rc 0 | red by name | **0 / 0 / 0** |
+| E4, demos `Object.assign(base.use, …)` | rc 0 | red by name | **0 / 0 / 0** |
+| E5, `devices[…]` mutated in `required-projects.ts` | rc 0 | red by name | **0 / 0 / 0** |
+| E6, one `test.use` line in `health.spec.ts` | rc 0 | Lane A: 6 failed by name, 12 passed | **0 / 0 / 0** |
+| S6, canary pointed at a second config | **rc 1**, by name (twice) | canary red by name | **0 / 0 / 0** |
+| `--trace on` on the CLI | — | 3 failed by name | 0 |
+
+**Result: all six earlier routes are closed.**
+
+### R3. New routes around the runtime check
+
+**N1: disguised option values (`toJSON`), which ESCAPES.**
+
+`recorders.ts` compares `canonical(value)`, and `canonical` is `JSON.stringify` with a replacer. `JSON.stringify` calls a value's own `toJSON()` BEFORE the replacer. So the check compares what the object says about itself, while Playwright reads `.mode` and spreads the fields: `normalizeScreenshotMode`, `normalizeVideoMode`, and `Tracing.startIfNeeded` in `workerProcessEntry.js`. This spec is lint- and typecheck-clean:
+
+```ts
+import { expect, test } from "../harness/test";
+const screenshot = { mode: "on" as const, toJSON: () => "off" };
+const video = { mode: "on" as const, toJSON: () => "off" };
+const trace = { mode: "on" as const, sources: false, screenshots: true,
+  toJSON: () => ({ mode: "retain-on-failure", sources: false, screenshots: false }) };
+test.use({ screenshot, video, trace });
+test("home renders", async ({ page }) => { await page.goto("/"); await expect(page.getByRole("heading", { level: 1 })).toBeVisible(); });
+```
+
+Measured outcome:
+- `npx eslint` 0, `npx tsc --noEmit` 0, lane guard 0.
+- **Alone:** 1 passed and stamped; `test-results/` holds `test-finished-1.png`, `video.webm` and a `trace.zip` with 2 screencast frames.
+- **Inside the full Lane A (`npx playwright test`):**
+  - **20 passed**, floor OK (10/9, 10/9), 20 stamps verified;
+  - `node scripts/ci/check-coverage-floor-ran.mjs` exit 0;
+  - **2 PNG, 2 WebM**, plus screencast frames.
+- **Publication:** any red lane then uploads `test-results/` whole, pixels included.
+
+**N2: getters, no `toJSON`, which also ESCAPES.** A plain trace object whose getters for `mode` and `screenshots` return the Lane A values when the call stack includes `recorders`, and `"on"`/`true` otherwise. `test.use({ trace })` gives:
+- lint 0, typecheck 0, guard 0;
+- 1 passed and stamped;
+- `trace.zip` retained for a PASSING test, with **2 screencast frames**.
+
+So swapping `JSON.stringify` for a structural compare would not close the class. The checked value and the value Playwright uses are two separate reads of an object the spec controls.
+
+**Fixture replacement and direct import: the lane goes RED, and the pixels are produced anyway.**
+- **R-a, fixture replacement.** A spec replaces both branded fixtures through `harnessTest.extend({ vizraWorkerGuard: no-op, vizraHarnessGuard: no-op })` and adds `test.use({ …recorders on })`.
+  - lint 1, tsc 2 (my typing), lane guard 0;
+  - the run goes red, "succeeded WITHOUT the harness stamp";
+  - `test-results/` holds **1 png, 1 webm, 3 frames**.
+- **R-b, direct import.** A spec does `import { expect, test } from "@playwright/test"` with the same `test.use`.
+  - eslint 1 ("must not reference `@playwright/test`"), tsc 0, lane guard 0;
+  - the run goes red, unstamped;
+  - **1 png, 1 webm, 3 frames**.
+- **Why this matters.** The upload runs precisely `if: failure()` after a redaction that passes pixels, and ESLint runs in the separate `frontend` job. So "costs the stamp" makes the lane red and **publishes** these pixels. The redaction step refuses page snapshots, not images.
+
+**R-c, worker-option timing: CAUGHT.** In a serial pair, test 1 does `Object.assign(trace, { mode: "on", screenshots: true })` after its own check. Test 2's per-test check refuses it by name, and test 2 produces 0 pixels: the harness throws before any page exists.
+
+**Removing only one of the two calls.** Removing only the worker-scoped `recorderProblems` call leaves the lane guard at rc 0, because one genuine call remains. E6 is then still refused by the per-test check, with 0 pixels. The two-call design holds, but case 118 only proves that removing BOTH calls is red.
+
+**The demos config** is covered by the runtime check (E4 above).
+
+**A project whose fixtures bypass `test.ts`:** a project cannot declare fixtures. Its specs must import a `test`, so this reduces to R-b.
+
+### R4. AGENTS.md and the config header, under "no false-guarantee merges"
+
+| Sentence | Verdict |
+|---|---|
+| Config header: the runtime check "refuses any RESOLVED value other than these three, **however it was produced**" | **False.** N1 and N2 produce recording values the check accepts. |
+| "The runtime check refuses each of them, whatever the spelling, because every one changes the RESOLVED value" (E1–E6, S6) | True for the six routes named (R2) |
+| Fixture table: `vizraWorkerGuard` "refuses the worker if the RESOLVED … options are not Lane A's no-pixels values" | **Overstated:** it compares a serialisation the value controls (N1) |
+| "replacing either fixture to drop the check costs the stamp" | True, and incomplete. The run is red, but the pixels are produced and the red-lane upload publishes them (R-a, R-b). "What this does NOT stop" does not say so. |
+| "The cost: a developer can no longer turn the recorders on locally with `--trace on`, **`--video on`** or `test.use`" | `--trace on` and `test.use` are refused (measured). **Playwright 1.63.0 has no `--video` option:** `npx playwright test --video on` prints `error: unknown option '--video'`. The sentence names a nonexistent flag. |
+| The residual list: `resources/*` image bytes, DOM snapshots, `page.screenshot({ path })`, failing `toHaveScreenshot`, `recordVideo` on a spec's context | Accurate as far as it goes. **Incomplete:** N1/N2, and a spec outside the harness (R-a, R-b) |
+| "eight of its cases are red by name and one inverse control stays green" | Corrected; matches the suite |
+| "There are sixteen: fifteen that require a genuine CALL …" | Not independently counted; not load-bearing for this slice. UNVERIFIED |
+| The stray-config paragraph ("the one other CI script … has its `--config` pinned") | True: S6 is red by name (cases 119–121 and my S6) |
+| The upload table: test-failed PNG and WebM "not produced by the recorders: the RESOLVED options are checked at runtime" | **Overstated** per N1: `test-finished-1.png` and `video.webm` were produced by the recorders with the check green |
+
+### R5. Findings at 96dd3ff
+
+Status of the earlier findings:
+- **FINDINGS 1 and 3: closed** at runtime. E1, E2, E4, E5 and S6 each produce 0 pixels, and S6 is also red at the guard.
+- **FINDING 2: closed for E6** (0 pixels, red by name), but see FINDING 6.
+- **FINDING 4: closed.** The transcripts are regenerated and the historical logs are labelled.
+- **FINDING 5: closed.**
+
+```
+FINDING 6: The runtime recorder check compares a value's self-serialisation, not what Playwright reads — a spec's disguised test.use turns every recorder back on with lint, typecheck, guard, floor and stamps green
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     e2e/harness/recorders.ts (canonical → JSON.stringify; recorderProblems), e2e/harness/test.ts:148 and :234, playwright.config.ts header ("however it was produced"), AGENTS.md fixture table, upload table and "The control is a RUNTIME check on the RESOLVED values"
+  requirements: VZ-FOUND-008 (security seat Q3/F14)
+
+Observed:
+  N1 (toJSON) in e2e/specs/: eslint 0, tsc 0, check-e2e-lane 0; full Lane A 20 passed, floor-ran 0, 20 stamps;
+  test-results/ holds 2 PNG (test-finished-1.png), 2 WebM, screencast frames in trace.zip.
+  N2 (stack-aware getters on the trace object, no toJSON): 1 passed, trace.zip with 2 screencast frames.
+  Playwright reads normalizeScreenshotMode(v) = v.mode, normalizeVideoMode(v) = v.mode, and Tracing.startIfNeeded spreads
+  the object; the check reads JSON.stringify(v), which calls v.toJSON() first.
+
+Failure:
+  The control the PR now names as THE control is satisfied by an object that reports the literals when asked and records
+  when used. Any red lane then publishes the pixels. The same spec-author reach that E6 needed.
+
+Perspective:
+  operator | developer
+
+Recommendation:
+  Do not trust the option object's self-report. Either
+  (a) accept only primitives for `screenshot`/`video` (`typeof v === "string" && v === "off"`) and, for `trace`, only a
+      plain object — Object.getPrototypeOf === Object.prototype, every own property a DATA descriptor (no get/set), no
+      `toJSON`, exact key set — and then make Playwright read the object you checked (for example, fail unless
+      Object.isFrozen(trace) and the config freezes it); a Proxy still defeats this, so add (b); or
+  (b) the effect-based backstop: refuse, in redact-artifacts.sh (the upload gate that already refuses `# Page snapshot`),
+      any `*.png`, `*.webm` or screencast/`resources/*.jpeg` member under the uploaded paths — "not produced" becomes
+      "not published", whatever the spelling, and it also covers R-a/R-b and the spec capture APIs this PR lists as open.
+  (b) alone closes the privacy outcome; (a) keeps the lane's red-by-name signal honest.
+
+Acceptance criteria:
+  N1 and N2 as written above are red (lint, runtime or upload gate), and in a failing run with either present nothing
+  under the upload paths is a PNG, WebM or screencast frame; the unmodified lane stays green; AGENTS.md states which
+  layer refuses each.
+
+Tests:
+  a demonstrate.sh half per route (N1, N2) mirroring D23, and a redact-artifacts test fixture tree carrying a .png, a
+  .webm and a trace.zip with a screencast member, each refused with a distinct exit code.
+
+Cross-repo implications:
+  core: none | user: this PR and PR B (Lane B's recorder literals have the same shape) | search: none | meta: none
+
+Challenge:
+  N1/N2 are deliberate evasions, and a deliberate spec author can already call page.screenshot(), which AGENTS.md lists as
+  open. But this PR's text says the recorder options are refused "however it was produced", and the builder's own control
+  was written because the previous one checked the text rather than the effect; this one checks the object's self-report
+  rather than the effect.
+```
+
+```
+FINDING 7: A spec that leaves the harness still records with the recorders on, and "costs the stamp" means the red-lane upload publishes those pixels — not stated
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     AGENTS.md ("It sits inside the two BRANDED fixtures, so replacing either fixture to drop the check costs the stamp"; "What this does NOT stop"), .github/e2e-pinned-steps.yml (upload `if: failure() && steps.redact.outcome == 'success'`)
+  requirements: VZ-FOUND-008
+
+Observed:
+  R-a (both branded fixtures replaced + test.use recorders on): run red "succeeded WITHOUT the harness stamp"; 1 png, 1 webm, 3 frames.
+  R-b (direct `@playwright/test` import + same test.use): eslint 1, tsc 0, run red unstamped; 1 png, 1 webm, 3 frames.
+  ESLint runs in the `frontend` job; the `e2e` job's upload fires on its own failure.
+
+Failure:
+  The stamp turns the lane red, and red is exactly when test-results/ is published; the pixels go with it.
+
+Perspective:
+  operator
+
+Recommendation:
+  State it in "What this does NOT stop", or close it with FINDING 6's upload-gate refusal (which closes it outright).
+
+Acceptance criteria:
+  Either the sentence exists, or R-a/R-b in a red run leave no PNG/WebM/screencast frame in the uploaded paths.
+
+Tests:
+  as FINDING 6 (b).
+
+Cross-repo implications:
+  core: none | user: this PR | search: none | meta: none
+
+Challenge:
+  Pre-existing class (true of any spec that leaves the harness since PR #3), and two layers go red. Still, red is the
+  publishing condition, so "costs the stamp" is not a pixel guarantee and should not read like one.
+```
+
+```
+FINDING 8: AGENTS.md names a CLI flag Playwright does not have
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     AGENTS.md ("with `--trace on`, `--video on` or `test.use`")
+  requirements: VZ-FOUND-008
+
+Observed:
+  `npx playwright test --video on` → `error: unknown option '--video'`; lib/program.js has only `--trace <mode>`.
+
+Failure:
+  An invented API in a contract document.
+
+Perspective:
+  developer
+
+Recommendation:
+  "with `--trace on` or `test.use`".
+
+Acceptance criteria:
+  The sentence names only options that exist in the installed Playwright.
+
+Tests:
+  none.
+
+Cross-repo implications:
+  core: none | user: this PR | search: none | meta: none
+
+Challenge:
+  Trivial.
+```
+
+### Re-verification verdict
+
+**What passed:**
+- The fix round closes every route I reported: E1, E2, E4, E5, E6 and S6 all produce 0 pixels, and S6 is also red at the guard.
+- The lanes reproduce: 647/0, 246/253/0, Lane A 18 passed, and demos 155/0/0.
+- The digest ledger change is exactly as stated.
+- The transcripts are reconciled.
+- CI is 8/8 green, with `ci-required` green and its manifest honest.
+
+**Why it still fails:** the new control is not what the PR says it is. A spec's `test.use` whose values serialise as the literals but record when Playwright reads them (N1 `toJSON`, N2 getters) passes the check. With lint, typecheck, guard, floor and stamps all green, Lane A then writes PNG, WebM and screencast frames into the uploaded directory (FINDING 6). The sentences "however it was produced" and "refuses the worker if the RESOLVED options are not…" are false as written.
+
+FINAL VERDICT: FAIL — SHA 96dd3ff553e1e230c62ad0e48d2d0b6a1261a5ed
