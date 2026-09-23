@@ -240,3 +240,35 @@ Status stays UNVERIFIED, as the plan says.
 **SEAT VERDICT: CHANGES STILL REQUIRED** (R3-1, R3-2 only). The seat states that the chair may confirm both by checking the text, with no further seat pass.
 
 **Chair ruling (tick 209):** R3-1, R3-2 and NITs 1–4 are accepted, and Q-r3-1 is adopted as the seat answered it. The builder amends the plan to revision 4, and the chair confirms R3-1 and R3-2 in the text. Phase 2 starts after that and after user #10 merges.
+
+## Seat check of plan revision 4 — R3-1 deviation, R3-2 (tick 211) — recorded by the chair
+
+**Measured at source (Playwright 1.63.0):** the built-in `browser` fixture calls `launch()` with NO arguments. The options travel in `playwright._defaultLaunchOptions`:
+- the `_browserOptions` auto fixture sets them to `{ handleSIGINT: false, ...launchOptions, tracesDir, artifactsDir, headless[, channel] }` (`playwright/lib/index.js:196-205, :231`);
+- `BrowserType.launch` merges them itself (`coreBundle.js:63301`; the same for `launchServer` :63317 and `launchPersistentContext` :63323).
+
+So any screen over the call's ARGUMENTS passes the runner's launch unconditionally, and a spec's `test.use({ launchOptions: { proxy, args } })` gets through.
+
+**Answers:**
+1. **The once-per-worker form is sound**, and the deviation from the literal R3-1 is accepted, on three conditions: the screen reads the EFFECTIVE options; the slot is consumed before calling through; the counter is per worker process and shared across browser types.
+2. **Deep equality on the effective merged options** `{ ...this._playwright._defaultLaunchOptions, ...args }`, against an exact literal:
+   - `{ handleSIGINT: false, artifactsDir: path.join(<project outputDir>, ".playwright-artifacts-" + workerIndex), tracesDir: path.join(<artifactsDir>, "traces"), headless: <boolean> }`;
+   - sources: `runner/index.js:5466`, `workerProcessEntry.js:530`;
+   - only `headless` varies; `channel` is absent; the user part is `{}`;
+   - a key added by a future version fails closed.
+3. **A `browser` override that runs first gains nothing**, given R4-1.
+
+**Findings:**
+- **R4-1 (REQUIRED):** the launch screen reads the effective merged options, not the call's arguments. Tests in D21h:
+  - `test.use({ launchOptions: { proxy } })` with no override: refused;
+  - `launchOptions.args` carrying a proxy switch: refused;
+  - mutation "screen reads call arguments only": both accepted.
+- **R4-2 (REQUIRED):** spec-level `test.use` is a second options surface the config `use` allowlist never sees.
+  - **Fix:** the Lane-B harness fixtures assert that the effective option fixtures (`trace`, `screenshot`, `video`, `launchOptions`, `connectOptions`, `contextOptions`, `proxy`, `serviceWorkers`, `baseURL`, `storageState`, `httpCredentials`, `extraHTTPHeaders`, `ignoreHTTPSErrors`) deep-equal the project's configured values, and throw and record otherwise. Add a lint warning for `test.use(` in `e2e/authenticated/**`.
+  - **Test:** a `test.use({ trace: "on" })` spec is refused; the "fixture assertion off" mutation lets it pass.
+- **R3-2:** confirmed.
+- **NIT:** update the record schema at plan:584-591: `kind: start|end|worker-start|worker-end|signal`, plus `token`, `signals`, `writeFailures` and the read kinds.
+
+**SEAT VERDICT: CHANGES STILL REQUIRED** (R4-1, R4-2 are text amendments). The chair may confirm them in the text with no further seat pass.
+
+**Chair ruling (tick 211):** accepted. The chair's deep-equality proposal is superseded by R4-1, which applies deep equality to the EFFECTIVE options. The builder amends the plan to revision 5, and the chair confirms R4-1, R4-2 and the NIT in the text.
