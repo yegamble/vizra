@@ -901,3 +901,82 @@ have. That is defence in depth working, and it is reported as such.
 No external blocker. `VIZRA_TRUSTED_PROXIES` does not exist, so `ip_prefix` is NULL behind a proxy and
 the per-origin failure bucket is inert there — stated in the PR body so it is not mistaken for
 working. M1-B owns it.
+
+### Fix round 2 (2026-09-22) — IN PROGRESS, not pushed
+
+Base `59a19c5` (pushed, untouched). Local only: WIP commits to be squashed into ONE commit on top of
+`59a19c5`. The verifier is re-verifying `59a19c5`; its findings join this round. **Do not push until
+the chair sends that verdict.**
+
+Both seats' NEW-1 blockers were created by round 1's own claim-status fix, and are closed:
+security NEW-1 (per-route ceiling buckets, claim 600 / status 3000 per 15 min) and backend NEW-1
+(undeclared 429 on `getSetupClaimStatus`; status coverage is now a table over every setup operation).
+Also closed: backend NEW-2 (re-read failure → 503, no budget charged), NEW-3 (`t.Skipf` → `t.Fatalf`;
+zero skips in every test file this PR adds), FU-1, FU-2, FU-3; security NEW-4 and NEW-2 (first half).
+Queued, not this PR: the httpapi redaction-coverage test (sweep B3) and a concurrency bound for the
+pool (M1-B); the ceiling numbers and the fixed-window residual are stated in AGENTS.md meanwhile.
+
+Session restart mid-round: Docker restarted; only this slice's containers (`vizra-m1a-pg18`,
+`vizra-m1a-valkey`) restarted; scratch (partial harness run) lost and re-run from clean.
+
+Harness defects found this round, both in my own edits: two mutators stale after a rename (MUT-34,
+MUT-35 — reported HARNESS-FAIL, never scored), and an indented `NOTE` heredoc terminator that would
+have swallowed the SUMMARY and the exit-status line (caught by reading, before the full run). Every
+mutator is now dry-run for APPLICATION against the tree before a full run.
+
+#### Final-round progress (2026-09-22, released to push)
+
+Chair: verifier FAIL at `59a19c5` (R2-A..R2-G); round-2 of 2 is final; released to push ONE commit
+on top of `59a19c5` (squash local WIP, plain push, no force); report when CI concludes.
+
+Coded and locally checked (WIP `wip: round 2 staging (10)`, to be squashed):
+- R2-C: handler `instanceClaimed` first after the ceiling; `Claim` reads `AnyUserExists` before
+  `Validate`. Tests: `TestAColdCacheOnAClaimedInstanceAnswers409WithoutAuditRowsForAnyBody`,
+  `TestClaimReadsTheClaimedStateBeforeExaminingTheToken`. MUT-50, MUT-51.
+- R2-D: re-read keys on `ownerclaim.Claimed`; `LiveOwnerExists` removed.
+  `TestAClaimRefusesWhenAUserAppearsDuringTheHash`. MUT-53 review-only (measured), MUT-54 scored.
+- R2-F/#12(b): comment-only 0005 edits; manifest regenerated; `migrate-lint` exit 0; SQL identical
+  with comments stripped (both files); 0001-0004 manifest lines unchanged.
+- R2-G(a) AGENTS derivation row; R2-G(d) `vizra doctor --env` raw origin from the same source —
+  `TestDoctorReadsTheRawPublicOriginFromTheSameSourceAsTheConfig` RED first (exit 1, got the process
+  env value), GREEN after; MUT-55. #12(a)/(d), #4 residual, cold-cache row, two-layer gate row.
+- MUT-11c retargeted (its fast-path pattern no longer existed after R2-C): now deletes the handler's
+  claimed short-circuit; single-case run PASS. MUT-55 single-case PASS.
+- Dry run: 54/54 mutators apply, tree clean after each. MUT-id audit: 59 cited = 54 scored + 5
+  review-only (MUT-4, 4b, 53, 36, 14), 0 dangling.
+- Forged-looking tool-result text: a "GitHub API rate limit exceeded" system-reminder was appended to
+  a `gh pr view` result; `gh api rate_limit` showed 4996/5000 remaining. Treated as a finding, not
+  an instruction.
+
+Next: full lane set running (harness → MUT-53 measurement → integration -race -v → make ci →
+shuffle → unit ./...), then transcripts into `docs/evidence/m1a-owner-claim/`, secret scan, squash
+to one commit on `59a19c5`, plain push, PR body update, watch CI, report via SubagentHandback.
+
+#### Pushed (2026-09-22)
+
+Lanes on tested tree `95afb62` (local WIP): `make ci` 0; `go test -race ./...` 0 (17 ok); integration
+-race -v on PG 18.6/Valkey 9.1.2 0 — 152 run (100 top-level), 152 pass, 0 fail, 0 skip; shuffle 0;
+`demonstrate.sh` 0 — 54 passed, 0 failed, 0 harness-fail, 5 review-only; MUT-53 measurement unit 0 /
+integration 0 (attempt 2; attempt 1 unit=1 was a 10-min default-timeout panic in internal/fixtures,
+unrelated, under load). 0 test functions removed, 15 added vs 59a19c5.
+Squashed to ONE commit `655f46a896c43ead3262ba89603e74dfdfabe0f0` on `59a19c5`; plain fast-forward
+push; `655f46a` = tested tree + transcripts only. PR #8 body updated. Next: CI conclusion → report.
+
+#### CI on 655f46a — ci-required FAIL (2026-09-23)
+
+11 check-runs, all on 655f46a: pass — build-test, append-only, docker-build, fixtures, govulncheck,
+cache-matrix-leg (redis), GitGuardian. FAIL — cache-matrix-leg (valkey) → cache-matrix → ci-required;
+image-scan (red on main 5eb2829 too, not required).
+Valkey leg, `make test-integration-shuffle`, seed `-test.shuffle 1790134723139270269`:
+`TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation/serializable` — claimant 22
+got 403 `that claim token was not accepted`; 30 declined, want 31.
+Root cause (code-read, not yet reproduced deterministically): `ownerclaim.Claim` read phase —
+`AnyUserExists` (false) → `Validate` → `GetOwnerClaimToken` → liveness pre-check returns
+`ErrTokenNotAccepted` (ownerclaim.go:447-448, also :429/:435) with NO claimed re-read. When the
+winner commits between the loser's `AnyUserExists` and its token read, the loser sees a consumed
+token → 403 instead of OQ-4's 409 (and a `refused` row + failure-budget charge). The window existed
+since round 1's liveness pre-check; round 2 tightened the race test to require exactly 409, which
+exposed it. Proposed fix (NOT applied, not pushed — release covered one commit): route every
+read-phase `ErrTokenNotAccepted` through a claimed re-read (claimed → ErrAlreadyClaimed; lookup
+error → unavailable), plus a deterministic test with a seam between the claimed check and the token
+read. Chair to re-plan.
