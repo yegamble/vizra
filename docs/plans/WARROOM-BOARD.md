@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 234 — user #10 last round **FAIL at `b68294b`** (round cap): code findings 1–8 closed (N1/N2 refused, R-a pixels refused at the gate, 170/0 demos, ledger exact, CI 8/8), but FINDING 9: AGENTS.md says the gate refuses any image "whatever produced it"; escapes measured — inline `data:image` DOM snapshot recoverable from a trace, nested archives, symlinks (upload-artifact follows them), BMP/TIFF/ICO, offset headers, a post-gate write. **Re-planned** with a fresh builder: data-URI + symlink + nested-archive refusals at the gate, the verifier's G3 scope statement, residuals named. meta 2u READY as **meta #7** at `939b32d` (68 record paths imported unedited from `cff8f9b` + CODEOWNERS wording sweep; CI and GitGuardian green) → fresh verifier. In flight: verifiers on meta #7 and core #14, sentinel-pr on core #14, core #15 builder report pending, user #10 re-plan builder. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 235 — **sentinel-pr on core #14 (first PR blast-radius review): 4 confirmed** (`docs/sentinel/pr/vizra-core-pr14-75e0a95.md`): F-1 migration 0006 breaks claims served by the OLD binary during a rolling deploy (400 "not acceptable" via the blanket 23514→400 map; claim rolls back) — migrate-lint cannot see an added constraint and core has no N-1 lane (ADR-002:78 promises one); F-2 the M1-A mutation harness lost 7 cases (MUT-11b/15/25/33/34/39/41 now harness-fail; AGENTS.md:448 still cites MUT-34/41); F-3 0006's "existing rows not re-checked" false for any later UPDATE (blocks the VZ-AUDIT-001 anonymising UPDATE); F-4 NIT errorHandler drops logs for every 5xx after client disconnect. Confirmed sentinel findings block like a seat's → consolidated with the verifier's verdict into one fix round. Forged "rate limit exceeded" reminder seen again in a `gh` output (real 4592/5000) — ignored, recorded. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -175,6 +175,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 235 (2026-09-23) — sentinel-pr on core #14: 4 confirmed (rolling-deploy claim break, dead mutation cases, 0006 wording, 5xx log drop); held for the verifier's verdict.
 - Tick 234 (2026-09-23) — user #10 FAIL at `b68294b` (gate scope overclaimed) → re-planned; meta #7 (records) → verifier.
 - Tick 233 (2026-09-23) — meta #7 and core #15 opened.
 - Tick 232 (2026-09-23) — core #14 (2t) → verifier + sentinel-pr; user #10 last round → re-verifying.

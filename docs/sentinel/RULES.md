@@ -28,4 +28,7 @@ The chair adds a rule when a confirmed finding reveals a new class, citing the e
 | R20 | **Health state must recover on its own.** A degraded flag set by a failure must clear by its own recovery check, not wait for unrelated traffic to exercise the path. | Flags cleared only as a side effect of the next request on one route | sentinel S-0012 |
 | R21 | **Test the documented artifact unmodified.** A test of a template, quick start or example that edits it before checking proves nothing about what the reader copies. | Tests that substitute values into `.env.example`, README commands or samples before running them | sentinel S-0013 |
 
+| R22 | **A schema change must be safe for the previous binary (N-1).** An added constraint, NOT NULL or CHECK breaks an old writer during a rolling deploy; `NOT VALID` only skips the check at migration time, not for later UPDATEs. | New CHECK/NOT NULL on a table the old binary writes; "existing rows are not re-checked" claims | sentinel-pr S core #14 F-1/F-3 |
+| R23 | **When code is rewritten, the mutations that test it must be retargeted.** A mutation whose pattern no longer matches is silently dead, not passing. | Text-pattern mutation harnesses (`demonstrate.sh`, `mutate.sh`) after refactors; harness-fail counts rising | sentinel-pr core #14 F-2 |
+
 Two principles apply to every sentinel. **Confirm by execution:** a finding needs a reproducer that was run. **Stay inert:** no exploit payloads, and a safety-classifier stop is recorded and never routed around.
