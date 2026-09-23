@@ -54,3 +54,10 @@ None at start.
 - Ledger: the three D24e lines changed (bf820b0e… BEFORE/RESTORED, 528b9284… MUTATED); three D25b lines added (bf820b0e…, 83a85e46…, bf820b0e…); all other lines byte-identical.
 - Transcript churn in the other D-rows is port (3391 -> 3941) and volatile run data only.
 - Docker image pr10close-user:demonstrate removed.
+
+### Chair ruling round (2026-09-23): recorders.ts:44 and any other absolute claim
+- Commit 5c5c971ea8980c1ae44a3716f2d0b73ee54fe50b on 03baf75, fast-forward.
+- Grep outside docs/evidence ("any image", "no image", "never uploaded", "whatever produced it", "refuses any", "holds regardless"): two gate claims found and scoped: e2e/harness/recorders.ts:43-45 and e2e/harness/test.ts:148-150. Remaining hits are the recorder-config policy ("Lane A records NO PIXELS"), negations ("not a proof that no pixels are present"), gate-OK-message assertions, the page-snapshot gate (ci-environment.ts:94), and unrelated text.
+- test.ts is also hashed in the ledger (D13q/D15i/D15j), so its 6 lines changed too, as forced by the edit; flagged to the chair.
+- Ledger diff vs 03baf75: 12 lines changed (6 recorders.ts, 6 test.ts); 17 lines byte-identical.
+- npm ci 0; npm run e2e:demos 0 (176/0/0); npm run ci 0 (670 tests, 0 skipped, 25 digest lines); require-checks 0 (246/253/0); lane guard 0; Lane A 0 (18 passed, floor 9/9 9/9, 18 stamps); floor check 0; canary 0.

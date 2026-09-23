@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 241 — core #15 verifier **FAIL at `96b8999`** (`docs/evidence/warroom/2026-09-23-vizra-core-pr15-test-stability-VERIFY.md`): everything else reproduced (lanes 1566 / 1737×3 / shuffle, 0 skips, 0 leaked entries; R0/T1–T3 + own M5 red; boundary probe clean; CI 6/6 required green) but the committed **T4 red is a build failure** (`errors` unused). Consolidated fix round 1 of 2 with sentinel-pr F-1…F-5 + Q-1/Q-3 → builder `a6838af8c94145b13`: compiling T4 + audit every transcript's red; `-timeout 8m` on fixtures.yml:136 + README:65 + lanes.sh; `testtmp_other.go` (!unix); floors 37/145; stated limits (review-only Makefile timeout, orphan go build, PID-namespace scope, root runner); strip absolute temp paths; evidence NITs. In flight: core #14 fix, core #15 fix, user #10 comment fix, meta 2x. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 242 — user #10 READY at **`5c5c971`** (comment-only R1 rescoping of `recorders.ts:43-48` + `test.ts:148-151`; 12 digest lines recomputed by `e2e:demos`, 17 byte-identical; chair accepts the test.ts lines as forced by the same rule; CI 8/8 incl. `ci-required`) → fresh verifier + sentinel-pr dispatched in parallel. In flight: core #14 fix, core #15 fix, meta 2x, user #10 verifier + sentinel-pr. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -176,6 +176,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 242 (2026-09-23) — user #10 at `5c5c971` → fresh verifier + sentinel-pr.
 - Tick 241 (2026-09-23) — core #15 FAIL (T4 red = build failure) → fix round 1 with sentinel F-1…F-5.
 - Tick 240 (2026-09-23) — meta self-test fixture broken by #7's merge → 2x; R24; user #10 READY at `03baf75`, held for recorders.ts:44 (R1).
 - Tick 239 (2026-09-23) — meta #7 merged (`608ffbf`); 12 merges today; sentinel-pr core #15: 5 NIT, none blocking; core #14 fix builder resumed.
