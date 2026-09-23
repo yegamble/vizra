@@ -328,3 +328,43 @@ Fan-in `all 6 required check(s) succeeded` on head 6b65eff. CI counts: unit 1071
 integration 1116/0 skips (×2 incl. shuffled), internal/integration 45. New controls' ok
 lines present in the CI log for every make-running lane. State: READY_FOR_REVIEW; next action
 is the independent verifier at 6b65eff.
+
+# Fix round 2 of 2 (the last) — the verifier's re-verification FAIL at `6b65eff`
+
+`docs/evidence/warroom/2026-09-21-vizra-core-pr9-hardening-b1-VERIFY.md`, section
+"Re-verification at 6b65eff". The anchor was weak two ways: recognised by substring
+(R-1, N1–N4) and lenient whenever MAKELEVEL was present (R-2).
+
+| # | Fix | Where |
+|---|---|---|
+| R-1 | anchor pinned: `anchor_step: ./scripts/make-integrity-guard.sh --workflow`; the step before each make step must BE it; a look-alike is refused anywhere | `pinned-steps.yml`, `step_is_the_anchor`, `check_job_surroundings`; 8 workflow anchors updated |
+| R-2 | mode chosen by `--workflow`, never by env; strict = MAKEFLAGS family unset, make recipe vars absent; lenient = measured allowlist (Make 4.3 in `ubuntu:24.04`, 3.81 host); MAKELEVEL & co. refused as job/workflow env | `check_environment`, `DANGEROUS_ENV_NAMES` |
+| (mine) | `?=` variables (`GO`, `SQLC`, `GOFLAGS`, `RELEASE`, `COMMIT`, `BUILT_AT`) refused in strict mode and as job/workflow env — `GO=true make test-race` exits 0 over a failing test | `check_environment_overrides`, `MAKEFILE_ENV_NAMES`; `R5-makefile-env-override.txt` |
+| R-4 | duplicate YAML keys refused | `_NoDuplicateKeysLoader` |
+| R-5 | real file must be named make; ok line states only what is checked | `check_make_resolves_to_a_real_program` |
+| R-3 | AGENTS.md, both docstrings, pinned-steps.yml, README, COMMANDS, PR body restated | |
+
+Commits `fc4885b` (code), `d435cd8` (evidence) on top of `6b65eff`; head `d435cd8`.
+Fixtures 75 (+10). Evasion table at `fc4885b`: static 57 rows / 54 red / 3 named
+counter-rows; runtime 13 rows / 11 red / green = control + GOTOOLCHAIN (stated boundary).
+Local at the working tree: tidy/ci/build 0, both guards 0, `make ci-guard` (plain, -j2, -s) 0,
+`go test -race ./scripts/` 0. Host load average ~250 (other agents) — local timings unreliable.
+Cross-PR: PR #8's `internal/audit`, `internal/credential`, `internal/ownerclaim` need floors in
+BOTH suites from whichever PR merges second; stated in the PR body. Not added here.
+
+CI on `d435cd8`: every required lane green (build-test 10m32s, ci-required 10m03s), but it
+measured unit **1109** / integration **1154** (scripts 189), disproving my PR-body sentence
+"counts unchanged from round 2 (1071/1116)" and staling test-floors.json `_why` (the FINDING 8
+class). Corrected in `e2a3e01`: `_why` and COMMANDS take CI's numbers; floors raised with the
+same generator formula (never lowered): suite 910→943 / 949→981, `scripts` 128→161. PR body
+carries an explicit correction paragraph. Head `e2a3e01`; waiting on CI.
+
+## CI on `e2a3e01` — every required lane green (final head of fix round 2)
+
+ci-required 11m23s · build-test **11m13s** · cache-matrix 4s (legs 4m33s/5m05s) · docker-build 3m09s ·
+fixtures 1m49s · govulncheck 30s · append-only 7s · GitGuardian 1s · image-scan failure (not required;
+exit 1 findings, 48 HIGH / 179). Fan-in `all 6 required check(s) succeeded` on `e2a3e01`. CI counts:
+unit 1109 (floor 943), integration 1154 ×2 (floor 981), internal/integration 45, scripts 189 (floor
+161), 0 skips. 7 strict `--workflow` anchor passes plus 1 ci-guard (allowlist) pass. State:
+READY_FOR_REVIEW; next action is the same verifier at `e2a3e01`.
+Cleanup: `ubuntu:24.04` image I pulled removed by name; no containers of mine remain; scratch removed.
