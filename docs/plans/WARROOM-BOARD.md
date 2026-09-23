@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 192 — **search PR #5 PASS (local; CI BLOCKED) at `1d28281`** (F17 closed; comment/doc lists equal the test's `forbidden` and `text_reads`; `go test ./scripts/` 422/0). **LOOP PAUSED — everything left is owner-gated.** Six PRs have an independent verifier PASS (local) and wait only on GitHub Actions billing (inbox 0) for a green `ci-required` on the verified SHA: meta #5 `c3bb02e`, core #8 `0cc906e`, core #10 `398ac4f`, core #11 `0243f2e` (after #10: rebase, R2-1 commit `bc8df3a` staged locally, re-pin, re-confirm), user #8 `c2ff445`, search #5 `1d28281`; meta #4 `ddec39c` needs CI then a docs-delta re-confirmation. Merge order when CI returns: meta #4 → meta #5 → core #8 → core #10 (re-pin) → core #11 → user #8 → search #5. Every queued slice depends on those merges or on owner decisions (design acceptance 4; ADR items 8b–8e), so no new builder is dispatched while billing blocks merges. Restart with `/loop /warroom` once billing is fixed. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 193 — loop resumed at the owner's request; billing probe (re-run of meta `validate` 35837872919) still refused: "recent account payments have failed or your spending limit needs to be increased". Owner action (inbox 0): github.com/settings/billing — payment information and the Actions spending limit/budget. Each tick re-probes with one cheap re-run; when a job starts, the chair re-runs CI on every verified SHA and merges in order meta #4 → meta #5 → core #8 → core #10 (re-pin) → core #11 (rebase + re-confirm) → user #8 → search #5. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -155,6 +155,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 193 (2026-09-23) — loop resumed; billing probe still refused.
 - Tick 192 (2026-09-23) — search PR #5 PASS (local; CI BLOCKED) at `1d28281`; loop paused: six verifier-PASSed PRs wait only on GitHub Actions billing; nothing dispatchable without merges or owner decisions.
 - Tick 191 (2026-09-23) — quiet.
 - Tick 190 (2026-09-23) — search PR #5 PASS (local; CI BLOCKED) at `6646ccd`; final docs-only narrowing (F17) before merge.
