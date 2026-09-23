@@ -75,3 +75,44 @@ Mutations on the fixed tree (each restored with `git checkout -- .`):
   - Worktree removed.
   - The scratch transcripts are kept at the path above for the verifier.
 - Finding outside this slice: `internal/integration/healthcheck_test.go:55` `os.MkdirTemp("", "vizra-healthcheck-bin-")` is never removed. That leaks about 74 MB per integration run; 88 had accumulated in `$TMPDIR` on this host, and that caused the ENOSPC above. I removed only the five my runs created.
+
+## Fix round 1 (verifier FAIL at 6edaf83: V-1 REQUIRED, V-2 SHOULD, V-3/V-4 NIT)
+State: IMPLEMENTED, READY_FOR_REVIEW.
+- Head **`25f62ac6ff2bb2b0b203938c015c6f49a6cb130d`**: one commit on `6edaf83`, pushed as a fast-forward.
+- `dd23785` was the same tree without the floors; all lanes ran on it.
+- Worktree recreated at `/Users/yosefgamble/github/vizra/.claude/worktrees/core-b3`.
+- Transcripts: `/private/tmp/claude-501/-Users-yosefgamble-github-vizra/7321b930-95d2-4a95-ba2e-61ef2ce3c13c/scratchpad/b3r1.n4jc/`.
+- Files:
+  - `internal/obs/{log.go,log_test.go}`
+  - `internal/search/{service.go,search_test.go}`
+  - `internal/httpapi/logsites_test.go`
+  - `internal/cache/ratelimit.go` (comment only)
+  - `AGENTS.md` (the obs, worker, API and L-2 rows)
+  - `scripts/test-floors.json`
+- V-1:
+  - `obs.Redact` now covers the forms the verifier listed, plus a Cookie-header pattern whose value is proven by two any-name cookie rows.
+  - Tests:
+    - `TestRedactCoversEveryCredentialForm`: 23 rows; the 15 new ones are red on 6edaf83's log.go (`red-r1-obs-cookie-rows.txt`) and green after.
+    - `TestRedactLeavesLookalikesAlone`: the false-positive control.
+    - `TestTheErrorHandlerRedactsEveryCredentialFormInA500`: 10 rows through the handler, red on 6edaf83.
+    - `TestTheFallbackLogLinesAreRedacted`: a real `*url.Error` in search, red on 6edaf83.
+  - The sentences are rewritten to the measured pattern set, with residuals named: panics, helpers in other packages, JSON keys, raw `/` or `@` in a password, and no pattern for private metadata.
+- V-2: 11 planted shapes, all red against the 6edaf83 checker (`red-r1-httpapi.txt`) and green after.
+- Mutations: R1 to R7 (Redact), S1 (search), C1 and C2 (checker). Each is red on the intended row; transcripts in `mut-*.txt`.
+- V-3: the comment is corrected. V-4: the provenance above is corrected.
+
+| Command | Rev | Exit | Result |
+|---|---|---|---|
+| red: obs / search / httpapi new tests | 6edaf83 + new tests | 1 / 1 / 1 | 14 / 3 / 23 FAIL lines |
+| green: same | dd23785 | 0 / 0 / 0 | 38 / 3 / 44 PASS lines |
+| `make ci` | dd23785, 25f62ac | 0, 0 | all lanes passed |
+| unit `go test -race -count=1 -json ./...` + report, attempt 1 | dd23785 | 1 / 1 | NOT a test failure: `panic: test timed out after 10m0s` in internal/fixtures `TestManifestDetectsEveryClassOfDrift` at host load average about 272 |
+| unit, attempt 2 | dd23785 | 0 / 0 | 1259 executed, 0 skips |
+| integration Valkey plain, attempt 1 | dd23785 | 1 / 1 | NOT a test failure: 10m timeout in internal/fixtures and internal/integration, same load |
+| integration Valkey plain, attempt 2 | dd23785 | 0 / 0 | 1428 |
+| integration Valkey shuffled | dd23785 | 0 / 0 | 1428 |
+| integration Redis 7.2.16 plain | dd23785 | 0 / 0 | 1428 |
+| integration Redis 7.2.16 shuffled | dd23785 | 0 / 0 | 1428 |
+| `--emit-floors` | dd23785 | — | httpapi 66→85, obs 14→36, search 110→112 (both suites); min_tests unit 1028→1070, integration 1171→1214; applied in 25f62ac; every stream re-judged: ok |
+
+The integration runs set `TMPDIR` to the scratch directory, so the healthcheck binary leak stayed in my own directory.

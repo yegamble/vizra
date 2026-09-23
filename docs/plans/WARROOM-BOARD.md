@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 224 — **core #13 (B5d) PASS at `54a1376`** (T0 red; 84/84 rows on 3.81 and 4.3; C33–C41; ~60-line in-process hunt found no line the grammar accepts that make reads differently; one reader confirmed; CI green, integration 1657/0) — held for one comment-only fix (F-2 overstated `$(NAME)` resolution scope); F-1 (core accepts `+`/`$(NAME)`-led recipes on non-closure rules; search refuses on every rule) → queue 2o; F-3/F-4 NITs. user #10 round 1 at `96dd3ff` (runtime recorder check in the branded fixtures; canary config pinned; E6 red/green; CI 8/8) → re-verifying. In flight: fixes on meta #6, core #12, core #13 (comment); user #10 re-verification. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 225 — core #12 round 1 at `25f62ac` (obs.Redact widened to every V-1 form with a 23-row table and a lookalike control; search fallback logs redacted with a real `*url.Error` leak test; 11 checker refusals; sentences narrowed with named residuals; floors raised; lanes green after load-timeout retries in untouched `internal/fixtures`; CI pending) → re-verifying. In flight: re-verifications of core #12 and user #10; fixes on meta #6 and core #13 (comment). History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -171,6 +171,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 225 (2026-09-23) — core #12 round 1 at `25f62ac` → re-verifying.
 - Tick 224 (2026-09-23) — core #13 PASS (comment fix held); user #10 round 1 → re-verifying.
 - Tick 223 (2026-09-23) — quiet.
 - Tick 222 (2026-09-23) — core #13 (B5d allowlist grammar) → verifier.
