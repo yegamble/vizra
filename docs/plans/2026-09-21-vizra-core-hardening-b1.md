@@ -368,3 +368,19 @@ unit 1109 (floor 943), integration 1154 ×2 (floor 981), internal/integration 45
 161), 0 skips. 7 strict `--workflow` anchor passes plus 1 ci-guard (allowlist) pass. State:
 READY_FOR_REVIEW; next action is the same verifier at `e2a3e01`.
 Cleanup: `ubuntu:24.04` image I pulled removed by name; no containers of mine remain; scratch removed.
+
+## Verifier PASS at `e2a3e01`; merge held for one sentence (R2-1) — corrected in `0c1851f`
+
+AGENTS.md claimed a `$GITHUB_PATH` write is refused if it "puts a directory other than a system
+one first on PATH"; an empty non-system dir prepended gives anchor exit 0 (only a `make` that
+RESOLVES elsewhere is refused). Reworded in AGENTS.md, the pinned-steps.yml comment and the
+ci-required-guard.py docstring ("true split" sentence), and the PR body. Docs/comments only:
+guard AST identical with docstrings stripped (18/18), pinned-steps.yml parsed-identical, proof +
+measurement in `R6-path-order.txt`. No docs file byte-pinned. PR body records the verifier's
+cross-PR note and merge order (#9 first; #8 then merges main and adds floors for audit,
+credential, ownerclaim in both suites). Head `0c1851f`; diff stat e2a3e01..HEAD: 4 files,
++29 −3. Waiting on CI.
+
+CI on `0c1851f`: every required lane green (ci-required 10m21s, build-test 10m11s); fan-in all 6 on head
+0c1851f; counts 1109/1154 unchanged, 0 skips; image-scan unchanged (not required). READY_FOR_REVIEW; merge
+held only on the chair.

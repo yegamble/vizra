@@ -1821,3 +1821,96 @@ blocking, but the chair may want it fixed in the merge commit or a follow-up. Lo
 starved by host load and are corroborated by CI only.
 
 FINAL VERDICT: PASS — SHA e2a3e0177bdcda4ddb16b4b53cadafa69bb21ef4
+
+---
+---
+
+# Re-confirmation at 0c1851f — 2026-09-23
+
+- **Head:** `0c1851ffa678fa6e100a0dea26ebb5815aea87ff`, one commit on `e2a3e01` (an ancestor, no force-push):
+  "docs: the anchor checks where `make` RESOLVES, not PATH order (R2-1)". Fresh clone in a private
+  `mktemp -d`. No containers were needed this round.
+- **Scope (narrow, as briefed):** the docs-only property, the R2-1 correction, the lanes that matter for a
+  docs change, and CI on this SHA.
+
+## RC-1. Docs-only, by my own method
+
+`git diff --numstat e2a3e01..0c1851f`: `.github/pinned-steps.yml` 3/1, `AGENTS.md` 3/1,
+`scripts/ci-required-guard.py` 3/1, and the new `docs/evidence/hardening-b1/R6-path-order.txt` 20/0. The diff
+is empty for api/, internal/, cmd/, migrations/, Makefile, `.github/workflows`, `required-checks.txt`, every
+other script, the Go tests, testdata and `test-floors.json`.
+
+My method is different from the chair's AST comparison. I **tokenised** both versions of
+`ci-required-guard.py` with Python's `tokenize`, dropped COMMENT/NL tokens and the module-docstring STRING,
+and compared the streams:
+
+```
+guard: token streams equal (comments + module docstring removed): True | tokens: 5883 5883
+pinned-steps.yml: parsed documents equal: True
+pinned-steps.yml: non-comment lines byte-equal: True
+__doc__ used in guard: 0
+```
+
+**The code path is byte-for-byte unchanged, and so is every value the guard reads from the pins file.**
+
+## RC-2. The corrected sentence, against my R2-1 measurement
+
+The strict anchor on the host, `python3 scripts/make-integrity-guard.py --workflow`:
+
+```
+control                                 exit=0
+PATH=<empty non-system dir>:$PATH       exit=0
+PATH=<dir holding a stub make>:$PATH    exit=1   FAIL  `make` resolves to '<scratch>/stubdir-…/make' …
+```
+
+The new AGENTS.md:100-103 reads: "…or makes `make` resolve outside the approved system directories. The anchor
+checks where `make` RESOLVES, not the order of PATH: prepending a directory that holds no `make` is not
+refused, and has no effect on which `make` runs." **This matches the measurement.** The two other copies
+now say the same thing: the `pinned-steps.yml` comment at :34-36 and the guard docstring at :105-107, "…or
+makes `make` resolve outside the approved system directories. The anchor checks where `make` RESOLVES, not
+the order of PATH." **Both are true.**
+
+Grep across every `.md/.py/.yml/.txt/.sh` outside testdata for PATH-order wording ("first on PATH", "earlier
+on PATH", "prepend", "PATH order", "order of PATH"). Every remaining hit is one of these:
+
+- the corrected sentences;
+- R6's labelled quotation of the retracted sentence;
+- a description of a stub **`make`** earlier on PATH. That case is refused, and the exit=1 row above measures it.
+  The hits are `ci-required-guard.py:539`, `make-integrity-guard.py:799, :836`, `pinned-steps.yml:16`,
+  evasion row A25, and `evasion-table.py:194`, which describes GitHub's `$GITHUB_PATH` mechanism.
+
+In the PR body, line 42 states the corrected split. Line 97 quotes the retracted sentence under "**That was
+false.**", which is a labelled quotation. **No PATH-order claim stronger than the control remains.**
+**FINDING R2-1 is closed.**
+
+## RC-3. Lanes
+
+```
+./scripts/make-integrity-guard.sh --workflow   exit 0   passed (8 gate target(s))
+./scripts/ci-required-guard.sh                 exit 0   passed (6 required check(s))
+go test -race -count=1 -v ./scripts/           exit 0   ok … 70.678s — 189 PASS, 0 FAIL, 0 SKIP
+```
+
+## RC-4. CI on 0c1851f
+
+| check | conclusion |
+|---|---|
+| `ci-required` (run 35818887320) | **success**: `ci-required-guard: passed (6 required check(s))`; the fan-in prints `SUCCESS` for append-only, build-test, cache-matrix, fixtures, govulncheck and docker-build |
+| `append-only`, `build-test`, `cache-matrix` (+ both legs), `fixtures`, `govulncheck`, `docker-build` | **success**. All six FLOOR_LANES completed on this SHA; the manifest matches the jobs that ran |
+| `image-scan` (not required) | failure: `48 finding(s) at or above ['CRITICAL','HIGH']`, exit **1** (findings) |
+
+The build-test log (run 35818887259) prints unit **1109**/943 and integration **1154**/981 (plain and
+shuffled), with `internal/integration` **45**/40 and `skipped: 0` in all three. Provenance: tested merge tree
+`4d44026…`, `HEAD^2 == 0c1851f…`, "checked: HEAD^2 == the PR head SHA". Duration 04:34:35 → 04:44:46 =
+10m11s of 20 minutes.
+
+## Verdict at 0c1851f
+
+The only change since my PASS at `e2a3e01` is documentation. It is proven docs-only by token comparison, and
+it corrects the one overstatement I raised (R2-1) to match my measurement exactly. The lanes and CI are green
+on this SHA with the expected counts and 0 skips. No open finding.
+
+Cleanup: the scratch clone and the two temporary PATH directories were deleted. No containers or images
+were created.
+
+FINAL VERDICT: PASS — SHA 0c1851ffa678fa6e100a0dea26ebb5815aea87ff

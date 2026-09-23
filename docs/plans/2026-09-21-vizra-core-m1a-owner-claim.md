@@ -980,3 +980,68 @@ exposed it. Proposed fix (NOT applied, not pushed — release covered one commit
 read-phase `ErrTokenNotAccepted` through a claimed re-read (claimed → ErrAlreadyClaimed; lookup
 error → unavailable), plus a deterministic test with a seam between the claimed check and the token
 read. Chair to re-plan.
+
+## 16. Closing slice (fresh builder, 2026-09-22) — IN_PROGRESS
+
+Repo `yegamble/vizra-core`, worktree `.claude/worktrees/core-m1-owner-claim`, branch
+`feat/m1-owner-claim`, PR #8. Base head `655f46a896c43ead3262ba89603e74dfdfabe0f0` (tree clean, equal to
+origin at start). Commits go ON TOP: no amend, no rebase, no force-push. Acceptance: VZ-INSTALL-003
+(OQ-4: the claimed check strictly precedes any token examination; a claimed instance answers 409).
+
+**The defect class.** A refusal decided in `Claim`'s READ PHASE (malformed shape, no token row,
+digest mismatch, not live) is answered without being classified against a FRESH claimed state. If a
+winner commits between the loser's `AnyUserExists` and its token read, the loser answers 403, writes a
+`refused` audit row and spends failure budget on an instance that is claimed. CI run 35814919455,
+valkey leg, seed 1790134723139270269.
+
+**Plan.**
+1. ONE classification function in `internal/ownerclaim` (`classifyRefusal`): fresh `AnyUserExists` →
+   claimed ⇒ `ErrAlreadyClaimed`; lookup error ⇒ `ErrUnavailable`; otherwise ⇒ `ErrTokenNotAccepted`.
+   The read phase has a single refusal exit that calls it; the post-redeem `pgx.ErrNoRows` path calls
+   the same function (after rolling back its transaction). The handler's own re-read branch in
+   `mapClaimError` is deleted — one place decides. The handler still maps `ErrAlreadyClaimed` → 409 +
+   monotonic cache set (no audit, no budget), `ErrUnavailable` → 503, `ErrTokenNotAccepted` → the
+   uniform 403 with its audit/budget semantics unchanged.
+2. Test seam: an unexported hook in `ownerclaim` fired after the read-phase claimed check and before
+   any token examination; nil in production; its only setter lives in a `//go:build integration` file,
+   and a unit test asserts the setter is absent from the default build.
+3. Deterministic tests (integration): pause claimant A at the seam, let the world become claimed,
+   release; one sub-test per read-phase refusal branch (consumed, digest mismatch, no row, malformed);
+   A must get 409, zero audit rows, zero failure-budget `Allow` calls (recording limiter), cache set.
+   Plus: classification lookup failure ⇒ 503 without budget/audit; unclaimed controls still 403.
+4. Mutations: new MUT for the read-phase bypass (named test red); MUT-43/MUT-52 retargeted to the
+   classification's new home (their handler patterns no longer exist); MUT-31 pattern updated.
+   Review-only list re-examined.
+5. Race stress: `TestOwnerClaimRaceYieldsExactlyOneOwnerUnderEveryServerDefaultIsolation` ≥200×
+   (`-count`) on Valkey 9.1.2 and Redis 7.2.16, with and without CPU contention; red baseline at
+   655f46a recorded first if reproducible.
+6. Full lanes on PG 18.6: `make ci`, `go test -race ./...`, integration `-v`, shuffle incl. seed
+   1790134723139270269, `demonstrate.sh` + MUT-id audit; transcripts as a final evidence-only commit.
+
+Containers (mine only): `m1close-pg18` (:55461), `m1close-valkey` (:63861), `m1close-redis` (:63862).
+Scratch: `scratchpad/m1close-9yeBtt`.
+
+Coordination note for the PR body: when the second of core #8/#9 merges it needs per-package floors
+for `internal/audit`, `internal/credential`, `internal/ownerclaim` and pinned make-step shapes — NOT
+added here.
+
+Process note: one read-only `git status` was run in the meta checkout at the start of this slice
+before re-reading the rule; nothing was changed by it. No further git in the meta checkout.
+
+### Progress and evidence
+- Baseline RED at 655f46a, reproduced locally: non-race binary built from `git archive 655f46a`,
+  race test `-count=200`, Valkey 9.1.2, 16 busy loops on 8 CPUs — iteration(s) failed with
+  "28 claimants were declined, want 31" (full counts in `07-race-stress.txt`). A first attempt with a
+  `-race` binary at load ~430 was stopped after 28 min with no output (too slow to finish).
+- Fix committed `a42ca76` (on 655f46a): `classifyRefusal` + `examineToken`, handler re-read deleted,
+  seam `afterClaimedCheck` + `seam_integration.go`, 6 new tests (+1 unit), race test tightened,
+  MUT-56..59 new, MUT-43/52 retargeted, MUT-13/31 patterns moved. AGENTS row added.
+- Focused green on the working tree (Valkey, `-race -v`): TestAReadPhaseRefusal…Answers409 4/4,
+  …Uniform403 5/5, TestAFailedClassificationRead… PASS, TestATokenSuperseded… PASS,
+  TestTheClaimTransactionPins… PASS, race test 3/3 isolations PASS.
+- `make ci` attempt 1 on the working tree: exit 2 — every lane ok except `internal/fixtures`
+  (`panic: test timed out after 10m0s` in TestManifestDetectsEveryClassOfDrift, host load ~300,
+  package does not import ownerclaim). Re-run owed on a quieter host.
+- Chair coordination (received mid-slice): core #9 merges first; when it lands, merge origin/main
+  (no rebase), add floors for internal/audit, internal/credential, internal/ownerclaim via
+  `--emit-floors`, run both guards, no skips. At a42ca76: #9 OPEN, origin/main still 5eb2829.
