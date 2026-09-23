@@ -850,3 +850,499 @@ Challenge:
 **Why it still fails:** AGENTS.md states the gate's scope as "any image or video … never uploaded … whatever produced it". That is a guarantee the gate does not provide. Measured end to end, an inline data-URI image survives the gate byte for byte in the trace, and so do several other shapes. The blocking item is a documentation change: the G3 scope statement plus the data-URI row. An optional ~10-line gate addition would close the data-URI and symlink cases. No other code change is required for Q3.
 
 FINAL VERDICT: FAIL — SHA b68294b027965b6df57e3705d3b15631bafd4873
+
+## Re-verification at 5c5c971
+
+- **Verified SHA:** `5c5c971ea8980c1ae44a3716f2d0b73ee54fe50b`. It is two fast-forward commits on `b68294b`: `03baf75` (the gate additions, AGENTS.md, 9 unit cases, D25) and `5c5c971` (comment-only rescoping in `recorders.ts` and `test.ts`, with 12 digest lines).
+- **Head:** confirmed with `gh api repos/yegamble/vizra-user/pulls/10` at the start and again at the end (`.head.sha`). It had not moved.
+- **Verifier:** a fresh, independent verifier. I did not write this code or any earlier round of it.
+- **Clone:** fresh, from GitHub, under the scratchpad (`vzv-user-pr10r3-XXXXXX`, via `mktemp -d`). A detached side worktree of the same clone was used for red/green runs and probes, so the demos run was never disturbed.
+- **Environment:** Node 22.14.0 (nvm, matching `.nvmrc`), Playwright 1.63.0, Chromium from `npx playwright install`, Docker 29.8.0, macOS arm64 (Darwin 25.5). The userland is BSD: Info-ZIP Zip 3.0 and UnZip 6.00 (Apple builds) and perl 5.34.1. CI runs on GNU/ubuntu-24.04. Every escape below follows from the gate's own logic (which signatures and which arguments it reads), not from BSD behaviour.
+- **Ports:** 3961 (Lane A), 3962 (canary), 3963/3964 (demos), 3965 (my probes).
+- **Images:** `vzv-pr10r3-5c5c971:demonstrate` and `…:demonstrate-with-fixtures`. The pre-existing `vizra-user:demonstrate` image belongs to someone else and was not touched.
+- **Cleanup:** see the end of this section.
+
+### H1. Lanes
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm ci` | 0 | 0 vulnerabilities |
+| `npm run ci` | 0 | 21 files, **670 passed**, 0 skipped; hygiene: 340 sources, 25 digest lines match this tree |
+| `bash scripts/ci/require-checks_test.sh` | 0 | 246 cases, 253 assertions, 0 failed |
+| `bash scripts/ci/check-e2e-lane.sh .github/workflows/e2e.yml` | 0 | OK |
+| `E2E_LOCAL_PORT=3961 npm run e2e` (Lane A) | 0 | **18 passed**; floor 9/9 and 9/9; 18 stamps |
+| `node scripts/ci/check-coverage-floor-ran.mjs` | 0 | OK; 18 stamps verified |
+| `E2E_LOCAL_PORT=3962 node scripts/ci/harness-canary.mjs` | 0 | all 4 fixtures failed, each with its exact kind set |
+| `npm run e2e:demos` (`DEMO_PROD_PORT=3963 DEMO_DEV_PORT=3964 DEMO_IMAGE=vzv-pr10r3-5c5c971:demonstrate`) | 0 | **176 halves passed, 0 blocked, 0 failed**; all 15 D24 and 6 D25 halves `ok` |
+
+No test was skipped in any lane.
+
+### H2. Red/green: the 9 new unit cases, and D25
+
+**The builder's unit claim, reproduced.**
+- With `b68294b`'s gate (sha256 `97627fe1…`) copied over the head's, `npx vitest run e2e/harness/upload-gate-pixels.test.ts` exits 1: **9 failed / 7 passed**.
+- All 9 failures are the 9 new cases. Each one is an assertion failure, not an error: "expected +0 to be 4" (the 4 data-URI cases) or "expected +0 to be 5" (the 5 exit-5 cases). The old gate exits 0 on every one of those trees.
+- Restored (sha256 `bf820b0e…`, the committed file), the same file plus `redaction-corpus.test.ts` gives **162/162**.
+
+**Each new branch is load-bearing.** I made seven mutations of my own to the head gate. Each one turns the unit file red, on the case that names it:
+
+| Mutation | Result |
+|---|---|
+| `refuse_data_uris` returns 0 | 4 failed: all four data-URI cases |
+| exemption applied to every root, not only `playwright-report` | 1 failed: "the HTML reporter's own viewer is the ONLY exemption" |
+| `DATA_URI_RE` without `\\*` | 1 failed: the case/escape/video case |
+| `grep` without `-i` | 1 failed: the same case |
+| `archive_magic` returns 1 | 2 failed: nested archives, unopened archives |
+| no `refuse_uninspectable … member` call | 2 failed: link inside a trace, nested archives |
+| no `! -type f ! -type d` scan | 3 failed: all three link cases |
+
+**D25, reproduced by me in the side worktree.** I extracted the D25 spec byte for byte from `demonstrate.sh` and ran it against a local production server with `PLAYWRIGHT_NO_COPY_PROMPT=1`, followed by the pinned gate command.
+
+| Half | Spec | `data:image/` members in the traces | Gate | Upload |
+|---|---|---|---|---|
+| a, gate as committed | exit 1, 1 failed | 2 | **rc 4**, naming `1-trace.trace` and `resources/<sha1>.html`; no base64 in stdout or stderr | skipped: 0 uploaded |
+| b, mutation `refuse_data_uris() { return 0` (sha256 `83a85e46…`, the ledger's D25b MUTATED) | exit 1 | 2 | rc 0 | **runs, and carries 2 members with the image** |
+| c, restored (sha256 `bf820b0e…`, byte-identical to the commit) | exit 1 | 2 | rc 4 | skipped |
+
+**The exemption, on a real red run.** A plain failing spec run under the main configuration, with the HTML reporter, writes `data:image/` only in `playwright-report/index.html` and `playwright-report/trace/assets/codeMirrorModule-*.js`. The gate passes it: **rc 0**. That reproduces the builder's measurement. So the exemption is what keeps an ordinary red run diagnosable.
+
+### H3. The b68294b G3 escape table against the new gate
+
+I rebuilt each G3 case as a fresh `test-results/` + `playwright-report/results.json` tree and ran the head gate with the pinned arguments.
+
+| G3 case | rc now | Status |
+|---|---|---|
+| clean tree (inverse control) | 0 | passes, as it should |
+| PNG with 1 leading byte, `a.dat` | 0 | listed as not detected ("a signature not at byte 0") |
+| JPEG with 1 leading byte | 0 | listed, same bullet |
+| zip-in-zip | **5** | refused |
+| zip named `a.dat` / `trace.zip.bak` | **5 / 5** | refused |
+| gzip `a.png.gz`, `a.dat.gz`; tar `a.tar` | **5 / 5 / 5** | refused |
+| data-URI PNG in `error-context.md` | **4** | refused |
+| base64 PNG in `results.json` stdout | 0 | listed ("base64 with no `data:` prefix") |
+| `results.json` attachment typed `application/octet-stream` | 0 | listed |
+| SVG with an embedded `data:image/png` raster | **4** | refused |
+| trace member with 1 leading byte | 0 | listed ("a signature not at byte 0") |
+| BMP bytes `.dat`, TIFF `.tif`, ICO `.ico` | 0 / 0 / 0 | listed |
+| symlink to a PNG outside; symlinked directory | **5 / 5** | refused |
+| hex dump | 0 | listed |
+| end to end: an inline data-URI image (D25) | **4** | refused (H2) |
+| a file written after the gate | n/a | listed (§ Residuals, the `run:` class) |
+
+**Every G3 escape is now either refused or listed exactly under "What the gate refuses, exactly".** FINDING 9's acceptance criteria are met.
+
+### H4. Attacking the new code
+
+All fixtures were synthetic: a generated 1×1 PNG (70 bytes) and 16-byte header stubs. No safety classifier stopped anything, so there are no NOT RUN rows.
+
+**Unrecognised archives and compressed streams.** Each held the synthetic PNG.
+
+| Case | rc |
+|---|---|
+| lz4, brotli, `compress` (`.Z`, magic `1f9d`), lzma-alone, cpio (newc), `ar`, a zlib stream, raw deflate, each renamed `x.dat` at top level | **0** for all 8 |
+| `.lz4`, `.Z`, `.lzma`, `.cpio`, `.ar` under their own names | **0** for all 5 (not in `ARCHIVE_NAME_RE`) |
+| trace member `resources/77ab` holding a zlib stream, a cpio or an lz4 | **0** for all 3 (not refused as "an archive inside an archive") |
+| stored zip with 1 leading byte, `a.dat`, at top level and as a trace member | **0 / 0** |
+| v7 (pre-POSIX) tar with no name | 0 (this one is listed) |
+
+**data: URIs that the literal does not match.**
+
+| Case | rc |
+|---|---|
+| `data:application/octet-stream;base64,<PNG>` | **0** |
+| `data:;base64,<PNG>` (no media type) | **0** |
+| `data:ima\nge/png` (the URL parser strips the newline) | 0 |
+| `data:image%2Fpng`, `data:image/png` | 0 / 0 |
+| UTF-16LE `data:video/` | 0 |
+| double-escaped `data:image\\\/png`, upper-case `DATA:IMAGE/` | **4 / 4** |
+
+- **Chromium renders all of these as images.** I set `<img src=…>` with the synthetic PNG under `data:image/png`, `data:application/octet-stream`, `data:;base64` and `data:text/plain`, and got `naturalWidth` = 1 for every one.
+- **End to end, through the harness.** A probe spec (scratch only, eslint 0) serves `<img src="data:application/octet-stream;base64,…">` and asserts `naturalWidth === 1`, which passes. It then fails on a heading.
+  - The trace keeps the base64 PNG in `trace.zip::1-trace.trace` and `resources/<sha1>.html`.
+  - The pinned gate prints OK, **rc 0**, and both members are still in the upload set.
+- This is the shape `FileReader.readAsDataURL` produces for an untyped Blob, for example an upload preview.
+
+**An uploaded path the gate never reads.** The upload's `path:` is `test-results/`, `playwright-report/results.json` and **`playwright-browsers.txt`**. The gate is run as `redact-artifacts.sh test-results playwright-report`, and `playwright-browsers.txt` is written by the record step, BEFORE the lane (`e2e.yml:85` against `:125`).
+- A probe spec (eslint 0) copies the synthetic PNG over `playwright-browsers.txt`, then fails: the gate gives **rc 0**, and the file is a PNG.
+- The same spec, replacing the file with a **symbolic link** to a PNG outside the tree: gate **rc 0**, and `file -L` reports a PNG. The pinned `upload-artifact` follows links (G3).
+
+**The exemption.**
+
+| Case | rc |
+|---|---|
+| exempt `playwright-report/index.html` and `trace/` | 0; they are not uploaded (the path allowlist, `check-e2e-lane.mjs:444`) |
+| `playwright-report/Index.html`, `playwright-report/Trace/v.js` | 4 / 4 |
+| `test-results/playwright-report/{index.html,trace/v.js}` | 4 (the root is `test-results`) |
+| a hard link from the exempt `trace/` into `test-results/` | 4 |
+| a symlink from `test-results/` into the exempt `trace/` | 5 |
+| the argument `./playwright-report` | 0 (exempt, correctly) |
+| the argument `playwright-report/` (trailing slash) | 4 on BSD `find` (`//` in paths), so it over-refuses and stays closed. The pinned step has no slash |
+
+- `..` cannot occur, because the paths come from `find`.
+- No spec output can reach the exempt paths AND the upload, because the upload never names them. **The exemption is sound.**
+
+**Signatures, truncation, names, bounds.**
+- A zero-byte file passes (0), as does a zero-byte or corrupt `x.zip` (0: removed with a warning, not uploaded).
+- A 3-byte truncated PNG or zip signature passes (0). There is nothing to carry.
+- A bare 2-byte `1f8b` is refused (5), which over-refuses and stays closed.
+- A PNG named `a b⏎c.dat` or `x.png⏎`: 4. A link in a directory whose name holds a space and a newline: 5.
+- A 150-deep tree with a PNG: 4.
+- 2,000 small files: rc 0 in **253 s** on this machine, about 10 process spawns per file. The step has no timeout. A timeout would skip the upload, so this is closed but slow.
+
+**Fail-closed.**
+
+| Case | rc | Result |
+|---|---|---|
+| unreadable file (mode 000) holding a PNG | **2** | "a file this gate cannot read is not a clean file" |
+| trace member extracted with mode 000 | **2** | closed |
+| unreadable DIRECTORY (mode 000) holding `a.png` | **0** | "OK … no image or video is present". `find`'s EACCES is swallowed by every `< <(find …)` loop |
+| read-only directory (555) holding `error-context.md` with `https://h.example/p?X-Amz-Signature=VZSECRET123` | **0** | the value survives: `perl -pi` prints "Can't do inplace edit" and exits 0, and `n=$(redact_tree …)` would hide a non-zero anyway. Pre-existing (redact_tree dates from `f49bca4`, #3) |
+
+### H5. R1: absolute claims, judged by me
+
+I grepped `5c5c971` outside `docs/evidence` for "any image", "never uploaded", "whatever produced", "refuses any", "holds regardless", "archive it does not open", "any archive", "whatever it is called", "of any kind", "unopened archive", "at any depth", "anywhere in what would be uploaded", "everything Playwright" and "image a page inlines". I also read the PR body and the builder's PR comment.
+
+| Sentence | Verdict |
+|---|---|
+| AGENTS.md:822 "anything is a symbolic link or another non-regular file, at any depth, the named directory itself included" | True for the two named directories. The named directory is refused as `.` |
+| AGENTS.md:826 "an archive is nested in an archive, **of any kind**, or an archive not named `.zip` … recognised by name or by a zip, gzip, bzip2, xz, zstd, 7z, rar or `ustar` signature" | **False as written.** cpio, lz4, zlib and friends are not refused (H4), and "of any kind" contradicts the list after it. The not-detected list names only the pre-POSIX tar |
+| AGENTS.md:830-831 "That covers … **an image a page inlines as a `data:` URI**" | **False as written.** Only a URI typed `image/` or `video/` is refused. `data:application/octet-stream` and `data:;base64` render in Chromium and pass, end to end (H4). They are not in the not-detected list either: "base64 with no `data:` prefix" does not cover them |
+| AGENTS.md:774 (upload table) "refuses the WHOLE upload … if **what would be uploaded** holds an image or video file … a symbolic link, or **an archive it does not open**" | **False** on two counts: `playwright-browsers.txt` is uploaded and never read (H4), and unrecognised archives |
+| AGENTS.md:182 (COMMANDS) "REFUSE — exit 5 — a symbolic link or other non-regular file **anywhere in what would be uploaded**, an archive inside an archive, and an archive not named `.zip`" | **False**, same two counts |
+| AGENTS.md:1062-1064 (§ What PR A still guarantees) "… a symbolic link, or **an archive it does not open**" | **False** for unrecognised archives |
+| AGENTS.md:214 (`vizraWorkerGuard` row, from `b68294b`) "the upload gate is the one that **holds regardless**" | **Unscoped.** This is the exact phrase the chair's ruling had rescoped in `recorders.ts` and `test.ts`, and the builder's own grep for "holds regardless" missed it |
+| `redact-artifacts.sh:216-219` "Images inlined as `data:` URIs, links and archives this script does not open are refused by the two gates after this one" | **False**: non-image-typed data URIs and unrecognised archives |
+| `redact-artifacts.sh:353-358` "an ARCHIVE INSIDE AN ARCHIVE … refused … whatever it is called"; "**Any archive not named `*.zip` is refused.**" | **False** as written (H4) |
+| `redact-artifacts.sh:417-418` "a link or an unopened archive **anywhere in what would be uploaded** refuses the whole set" | **False**: `playwright-browsers.txt`, and unrecognised archives |
+| `redact-artifacts.sh:465`, the OK line: "… and **no link or unopened archive is present**" | **False** when it prints over a cpio, lz4 or zlib payload (H4) |
+| `upload-gate-pixels.test.ts:261` "an archive inside an archive, **whatever its name or kind**, is refused" | **False**: the case tests zip, gzip and tar only |
+| PR body, § "1. The control that holds regardless: the upload gate refuses pixels", and "The upload gate is the control that holds regardless" | **Unscoped, and live.** The body has no section at all for `03baf75` or `5c5c971`; the 03baf75 evidence exists only as a PR comment, and there is nothing for `5c5c971` |
+| PR comment (03baf75): "An archive nested inside an archive." / "An archive not named `.zip`, found by name or by signature." | Overstated in the same way as AGENTS.md:826 |
+| `recorders.ts:43-48`, `test.ts:148-151`, `playwright.config.ts:26-33,134` "refuses … in the shapes it knows" | **Accurate** |
+| AGENTS.md:832-846, the not-detected list; :852-860, "The cost"; :872-877, D25; :963-969 | Accurate as far as they go; they are incomplete for the H4 shapes above |
+| AGENTS.md:703 and `ci-environment.ts:94`, "layer 3 … holds regardless" (the page-snapshot gate, from #8) | Out of this slice. Noted only: a `# Page snapshot` inside a cpio or zlib payload would pass too |
+
+### H6. The mutation-digests ledger
+
+- `git diff 03baf75 5c5c971 -- …/mutation-digests.txt`: **exactly 12 lines changed**. They are the six `test.ts` lines (D13q BEFORE/RESTORED; D15i BEFORE/MUTATED/RESTORED; D15j RESTORED) and the six `recorders.ts` lines (D23b ×3; D24d BEFORE/MUTATED/RESTORED).
+- **Every other line is byte-identical**, by position and by content. There are 32 lines, so **20** are unchanged, not the 17 the plan and brief state (NIT).
+- The new hashes:
+  - `6237e614…` is the sha256 of `test.ts` at 5c5c971;
+  - `85d8d686…` is `recorders.ts` at 5c5c971;
+  - `c8de74f9…` is `test.ts` with D15i's `perl` mutation applied, recomputed by me;
+  - `eca56a69…` is `recorders.ts` with the D23b/D24d mutation applied, recomputed by me.
+- `03baf75..5c5c971` changes code only inside comment blocks of those two files. The rest of the commit is evidence transcripts.
+- After my own `npm run e2e:demos`, the regenerated `mutation-digests.txt` is **byte-identical** to the committed file (`git diff --quiet` exit 0), so every BEFORE/MUTATED/RESTORED hash, D24e and D25b included, is what the demonstrations produce on this tree.
+
+### H7. CI on 5c5c971, read with my own `gh api`
+
+- **`check-runs`:** `total_count` 8, all `completed/success` on `5c5c971`: ci-required, e2e, frontend, guard, contract, deps-scan, image-scan, GitGuardian.
+- **Workflow runs**, all `pull_request`, attempt 1: ci-required 35928751782, e2e 35928751808, contract-ci, supply-chain, frontend-ci 35928927649, ci-guard.
+- **`ci-required`** started 22:30:52Z and completed 22:34:49Z, after the last lane (guard, 22:34:45Z). Its log: "manifest .github/required-checks.txt … OK: every required check on 5c5c971… concluded success".
+- **The manifest** is `frontend`, `contract`, `?guard`, `?docker-build`, `e2e`. The first four of those ran; `docker-build` is optional and was not triggered. No listed lane was left unexecuted.
+- **frontend log:** 670 passed, with `upload-gate-pixels.test.ts` at 16 tests.
+- **e2e log:** "18 passed", floor 9/9 and 9/9, 18 stamps, canary OK on all 4.
+- The gate step itself did not run, because the lane was green. The unit file is what exercises it in CI.
+
+### H8. R14, public-repo exposure of what the PR adds
+
+- **Tokens:** a scan of every added line (`b68294b..5c5c971`) for `gh*_`, `github_pat_`, `AKIA`, PEM, `xox`, `sk-` found none.
+- **Pixel data:** none, beyond the D25 spec's synthetic 1×1 PNG literal (70 bytes, generated) in `demonstrate.sh` and the unit test's 8-byte signature stubs. No transcript carries base64 image data: there is no run of 200 or more base64 characters.
+- **Local paths:** the regenerated `d16d-*` transcripts carry `/var/folders/f0/<id>/T/tmp.*` temp paths. The same shape is on `main` and at `b68294b`, so this is pre-existing churn, not new here. There is no `/Users/`, user name or `/private/tmp`.
+- **Out of scope, noted:** `e2e.yml`'s comment above the upload still says "`yegamble/vizra-user` is a PRIVATE repository". `gh api repos/yegamble/vizra-user` returns `visibility: public`.
+
+### H9. Findings at 5c5c971
+
+FINDING 9 is closed in code and in its acceptance criteria (H3, H2). The new text introduced new guarantees that the control does not keep.
+
+```
+FINDING 10: The archive refusal is documented as "of any kind" / "any archive not named .zip" / "no unopened archive is present"; it recognises eight signatures, and cpio, ar, lz4, brotli, .Z, lzma, zlib and raw-deflate payloads pass
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     AGENTS.md:182, :774, :826, :1062-1064; scripts/ci/redact-artifacts.sh:216-219, :353-358, :365 (ARCHIVE_NAME_RE),
+             :366-381 (archive_magic), :465 (OK line); e2e/harness/upload-gate-pixels.test.ts:261 (title)
+  requirements: VZ-FOUND-008 (security seat Q3/F14)
+
+Observed:
+  With the pinned arguments, each tree holding the synthetic PNG: lz4, brotli, compress(.Z), lzma, cpio, ar, zlib, raw
+  deflate renamed x.dat -> rc 0 (8/8); .lz4 .Z .lzma .cpio .ar under their own names -> rc 0 (5/5); a zlib, cpio or lz4
+  payload as trace member resources/77ab -> rc 0 (3/3); a stored zip with one leading byte, top level and as a member ->
+  rc 0. The OK line then says "no link or unopened archive is present".
+
+Failure:
+  The sentences promise that any archive the gate does not open is refused. It refuses archives it RECOGNISES. The
+  "What the gate refuses, exactly" list names only the pre-POSIX tar as unrecognised, so a reader takes the rest as
+  closed.
+
+Perspective:
+  operator | photographer
+
+Recommendation:
+  Docs (required): say "an archive recognised by name (list) or by signature (list)" everywhere, drop "of any kind",
+  "whatever it is called", "any archive" and "no unopened archive"; add to the not-detected list: other archive and
+  compression formats (cpio, ar, lz4, brotli, compress, lzma, zlib/deflate streams) and an archive signature not at byte 0.
+  Code (optional): add the lz4 (04224d18), compress (1f9d), lzma (5d0000), cpio (070701/070707/c771), ar (!<arch>),
+  zlib (78 01/5e/9c/da) signatures and names.
+
+Acceptance criteria:
+  No sentence in AGENTS.md, the script or the test titles says "any archive", "of any kind", "whatever it is called",
+  "whatever its name or kind" or "no unopened archive" unless each case above exits non-zero; each case above is either
+  refused or named in the not-detected list.
+
+Tests:
+  upload-gate-pixels.test.ts: if code: one tree per added signature, rc 5. If docs only: rename the test title to the
+  kinds it builds (zip, gzip, tar).
+
+Cross-repo implications:
+  core: none | user: this PR (and PR B's upload rides the same gate) | search: none | meta: none
+
+Challenge:
+  Every one of these needs a spec to deliberately compress pixels in an odd format, which the `run:` class already
+  admits. True; the finding is the sentence, and it is new in this round.
+```
+
+```
+FINDING 11: "That covers … an image a page inlines as a data: URI" — only a data: URI typed image/ or video/ is refused; a page inlining a PNG as data:application/octet-stream (what FileReader.readAsDataURL gives an untyped Blob) renders, is kept by the trace, and passes
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     AGENTS.md:830-831, :963-969, :986 (NOT-covered row "inlined as a data: URI"), :1063;
+             scripts/ci/redact-artifacts.sh:216-219, :285-294, :309 (DATA_URI_RE)
+  requirements: VZ-FOUND-008 (security seat Q3/F14)
+
+Observed:
+  Chromium 1.63.0's build: <img src="data:application/octet-stream;base64,<synthetic PNG>"> -> naturalWidth 1; same for
+  "data:;base64," and "data:text/plain;base64,". End to end: a harness probe spec serving the octet-stream form, asserting
+  naturalWidth === 1 (passes), then failing -> trace.zip::1-trace.trace and ::resources/<sha1>.html carry the base64 PNG
+  -> pinned gate rc 0, "OK … no image or video is present in the shapes this gate reads" -> both members in the upload set.
+
+Failure:
+  The doc says the inlined-image route is covered. It is covered for one labelling of it. The octet-stream label is the
+  natural output of reading an untyped File/Blob in the browser — an uploader preview in a photo app.
+
+Perspective:
+  photographer | operator
+
+Recommendation:
+  Docs (required): scope to "a data: URI typed image/* or video/*" and list "a data: URI with another or no media type,
+  which Chromium still renders in an <img>" as not detected.
+  Code (optional, small): also refuse `data:[^,]{0,100};base64,` followed by the base64 of a known signature
+  (`iVBORw0KGgo` PNG, `/9j/` JPEG, `R0lGOD` GIF, `UklGR` RIFF, `GkXfo` WebM), any case.
+
+Acceptance criteria:
+  Either the octet-stream probe exits non-zero at the gate, or AGENTS.md no longer says the data-URI route is covered
+  without the image/video qualifier, and names the other-typed form as not detected.
+
+Tests:
+  upload-gate-pixels.test.ts: a tree with `data:application/octet-stream;base64,<PNG b64>` in a trace member — rc 4 if
+  the code option is taken, or a named residual case asserting rc 0.
+
+Cross-repo implications:
+  core: none | user: this PR; any future upload-preview slice | search: none | meta: none
+
+Challenge:
+  A server-rendered photo page would label its data URIs correctly; the untyped case needs a client-side preview. The
+  first uploader slice is exactly that.
+```
+
+```
+FINDING 12: playwright-browsers.txt is uploaded but never gated; a spec can replace it with PNG bytes or a link to one, and the gate prints OK
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     .github/workflows/e2e.yml:85-89 (record step, BEFORE the lane at :125), :191 (gate args), :243-246 (upload
+             paths); AGENTS.md:182 ("anywhere in what would be uploaded"), :774 ("if what would be uploaded holds"), :777
+             ("nothing sensitive"); scripts/ci/redact-artifacts.sh:417-418
+  requirements: VZ-FOUND-008 (security seat Q3/F14)
+
+Observed:
+  Probe spec (eslint 0) `copyFileSync(<synthetic PNG>, "playwright-browsers.txt")`, then fails -> `redact-artifacts.sh
+  test-results playwright-report` rc 0; `file playwright-browsers.txt` = PNG image data. Same spec with
+  `symlinkSync(<PNG outside the tree>, "playwright-browsers.txt")` -> rc 0; the file is a link (the pinned upload action
+  follows links).
+
+Failure:
+  Two sentences promise that the gate reads everything that would be uploaded; one of the three uploaded paths is outside
+  it. "What the gate refuses, exactly" says "under the uploaded directories", which is accurate, but its residual line
+  "anything outside the uploaded paths, which is not uploaded either" does not cover an uploaded path outside the gate.
+
+Perspective:
+  operator
+
+Recommendation:
+  Either gate the file (record the browser revision after the lane, or have the gate take the file as an argument and
+  refuse a link / non-text there — a pinned-step change, with its pin), or scope both sentences to "under test-results/
+  and playwright-report/" and name playwright-browsers.txt as ungated in the not-detected list.
+
+Acceptance criteria:
+  The two probe routes above exit non-zero at the gate, or no sentence says "what would be uploaded" for the gate's scope
+  and the file is named as not read.
+
+Tests:
+  If code: upload-gate-pixels.test.ts (or a require-checks case) with playwright-browsers.txt as a link and as PNG bytes,
+  refused. If docs: none beyond the wording.
+
+Cross-repo implications:
+  core: none | user: this PR and PR B | search: none | meta: none
+
+Challenge:
+  A spec that writes PNG bytes into a text file is deliberate, the same class as encoding pixels; the doc already
+  concedes deliberate shapes. It concedes shapes it does not recognise; this is a recognised shape in a place it does
+  not look, and the COMMANDS row says it looks everywhere.
+```
+
+```
+FINDING 13: "The upload gate … holds regardless" survives in AGENTS.md:214 and in the live PR body; the PR body has no section for 03baf75 or 5c5c971
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     AGENTS.md:214 (vizraWorkerGuard row: "the upload gate is the one that holds regardless"); PR #10 body
+             § "1. The control that holds regardless: the upload gate refuses pixels" and "The upload gate is the control
+             that holds regardless"
+  requirements: VZ-FOUND-008
+
+Observed:
+  git grep -n 'holds regardless' 5c5c971 -- AGENTS.md -> :214 (added in b68294b) and :703 (page-snapshot layer, #8).
+  The chair's ruling rescoped this exact phrase in recorders.ts and test.ts; the plan's grep lists "holds regardless" and
+  reports only ci-environment.ts:94 among gate claims. The PR body was last written for b68294b; the 03baf75 summary is
+  a PR comment, and 5c5c971 has none.
+
+Failure:
+  The fixture table and the PR description (the squash-merge text by default) still state the unscoped guarantee the
+  round was opened to remove.
+
+Perspective:
+  operator | developer
+
+Recommendation:
+  Rescope AGENTS.md:214 as recorders.ts was ("the control that does not depend on how the pixels were produced, for the
+  shapes it knows"); update the PR body with a 03baf75/5c5c971 section and rescope its § 1 heading and § 3 bullet.
+
+Acceptance criteria:
+  `git grep -n 'holds regardless'` shows no gate-for-pixels claim; the PR body describes the current head and uses the
+  scoped wording.
+
+Tests:
+  none (wording). Note AGENTS.md is not in the digest ledger, so no ledger churn.
+
+Cross-repo implications:
+  core: none | user: this PR | search: none | meta: none
+
+Challenge:
+  The row points at § Artifact privacy, which is now scoped. A reader of the fixture table does not follow the pointer.
+```
+
+```
+FINDING 14: The gate reports OK over what it could not read or could not rewrite: an unreadable directory (find errors swallowed) and a read-only directory (perl -pi exits 0 without redacting)
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     scripts/ci/redact-artifacts.sh:162-167 (redact_tree), :458 (n=$(redact_tree …)), every `done < <(find …)`
+             loop (:258, :275, :330, :392, :407, :454)
+  requirements: VZ-FOUND-008 (sentinel R5)
+
+Observed:
+  test-results/t/locked (mode 000) holding a.png -> "find: Permission denied" ×N, rc 0, "OK … no image or video is
+  present". test-results/t/ro (mode 555) holding error-context.md with `?X-Amz-Signature=VZSECRET123` -> "Can't do
+  inplace edit … Permission denied", rc 0, value still present (count 1). `perl -0777 -pi` exits 0 on that error
+  (measured). An unreadable FILE is correctly refused (rc 2).
+
+Failure:
+  Fail-open on error in the same script the upload trusts. The unreadable-directory case needs a later chmod to leak (the
+  documented `run:` class), but the read-only case uploads an unredacted query string with no further step. The
+  redact_tree half predates this PR (f49bca4, #3).
+
+Perspective:
+  operator
+
+Recommendation:
+  Collect `find` output into a file and check `find`'s status before the loop (or `wait $!` on the process
+  substitution); make redact_tree verify each rewrite (perl `-i` with an explicit `open … or die`, or compare output) and
+  run it outside `$(…)` so set -e applies.
+
+Acceptance criteria:
+  Both trees above exit non-zero; the 670-test suite and D-rows stay green.
+
+Tests:
+  upload-gate-pixels.test.ts or redaction-corpus.test.ts: a mode-000 directory and a mode-555 directory case, each
+  expecting a non-zero exit (skip-proof: assert the chmod took effect first, since root ignores modes).
+
+Cross-repo implications:
+  core: none | user: this gate; register the redact_tree half with the sentinel if it is ruled out of this slice |
+  search: none | meta: none
+
+Challenge:
+  A spec has to chmod its own output to reach either; that is deliberate. R5 says the check fails closed on the
+  unreadable regardless of intent, and the new data-URI gate already does so for files.
+```
+
+```
+FINDING 15: Bookkeeping: "17 lines byte-identical" is 20; environment.txt at 5c5c971 records head 03baf75
+Severity:    NIT
+Confidence:  high
+
+Affected:
+  repo:      vizra-user (and meta docs/plans/2026-09-23-user-pr10-close-gate-scope.md)
+  files:     docs/evidence/VZ-FOUND-008/mutation-digests.txt (32 lines), docs/evidence/VZ-FOUND-008/environment.txt
+  requirements: none
+
+Observed:
+  32 ledger lines, 12 changed, 20 identical (the invariant holds; the count is misstated). environment.txt: "head sha:
+  03baf75…" in the 5c5c971 tree, because the demos ran on the uncommitted comment edits.
+
+Failure:
+  Evidence text disagrees with the evidence.
+
+Perspective:
+  developer
+
+Recommendation:
+  Say 20; note that the transcripts were generated on 03baf75 plus the uncommitted 5c5c971 edits.
+
+Acceptance criteria:
+  The numbers match the files.
+
+Tests:
+  none
+
+Cross-repo implications:
+  none
+
+Challenge:
+  Cosmetic. Recorded because R1 applies to evidence too.
+```
+
+### Re-verification verdict
+
+**What passed:**
+- The lanes reproduce: 670/0; 246/253/0; Lane A 18; floor and canary OK; demos 176/0/0.
+- The 9 new unit cases are red on `b68294b`'s gate as assertion failures, and green on the head. Seven mutations of my own each turn a named case red.
+- I reproduced D25a/b/c myself.
+- Every G3 escape is refused or listed.
+- The exemption is sound: exact, not reachable from the upload, and pinned.
+- The 12-line ledger delta is exact, with 4 hashes recomputed by me.
+- CI is 8/8 green on `5c5c971`, `ci-required` is green, and its manifest is honest.
+- There are no tokens and no pixel data.
+
+**Why it fails:** the gate got stronger, and the new sentences claim more than it does.
+- It refuses the archives it recognises, but the docs, comments, test title and OK line say "any archive … of any kind" (FINDING 10).
+- It refuses `data:image/` and `data:video/`, but the docs say it covers "an image a page inlines as a `data:` URI". The untyped form renders and passes, end to end (FINDING 11).
+- It reads two of the three uploaded paths, but the docs say "anywhere in what would be uploaded" (FINDING 12).
+- "Holds regardless" remains in AGENTS.md:214 and in the PR body, which also does not describe the current head (FINDING 13).
+
+The blocking items are wording under R1, plus small optional code for 10 to 12. FINDING 14 is a fail-open worth scheduling; the `redact_tree` half predates this slice.
+
+**Cleanup:** the probe specs were deleted from the side worktree; my image `vzv-pr10r3-5c5c971:demonstrate` was removed (the mutant image had already been removed by the script); ports 3961-3965 are free; the clone and worktree directory `vzv-user-pr10r3-*` is deleted after this file is written. Containers `vzv-pr15r1-*` and the image `vizra-user:demonstrate` belong to others and were not touched. Head re-checked at the end: `5c5c971ea8980c1ae44a3716f2d0b73ee54fe50b`, unchanged.
+
+FINAL VERDICT: FAIL — SHA 5c5c971ea8980c1ae44a3716f2d0b73ee54fe50b

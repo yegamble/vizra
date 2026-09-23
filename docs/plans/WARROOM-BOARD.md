@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 246 — sentinel-pr on user #10 at `5c5c971` (`docs/sentinel/pr/vizra-user-pr10-5c5c971.md`): **2 MAJOR, BLOCKING** — F-1 `playwright-browsers.txt` is uploaded but never read by the gate (a spec can overwrite it with a PNG → gate OK); F-2 `contextOptions.recordHar` (content: embed) gets page images past both the runtime check and the gate — plus MINOR F-3 stale workflow comments (incl. "repo is PRIVATE"), F-4 ledger text VZ-FOUND-008 → **owner inbox 12**, F-5 surviving `|| !known` mutant; NIT F-6. Held for the verifier's verdict, then one consolidated round (the re-plan builder's second and last). In flight: core #14 re-verify + sentinel, core #15 re-verify, user #10 verifier, meta #10 verifier. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 247 — user #10 verifier **FAIL at `5c5c971`** (lanes, red/green, D25, exemption, digests and CI all reproduced; FINDING 9 closed) with REQUIRED 10 (8 more archive/compression formats pass: lz4, brotli, .Z, lzma, cpio, ar, zlib, raw deflate), 11 (untyped `data:application/octet-stream;base64` images render and pass), 12 (`playwright-browsers.txt` uploaded, never scanned — = sentinel F-1), 13 ("holds regardless" at AGENTS.md:214 + PR body); SHOULD 14 (gate fails OPEN on mode-000 dirs and failed `perl -pi`, R5); NIT 15. With sentinel F-2 (HAR via `contextOptions`), every round finds a new shape → **defect class R3 (denylist over an attacker-editable space). RE-PLANNED:** fresh builder `ab29c4d29b3b03d48` on the same branch — public Lane A uploads ONLY an allowlist of text (`results.json`, `error-context.md`) staged BY CONTENT into a fresh dir that is the only upload path; every staged file regular, size-capped, valid UTF-8, no control bytes, no base64/hex run > measured N, redacted; fail closed on any error; traces/HTML/pixels → private Lane B (PR B); `recorderProblems` screens resolved `contextOptions`. Plan first → security seat → build. In flight: core #14 re-verify + sentinel, core #15 re-verify, meta #10 verifier, user #10 re-plan (planning). History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -181,6 +181,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 247 (2026-09-23) — user #10 FAIL at `5c5c971` (10–15) → RE-PLANNED as an allowlist gate (R3); fresh builder, plan first.
 - Tick 246 (2026-09-23) — sentinel-pr user #10: 2 MAJOR blocking (unscanned upload file; HAR recorder); inbox 12.
 - Tick 245 (2026-09-23) — core #15 at `434abe5` → re-verify; 2aa queued.
 - Tick 244 (2026-09-23) — core #14 at `1d57ad8` → re-verify + sentinel re-review; 2z queued.
