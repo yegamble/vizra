@@ -37,3 +37,8 @@ None. State: READY_FOR_REVIEW. Next: independent verifier on #15.
 - Lanes on 8f96cd6 (= fix tree minus floors/evidence): make ci 0, fixtures-verify 0, unit 1566/0/0, integration valkey/redis plain+shuffled 1737/0/0 each, 0 leftovers; raised floors judged against those events: 5x exit 0.
 - CI on 434abe5: ci-required, build-test, cache-matrix + legs, fixtures (step ran with -timeout 8m), govulncheck, append-only, docker-build, GitGuardian pass; image-scan fail (not required, as on main).
 - State READY_FOR_REVIEW; not merged.
+
+## Fix round 2 (docs only; verifier PASS at 434abe5, chair hold for FINDING 5/6/7b)
+- Commit `e161af7bcecc15a3f6462e8ce1ca4279035599ee`, fast-forward from 434abe5; 6 files, docs/evidence only (+20/-9). No Makefile/workflow/script/test change; no re-pin.
+- COMMANDS.md: "every full-suite go test lane"; config-template-check (Makefile:81) and openapi-verify (Makefile:86) named, under go's 10m default which fires inside build-test's 20m job. Job minutes rounded (API: 7.80-10.88, 4.58-5.83, widest 6.38). T1-T4 note the pre-squash tree 8f96cd6 (git diff 8f96cd6 434abe5 touches only test-floors.json and evidence). Makefile comment carries none of the corrected figures.
+- CI on e161af7: ci-required, build-test, cache-matrix + legs, fixtures, govulncheck, append-only, docker-build, GitGuardian pass; image-scan fail (not required). Not merged.

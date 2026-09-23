@@ -548,3 +548,113 @@ Recommendation:
 - All earlier findings are closed. FINDINGS 5–7 are NITs and non-blocking.
 
 FINAL VERDICT: PASS — SHA 434abe5dd4332e7291820f0f8555b9d33e4d2bbc
+
+---
+
+## Re-confirmation at e161af7
+
+- Target: head **`e161af7bcecc15a3f6462e8ce1ca4279035599ee`** (fix round 2), one fast-forward commit on `434abe5` (`merge-base --is-ancestor` ok).
+- Head confirmed with `gh api repos/yegamble/vizra-core/pulls/15` at the start and at the end (2026-09-23T23:27:17Z): unchanged, open.
+- I checked the delta only, from a fresh clone in `mktemp -d $SCRATCH/vzv-core-pr15r2-XXXXXX` (now deleted). The delta touches no code, so I did not re-run the lanes.
+
+### 1. The delta is docs only
+
+- `git diff --stat 434abe5 e161af7`: 6 files, +20/−9, namely `docs/quality/COMMANDS.md`, `docs/evidence/test-stability/timings.txt` and `host-darwin-arm64/T1–T4.txt` (one added line each).
+- Non-`docs/` paths changed: **0**.
+- On e161af7:
+  - `go build ./...` ok;
+  - `go vet ./...` ok;
+  - `go vet -tags=integration ./...` ok.
+- The Makefile sha256 is `6b3d93c7…`, which equals the pin (unchanged).
+- `make-integrity-guard.sh --workflow` rc 0, lenient rc 0, `ci-required-guard.sh` rc 0.
+
+### 2. R1 on the new COMMANDS.md sentence
+
+| Claim | Check | Result |
+|---|---|---|
+| Exactly two narrow recipes lack `-timeout` | grep of every `go test` in the Makefile, workflows, `pinned-steps.yml` and `scripts/*.sh`, minus comments and echo lines | only `Makefile:81` and `Makefile:86` lack it; nothing else is left out |
+| "five named tests in `internal/config`" | `go test -list '<Makefile:81 regex>' ./internal/config/` | 5 top-level tests matched |
+| "seven named tests in `internal/httpapi`" | same, for `Makefile:86` | 7 |
+| "they run only inside `make ci`" | the only references to either target in `.github/`, `Makefile` and `scripts/` are its own rule and `ci:`'s prerequisite list (`Makefile:38`). No workflow or pinned make body calls them directly. | true for CI (a developer can still type `make openapi-verify` locally, where the sentence notes there is no job limit) |
+| "`make ci` starts about 1.7 minutes into build-test" | job API step offsets: e161af7 1.62, 434abe5 1.50, 96b8999 1.53; the 12 earlier runs up to 1.7 | true |
+| "runs them before anything slow, so the 10m default fires before the job is killed" | build-test log timestamps (minutes from job start). Before them only tidy-check, fmt-check, vet (≈0.3–0.4 min), lint-imports and migrate-lint run, and `make` stops at the first failing recipe. A hang would get its dump at about 2.0 + 10 ≈ 12 min, which is under 20. | true (see table below) |
+
+| Job | `config-template-check` | `openapi-verify` | `test-race` |
+|---|---|---|---|
+| e161af7 | 2.00 | 2.03 | 2.11 |
+| 434abe5 | 1.78 | 1.80 | 1.86 |
+| 96b8999 | 1.90 | 1.92 | 2.00 |
+
+- The builder's correction is right: a job-level `timeout-minutes` kill prints no goroutine dump, so what matters is go's own 10m timeout firing first.
+- The sentence is at measured strength. **FINDING 5 is closed.**
+
+### 3. FINDING 6 (rounding)
+
+| Figure | Now written | API value | Rounds to |
+|---|---|---|---|
+| build-test, 4 runs | 7.8–10.9 min | 7.80–10.88 | 7.8–10.9 |
+| cache-matrix-leg, 4 runs | 4.6–5.8 min | 4.58–5.83 | 4.6–5.8 |
+| cache-matrix-leg widest, 12 runs | 6.4 min | 6.38 | 6.4 |
+
+- All match my two-decimal API values, in COMMANDS.md and in timings.txt (both lines, plus the 888a003 comparison line).
+- A grep for any leftover `10.8`, `6.3` or `4.5–5.8` in COMMANDS.md, the evidence directory and the Makefile finds none.
+- **FINDING 6 is closed.**
+
+### 4. FINDING 7b (the pre-squash tree line)
+
+- The line added to T1–T4.txt says: "its tree matches 434abe5 for every file this row mutates or runs (git diff 8f96cd6 434abe5 touches only scripts/test-floors.json and evidence files)".
+- **What can be shown:** each transcript's recorded `sha256 BEFORE` equals the mutated file at 434abe5.
+
+  | Row | File | Recorded hash equals 434abe5 |
+  |---|---|---|
+  | T1 | `internal/fixtures/fixtures_test.go` | `864996c8…` |
+  | T2 | `internal/integration/main_test.go` | `0f3d0926…` |
+  | T3, T4 | `internal/testtmp/testtmp.go` | `e899c169…` |
+
+- **What cannot be shown:** `8f96cd6` is not on the remote (`git fetch` → "not our ref"). So the whole-tree `git diff 8f96cd6 434abe5` result, and "every file this row … runs" (the rest of each package, `testtmp/child.go`, the test binary's dependencies), cannot be checked by anyone but the builder.
+- The parenthetical claims more than the repository can show.
+- It is **not load-bearing**: I re-ran T1–T4 on 434abe5 myself (section (a) above), with the same reds at `tmpleak_test.go:35`, `:33`, `testtmp_test.go:50` and `:74`. None of this slice's evidence depends on the unpublished tree. The delta since then is docs only.
+- Wording that would hold:
+  > 8f96cd6 was a local pre-squash commit and is not on the remote. The sha256 BEFORE above equals `<file>` at 434abe5; the rest of that tree cannot be checked from this repository. The row was re-run independently on 434abe5 (meta `docs/evidence/warroom/2026-09-23-vizra-core-pr15-test-stability-VERIFY.md`, re-verification (a)).
+
+```
+FINDING 8: T1–T4.txt state an unverifiable whole-tree diff for an unpublished commit
+Severity:    NIT
+Confidence:  high
+Affected:    vizra-core docs/evidence/test-stability/host-darwin-arm64/T1.txt:4, T2.txt:4, T3.txt:4, T4.txt:4
+Observed:    "(git diff 8f96cd6 434abe5 touches only scripts/test-floors.json and evidence files)". 8f96cd6 is not fetchable
+             (`git fetch origin 8f96cd6ca968b2718c46f7ffb89c7f2d728284b3` → "not our ref"). Only the mutated file's sha256 is checkable,
+             and it matches 434abe5.
+Failure:     A reader cannot confirm the claim. The evidence does not depend on it (independent re-run on 434abe5).
+Recommendation: replace line 4 of each file with the wording above (fold into any later docs touch; not worth a round on its own).
+```
+
+### 5. CI on e161af7 (own `gh api …/commits/e161af7…/check-runs`)
+
+All success on head_sha e161af7:
+
+| Check | Job id |
+|---|---|
+| ci-required | 107423024058 |
+| build-test | 107423024844, 7.4 min |
+| cache-matrix | – |
+| cache-matrix-leg valkey | 107423024840 |
+| cache-matrix-leg redis | 107423024767 |
+| fixtures | 107423024309 |
+| append-only | – |
+| govulncheck | – |
+| docker-build | – |
+| GitGuardian | – |
+
+- `image-scan` failed and is not required.
+- The ci-required log ends `all 6 required check(s) succeeded`: append-only, build-test, cache-matrix, fixtures, govulncheck, docker-build, which equals `required-checks.txt`.
+
+### Verdict at e161af7
+
+- The delta is documentation only.
+- Code, Makefile pin, anchors and guard are identical to the PASS at 434abe5.
+- FINDINGS 5 and 6 are closed.
+- FINDING 8 (the reworded 7b) is a non-blocking NIT. FINDING 7a (the `demo.sh` scrub under a home-directory TMPDIR) remains a non-blocking NIT.
+- CI is green on this SHA, including `ci-required`.
+
+FINAL VERDICT: PASS — SHA e161af7bcecc15a3f6462e8ce1ca4279035599ee
