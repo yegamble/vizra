@@ -3470,3 +3470,27 @@ Challenge:
 Infrastructure NEW-2 (the stale-disclosure direction) and NEW-3 (README ports,
 `/readyz` without `-f` in both files, the 4092/4096 sentence) both verified.
 
+
+## 9. S-4 — demo.sh stability loop, back to back on a quiescent tree
+
+Method: an isolated clone at `cf9e4c8` that nothing else touches while it runs;
+`bash docs/evidence/compose-topology/demo.sh` back to back; after each run the
+RESULT line, the exit code, the count of `Broken pipe` in that run's output, and
+`git status --porcelain` (excluding `build/`) are recorded. Each line below was
+appended as its run landed, so a restart cannot lose completed runs.
+
+Runs 1–3 are from the pre-restart clone (`…/scratchpad/vzver4-qi87vDoa/loop`,
+since removed with the session). Their RESULT lines are reproduced from my tool
+output in that session; the per-run output files did not survive the restart.
+Runs 4–10 are from a fresh clone made after the restart.
+
+| Run | Clone | Exit | RESULT | Broken pipe | Tree dirty |
+|---:|---|---:|---|---:|---:|
+| 1 | pre-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
+| 2 | pre-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
+| 3 | pre-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
+| 4 | post-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
+| 5 | post-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
+| 6 | post-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
+| 7 | post-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |
+| 8 | post-restart | 0 | `95 assertion(s) passed, 0 failed, across 50 case(s)` | 0 | 0 |

@@ -1545,3 +1545,279 @@ paths are closed (R-3). Fixes are small (pin the anchor body; choose strict mode
 MAKELEVEL at job/workflow level) — this is round 1 of 2.
 
 FINAL VERDICT: FAIL — SHA 6b65eff6ee29e99e1b93b01242b4c97d90a57267
+
+---
+---
+
+# Re-verification at e2a3e01 — 2026-09-23
+
+- **Head verified:** `e2a3e0177bdcda4ddb16b4b53cadafa69bb21ef4` (fix round 2 of 2, the last). On top of `6b65eff`:
+  `fc4885b` (code), `d435cd8` (evidence), `e2a3e01` (counts/floors from CI). `6b65eff` is an ancestor, so
+  there was no force-push. `git ls-remote` showed `e2a3e01…` at the start.
+- **Clone:** fresh `mktemp -d …/scratchpad/vzv-core-pr9r2-XXXXXX`. None of my earlier containers existed.
+  Others present and left alone: `m1close-*` (the core-#8 closing builder), `vidra-ipfs-071-*`. My services:
+  `vzv9r2-pg` (PostgreSQL 18, :55929) and `vzv9r2-cache` (Valkey 9.1.2, :63929). GNU Make 4.3 ran in a throwaway
+  `ubuntu:24.04` container, `vzv9r2-make43`, started with `--rm`.
+- **Host condition:** the shared host was saturated by other agents' runs, with **load average 279–442**
+  (`uptime`). One heavy test process belonged to the `m1close` builder (cwd in the core-#8 worktree);
+  I did not touch it. This affected only my local `-race` timing; see R2-4.
+- **Harness:** my own `h.py`, rewritten fresh, with the round-one/round-two rows. The builder's `evasion-table.py`
+  was not used. Control (a comment-only edit) is **GREEN**.
+
+## R2-1. Frozen paths and baseline
+
+```
+git diff --stat 5eb2829..e2a3e01 -- migrations/ api/ internal/ cmd/ sqlcgen/ Makefile .github/required-checks.txt   (empty)
+./scripts/make-integrity-guard.sh --workflow   exit 0   passed (8 gate target(s))
+./scripts/ci-required-guard.sh                 exit 0   passed (6 required check(s))
+go test -race -count=1 ./scripts/              exit 0   ok … 47.648s
+scripts/testdata/guard                         75 fixture dirs (claimed 75 ✔)
+anchors in workflows, byte-equal to the pin    8 (build-test.yml 5, fixtures.yml 2, govulncheck.yml 1)
+```
+
+## R2-2. My earlier rows, re-run with my own harness
+
+| rows | result |
+|---|---|
+| 44 round-one rows (B1–B10, A1–A34, the key rows, the merge-key row) | **44/44 RED** |
+| A19: a separate *earlier* step writes MAKEFLAGS to `$GITHUB_ENV` | GREEN at the static guard, as stated; **RED at the runtime anchor** (R2-3) |
+| **N1** compound anchor `… --workflow && echo "MAKEFLAGS=-i" >> "$GITHUB_ENV"` | **RED**: `make step 'make ci' is not IMMEDIATELY preceded by the make-integrity-guard …` |
+| **N2** real anchor, then a look-alike step that writes | **RED** (same rule) |
+| **N3** earlier write, then a fake `': make-integrity-guard'` | **RED** (same rule) |
+| **N4** compound anchor writing `$GITHUB_PATH` | **RED** (same rule) |
+| J4 job-level `env: MAKELEVEL: '1'` | **RED**: `job-level env sets MAKELEVEL: '1', and this job invokes make` |
+| R-4 duplicate `run:` key (`make -i ci` then `make ci`) | **RED**: the loader refuses the file |
+
+**Round-two FINDINGS R-1 and R-4 are closed statically.**
+
+## R2-3. The runtime anchor (round-two FINDING R-2)
+
+`./scripts/make-integrity-guard.py --workflow` measured on **GNU Make 4.3 / ubuntu:24.04** (repo mounted
+read-only) and on the host's **3.81**. Both produced identical verdicts:
+
+```
+control (clean)                     exit=0
+MAKELEVEL=1 MAKEFLAGS=-ki           exit=1   FAIL  the environment has MAKELEVEL='1', and this is the WORKFLOW anchor.
+MAKELEVEL=1 MAKEFLAGS=n             exit=1   (same)
+MAKELEVEL= MAKEFLAGS=--ign          exit=1   FAIL  the environment has MAKELEVEL='', …
+MAKELEVEL=1 GNUMAKEFLAGS=-ki        exit=1
+MAKEFLAGS= (empty but set)          exit=1   FAIL  the environment sets MAKEFLAGS='', …
+MAKELEVEL=1 alone                   exit=1
+GO=true                             exit=1   FAIL  the environment sets GO='true', …
+GOFLAGS=-run=^$                     exit=1
+MAKEFILES=/tmp/x.mk                 exit=1
+```
+
+**All four of my MAKELEVEL spellings are now red, and so is the builder's own `?=` finding (`GO=true`).
+FINDING R-2 is closed.** The strict mode is selected by the pinned argv `--workflow`. The environment has
+no influence on it.
+
+## R2-4. Attacking the new surface
+
+**The anchor pin** (each substituted for the anchor immediately before `make ci`):
+
+| # | variant | guard |
+|---|---|---|
+| AP1 | `run: ./scripts/make-integrity-guard.sh --workflow # ok` | GREEN — correct: YAML treats ` #` in a plain scalar as a comment, so the parsed string (and what GitHub runs) is byte-equal to the pin |
+| AP2 | `--workflow --workflow` | RED |
+| AP3 | `--workflow=` | RED |
+| AP4 | extra argument `--root .` | RED |
+| AP5 | reordered `--targets ci --workflow` | RED |
+| AP6 | env prefix `FOO=1 ./scripts/…` | RED |
+| AP7 | no `--workflow` | RED |
+| AP8 | `python3 scripts/make-integrity-guard.py --workflow` | RED |
+| AP9 | `\|` block scalar | GREEN — correct: identical string |
+| AP10 | anchor with an `env:` key | RED (`carries ['env']`) |
+
+**Mode selection:** argv is the pinned text. Aliases and functions cannot cross a step boundary.
+`BASH_ENV`/`ENV` are refused in both modes, and the step's keys are limited to name/run/id, so no `shell:` or `env:` is possible.
+**The argument-less allowlist mode is not reachable from a floor lane.** `make ci-guard` is not a
+pinned body (the pins are tidy-check, ci, build, test-integration, test-integration-shuffle, fixtures,
+fixtures-verify, govulncheck), and an anchored `make ci-guard` step is RED (CG1). A non-anchor step that
+merely mentions `make-integrity-guard` is RED anywhere in the lane (CG2).
+
+**Duplicate-key loader vs anchors, aliases and merge keys:**
+
+- DK1, reusing an identical anchor step through `*alias`: GREEN. Correct; it is legitimate content.
+- DK2, a merge key overridden with the same `run:` value: RED. This fails closed on a construct nobody uses.
+- DK3, a merge key overridden with `make -i ci`: RED.
+- DK4, a duplicate `name:`: RED.
+
+**`?=` / environment-read discovery.** The strict anchor lists what it refuses in its own log:
+`['BUILT_AT', 'COMMIT', 'GO', 'GOFLAGS', 'RELEASE', 'SQLC']`. `:=`, `=` and `override` assignments are not
+overridable by the environment without `make -e`, which the make-step pin already excludes. `export` does
+not let the environment win. Variables that the **go command** (not make) reads were measured, and the
+anchor passes them all:
+
+```
+GOTOOLCHAIN=local  GOENV=<file>  GOROOT  GOPATH  CGO_ENABLED=0  GOCACHE  GOPROXY=off  GODEBUG  GOEXPERIMENT   -> anchor exit=0
+```
+
+AGENTS.md:144-148 states this: "**The anchor checks a named set of variables, not the whole
+environment.** A `$GITHUB_ENV` write by an earlier step of any variable NOT in the list above
+(`GOTOOLCHAIN`, `GODEBUG`, `CGO_ENABLED`, …) is not refused. The per-package floors in the direct test
+steps still turn a suite that was made to run nothing red; anything subtler is review-only." A
+`go env -w` / `GOENV` **file** is a change to the machine, which falls under the first bullet. I measured the
+stated backstop directly: with `GOFLAGS=-run=^$` supplied through a `GOENV` file, not the environment, the
+anchor exits 0 (as stated), `go test ./...` exits 0 having run nothing, and the report goes **RED**:
+`tests executed: 0 (floor: 943)`, `FAILED (15 problem(s))`. **The residual is accurately stated and its
+backstop works.**
+
+**Floor arithmetic.** The formula is in code (`go-test-report.py:205-211`: 15% headroom, at least 2 tests
+of slack, never below 1) and in `test-floors.json`'s `_why`. The new floors (unit 943, integration 981;
+per package, for example authz 427 of 502, scripts 161, obs 14, fixtures 36, internal/integration 40)
+still leave each per-package floor meaningful. Emptying `internal/obs` in my own unit event stream
+leaves 1092 executed (above the suite floor of 943) and is **RED** by its package floor of 14.
+
+## R2-5. Regression, and counts from my own runs
+
+| check | result |
+|---|---|
+| FINDING 6 (direct-step exit) | report call deleted → RED; `\|\| exit 1` removed → RED; `exit "$rc"` deleted → RED |
+| D6 | main's step: `broken` → 125, `broken-probes-1-3` → 0; the new script exits 1 on both |
+| FINDING 7 (per-package floors) | `internal/obs` emptied → RED (above) |
+| round-one rows | 44/44 RED (R2-2) |
+
+**Counts, on my own services:**
+
+- Unit (`go test -count=1 -json ./...` + report): **1109 executed, 0 skipped, 14 packages, report exit 0**. This matches CI.
+- Integration (`go test -count=1 -tags=integration -json ./...` + report): **1154 executed, 0 skipped, 15
+  packages; `internal/integration` 45 (floor 40); report exit 0**. This matches CI.
+
+Zero skips was **measured** from the `-json` stream both times.
+
+**Local `-race` limit:** my verbatim run of the pinned unit body (`-race`) failed. The only problem was
+`internal/fixtures`, which hit Go's default 10-minute test timeout (`FAIL … internal/fixtures 604.929s`,
+12 of its tests run). Re-running that package alone under `-race` hit the same 604 s timeout. The host load
+average was 279–442 at the time, driven by other agents' runs. The same package passes under `-race` in CI on
+this SHA inside build-test's 11m13s, and it passes locally without `-race` at the full count. I record the
+local `-race` runs as **UNVERIFIED on this host (resource-starved), corroborated by CI**. They are not a pass
+of mine. The report handled the timeout correctly: it named the package as `FAILED with no failing test`
+and flagged it as below its floor.
+
+## R2-6. CI on e2a3e01
+
+| check | conclusion |
+|---|---|
+| `ci-required` | **success**: `ci-required-guard: passed (6 required check(s))`; the fan-in prints `SUCCESS` for all six manifest names |
+| `append-only`, `build-test`, `cache-matrix` (+ both legs), `fixtures`, `govulncheck`, `docker-build` | **success**. All six FLOOR_LANES ran on this SHA and the manifest matches the jobs; none was skipped or cancelled |
+| `image-scan` | failure, **not required**: `48 finding(s) at or above ['CRITICAL','HIGH']`, **exit 1** (findings), not 3 |
+
+The build-test log (run 35815363655) shows:
+
+- unit **1109**/943, integration **1154**/981 (plain and shuffled), `internal/integration` **45**/40, and `skipped: 0` in each;
+- all 7 anchor runs print `[--workflow (strict)]` and `none of the 6 variable(s) the makefiles take from the environment is set`;
+- provenance names the tested merge tree `f70b5b4…` with `HEAD^2 == e2a3e01…`;
+- a duration of **03:42:07 → 03:53:20 = 11m13s** of the 20-minute timeout (claimed 11m13s ✔).
+
+## R2-7. Truthfulness at e2a3e01
+
+| claim | verdict |
+|---|---|
+| anchor pinned byte-equal; look-alikes refused anywhere in a floor lane | **TRUE** (N1–N4, AP2–AP10, CG2) |
+| strict mode chosen by `--workflow`, never by the environment; MAKEFLAGS family unset, MAKELEVEL/MAKE_RESTARTS/MAKEOVERRIDES/MAKECMDGOALS absent | **TRUE**, measured on Make 4.3 and 3.81 |
+| `?=` / referenced-but-unassigned variables refused in strict mode (GO, SQLC, GOFLAGS, RELEASE, COMMIT, BUILT_AT) and as job/workflow env | **TRUE** (`GO=true` and `GOFLAGS` red at runtime; the anchor's log lists all six) |
+| duplicate keys refused | **TRUE** |
+| make must be a file named make in a system directory; the log line does not claim to inspect content | **TRUE** — the ok line now reads "This does not inspect the program's CONTENT" |
+| "Eleven of the thirteen … refused statically; `$GITHUB_ENV`/`$GITHUB_PATH` refused statically when the writer sits between the anchor and make or IS the anchor" | **TRUE** (N1–N4, A19) |
+| AGENTS.md:98-101: an EARLIER step's write is refused at runtime if it "puts a directory other than a system one first on PATH" | **OVERSTATED**: an empty non-system directory prepended to PATH gives anchor **exit 0**. The anchor refuses a `make` that *resolves* outside a system directory; it does not check PATH order. See FINDING R2-1 |
+| residual list: "a named set of variables, not the whole environment (GOTOOLCHAIN, GODEBUG, CGO_ENABLED, …)", "what make IS, not what it DOES", other steps' effects on the machine are review-only | **ACCURATE**. Every green I found falls inside one of these bullets |
+| no "exhaustive" claim; "by construction" replaced by the 11 + 2 split | **TRUE**: the remaining uses say a blacklist *cannot* be exhaustive, or that the list is *not* called exhaustive |
+| counts 1109 / 1154 / 45, 0 skips; floors 943 / 981; 75 fixtures; 11m13s | **TRUE**, reproduced |
+| PR body correction paragraph ("unchanged 1071/1116 … was false") | **TRUE and accurate** |
+| no change under api/, internal/, cmd/, migrations/, Makefile, required-checks.txt; FLOOR_LANES unchanged | **TRUE** |
+
+## Finding at e2a3e01
+
+```
+FINDING R2-1: one AGENTS.md clause says the anchor refuses a non-system PATH directory; it refuses only a
+              non-system `make`
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra-core
+  files:     AGENTS.md:98-101
+  requirements: none
+
+Observed:
+  AGENTS.md:98-101: "When the writer is an EARLIER step they are refused at RUNTIME, by the anchor —
+  provided the write is to a variable the anchor checks (the list above), or puts a directory other than
+  a system one first on PATH."
+  Measured: `env PATH="<empty scratch dir>:$PATH" python3 scripts/make-integrity-guard.py --workflow`
+  -> exit 0. check_make_resolves_to_a_real_program() refuses only when `make` itself resolves outside
+  the approved directories. It does not look at PATH order. The clause does not appear in the PR body,
+  the guard docstrings or pinned-steps.yml.
+
+Failure:
+  A reader concludes that any $GITHUB_PATH write is refused at runtime. It is refused only when the
+  prepended directory provides `make`. A directory providing a different `go` or `python3` passes.
+  That is the "another step changes the machine" boundary, which the same section's first bullet states
+  correctly, so this is a wording defect, not an unlisted hole.
+
+Perspective:
+  developer
+
+Recommendation:
+  Reword to "…or makes `make` resolve to a file outside the approved system directories", or add a PATH-
+  order check to the strict anchor.
+
+Acceptance criteria:
+  The clause states what the anchor checks. Or, if a PATH-order check is added, the empty-directory row
+  goes red with a named reason and has a table case in TestMakeIntegrityGuardEnvironment.
+
+Tests:
+  review, or one TestMakeIntegrityGuardEnvironment row if the check is added.
+
+Cross-repo implications:
+  none.
+
+Challenge:
+  "It's one clause and the bullet below states the boundary." True. That is why this is SHOULD and not
+  REQUIRED. It is still text stronger than its control.
+```
+
+No other finding. Round-two FINDINGS R-1, R-2, R-3, R-4 and R-5 are closed and reproduced by me.
+
+## Cross-PR note for the chair (reported, not acted on). Core PR #8 at `655f46a` (the head is moving)
+
+1. **Floors for three new packages.** #8 adds tested packages `internal/audit`, `internal/credential`
+   and `internal/ownerclaim`. #9 refuses any package that runs tests without a recorded floor, in either suite.
+   Whichever PR merges second must add floors for all three, in **both** suites of `scripts/test-floors.json`
+   (`--emit-floors`), or all three direct steps go red.
+2. **Anchor text: no conflict today.** #8 does not touch `.github/` (its file list has no workflow),
+   so the 8 pinned `--workflow` anchors are unaffected. If #8 later adds or edits a make step, it must copy the
+   pinned anchor exactly and use only pinned bodies. Any other form is refused.
+3. **Makefile.** #8 changes only the `openapi-verify` `-run` alternation
+   (`TestM0ContractIsTheFourProbes` → `TestPublicContractIsTheProbesPlusTheSetupOperations`). It adds no
+   `?=` or unassigned variable, so the strict anchor's from-environment list stays at six. No pinned body
+   changes, and check 5 ("non-empty -run") still holds.
+4. **Counts only rise**, so the existing floors cannot trip. **Any `t.Skip`** in #8 fails the lane by name,
+   because `allowed_skips` is empty.
+
+## Cleanup (round three)
+
+`vzv9r2-pg` and `vzv9r2-cache` were removed by exact name. `vzv9r2-make43` ran with `--rm`. `ubuntu:24.04` was
+pulled by me this round and removed by exact name. The scratch clone was deleted. Nothing belonging to
+`m1close-*` or `vidra-*` was touched, and neither was the builder's checkout nor the core-#8 worktree. `git ls-remote`
+at the end: `e2a3e01…`, unmoved.
+
+## Verdict at e2a3e01
+
+Every in-scope acceptance bullet reproduced by me:
+
+- the round-one and round-two attack rows are red with my own harness;
+- the anchor pin holds against every altered form;
+- strict mode can no longer be selected, or softened, from the environment;
+- the builder's own `?=` finding is closed and demonstrated;
+- the duplicate-key loader holds;
+- the per-package floors are meaningful;
+- FINDING 6 and D6 hold;
+- the counts reproduce (1109 / 1154 / 45, 0 skips);
+- CI is green on this SHA, with the manifest matching and the provenance naming the tested merge tree.
+
+The residual list is now accurate. One SHOULD-level wording overstatement remains (R2-1). It is not
+blocking, but the chair may want it fixed in the merge commit or a follow-up. Local `-race` runs were
+starved by host load and are corroborated by CI only.
+
+FINAL VERDICT: PASS — SHA e2a3e0177bdcda4ddb16b4b53cadafa69bb21ef4
