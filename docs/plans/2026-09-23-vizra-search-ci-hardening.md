@@ -101,3 +101,26 @@ Cleanup: `ubuntu:24.04` (pulled by me) removed by name; `searchci-m43-*` contain
 - Cross-repo, reported to the chair and not changed here: vizra-core's anchor has the same parse-time side-effect
   hole. Its `make -pn` would execute `$(shell)`, `$(file)`, `+`, `$(MAKE)` and remake rules in the Makefile.
 - Next action: independent verification of PR #5, then CI once Actions runs.
+
+## Fix round 1 (2026-09-23) — the control moves from grammar to digest
+Input: the chair's ruling on docs/evidence/warroom/2026-09-23-anchor-preflight-DESK-REVIEW-security.md (FINDINGS 1–3).
+The verifier reproduced the baseline and declined to build payloads; the security seat's desk review found the text
+scanner admits `.SECONDEXPANSION` + `$$`-escaped prerequisites and `.RECIPEPREFIX`.
+Changes (commits on top of 4476ad5, no amend or force-push):
+- `.github/pinned-makefiles.yml` (`path: sha256`, a format shared with core slice 2d-B5). The anchor refuses to invoke make
+  unless the bytes match, and refuses an unpinned GNUmakefile/makefile (exact-name listing, so it is case-insensitive-FS safe). After
+  make runs, MAKEFILE_LIST must equal the pinned set. This applies in both modes; there is no `make ci-guard` in search.
+- The text-shape scanner (`check_parse_time_side_effects`, APPROVED_SHELL_CALLS) is RETIRED. Kept: the environment
+  checks, the make-is-a-real-file check, the resolver, the text readings of reviewed bytes (plus `.SECONDEXPANSION` and
+  `.RECIPEPREFIX` refusals there, no claim of control), and the runner command-file scrub.
+- `ci-required-guard.py`: DIGEST check (exists, non-empty, 64-hex, covers Makefile, tree matches).
+- The `ok` wording now states what the digest guarantees; AGENTS.md, ci.yml, Makefile header, and the pin comments are updated.
+  The residual is named: a reviewer approving a malicious Makefile together with its pin update.
+- Tests: TestTheAnchorRunsMakeOnlyOnPinnedBytes, TestMakeIntegrityGuardStillRefusesKnownShapesInReviewedBytes, and
+  digest rows in TestCIRequiredGuardRefusesEveryEvasion. The demo harness has rows 1k–1m4 and 1q.
+- Make 4.3 container: `make43-digest-gate-round1.txt`. Every row is as expected; the env file is empty in all rows.
+- Review follow-ups (comment false positives, CRLF in the scanner) did not survive the redesign: the scanner is gone.
+
+Round 1 pushed: head c3b2021ee089a04dfbfce2a8cb0d3ee653e8b7fb. CI on c3b2021: all 12 jobs failed with 0 steps (billing annotation); not re-run.
+Local: make ci exit 0 (554/0 skips); go meta-tests exit 0 (129 red→green rows); demo 39/39; Make 4.3 digest rows as expected.
+Next: independent verification of round 1; CI once billing is fixed; core slice 2d-B5 adopts the same pin format.

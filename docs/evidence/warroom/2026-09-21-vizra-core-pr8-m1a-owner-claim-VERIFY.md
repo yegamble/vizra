@@ -1621,3 +1621,26 @@ The restructured race holds under all three server isolation defaults with every
 The fix round closed every round-1 blocker, and its engineering is largely strong. It introduced or left four REQUIRED defects, each reproduced here: an undeclared 429 on a published operation, with a drift guard that misses it (R2-A); a shared global ceiling that lets under one request per second lock out a valid claim (R2-B) — both raised by the seats, confirmed by measurement; an invariant-table row falsified on a cold cache, so a permanently claimed instance still writes undeletable audit rows (R2-C); and the restructure's own "authoritative gate", which no test observes and no declaration covers (R2-D). Migration 0005 freezes on merge, and R2-F's citations are in those frozen bytes.
 
 FINAL VERDICT: FAIL — SHA 59a19c5cc7eeef4154c5e39b6d13ab84f60b5290
+
+---
+---
+
+# Re-verification at 56504c1 (closing slice, fresh builder) — 2026-09-23
+
+- **SHA verified:** `56504c14683224cfd1fce0ecd7b826dcbf6de88d`
+- **History:** `compare 59a19c5...56504c1` = ahead 7 / behind 0; `compare 655f46a...56504c1` = ahead 6 / behind 0 (all pushes fast-forward). Commits on top of 655f46a: `a42ca76` fix, `8b54916` merge of `origin/main` `eeeea068` (core #9), `c79c4d2` floors, `b2f0d22` + `56504c1` transcripts. PR now has 8 commits.
+- **CI IS BLOCKED BY BILLING** (per the coordinator; GitHub Actions refuses every job). This verdict is **LOCAL ONLY**. Everything that would normally come from CI is listed in R3-CI below as NOT OBTAINED.
+- Host condition: load average ~120 at start (other agents' workloads). Where that affects a result, the record says so.
+- Written incrementally.
+
+## R3-0. Environment
+
+Fresh `mktemp -d` clone at `56504c1` (clean); `655f46a8` and `59a19c5c` also present in the clone for baselines. Containers, all mine, prefix `vzv11-`:
+
+| Container | Image | Port | Anonymous volume (recorded at creation for exact-name removal) |
+|---|---|---|---|
+| `vzv11-pg` | `postgres:18` → PostgreSQL 18.6, `max_connections=500` | 55941 | see below |
+| `vzv11-valkey` | `valkey/valkey:9.1.2` | 63941 | none |
+| `vzv11-redis` | `redis@sha256:0637954999d0…` (the CI-pinned Redis 7.2 digest) | 63942 | see below |
+
+Volumes: `vzv11-pg` → `1b89a41912015cf96d5006e522037cf7786d0e6eeb8804dded86385ce55298c0`; `vzv11-redis` → `c0431f176cd8b42f1b7c0b18b8119ff29b9984040f7fdafeed7fce14470f775a`. Server versions read back: PostgreSQL 18.6, `valkey_version:9.1.2`, `redis_version:7.2.16`. Go 1.27.1, sqlc 1.31.1.
