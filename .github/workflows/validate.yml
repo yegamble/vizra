@@ -216,7 +216,8 @@ jobs:
       # These steps are added to the EXISTING `validate` job rather than to a
       # new lane, deliberately. A new lane would have to be added to
       # `.github/required-checks.txt` and to the floor in
-      # `scripts/ci-required-guard.sh` — both owner-reviewed under CODEOWNERS,
+      # `scripts/ci-required-guard.sh` — both CODEOWNERS paths (though
+      # CODEOWNERS is advisory; the war room's verifier-gated merge is the only review),
       # and AGENTS.md says a manifest must not be edited in the same PR as the
       # thing it guards. `validate` is already the floor lane and already
       # required, so extending it gates the new checks with no manifest change

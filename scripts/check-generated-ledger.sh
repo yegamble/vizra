@@ -14,7 +14,8 @@
 # committed file, and `git diff --exit-code` goes red NAMING the file.
 #
 # It is a script rather than an inline workflow step so it can be run and
-# demonstrated outside GitHub Actions. CODEOWNERS puts it under owner review.
+# demonstrated outside GitHub Actions. CODEOWNERS names the owner for
+# it, but CODEOWNERS is advisory; the war room's verifier-gated merge is the only review.
 
 set -euo pipefail
 
@@ -154,7 +155,7 @@ fi
 # An undeclared, already-committed, deterministically-regenerated file would sit
 # between the two. Nothing like that exists today — build.py writes exactly one
 # file — and the guard against it is that adding a second output means editing
-# build.py, which is a CODEOWNERS path.
+# build.py, a change visible in the PR diff. CODEOWNERS is advisory; the war room's verifier-gated merge is the only review.
 after="$(git status --porcelain -- docs/quality | sort)"
 if [ "$before" != "$after" ]; then
   undeclared="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | awk '{print $2}')"
