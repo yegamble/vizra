@@ -12,7 +12,9 @@ committed record admits turns the lane red, and this holds however the status wa
 - a `str` subclass;
 - a generator monkeypatched in-process;
 - a replaced `json.dump` that writes a duplicate status key before the real one (round 2: duplicate
-  keys are refused at every level, and the bytes must equal the generator's own serialisation).
+  keys are refused at every level, and the bytes must equal the output check's re-serialisation of
+  its own parse with the generator's settings; bytes the generator itself would not write, such as
+  `192.0` for `192`, pass that comparison and are refused by the regeneration check).
 
 Free-text fields (`notes`, `title`, …) are not status fields. A status word written there is not
 refused. `test_ids` is pinned to `[]`.

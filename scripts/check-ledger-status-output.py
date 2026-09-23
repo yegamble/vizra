@@ -30,11 +30,13 @@ an extra key is visible. It then asserts:
      what its record admits, and nothing else;
   5. the summary's status counts equal the counts in the features;
   6. (fix round 2) neither JSON file has a DUPLICATE KEY at any level, and the
-     bytes of features.json equal the generator's own serialisation of what was
+     bytes of features.json equal the re-serialisation of what was
      parsed (`json.dump(..., indent=2, ensure_ascii=False)`, no trailing
      newline). A text that carries more than the parse keeps (a duplicate key
      before the real one, which Python, jq and node all resolve to the LAST
-     value) is refused, not silently resolved;
+     value) is refused, not silently resolved. A re-typing that round-trips
+     through Python's json (192.0 for 192) passes THIS comparison; the
+     regeneration check in the same lane refuses it;
   7. `test_ids` is [] everywhere (core.req always emits []);
   8. every evidence file a VERIFIED record cites is on meta `main`
      (refs/remotes/origin/main) with identical bytes, so a pull request cannot

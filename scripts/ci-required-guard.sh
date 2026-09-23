@@ -3,7 +3,8 @@
 # The fan-in guard for the vizra META repo (ADR-002 § CI fan-in and merge queue).
 #
 # It is a script rather than an inline workflow step so it can be run and
-# demonstrated outside GitHub Actions. CODEOWNERS puts it under owner review.
+# demonstrated outside GitHub Actions. CODEOWNERS names the owner for
+# it, but CODEOWNERS is advisory; the war room's verifier-gated merge is the only review.
 #
 # It enforces, about .github/required-checks.txt — which the PR under test is
 # able to edit — and about the workflows themselves:

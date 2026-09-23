@@ -114,8 +114,85 @@ without `make fixtures-manifest` turns the lane red.
 | CI run on the head SHA | acceptance platform of record |
 
 ## Progress and evidence
-Appended below as it runs; transcripts committed under
-`vizra-core/docs/evidence/fixtures/`.
+
+### What was built
+- `internal/fixtures/` — the generator: `fixtures.go` (the twelve specs, each
+  with purpose, expected decode outcome and assertions), `raster.go` (fixed LCG
+  painter), `jpeg.go` (EXIF/GPS IFD writer + independent EXIF reader for the
+  assertions), `png.go` (raw chunk writer, the two bombs), `gif.go` (animation +
+  the GIF/SVG polyglot), `webp.go` (a hand-written VP8L encoder and an
+  independent VP8L reader, plus the RIFF/VP8X/ANIM/ANMF container), `mp4.go`
+  (ISOBMFF box tree with MJPEG samples), `codec.go` (the two committed codec
+  inputs and their provenance), `manifest.go`, `loadcorpus.go`.
+- `cmd/fixturegen` (generate / manifest / verify), `cmd/loadcorpusgen`.
+- `fixtures/manifest.json` — committed. `testdata/fixtures/` — gitignored.
+- `Makefile`: `fixtures`, `fixtures-verify` (added to `make ci`),
+  `fixtures-manifest`, `load-corpus`.
+- `.github/workflows/fixtures.yml`; `fixtures` added to
+  `.github/required-checks.txt` and to `FLOOR_LANES`; new guard fixture
+  `scripts/testdata/guard/fixtures-floor-deleted` with a case in
+  `scripts/scripts_test.go`.
+- `NOTICE` (licence position), `AGENTS.md` (gate + rules + a Fixtures section).
+
+### Decisions as implemented
+D1–D5 as designed above, with one correction: **D4 was wrong as first written.**
+The byte difference that broke the codec provenance test came from the Go
+TOOLCHAIN (go1.26.2 vs go1.27.1, selected by `GOTOOLCHAIN=auto` on a scratch
+module with no `toolchain` line), not from go.mod's language version. With the
+toolchain held at go1.27.1, `go 1.26.0` and `go 1.26.2` produced identical bytes
+for all twelve fixtures. The toolchain pin is therefore the measured one; the
+go.mod directive is still recorded, for the two mechanisms that do hold (GODEBUG
+defaults, and toolchain selection under `GOTOOLCHAIN=auto`). Every place that
+claimed otherwise was corrected before the PR: `internal/fixtures/manifest.go`,
+`AGENTS.md` and the evidence document.
+
+### Commands run (darwin/arm64, go1.27.1)
+| Command | Result |
+|---|---|
+| `go run ./cmd/fixturegen -repo . generate` | 12 fixtures, 1,791,508 bytes |
+| `go run ./cmd/fixturegen -repo . verify` | exit 0 |
+| `go test -race -count=1 ./internal/fixtures/` | ok, 108 s |
+| `make ci` | all lanes passed (transcript in the repo) |
+| `./scripts/ci-required-guard.sh` | pass on the real workflows |
+| `./docs/evidence/fixtures/demonstrate.sh` | exit 0, 4 red/green pairs, tree restored clean |
+
+### Performance work (no fixture weakened)
+The first race-enabled run of the package took **557 s**, which is not
+acceptable in a required lane. Three changes brought it to **108 s**, and each
+was checked to leave every fixture byte identical (only the generator source
+digest moved, which is the `generator-source` check working):
+1. the painter rewritten from O(pixels x blocks) to three passes, and its buffer
+   narrowed from `[]int32` to `[]uint8`;
+2. `rawPNG` now uses `clear(row)` instead of an element-wise reset — that loop
+   was 112 million individually instrumented writes;
+3. the two large rasters pinned to `zlib.BestSpeed`. Their data is a long run of
+   a repeating pattern, level 1 still reaches 920:1 and 1011:1, and **every
+   assertion keeps its original threshold** (file under 512 KiB, raster over
+   64 MiB, expansion ratio at least 500:1). The file grew 109 KB -> 122 KB.
+Plus: the suite now generates the corpus once and shares it, and
+`VerifyAgainstManifest` does its cheap checks first and refuses to regenerate
+when a pin, the generator source or the on-disk corpus already disagrees.
+
+### Evidence locations (inside the repo)
+- `vizra-core/docs/evidence/fixtures/2026-09-21-demonstrations.md`
+- `vizra-core/docs/evidence/fixtures/2026-09-21-determinism.md`
+- `vizra-core/docs/evidence/fixtures/2026-09-21-external-tool-crosscheck.md`
+- `vizra-core/docs/evidence/fixtures/2026-09-21-make-ci.md`
+- `vizra-core/docs/evidence/fixtures/demonstrate.sh` (re-runnable)
 
 ## Blockers and handoff
-Recorded as they occur.
+
+1. **ADR-009 amendment owed (meta repo, not mine).** ADR-009 names libvips and
+   exiftool as the generator's tools. The generator uses neither, for reasons
+   measured and recorded in the determinism document, and under a carve-out
+   ADR-001 already grants. The ADR text should be amended to match. I did not
+   edit it: it is not this slice's to change.
+2. **exiftool is absent on the owner's machine** (already recorded in
+   VZ-ISSUE-001). It is no longer on the critical path for this slice, since the
+   generator does not use it.
+3. **arm64 vs amd64 byte-identity** is asserted by comparing the table in the
+   determinism document with the `fixtures` CI job's step summary on the head
+   SHA. Until that CI run is read, the cross-architecture claim is PENDING, not
+   PASS.
+4. **No local container build was attempted.** `df` showed 11 GiB free, at the
+   brief's floor, and the final design needs no container at all.
