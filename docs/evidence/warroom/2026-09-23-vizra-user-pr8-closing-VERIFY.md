@@ -533,3 +533,247 @@ fix is a sentence, or one anchor condition and one test. Also open:
 - **V-E and V-F:** NITs.
 
 FINAL VERDICT: FAIL — SHA f0f702eb289f801d93e161717546762b5fa8d51c
+
+---
+
+# Re-verification at `f6d245f` (2026-09-23) — closing slice, fix round 1 of 2
+
+- **SHA verified:** `f6d245f6076b8641cf360ae30a7af1cc8ce00c03` (`gh pr view 8 … headRefOid`
+  at start). A fast-forward from `f0f702e`: `git merge-base --is-ancestor f0f702e HEAD` holds.
+  Two commits: `4db7dce` (the fix) and `f6d245f` (transcripts). 30 files, +1664 −986.
+- **Environment:** as above; a NEW private clone under
+  `…/scratchpad/vzv-vizra-user-pr8r5-OvbNMq/{repo,mut}`; `npm ci` exit 0. Load 1/5/15 at start:
+  165 / 167 / 139.
+- **Classifier:** no stop in this round. Every probe below is either an environment passed
+  to the unmodified lane (the same simulation as the builder's D16c) or a byte or file
+  mutation of the workflow, the pins file, `package.json` and the harness file.
+
+## R5-1. Lanes
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run ci` | 0 | lint 0; tsc 0; **19 files / 627 tests / 0 skipped**; build ok; hygiene `OK: 308 text source(s) … 17 mutation-digest line(s)` |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **233 cases, 240 assertions, 0 failed** |
+| `CI=1 PLAYWRIGHT_NO_COPY_PROMPT=1 npx playwright test` | 0 | 18 passed; floor 9/9 9/9; 18 stamps |
+
+## R5-2. V-A — red/green, with the pre-fix harness checked out for the red half
+
+The lane was run unmodified under the environment the route produces:
+`env -u GITHUB_ACTIONS CI= GITHUB_ACTIONS=true PLAYWRIGHT_NO_COPY_PROMPT= npx playwright test`
+(local production server).
+
+| Harness | Exit | Result |
+|---|---|---|
+| `f6d245f` (new) | **1** | **18 failed**, 18 lines `PLAYWRIGHT_NO_COPY_PROMPT is not "1" …` |
+| `f0f702e`'s `ci-environment.ts` checked out over it | **0** | **18 passed**, 0 policy lines — the V-A hole, measured |
+| restored (`git status` clean), again | **1** | 18 failed |
+
+Unit tests, `npx vitest run e2e/harness/ci-environment.test.ts`:
+
+- **Old harness: 2 failed / 17 passed.** The two failures are the V-A policy case and the
+  "deleting `GITHUB_ACTIONS` is a named change" case. The inverse control passes on both
+  harnesses, as it should.
+- **New harness: 19/19.**
+
+The builder's "red 2/3, green after" reproduces.
+
+## R5-3. The GitHub documentation quotations — fetched myself (`curl`, HTTP 200, 2026-09-23)
+
+| Quoted in `ci-environment.ts` / AGENTS.md | Page | On the page? |
+|---|---|---|
+| "Currently you can overwrite the value of the `CI` variable" | `docs.github.com/en/actions/reference/workflows-and-actions/variables` AND `…/workflow-commands` | **verbatim**, followed on both pages by "However, it's not guaranteed that this will always be possible." |
+| "You can't overwrite the value of the default environment variables named `GITHUB_*` and `RUNNER_*`" | both pages | **verbatim** |
+| an `env:` assignment to a default name "is ignored" | variables page: "If you attempt to override the value of one of these default variables, the assignment is ignored." | **verbatim** |
+| (context) `GITHUB_ACTIONS` | variables page: "Always set to `true` when GitHub Actions is running the workflow." | matches the `=== "true"` anchor |
+| (context, not quoted by the builder) | workflow-commands page: "Due to security restrictions, GITHUB_ENV cannot be used to set the NODE_OPTIONS environment variable." | the ONLY name GitHub documents as blocked in `$GITHUB_ENV` |
+
+**Is the anchor sound as stated?** It is sound against what the pages say: `env:` and a
+`$GITHUB_ENV` write of `GITHUB_ACTIONS` itself. It is NOT sound against everything the new
+sentences say. See **R5-FINDING V-A2** (R5-6).
+
+## R5-4. New invariants, mutated by me (`mut/`, one mutation at a time, restored, baseline green before and after)
+
+**33 of 33 cases behaved as expected.** Each RED case matched the finding's own name in the
+refusal line:
+
+- **V-B.** Each root hook added to `package.json` scripts as `echo hi` is RED by name
+  (`package.json declares \`scripts.<hook>\` … during \`npm ci\``): `preinstall`, `install`,
+  `postinstall`, `prepublish`, `preprepare`, `prepare`, `postprepare`, `dependencies`.
+  Inverse control: an unrelated `hello` script stays GREEN.
+- **V-C.** The pin AND the workflow edited together are RED (`record_browsers` pin must run
+  exactly …) for:
+  - `uname -a >> playwright-browsers.txt` appended;
+  - one byte (`--versiom`);
+  - `set -eu` (pipefail dropped).
+- **V-E `with:`.** RED:
+  - `actions/checkout` with `ref:` added, with `persist-credentials: true`, with `path:`
+    added, with the whole `with:` removed, or with `persist-credentials: 'false'` as a string
+    (fails closed);
+  - `actions/setup-node` with `node-version: 20`, or with an extra `registry-url`.
+- **V-E `permissions:`.** RED at workflow level for `write-all`, for `contents: write`, for
+  an added `id-token: write`, and for `permissions:` removed. Job-level `permissions:` is
+  still RED.
+- **Regressions.** Still RED:
+  - pin + workflow weakened together: redaction `|| true`, upload gate `always()`,
+    lane `|| true`;
+  - the H spellings `|| true`, `; exit 0` and `echo redact-artifacts.sh`;
+  - `HOME` at job level;
+  - `pree2e`.
+
+`require-checks_test.sh` carries the builder's 13 new cases (V-B ×8 + inverse, V-C,
+V-E ×4); the run above is green with all of them.
+
+## R5-5. Every changed sentence, against "no false-guarantee merges"
+
+I compared the builder's before/after list (`closing-pr8-fzNI/sentences.md`) with
+`git diff -U0 f0f702e HEAD -- AGENTS.md` and the diffs of `ci-environment.ts`, `stamp.ts` and
+the pins-file header. The list is complete for AGENTS.md. The code-comment changes in
+`ci-environment.ts` and `stamp.ts` and the pins-file header are not on it; I read them too.
+
+| Sentence | Verdict |
+|---|---|
+| Commands table: the new clauses (checkout/setup-node `with:` exact, `permissions:` exactly `contents: read`, the eight root hooks, the record-revision `run:` in the pins invariants) | **accurate** — R5-4 |
+| Pins-file header: invariants now name the fixture check and the browser-revision record | **accurate** — R5-4 |
+| Layer 2: "That catches a `.npmrc`, `NODE_OPTIONS` or `$GITHUB_ENV` route that blanks the variable **only while the capture still says "CI"**" | accurate |
+| Layer 2: "GitHub documents … CANNOT overwrite `GITHUB_*` defaults through `env:` or `$GITHUB_ENV` … so a route that empties `CI` too **is still caught when it works through those**" + "An IN-PROCESS route … can delete both anchors" | **over-claim** — R5-FINDING V-A2 |
+| § Residuals, helper-script bullet: "since `GITHUB_ACTIONS` cannot be overwritten through `$GITHUB_ENV`, emptying `CI` **in the same write** does not switch it off … It is not caught by layer 2 when an **in-process** route deletes both anchors" | the first half is accurate as literally scoped ("in the same write"). The bullet then presents in-process as the only exception, and that is incomplete — V-A2 |
+| `ci-environment.ts` header: "So a `$GITHUB_ENV` write or an env map cannot switch the policy off; an IN-PROCESS route … still can" | **over-claim** for `$GITHUB_ENV` — V-A2. Accurate for an env map, because the guard makes env maps default-deny |
+| § Residuals, npmrc bullet: "caught … ONLY while the capture still says "CI" …; an npm-driven route runs in-process … can delete both anchors … layer 3 is the control that holds" | accurate |
+| "What still gets through": pre-load code "can also delete `CI` and `GITHUB_ACTIONS` (layer 2 then silent)" | accurate |
+| V-F table row clause | accurate |
+| V-D: "not readable from a spec **running in a worker**", the "NOT in the main process" paragraph, forgery item 1, the `stamp.ts` "NOT CLOSED" note | accurate. All of them describe exactly what I reported and claim nothing more |
+| V-D, **unlisted and unchanged**: AGENTS.md:459 "The claim this section makes is therefore precise: **a test cannot pass without the harness**" | still unqualified while the paragraph above it says a main-process read is NOT CLOSED and unestablished. **NIT** (R5-FINDING V-D2): add "subject to the main-process note above" |
+| Residual "Pinning a step fixes its BYTES": now names checkout/setup-node `with:` pinned, root lifecycle refused, and "a DEPENDENCY's own install script run by `npm ci`" | accurate, and more candid than before |
+
+## R5-6. Finding at f6d245f
+
+```
+FINDING V-A2: the new sentences say a `$GITHUB_ENV` route cannot switch layer 2 off
+              and only an IN-PROCESS route can; a `$GITHUB_ENV` write of a non-default
+              name (`BASH_ENV`), or a `$GITHUB_PATH` write, reaches the pinned lane
+              step's own shell before Playwright starts
+Severity:    REQUIRED
+Confidence:  high on the documents and on Bash semantics; the Actions behaviour is
+             UNVERIFIED (billing)
+
+Affected:
+  repo:      vizra-user
+  files:     e2e/harness/ci-environment.ts header ("So a `$GITHUB_ENV` write or an env map
+             cannot switch the policy off; an IN-PROCESS route … still can")
+             AGENTS.md § Artifact privacy layer 2 ("so a route that empties `CI` too is still
+             caught when it works through those [`env:` or `$GITHUB_ENV`] … An IN-PROCESS route
+             … can delete both anchors")
+             AGENTS.md § Residuals, helper-script bullet ("It is not caught by layer 2 when an
+             in-process route deletes both anchors")
+  requirements: VZ-FOUND-008
+
+Observed (read, not built):
+  - GitHub documents exactly ONE name that `$GITHUB_ENV` may not set: `NODE_OPTIONS`
+    (workflow-commands page, fetched 2026-09-23). `BASH_ENV` is not a `GITHUB_*` or
+    `RUNNER_*` name. `$GITHUB_PATH` "Prepends a directory to the system PATH variable …
+    available to all subsequent actions" (same page).
+  - The pinned lane step has no `shell:`, so it runs under GitHub's default `bash -e {0}`
+    (workflow-syntax page). Bash, running a script non-interactively, reads the file named
+    by `BASH_ENV` first (`man bash`: "If this parameter is set when bash is executing a
+    shell script, its value is interpreted as a filename containing commands to initialize
+    the shell"). And whatever `npm` PATH resolves first is what `npm run e2e` executes.
+  - GitHub's "can't overwrite `GITHUB_*`" governs assignment through `env:` and
+    `$GITHUB_ENV`. It does not stop the step's own shell, or a wrapper earlier on PATH,
+    from removing a variable before it starts Playwright. So such a route can make the
+    capture say "not CI" without being in the Playwright process.
+  - The lane guard refuses `$GITHUB_ENV` / `$GITHUB_PATH` only in `run:` TEXT and env
+    values, and AGENTS.md already states that a helper script's write is not seen. So the
+    route is the stated helper-script class. What is new is the sentence that says this
+    class "cannot switch the policy off".
+
+Failure:
+  The same shape as V-A, one layer out. The fix moved the policy onto an anchor that a direct
+  write cannot touch, which is right, and measured (R5-2). But the sentences now partition
+  pre-load routes into "`$GITHUB_ENV` / env map → caught" and "in-process → layer 3". The
+  indirect `$GITHUB_ENV` (`BASH_ENV`) and `$GITHUB_PATH` routes fall in neither half. For
+  those, layer 2 is silent and layer 3 holds. That is true in practice, and it is what the
+  docs should say.
+
+Perspective: developer (the reviewer who trusts the sentence)
+
+Recommendation (smallest — sentences only; the code is right):
+  In all three places, replace the partition with the general statement `ci-environment.ts`
+  already makes in its first new paragraph ("It does NOT hold when the same route also makes
+  the capture say 'not CI'; then layer 3 … is what holds"). Scope the `GITHUB_ACTIONS`
+  sentence to "a `$GITHUB_ENV` or `env:` assignment of `CI` or `GITHUB_ACTIONS` itself", and
+  name `BASH_ENV` via `$GITHUB_ENV`, and `$GITHUB_PATH`, as routes that reach the lane step's
+  shell and fall to layer 3.
+
+Acceptance criteria:
+  No sentence in AGENTS.md or ci-environment.ts says that a `$GITHUB_ENV` (or `$GITHUB_PATH`)
+  route cannot switch layer 2 off. The exceptions named include a route through the lane
+  step's own shell or PATH.
+Tests: none needed. The controls are unchanged and measured.
+Cross-repo implications: core: none | user: as above | search: none | meta: none
+Challenge: "It needs a helper script plus a second file, and layer 3 holds anyway." Both are
+  true, and neither changes the sentence. V-A was upheld on exactly this reasoning one round
+  ago, and the rule is about what the document claims.
+```
+
+```
+FINDING V-D2 (NIT): AGENTS.md:459 "a test cannot pass without the harness" is still
+  unqualified beside the new "NOT CLOSED" main-process paragraph. Add "subject to the
+  main-process note above".
+```
+
+## R5-7. Demonstrations, CI, diff audit, head
+
+- **`npm run e2e:demos`** (my ports 3291/3292, image `vzv-pr8r5:demonstrate`), 11:44:50Z →
+  12:05:38Z, load 221/202/177 → 44/74/107: exit 0, **149 passed / 0 blocked / 0 failed**.
+  `d16c-variable-blank-and-CI-emptied-under-GITHUB_ACTIONS-RED` passed (exit 1, "PLAYWRIGHT_NO_COPY_PROMPT
+  is not"), along with the other d16c halves, D17b and D7b. The digest ledger it wrote is
+  **byte-identical** to the committed one.
+- **CI on f6d245f** (read with `gh api`, not re-run): every Actions check is
+  `completed/failure` with the billing annotation ("The job was not started because recent
+  account payments have failed…"). GitGuardian: success. **BLOCKED.**
+- **Diff audit** (`f0f702e..f6d245f`):
+  - no removed line in any test, the require-checks script, `demonstrate.sh` or the corpus;
+    additions only (3 unit cases, 13 require-checks cases, 1 demo half);
+  - 0 added `.skip`, `.fixme`, `.only`, `it.todo` or `eslint-disable`;
+  - 0 credential-shaped additions, and no local path or e-mail in the added evidence;
+  - `package.json`, the lockfile and `contracts/` are untouched;
+  - failure messages still echo no values.
+- **Head at end:** `gh pr view … headRefOid` and `git ls-remote …` both report
+  `f6d245f6076b8641cf360ae30a7af1cc8ce00c03`. Unmoved.
+- **Cleanup:** removed image `vzv-pr8r5:demonstrate` (the script removes the mutant itself).
+  No container of mine remains. The scratch directory `vzv-vizra-user-pr8r5-OvbNMq` is
+  deleted by exact path. Nothing was pushed, merged or approved. No instruction-shaped text
+  appeared in any tool output.
+
+## Not verified in this round
+
+- GitHub CI (BLOCKED).
+- V-A2 on Actions. It follows from GitHub's own pages plus Bash's documented `BASH_ENV`
+  behaviour. By the chair's constraint I built no route.
+- The four reasoned rows of the prevents/detects table (unchanged).
+- Platform: macOS arm64 only.
+
+## Verdict at f6d245f
+
+Every finding from my f0f702e round has its control fixed and measured:
+
+- **V-A (code): closed.** The pre-fix harness passes the "`CI` emptied under
+  `GITHUB_ACTIONS`" lane (exit 0, 18 passed); the new harness fails it (exit 1, 18 policy
+  failures). The unit tests go red 2 of 3 before the fix and green after. The GitHub quotations
+  are verbatim.
+- **V-B, V-C, V-E: closed.** 33 of my mutations are red by name, and co-weakening the pins
+  file with the workflow is still red.
+- **V-D and V-F: stated accurately.**
+- **Lanes reproduce exactly:** `npm run ci` 627/0, require-checks 233/240, Playwright 18,
+  `e2e:demos` 149/0/0 with the ledger byte-identical.
+
+**One REQUIRED finding remains, and it is again a sentence, not a control.** V-A2: the new
+wording says a `$GITHUB_ENV` route cannot switch layer 2 off, and that only an IN-PROCESS
+route can. But GitHub documents `NODE_OPTIONS` as the only name `$GITHUB_ENV` refuses. A
+`BASH_ENV` or `$GITHUB_PATH` write reaches the pinned lane step's own shell, which can remove
+both anchors before Playwright starts. Layer 3 still holds, so nothing leaks.
+
+Under the chair's "no false-guarantee merges" rule this is a FAIL. The fix is three
+sentences, and it needs no code change. Also open: V-D2 (NIT).
+
+FINAL VERDICT: FAIL — SHA f6d245f6076b8641cf360ae30a7af1cc8ce00c03
