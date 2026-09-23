@@ -952,3 +952,88 @@ PASS is a verifier verdict, not a merge. The merge rule also requires `ci-requir
 this SHA, and CI is BLOCKED by billing.
 
 FINAL VERDICT: PASS (local; CI BLOCKED) — SHA cf053a3f003b251df4c3405edda91560502c458e
+
+---
+
+# Re-confirmation at `c2ff445` (2026-09-23) — comment-only, for V-A3 and R6-NIT 1
+
+- **SHA:** `c2ff4454b28d3b7887d19fdf2f44742ffb7f55da`. At start and at end, `gh pr view 8 …
+  headRefOid` and `git ls-remote … refs/heads/fix/m0-artifact-privacy-a` both report c2ff445.
+  One commit on cf053a3; `git merge-base --is-ancestor cf053a3 HEAD` holds.
+- **Environment:** as above; a new private clone `…/scratchpad/vzv-vizra-user-pr8r7-gRygN3/repo`,
+  `npm ci` exit 0.
+
+## RC-1. Scope
+
+`git diff --stat cf053a3 HEAD` lists three files, +9 −9:
+
+- `e2e/harness/ci-environment.ts` (4 comment lines in `pageSnapshotProblem`);
+- `scripts/e2e/demonstrate.sh` (2 comment lines at the D11 header);
+- `docs/evidence/VZ-FOUND-008/mutation-digests.txt` (the three D17d lines).
+
+Changed lines in `e2e/` and `scripts/` that are not `*`, `//` or `#` comments: **0**. The line
+count of `ci-environment.ts` is unchanged, **269 → 269**, so the code-frame line numbers
+from R6-3 do not move again.
+
+## RC-2. The new sentences
+
+- **`ci-environment.ts:226-229`:** "`GITHUB_ACTIONS` cannot be changed by a DIRECT
+  `env:`/`$GITHUB_ENV` assignment; anything that runs before the configuration loads (an
+  in-process preload, a `BASH_ENV` via `$GITHUB_ENV`, a `$GITHUB_PATH` entry) can remove both
+  anchors, and then layer 3 holds — see the header."
+  **Accurate.** It now matches the header and AGENTS.md, and the sources I checked in R5-3.
+  The "reasoned, not built" label sits in the header it points to. **V-A3 is closed.**
+- **`demonstrate.sh:824`:** "under a per-run key a spec in a worker cannot read".
+  **Accurate.** It matches AGENTS.md:418. **R6-NIT 1 is closed.**
+
+## RC-3. The D17d ledger lines, recomputed with `demonstrate.sh`'s own mutation
+
+`demonstrate.sh:2210`'s perl program
+(`s/return WATCHED_KEYS\.filter\(\(key\) => live\[key\] !== captured\[key\]\);/void live; void captured; return [];/`)
+was applied to a COPY of the file. The copy differed from the original, so the mutation
+applied, and the tracked file stayed clean (`git status` empty). `shasum -a 256`, as the
+script's `digest()` does:
+
+| Line | Recomputed | Ledger at c2ff445 |
+|---|---|---|
+| BEFORE | `441f0186…2ed5104` | `441f0186…2ed5104` ✓ |
+| MUTATED | `091c8f30…c20a517e` | `091c8f30…c20a517e` ✓ |
+| RESTORED | `441f0186…2ed5104` | `441f0186…2ed5104` ✓ |
+
+## RC-4. Lanes
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run ci` | 0 | lint 0; tsc 0; **19 files / 627 tests / 0 skipped**; build ok; hygiene `OK: 308 text source(s) … 17 mutation-digest line(s) match this tree` |
+| `bash scripts/ci/require-checks_test.sh` | 0 | **233 cases, 240 assertions, 0 failed** |
+
+`npm run e2e:demos` was not re-run; the chair did not ask for it. It is not needed for a
+comment-only change: RC-3 reproduces its only content-dependent output, the D17d digests,
+exactly.
+
+## RC-5. CI, cleanup
+
+- **CI on c2ff445** (read with `gh api`, not re-run): every Actions check is
+  `completed/failure` with "The job was not started because recent account payments have
+  failed…". GitGuardian: success. **BLOCKED.**
+- **Cleanup:** the scratch directory `vzv-vizra-user-pr8r7-gRygN3` is deleted by exact path.
+  No image or container was created. Nothing was pushed, merged or approved. No
+  instruction-shaped text appeared in any tool output.
+
+## Verdict at c2ff445
+
+The commit is comment-only, as claimed:
+
+- 0 non-comment code lines;
+- the line count of `ci-environment.ts` is unchanged;
+- the three D17d ledger values equal the sha256 of the new file and of `demonstrate.sh`'s own
+  mutation of it;
+- `npm run ci` (hygiene included) and `require-checks_test.sh` are green with the counts
+  unchanged.
+
+V-A3 and R6-NIT 1 are closed. R6-NIT 2 (the stale `:264` in eight transcripts) stays a NIT.
+V-D stays NOT CLOSED and queued for PR B, as documented.
+
+PASS is not a merge. `ci-required` must be green on this SHA, and CI is BLOCKED by billing.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA c2ff4454b28d3b7887d19fdf2f44742ffb7f55da
