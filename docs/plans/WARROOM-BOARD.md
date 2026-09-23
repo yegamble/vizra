@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 218 — **sentinel sweep (workflows W-OP-2/W-OP-3/W-DEV-1): 10 confirmed (0 BLOCKER, 4 MAJOR, 4 MINOR, 2 NIT), 12 workflow checks passed, 6 leads**; MAJORs: S-0011 `vizra healthcheck worker` ready with no worker (api metrics answers `/readyz`), S-0012 `/readyz` degraded sticks after cache recovery, S-0013 README getting-started does not boot, S-0014 `/setup/claim` leads nowhere → queue 2v, spot-check by a fresh verifier dispatched. New rules R19–R21. Sweep totals today: 19 confirmed findings, 0 false positives so far. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 220 — sentinel MAJOR spot-check (fresh verifier): all four reproduced; S-0013 (getting-started does not boot; the template test substitutes a DSN — a false-positive CI test) and S-0014 (`/setup/claim` leads nowhere; only a raw `POST /api/v1/setup/claim-owner` works) CONFIRMED MAJOR; S-0011 and S-0012 lowered to MINOR (no documented single-namespace deployment; degraded text only). Workflow sentinel's role now requires citing the doc line that puts a failing workflow on a documented path before BLOCKER/MAJOR. Sentinel totals: 19 confirmed (2 MAJOR, 13 MINOR, 4 NIT), 0 false positives, 2 severity corrections. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -171,6 +171,8 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 220 (2026-09-23) — sentinel spot-check: 2 MAJOR confirmed, 2 lowered to MINOR; workflow sentinel severity rule tightened.
+- Tick 219 (2026-09-23) — quiet.
 - Tick 218 (2026-09-23) — sentinel workflows sweep: 10 confirmed (4 MAJOR) → 2v; rules R19–R21; MAJOR spot-check dispatched.
 - Tick 217 (2026-09-23) — meta #6 (ledger status gate) → verifier; queue 2u (records onto main).
 - Tick 216 (2026-09-23) — sentinel sweep (bugs): 9 confirmed / 9 routed (2t) / 0 FP; rules R16–R18.

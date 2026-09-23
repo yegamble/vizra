@@ -32,7 +32,7 @@ Write your results to `/Users/yosefgamble/github/vizra/docs/sentinel/sweeps/<dat
 
 Each finding gets a heading, then one line per field:
 - dedupe key: `<repo>:<workflow-id>:<symptom-slug>`;
-- severity: BLOCKER (the documented golden path fails), MAJOR (a documented workflow fails or misleads), MINOR (friction or doc drift), or NIT;
+- severity: BLOCKER (the documented golden path fails), MAJOR (a documented workflow fails or misleads), MINOR (friction or doc drift), or NIT. Ground BLOCKER and MAJOR in a documented path: cite the exact doc line that tells a person to do what failed. A failure that needs an undocumented setup, e.g. api and worker in one network namespace, is MINOR until a doc prescribes that setup. The first spot-check lowered two MAJORs for this reason;
 - the workflow and its doc location (`file:line`);
 - expected versus observed;
 - the reproducer, exact and runnable, with the SHAs;
