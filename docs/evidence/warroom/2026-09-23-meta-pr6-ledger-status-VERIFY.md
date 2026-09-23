@@ -331,3 +331,250 @@ Every lane the builder claimed reproduces, CI is green on this SHA, and I reprod
 No status is recorded by this PR, so nothing false is in the ledger today. But the gate as merged would not stop one.
 
 FINAL VERDICT: FAIL — SHA 36913d2926ac2e5af4ab878f158764f089f24b83
+
+---
+
+# Re-verification at b694813 (fix round 1 of 2)
+
+- Head verified: `b694813fd63ce12cf2be403ad80ef448cbe41ca6`, confirmed with `gh pr view` at the start and at the end. Base `b2c5b96`.
+- Commits since `36913d2`: `1996d1c`, `19ba567`, `f32f9a8`, `b694813`.
+- Clone: fresh, in `mktemp -d …/scratchpad/vzv-meta-pr6r1-XXXXXX`, deleted at the end.
+- Environment: as in round 0 (macOS arm64, Python 3.9.6, gh 2.98.0).
+
+## R1. Lanes (my runs)
+
+| Step | Command | Exit | Result |
+|---|---|---|---|
+| a | `./scripts/check-generated-ledger.sh` | 0 | reproduces |
+| a2 | `./scripts/check-ledger-status-output.py` | 0 | 192 entries, exact key set, 0 statuses, 0 records |
+| a2 | `(cd docs/evidence/ledger-generator && python3 -m unittest -v test_status)` | 0 | 35 tests, 0 skipped |
+| a2 | `python3 scripts/test_ledger_status_remote.py -v` | 0 | 9 tests, all ok |
+| a2 | `./scripts/check-ledger-status-remote.py --self-test` | 0 | 9/9 |
+| a2 | `./scripts/check-ledger-status-remote.py` | 0 | 0 records |
+| a2 | `bash docs/evidence/ledger-status/demo.sh` | 0 | `demo: 47 passed, 0 failed`; tree restored |
+| b, c, guard | `check-quality-json.py`, `check-doc-links.py`, `ci-required-guard.sh` | 0 / 0 / 0 | |
+
+**CI, read with my own `gh api`:**
+- `validate`: check-run 107361901343, success, github-actions.
+- `ci-required`: check-run 107361899706, success, github-actions.
+- Workflow runs: 35914343009 and 35914342918, both `pull_request`.
+
+The `validate` log shows the checkout of `refs/remotes/pull/6/merge`, "HEAD is now at 0fa3d82 Merge b694813… into b2c5b96…", and then:
+- output check: 192 entries, 0 statuses;
+- unit tests: `Ran 35` and `Ran 9`;
+- self-test: 9/9;
+- remote check: 0 records;
+- demo: 47/0;
+- compose demo: 95/0.
+
+`ci-required` logged: every required check succeeded on `b694813…`.
+
+## R2. Demonstrations reproduced
+
+- **Through `demo.sh`:** D1c now names both the output check and the regeneration check. D6a, D6b-i, D6b-ii and D6c are each red by name and then green. D7 (`is NOT ALLOWLISTED`) and D8 (`the cited bullet does not name VZ-FOUND-007`) are red, then green.
+- **Output checker.** I built my own escape branches in a scratch git copy: 2c, 2d with a wrapper, 2e, and a tampered summary. Then I ran a mutated copy of the checker on each. Results:
+  - key-set check deleted: 2c passes (load-bearing);
+  - set-equality deleted: 2d and 2e still refused, by RE-DERIVATION MISMATCH;
+  - re-derivation deleted: 2d and 2e still refused, by STATUS WITHOUT A RECORD;
+  - both deleted: 2d and 2e pass;
+  - summary check deleted: the tampered summary passes (not demonstrated in the demo, but it is not claimed there).
+
+  The builder's `output-mutations.txt` claims match what I saw.
+- **Online checker.** I made 11 mutations and ran the unit tests and the self-test after each:
+  - base guard deleted: unit test red, self-test 8/9;
+  - app filter deleted: 2 unit tests red;
+  - anonymous-limit test deleted: unit test red;
+  - on-main check deleted: unit test red, self-test 8/9;
+  - conclusion check deleted: 3 unit tests red;
+  - `max` → `min`: unit test red;
+  - merged flag, head comparison and merge-SHA deleted: self-test red.
+
+  Not caught:
+  - removing the `prove_auth()` call site in `main()` (unit tests test the function, not the call);
+  - removing the one-page cap on check-runs.
+
+  Both are NITs.
+- **`status.py`.** Reverting the type check to `!=`, deleting the qualifier allowlist, and deleting the tagged-bullet check each turn a named test red. The head comparison, ui floor and final-line checks are still covered. Reverting the evidence check to `ev != []` is not caught by a unit test. The output check covers that case.
+
+## R3. Escape attempts
+
+| # | Route (scratch copy, regenerated and committed) | Outcome |
+|---|---|---|
+| 2c | extra `status`/`verified` keys | **caught** by the output check: `KEY SET differs … extra ['status', 'verified']` |
+| 2d | `str` subclass, with a wrapper that hides it from the in-process check | **caught**: `STATUS WITHOUT A RECORD` |
+| 2e | targeted wrapper around `check_dsl_defaults` (VZ-CI-005) | **caught**: `STATUS WITHOUT A RECORD` |
+| Q | `PASS (superseded — FAIL on re-run)` | **caught**: `is NOT ALLOWLISTED` |
+| N1 | a status in allowed free-text fields: `notes="STATUS: VERIFIED at SHA c2ff445… (ci-required green)"`, `title+=" [VERIFIED]"`, `test_ids=["VERIFIED"]` | **passes**, lane green. These are prose fields, not status fields, so the stated guarantee does not cover them (NIT). `test_ids` is always `[]` from `core.req`, yet it is not pinned. |
+| N2a | a unicode-lookalike extra key `implementation_ѕtatus` (Cyrillic ѕ) | **caught**: KEY SET (extra) |
+| N2b | the real key replaced by a lookalike | **caught**: the generator refuses it (`implementation_status None`); the output check fails closed |
+| N3 | **duplicate JSON keys.** A section source replaces `json.dump`, so the generator writes `"implementation_status": "VERIFIED", "verification_status": "VERIFIED_AT_SHA",` immediately before VZ-CONTROLS-001's real `"implementation_status": "PLANNED"` | **ESCAPED**: `check-generated-ledger` 0 (reproducible from the tampered source), output check 0, quality-json 0. The committed `features.json` contains, at line 11251, `"implementation_status": "VERIFIED"` and `"verification_status": "VERIFIED_AT_SHA"` for VZ-CONTROLS-001, with zero records. Python `json`, `jq` and `node` all keep the last value (PLANNED), so no parser in use is fooled. But the file as read by a person, `grep` or the GitHub file view carries a status no record admits. See FINDING R-2. |
+| N4 | BOM prepended by a patched `json.dump` | **caught**: fails closed (the regeneration check and the output check both exit non-zero with a JSON decode error) |
+| N5 | a record whose values are all admissible, with its evidence file written by the same PR (not on meta main: `contents/…?ref=main` returns 404) | **admitted by every check**: generator (`statuses={'PLANNED': 191, 'VERIFIED': 1}`), regeneration, output check (1 status, 1 record, sets equal), remote check (`ci-required` 107288308319 success; `OK: 1 status record(s)`), quality-json, doc-links. Nothing checks that the evidence file was written by a verifier or landed before the record. The builder's own judgement is the only thing that kept VZ-FOUND-008 out. See FINDING R-3. |
+| N6 | the PR also edits `check-ledger-status-output.py` | defeats it, trivially. The docs now declare this "not defended", which is honest, but they give CODEOWNERS review as the mitigation, and that is false (FINDING R-1) |
+
+## R4. Is "tree matches HEAD" sound in CI's merge-ref checkout?
+
+Yes.
+- `actions/checkout` checks out `refs/remotes/pull/6/merge`. HEAD is that merge commit (`0fa3d82`) and the tree equals it, so the output check reads exactly the merged ledger that would land.
+- The only earlier step that writes to a pinned path is the regeneration check. It regenerates `features.json` in place and fails the job if the bytes differ, so a passing run leaves no diff.
+- None of the pinned paths is gitignored.
+- Locally, a modified `docs/issues/VZ-ISSUE-001.md` is refused (`TREE DIFFERS FROM HEAD`), and so is an untracked `docs/evidence/warroom/untracked.md` (`UNTRACKED FILE`).
+
+## R5. The narrowed sentences
+
+| Sentence (new in this round) | Where | Verdict |
+|---|---|---|
+| "a status with no record (however it was produced) turns the validate lane red" | the notice in `build.py` and `features.json` | false for the duplicate-key route (N3), taking "status in this file" to include its raw text |
+| "this holds however the status was produced: … a generator monkeypatched in-process" | README:8–13 | same (N3) |
+| "Not defended: a pull request that edits the checkers themselves, which is a CODEOWNERS-reviewed path." | notice | **false** |
+| "That change is visible in the diff and owner-reviewed under CODEOWNERS." | README:17 | **false** |
+| "visible in the diff and owner-reviewed under CODEOWNERS" | `validate.yml:36` | **false** |
+| "A PR that edits status.py or this script is itself a visible, CODEOWNERS-reviewed change" | `check-ledger-status-output.py:35-36` | **false** |
+
+Why the CODEOWNERS sentences are false:
+- `.github/CODEOWNERS` itself says "NOTHING ENFORCES THIS FILE TODAY. CODEOWNERS is advisory until a ruleset requires owner review".
+- `gh api repos/yegamble/vizra/branches/main/protection` → 404 "Branch not protected".
+- `gh api repos/yegamble/vizra/rulesets` → `[]`.
+- Under AGENTS.md's verifier-gated merge authorization, the chair merges on a verifier PASS without owner review.
+
+Accurate, as far as I can see:
+- the rest of the notice and README (the output check's steps; "runs on meta pull requests and merge-queue entries, not on main after a merge");
+- `status.py`'s new "WHAT THIS MODULE CAN AND CANNOT ENFORCE";
+- COMMANDS.md (exits and counts; anonymous `gh` → exit 2);
+- the `validate.yml` step comments.
+
+The same unenforced-CODEOWNERS wording already existed before this PR, in `scripts/ci-required-guard.sh:6`, `check-generated-ledger.sh:17` and `ci-required-select.sh:12`. It is out of scope here, but it is the same defect.
+
+## Round-0 findings: status
+
+- **FINDING 1:** resolved. The output check refuses 2c, 2d and 2e by name, and my mutations show it is load-bearing.
+- **FINDING 2:** resolved (base guard, app filter).
+- **FINDING 3:** partly resolved. The overclaims are narrowed, but the new CODEOWNERS mitigation sentence is false (R-1).
+- **FINDING 4:** resolved.
+- **NIT 1:** resolved.
+- **NIT 2:** resolved (tagged bullets).
+- **NIT 3:** resolved (`rate_limit` auth proof), though the call site is untested.
+
+## Findings (round 1)
+
+```
+FINDING R-1: The "not defended" caveat names CODEOWNERS review as the mitigation, and nothing enforces CODEOWNERS
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra
+  files:     docs/evidence/ledger-generator/build.py:60 → docs/quality/features.json "notice"; docs/evidence/ledger-status/README.md:17; .github/workflows/validate.yml:36; scripts/check-ledger-status-output.py:35-36
+  requirements: queue 2i
+
+Observed:
+  .github/CODEOWNERS says "NOTHING ENFORCES THIS FILE TODAY." `gh api repos/yegamble/vizra/branches/main/protection` gives 404 Branch not protected. `gh api repos/yegamble/vizra/rulesets` gives []. War-room merges are verifier-gated, not owner-reviewed.
+
+Failure:
+  The generated ledger's own notice tells a reader that edits to the checkers are owner-reviewed. They are not. A PR that edits the checker and records a status merges on a verifier PASS alone.
+
+Perspective:
+  developer, business (the owner relying on the ledger)
+
+Recommendation:
+  Replace "CODEOWNERS-reviewed" / "owner-reviewed under CODEOWNERS" with what is true: "visible in the PR diff and judged by the war-room verifier; CODEOWNERS names the owner for these paths but is advisory until a ruleset enforces it". Regenerate features.json.
+
+Acceptance criteria:
+  No sentence added by this PR states or implies enforced owner review.
+
+Tests:
+  None (a docs change). `git grep -n "CODEOWNERS"` over the four files shows only the corrected wording.
+
+Cross-repo implications:
+  none (the same wording in scripts/ci-required-guard.sh, check-generated-ledger.sh and ci-required-select.sh predates this PR; the chair may route it separately)
+
+Challenge:
+  The owner intends to apply a ruleset. But intent written as a present-tense guarantee, inside the generated ledger itself, is the defect this slice exists to prevent.
+```
+
+```
+FINDING R-2: The output check parses duplicate JSON keys leniently, so a status can sit in features.json's text while the lane is green
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra
+  files:     scripts/check-ledger-status-output.py:91-94 (json.load with no object_pairs_hook)
+  requirements: queue 2i acceptance 1
+
+Observed:
+  Probe N3. A section source replaces json.dump so that "implementation_status": "VERIFIED" and "verification_status": "VERIFIED_AT_SHA" are written just before VZ-CONTROLS-001's real keys. Regenerated and committed, with zero records: check-generated-ledger 0, check-ledger-status-output 0, check-quality-json 0. json.load, jq and node all read PLANNED, and the raw file carries VERIFIED at line 11251.
+
+Failure:
+  It contradicts the README's "however the status was produced: … a generator monkeypatched in-process". RFC 8259 leaves duplicate-name behaviour to the parser, and a reader of the file sees a status that no record admits.
+
+Perspective:
+  developer
+
+Recommendation:
+  In the output check, load both JSON files with `object_pairs_hook` that raises on a repeated key (at every nesting level). Add a demo case that commits N3 and expects a named refusal.
+
+Acceptance criteria:
+  N3, regenerated and committed, turns the output check red, naming the duplicated key and the entry.
+
+Tests:
+  demo.sh: a D6d case (json.dump replaced to emit a duplicate key) that is red by name, then green on reset.
+
+Cross-repo implications:
+  none
+
+Challenge:
+  Every parser in use reads PLANNED, so no tool is misled today. The fix is three lines, though, and the sentence it falsifies was written to close my round-0 finding.
+```
+
+```
+FINDING R-3: A VERIFIED record's evidence file can be written by the same PR that records the status
+Severity:    SHOULD
+Confidence:  high
+
+Affected:
+  repo:      vizra
+  files:     docs/evidence/ledger-generator/status.py (check_evidence_file), scripts/check-ledger-status-remote.py
+  requirements: queue 2i acceptance 3
+
+Observed:
+  Probe N5 added, in one commit, a status record for VZ-FOUND-008 (vizra-user #8, true head and merge) and a new docs/evidence/warroom/2026-09-23-self-minted-VERIFY.md ending "FINAL VERDICT: PASS — SHA c2ff4454…". Every check passed. The file is not on meta main (contents API returns 404). The notice calls it "the verifier's evidence file", but nothing checks authorship or that the file landed first.
+
+Failure:
+  VERIFIED can rest on a verdict that the recording PR wrote itself. Only review of the record stops it, which is the builder's judgement today.
+
+Perspective:
+  developer, business
+
+Recommendation:
+  Online half: require each evidence_file to exist on the meta repo's main with identical bytes, via `gh api repos/{owner}/vizra/contents/<path>?ref=main`, so that the verdict landed through the chair's records path before the record. Or state the limit in the notice ("the checks do not establish who wrote the evidence file").
+
+Acceptance criteria:
+  N5 is red naming the evidence file not being on main, or the notice states the limit.
+
+Tests:
+  A self-test case (a real warroom file that is on main, admitted) and an injected unit test (a 404 on contents is refused).
+
+Cross-repo implications:
+  none
+
+Challenge:
+  The record PR itself goes through an independent verifier. But that is judgement, not mechanism, and "the verifier's evidence file" implies mechanism.
+```
+
+**NITs:**
+1. `test_ids` (always `[]` from `core.req`) and prose fields can carry "VERIFIED" (N1). Pinning `test_ids == []` in the output check is cheap.
+2. Removing the `prove_auth()` call site in `main()`, or the one-page check-run cap, is caught by no test.
+3. Removing the summary check is caught by no demo. It is load-bearing against a tampered summary.
+
+## Verdict
+
+**Fixed:** the round-0 escapes are fixed and demonstrated, the two untested guards are now tested, and CI is green on this SHA.
+
+**Still failing:**
+- one new sentence written as the mitigation for what is not defended claims CODEOWNERS enforcement that does not exist (R-1);
+- a duplicate-key route still leaves a hand-made status in the committed ledger with the lane green (R-2).
+
+Both are small fixes.
+
+FINAL VERDICT: FAIL — SHA b694813fd63ce12cf2be403ad80ef448cbe41ca6

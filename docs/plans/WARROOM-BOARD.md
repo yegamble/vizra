@@ -2,7 +2,7 @@
 
 State for `/warroom`. Tool results outrank this file: every tick reconciles it against `git` and `gh` before acting. Statuses use the AGENTS.md vocabulary; nothing here is VERIFIED without an evidence file under `docs/evidence/warroom/`.
 
-Last tick: 2026-09-23, tick 227 — **core #13 MERGED** `66fcb2e` → `3994893` (B5d: allowlist Makefile grammar + one line reader in core; verifier PASS at `54a1376`, comment-only re-confirmation PASS at `66fcb2e`; `ci-required` green via the chair's own check-runs call). **Merged today: 9.** meta #6 round 1 at `b694813` (out-of-process output check; guard tests; qualifier allowlist) → re-verifying. In flight: re-verifications of meta #6, core #12, user #10. History: "Tick log" at the end of this file.
+Last tick: 2026-09-23, tick 228 — meta #6 re-verification **FAIL at `b694813`**: round 0 largely closed (all demos and mutations reproduced; merge-ref tree check sound), but R-1 four sentences claim CODEOWNERS review that nothing enforces (no branch protection, no rulesets); R-2 duplicate JSON keys let the file text carry VERIFIED while every parser reads PLANNED; R-3 a record may cite an evidence file its own PR wrote. Round 2 of 2 (last): reword, refuse duplicates + canonical re-serialisation, evidence must be on main byte-identical (makes 2u a prerequisite for VERIFIED). Core test-stability slice dispatched. In flight: meta #6 last round, re-verifications of core #12 and user #10, core test stability. History: "Tick log" at the end of this file.
 
 ## Owner decisions
 
@@ -172,6 +172,7 @@ The owner's machine appears to have been restarted mid-tick: the session ended, 
 
 ## Tick log (2026-09-20, newest first)
 
+- Tick 228 (2026-09-23) — meta #6 FAIL at `b694813` (CODEOWNERS claim; duplicate keys; self-written evidence); last round sent.
 - Tick 227 (2026-09-23) — core #13 merged (`3994893`); 9 merges today; meta #6 re-verifying.
 - Tick 226 (2026-09-23) — quiet.
 - Tick 225 (2026-09-23) — core #12 round 1 at `25f62ac` → re-verifying.
