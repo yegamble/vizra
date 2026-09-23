@@ -358,3 +358,143 @@ X-1 is closed and reproduced on 3.81 and 4.3:
 One REQUIRED finding blocks under "no false-guarantee merges": R1-1. The new post-make backstop, which this round's docs describe as scanning every closure recipe as make holds it, passes a closure target it did not parse, and covers only the text closure. A one-line pre-make refusal of `$`-named rule targets, plus a fail-closed database lookup, would make the sentences true.
 
 FINAL VERDICT: FAIL — SHA 5488eb0e23940a376ea333c483d9af3a71b5ba14
+
+---
+
+# Re-verification at 0243f2e (#11 fix round 2 of 2, the last: R1-1)
+
+- **Head:** `gh pr view 11` → `0243f2ebf4b97d047acf8e3967924a8dd5c5d748` (draft). One commit on `5488eb0`.
+- **Clone:** new `mktemp -d …/vzv-core-pr11r2-XXXXXX`.
+- **Hosts:** 3.81 on the host. 4.3 in my own `vzvpr11r2-make43-<pid>` container (`--rm`, PyYAML, logging `/usr/bin/make` wrapper).
+- **Image:** `ubuntu:24.04` was **absent** before, so this run pulled it. It was removed afterwards; no container was using it.
+- **Method:** committed scripts and fixtures only, all read first, plus in-process calls on inert strings with process creation made to raise. I authored no Makefile. The only make runs on non-fixture bytes were the anchor's own runs on the real pinned Makefile, and one `make -pn Makefile ci` on it to read the database headers. No classifier stopped anything.
+
+## R2-a. Scope
+
+- Makefile and pin unchanged (`e7cc357c…`); nothing under `.github/`.
+- Only `scripts/`, `docs/` and `AGENTS.md` changed.
+- One file was deleted: `docs/evidence/hardening-b5/b5b/make-4.3-ubuntu24.04/C26.txt`. The C26 row is now a Go-test row, so it is not produced by the 4.3 `DEMO_ONLY=D` run; the 3.81 transcript is updated. Consistent, not a loss.
+- **Fixture moves:** `computed-target-recipe` and `resolver-computed-{ignore,default,secondexpansion}` now carry `notInvoked: true` with the text "is a rule whose TARGET make computes". **Stricter** (0 make processes). The post-make branches they used to exercise keep red cases as in-process rows in `db-scan-probe.py`: `.IGNORE` in effect, `.DEFAULT` has a recipe, `.SECONDEXPANSION` in effect, and the database recipe/closure rows. `TestTheDatabaseChecksFailClosed` runs them, and C26/C28–C32 go red without them.
+- **Real-tree assertions:** "carry no …" is replaced by "each of the 17 … has ONE readable entry whose 62 recipe line(s) equal the pinned rule's", and "the gate closure make reports … equals the text closure (17 target(s))" is added. Stricter.
+- 4 new refused-spelling rows for computed rule targets: recipe, prerequisite-only, `${G}::`, target-specific.
+- **No test line weakened; 0 skips** (below).
+
+## R2-b. Builder's scripts, probe and fixtures
+
+| Item | 3.81 | 4.3 |
+|---|---|---|
+| `measure.sh` | exit 0, as before | as before |
+| `db-scan-probe.py` | **PROBE: all 15 rows as expected** | same |
+| `demo.sh` (full) / `DEMO_ONLY=D` | exit 0, tree clean; 13 D rows HELD + probe; C15–C32 red or BROKEN, byte-identical restore, then green or HELD (C28–C32 show 1–2 `ROW BAD` each under mutation, then "all 15") | exit 0; D rows, C15/C15b, C22–C25, C27–C32 identical |
+| 62 makeguard fixtures | 60 red / 2 green | **identical to 3.81**, recorder = wrapper on every one |
+
+- `computed-target-recipe` and the three moved `resolver-computed-*` fixtures: 0 make processes, "is a rule whose TARGET make computes".
+- `resolver-computed-{shell,makeflags,recipeprefix,extra-prereqs}`: 4 make processes, refused by the resolver.
+
+## R2-c. My round-1 fail-open calls, re-run in-process (item 2)
+
+| Call | Result |
+|---|---|
+| empty database (no entry for `ci`) | **refused**: "make's database has NO entry for gate closure target `ci`" |
+| empty `ci` entry, while the text shows a recipe | **refused**: "make holds a DIFFERENT recipe for gate closure target `ci` … 0 line(s)" |
+| empty `ci` entry, and no recipe in the text either | not refused. Correct: a recipe-less aggregate like the real `ci` |
+| duplicate `ci` entry | **refused**: "MORE THAN ONE entry" |
+| a spaced (unreadable) header recorded | **refused**: "cannot read as ONE name" |
+
+The probe also refuses "no `# Make data base` section". Its control shows `-n` command output before the database (3.81) is not read as a target.
+
+## R2-d. Closure equality (item 3)
+
+- **Real databases:** on 3.81 and 4.3 the real `-pn` database prints `ci: fmt-check vet lint-imports … test-race` between the `# Make data base` and `# Finished Make data base` markers. `parse_database` reads it into `DB_PREREQS`, and the anchor reports "the gate closure make reports from its database equals the text closure (17 target(s))" on both versions.
+- **Order-only:** the reader replaces `|` with a space, so order-only prerequisites are included. By code: the real Makefile has none, and no committed fixture feeds real make output with one (NIT R2-3).
+- **Double-colon:** each `name::` rule prints as its own entry, so a closure target with two is refused as "MORE THAN ONE entry". Only the first entry's prerequisites feed the closure walk, but the target is refused anyway.
+- **`.PHONY`:** read as a separate `.PHONY:` entry and into `__PHONY__`; never reached from the seeds.
+- **Could equality pass while make's real closure differs?** The ways make reaches a target without listing it as a prerequisite are each refused or inapplicable:
+  - `.EXTRA_PREREQS`, refused before and after make;
+  - `.DEFAULT` and implicit or pattern rules: `.DEFAULT` refused, pattern rules refused, and phony targets skip implicit search (measured);
+  - `.SECONDEXPANSION` and `$(MAKE)`, refused;
+  - computed rule targets and `$`-prerequisites, refused before make.
+- I found no path; none was constructed.
+
+## R2-e. Recipe equality with whitespace collapsed (item 4)
+
+`_norm(line) = " ".join(line.split())`. In-process, against a text line `./run-the-real-tests.sh`:
+
+| Database line | Result |
+|---|---|
+| `-./run…` | refused (DIFFERENT, and the `-` prefix check) |
+| `+./run…` | refused (DIFFERENT, and the `+` prefix check) |
+| `@./run…` | refused (DIFFERENT) |
+| `./run… \|\| true` | refused (DIFFERENT, and the suffix check) |
+| `  ./run…  ` | equal (whitespace only) |
+
+Prefix characters are never collapsed away. Collapsing could only equate lines that differ in runs of whitespace, e.g. inside a quoted string. That cannot change a `-`/`+` prefix, a suffix or `$(MAKE)`, and each of those is checked on make's line independently. Not a material equivalence.
+
+## R2-f. Real Makefile and lanes (3.81 host, clean clone; 4.3 in the container)
+
+| Command | Exit | Counts |
+|---|---|---|
+| direct unit step + `go-test-report.py` | 0 / 0 | **1252 executed, 1252 pass, 0 skip** (my own JSON count); `scripts` **332**; `TestTheDatabaseChecksFailClosed` present and passed |
+| `make ci` | 0 | all 10 lanes |
+| anchors `--workflow` / lenient; `ci-required-guard` | 0 / 0 / 0 on 3.81 and on 4.3 | "each of the 17 gate closure target(s) has ONE readable entry whose 62 recipe line(s) equal the pinned rule's"; closure equality ok; **62 distinct expanded-prefix lines on 3.81** (R1-2 closed) |
+| tree afterwards | clean | 0 porcelain entries |
+
+Nothing the real Makefile needs is refused.
+
+**CI: BLOCKED** (billing); no result for this SHA, and the integration suites were not run.
+
+## R2-g. Doc sentences under "no false-guarantee merges"
+
+- **The new claim**, in AGENTS.md, COMMANDS.md and the guard docstring :118-141: "With (i)–(iii) [closure equality, one readable entry, recipe equal to the pinned TAB lines and the same literal checks], every recipe of every target in make's own closure is one the text reading scanned."
+  - (i)–(iii) are implemented as described and fail closed (R2-b to R2-e).
+  - The only qualifier is "whitespace collapsed", which COMMANDS.md states.
+  - The residual mechanisms by which make could run a recipe outside its listed prerequisites are each refused (R2-d).
+  - **I find the claim true** for what it states. It is scoped by the anchor's named constructs and the stated review residuals ("the value of any other variable … review's to catch"; TOCTOU; the pin is only as good as review).
+- The before-make sentences, including "a rule whose TARGET make computes is refused before make too": true (the 4 spelling rows and the 4 moved fixtures).
+- The "66 on 3.81, 62 on 4.3; both now read 62" note: reproduced (62 on both).
+
+## R2-h. Findings
+
+```
+FINDING R2-1: the guard's docstring now contains an invalid escape sequence — a SyntaxWarning on every anchor run under Python 3.12 (the CI runner's python3), and a SyntaxError under -W error
+Severity:    SHOULD (introduced in this round; one-character fix). Not a guarantee issue.
+Confidence:  high (executed)
+Affected:    vizra-core scripts/make-integrity-guard.py:139 (blame 0243f2e): "four `\`-continued recipe lines" inside the non-raw module docstring
+Observed:    4.3 container (python 3.12.3): `make-integrity-guard.py:2: SyntaxWarning: invalid escape sequence '\`'` printed by db-scan-probe and the anchor. `python3 -W error::DeprecationWarning -W error::SyntaxWarning` compile of 0243f2e → "SyntaxError: invalid escape sequence \`"; 5488eb0 compiles clean.
+Failure:     stderr noise on every anchor run in CI. CPython has announced invalid escapes will eventually become SyntaxErrors, and then the anchor would not start (fail-closed, every make lane red).
+Recommendation: write `\\`` (as line 1292 already does) or make the docstring raw.
+Acceptance:  `python3 -W error::SyntaxWarning -c 'compile(open("scripts/make-integrity-guard.py").read(),"g","exec")'` exits 0.
+Cross-repo:  none.  Challenge: harmless today.
+```
+
+```
+FINDING R2-2 (NIT): an unreadable pinned file or a database-less make run is reported by name, but a closure target that is legitimately recipe-less in BOTH the text and the database passes. That is correct (aggregates such as `ci`); recorded so the chair knows it was checked.
+FINDING R2-3 (NIT): no committed fixture feeds real make output with an order-only prerequisite or a double-colon closure target through parse_database. Both paths are right by code (R2-d), but only the synthetic probe covers the database reader. A fixture per form, run through the anchor, would pin it on 3.81 and 4.3.
+```
+
+No BLOCKER, no REQUIRED, no REGRESSION of any earlier row. R1-1 and R1-2 are **closed**.
+
+## R2-i. Cleanup and head
+
+- Scratch `vzv-core-pr11r2-XXXXXX` was deleted by exact path.
+- The container ran with `--rm`, and the pulled `ubuntu:24.04` was removed after I confirmed no container used it.
+- The builder's checkout, the core #8 worktree and vizra-search were not touched.
+- Head re-checked at the end: see below.
+
+## Verdict (#11 round 2 of 2)
+
+R1-1 is fixed and reproduced on GNU Make 3.81 and 4.3:
+- computed rule targets are refused before make;
+- the database scan fails closed on missing, duplicate, unreadable and differing entries;
+- make's closure must equal the text closure;
+- C26–C32 go red, then green;
+- the probe gives 15 of 15;
+- 62 fixtures, identical across versions and two observers;
+- fixture moves are stricter; no weakened test; 0 skips;
+- `make ci` 0; unit 1252; `scripts` 332; the real tree green on both versions.
+
+The new "every recipe of every target in make's own closure" claim holds for everything I could test and read. One SHOULD finding remains (R2-1, a one-character docstring escape).
+
+**This PR is a draft stacked on #10. After #10 merges and #11 is rebased, the rebased SHA must be re-confirmed** (at least the fixture sweep, the probe and `ci-required` once Actions runs) before merge.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 0243f2ebf4b97d047acf8e3967924a8dd5c5d748
