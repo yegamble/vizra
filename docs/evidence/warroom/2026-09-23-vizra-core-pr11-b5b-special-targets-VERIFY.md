@@ -218,3 +218,143 @@ Challenge:   today every spelling I executed is refused. The residual needs a re
 - **Head re-check** at the end: see the next line.
 
 CROSS-CHECK: GAP — SHA 29387da9dcb4b6bd842396a5d01857f10de7a856 (the named spellings are refused, incidentally; the recipe scan does not cover inline or multi-target rules, and two bypass spellings found by reading are UNVERIFIED by execution)
+
+---
+
+# Re-verification at 5488eb0 (#11 fix round 1 of 2: X-1 plus B5c)
+
+- **Head:** `gh pr view 11` → `5488eb0e23940a376ea333c483d9af3a71b5ba14` (draft). One commit on `29387da`.
+- **Clone:** new `mktemp -d …/vzv-core-pr11r1-XXXXXX`.
+- **Hosts:** 3.81 on the host. 4.3 in my own `vzvpr11r1-make43-<pid>` container (`--rm`, PyYAML, logging `/usr/bin/make` wrapper).
+- **Image:** `ubuntu:24.04` was **absent** before, so this run pulled it. It was removed afterwards; no container was using it.
+- **Method:** I ran only committed scripts and fixtures, which I read first. For item 2 I made in-process calls on the **committed** spelling strings from `TestEveryRefusedSpellingIsRefusedBeforeMake`. I authored nothing new. No classifier stopped anything.
+
+## R1-a. Scope
+
+- The Makefile and the pin are unchanged; `.github/` is untouched.
+- Only `scripts/`, `docs/` and `AGENTS.md` changed. No file was deleted.
+- **Tests:** the diff "removes" 45 rows of the refused-spelling table, but a row-by-row comparison of 29387da and 5488eb0 shows all 45 are present with **identical inputs and expected text**. Each only gained a `mustNot` field (nil), which the loop uses to fail a refusal given for the wrong reason. That is stricter. 12 rows were added. `scripts_test.go` only adds rows.
+- **Skips:** 0, by my own count (below).
+
+## R1-b. Builder's scripts and the 62 fixtures
+
+- **`measure.sh`**, 3.81 and 4.3: identical to the previous round (`.IGNORE` forms exit 0 raw; the phony rows behave as documented).
+- **`demo.sh`**, full on 3.81: exit 0, tree clean afterwards.
+  - All 13 D rows **HELD**, including `inline-recipe`, `multi-target-rule`, `computed-prerequisite`, `posix` (0 make processes) and `computed-target-recipe`. On that last fixture raw `make ci` exits 0 on 3.81 **and 4.3**, and the anchor refuses after make: "make's own database gives gate closure target `ci` the recipe line `-./run-the-real-tests.sh`".
+  - C15/C15b and C16–C26 each go BROKEN or red, restore byte-identical, then HELD or green.
+- **`DEMO_ONLY=D` on 4.3:** exit 0; the same D rows and C15, C15b and C22–C26 outcomes.
+- **62 makeguard fixtures:** 60 red, 2 green. Exit codes and make counts are **identical on 3.81 and 4.3**, and the recorder and wrapper agree on every one.
+  - 0 make processes for every text-refused fixture.
+  - 4 for `computed-target-recipe` and the resolver rows.
+  - 2 for `resolver-cannot-resolve`; 1 for `make-q-parse-error`.
+
+## R1-c. X-1: the two by-reading spellings, in-process on committed strings
+
+Method as in the cross-check: `prerequisite_closure` and `check_text` over an in-memory `good` Makefile plus the committed row text, with `subprocess.Popen`/`run` made to raise (none did).
+
+| Committed row | Pre-make result (0 make processes) |
+|---|---|
+| `inline recipe glued to a computed token`: `EMPTY :=` / `ci: $(EMPTY); -./run-the-real-tests.sh` | **refused by name**: "is a rule with an INLINE `;` recipe", plus "prerequisite make COMPUTES: $(EMPTY)" |
+| `multi-target recipe beside a recipe-less rule`: `lane:` + `other lane:` / `\t-./run…` | **refused by name**: "is a MULTI-TARGET rule (other, lane)" |
+| `inline recipe on the gate target`, `multi-target rule naming a closure target`, `grouped targets` (`a b &:`), `static pattern, two targets` | each refused by name |
+| control (nothing added) | not refused |
+
+(The in-process base, like the Go test's, already defines `ci`, so "defined 2 times" also fires on rows that add a `ci:` line. The committed test's `wantText` pins the specific message, so that collateral refusal cannot mask a regression.)
+
+**Both by-reading spellings are now refused by name before make.** The X-1 items from the cross-check are closed.
+
+## R1-d. C23: is the multi-target refusal adequately tested?
+
+- The demo's C23 row uses fixture `multi-target-rule` (`ci other:`). With the refusal removed it is still refused before make, as "not defined", because that fixture has no other `ci` rule.
+- **A spelling where "not defined" would not fire exists:** `lane:` (recipe-less, which satisfies "one explicit rule") plus `other lane:` carrying the recipe. The committed row `multi-target recipe beside a recipe-less rule` covers exactly that.
+- With `mutations.py C23` applied (through `mutate.sh`; byte-identical restore) and the Go tests run, these go **red**:
+  - `TestEveryRefusedSpellingIsRefusedBeforeMake/{multi-target rule naming a closure target, multi-target rule, gate target first, multi-target recipe beside a recipe-less rule, grouped targets, static pattern, two targets}`;
+  - `TestMakeIntegrityGuardFixtures/multi-target-rule`.
+  - `grouped targets` and `static pattern` even report "exit 0, want 1" under C23.
+- **Adequately tested.** Without C23's refusal, the recipe-less-beside spelling would be caught only after make, by the database scan.
+
+## R1-e. The post-make database recipe scan (`check_db_recipes`)
+
+- **It scans the TEXT closure, not make's closure.** `check_db_recipes(g, closure)` iterates the closure computed by `prerequisite_closure` from literal prerequisites. It reads no prerequisites from make's database.
+- **It is not fail-closed.** Called in-process:
+  - `DB_RECIPES={}` with `closure=['ci']` → **failed=False**, "the 0 recipe line(s) of the 1 gate closure target(s) carry no …";
+  - `{'ci': []}` → failed=False.
+  - `_db_recipe_lines` uses `DB_RECIPES.get(t, [])`, so a closure target the parser did not capture is silently treated as recipe-less.
+  - The parser (in `resolve_database`) keeps only the **first** occurrence of a name (`… if name not in recipes else None`) and skips names containing a space. A later occurrence's recipe is dropped without a failure.
+- **By reading, not executed:**
+  - A rule whose target NAME make computes is still accepted before make. Only its *recipe* for a closure target is caught after make.
+  - Such a rule can instead add a *prerequisite* to a closure target (a recipe-less `$(NAME): extra`, per GNU Make's multiple-rules semantics). make's closure would then include `extra`, but the text closure, the database scan and the `.PHONY` checks would all cover only the text closure, so `extra`'s recipe would go unscanned.
+  - I did not construct or run this spelling.
+- On the real Makefile the parser works: it attributes 62 recipe lines to all 17 closure targets on 3.81 and 4.3.
+
+## R1-f. Real Makefile
+
+The anchor passes on 3.81 and 4.3, in both modes, with `ci-required-guard` exit 0:
+- "every one of the 17 gate closure target(s) has one explicit rule and is declared .PHONY";
+- "make's own database: the 62 recipe line(s) of the 17 gate closure target(s) carry no `-`/`+` prefix …";
+- "make's own .PHONY list covers all 17".
+
+Nothing the Makefile uses is refused: every rule there is a single-target line with TAB recipes, with no inline `;`, no multi-target line, no `$`-prerequisite and no `.POSIX`. COMMANDS.md now states "No gate lane may depend on a real file target", which closes my earlier NIT B5b-N1.
+
+## R1-g. Lanes at 5488eb0 (3.81 host, clean clone)
+
+| Command | Exit | Counts |
+|---|---|---|
+| direct unit step + `go-test-report.py` | 0 / 0 | **1247 executed, 1247 pass, 0 skip** (my own JSON count `{'pass': 1247}`); `scripts` **327** |
+| `make ci` | 0 | all 10 lanes |
+| both anchors / `ci-required-guard.sh` | 0 / 0 / 0 | |
+| tree afterwards | clean | 0 porcelain entries |
+
+**CI: BLOCKED** (billing); nothing is recorded for this SHA, and the integration suites were not run.
+
+## R1-h. Doc sentences under "no false-guarantee merges"
+
+- **Guard docstring :118-129:** "every recipe the closure reaches … is then scanned twice: before make … and after make … the recipe of every closure target AS MAKE'S `-pn` DATABASE HOLDS IT, which catches a recipe make attached some other way (a rule whose target name make computes)".
+- **COMMANDS.md:** "So every recipe the closure reaches is scanned … After make, every closure target's recipe as make's `-pn` database holds it is held to the same literal checks, which catches a recipe make attaches some other way (a rule whose target name make computes)".
+- **AGENTS.md:165-172:** same wording.
+
+**Verdict on the sentences:**
+- The *before-make* half is true as measured (R1-b, R1-c).
+- The *after-make* half overclaims in two ways:
+  1. "the recipe of every closure target as make's database holds it": a closure target the database parser does not capture passes with 0 lines (R1-e, executed). The scan is not fail-closed.
+  2. "catches a recipe make attaches some other way (a rule whose target name make computes)": it catches such a recipe only when attached to a text-closure target. A computed-name rule that adds a prerequisite widens make's closure beyond the text closure, and nothing scans the added target's recipe (R1-e, by reading; not executed).
+
+## R1-i. Findings
+
+```
+FINDING R1-1: the post-make database recipe scan is not fail-closed and covers only the text closure, while three authored sentences say it scans "every closure target's recipe as make's database holds it"
+Severity:    REQUIRED (a false-guarantee sentence authored in this round). NEW-CLASS relative to X-1 (the backstop introduced this round)
+Confidence:  high for fail-open on a missing or shadowed entry (executed in-process); medium for the computed-prerequisite widening (by reading plus GNU Make's documented multiple-rules semantics; not executed)
+Affected:    vizra-core scripts/make-integrity-guard.py check_db_recipes / _db_recipe_lines (`DB_RECIPES.get(t, [])`), the recipe parser in resolve_database (first occurrence only; names with spaces skipped), main() (`check_db_recipes(g, closure)` with the text closure); check_text (no pre-make refusal of a rule line whose target name contains `$`); guard docstring :118-129, COMMANDS.md, AGENTS.md:165-172
+Recommendation (smallest, default-deny):
+  (a) before make, refuse any rule line whose TARGET contains `$`, as B5c already does for prerequisites. That removes the computed-name route at the source, and `computed-target-recipe` becomes a pre-make refusal;
+  (b) in check_db_recipes, FAIL for any closure target with no database entry, and fail on a duplicate entry rather than keeping the first;
+  (c) optionally, compute the closure from the database's own prerequisite lists and require it to equal the text closure;
+  (d) or narrow the three sentences to what the scan does.
+Acceptance:  in-process `DB_RECIPES={}` with closure ['ci'] → failed=True; a committed inert fixture with a computed target name refused before make with 0 make processes on 3.81 and 4.3; the real tree green.
+Tests:       one TestEveryRefusedSpellingIsRefusedBeforeMake row for a `$`-named rule target; a unit test of check_db_recipes on an empty and a duplicated database.
+Cross-repo:  search: if it adopts the database scan, the same requirements.
+Challenge:   reaching this needs reviewed bytes with a computed target name. (a) is a one-line default-deny consistent with every other B5 refusal, and the sentences can be made true cheaply.
+```
+
+```
+FINDING R1-2 (NIT): 3.81 reports 66 distinct expanded-prefix lines on the real tree, 4.3 reports 62; both pass. Informational only (the text and database line sets are deduplicated differently).
+```
+
+## R1-j. Cleanup and head
+
+- Scratch `vzv-core-pr11r1-XXXXXX` deleted by exact path.
+- The container ran with `--rm`, and the pulled `ubuntu:24.04` was removed.
+- The builder's checkout, the core #8 worktree and vizra-search were not touched.
+
+## Verdict (round 1 of 2)
+
+X-1 is closed and reproduced on 3.81 and 4.3:
+- inline and multi-target rules, `$`-prerequisites and `.POSIX` are refused before make with 0 make processes, including both of my by-reading spellings;
+- C22–C26 go red, then green;
+- 62 fixtures identical across versions;
+- no weakened test; 0 skips; `make ci` 0; unit 1247; `scripts` 327.
+
+One REQUIRED finding blocks under "no false-guarantee merges": R1-1. The new post-make backstop, which this round's docs describe as scanning every closure recipe as make holds it, passes a closure target it did not parse, and covers only the text closure. A one-line pre-make refusal of `$`-named rule targets, plus a fail-closed database lookup, would make the sentences true.
+
+FINAL VERDICT: FAIL — SHA 5488eb0e23940a376ea333c483d9af3a71b5ba14
