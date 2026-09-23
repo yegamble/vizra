@@ -136,3 +136,11 @@
    - Q3 ships NOW as its own small vizra-user PR, "Lane A pixel channels off": `screenshot: "off"`, `video: "off"`, and `trace` with `screenshots: false, sources: false`, each asserted by the parsed-config guard with a mutation.
    - Q6's repo-wide env-strictness fix is queued as 2r.
 4. **Item 1 (V-D design) stays in owner inbox 10.** Lane B's gate stays closed until V-D is closed and D18 is green.
+
+## F8 replacement ledger text — verbatim from the seat's hand-back (added by the chair, tick 207)
+
+The condensed F8 entry above referred to the seat's hand-back for the full text; the builder correctly asked for it (Q-r2-4). The seat's recommended replacement text, verbatim:
+
+> "An authenticated browser spec publishes no credential and no page content in an uploaded CI artifact or in the job log: it runs only in the separate authenticated lane, whose projects configure no trace, screenshot or video and write no snapshot baseline, whose output directory, log and report are in no upload path, whose writes into an upload path withhold the upload, and whose only contribution to the uploaded artifact is a summary of allowlisted structured fields with no error message, stack, locator or URL. Demonstrated against a loopback fixture with synthetic credentials by an end-to-end canary with runtime-minted markers, positively controlled (every marker found with recorders on) and negatively controlled (none found in the files of the allowlisted upload paths in the shipped configuration). Every run is backstopped by a credential-shape scan that withholds the upload on a hit; that scan detects known shapes and does not prove the absence of secrets. In the unauthenticated lane, a request carrying a header or body parameter from a fixed list of credential names fails the test, and any such signal, or a response Set-Cookie or vendor token header, withholds that lane's upload."
+
+Status stays UNVERIFIED, as the plan says.
