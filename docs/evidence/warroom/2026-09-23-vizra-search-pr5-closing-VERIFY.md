@@ -1,0 +1,229 @@
+# vizra-search PR #5 — closing slice: independent verification
+
+- **Verifier:** fresh war-room verifier (did not write this code; saw no builder reasoning).
+- **PR:** yegamble/vizra-search #5, branch `chore/m0-ci-hardening`.
+- **SHA under test:** `617c6d92b34c1acb68556f5f02a5b12793344cf5` (one commit on `e068e07fed999141a601374bb2b3b6251ede04d6`).
+- **Head at start:** `gh pr view 5 --json headRefOid` = `617c6d92b34c1acb68556f5f02a5b12793344cf5`; `git ls-remote … refs/heads/chore/m0-ci-hardening` = the same. State OPEN, 4 commits on `main`.
+- **Clone:** fresh `git clone` into my own `mktemp -d …/scratchpad/vzv-search-pr5-closing-XXXXXX`, detached at the SHA.
+- **Host:** darwin/arm64, go1.27.1, GNU Make 3.81, Python 3.9.6 (PyYAML 6.0.3), Docker 29.8.0 available (not used). **Nothing here ran on GNU Make 4.3.**
+- **Inputs read:** vizra/AGENTS.md; the security desk review at e068e07 (M-1…M-5, N-1…N-3); VERIFY "Re-verification at e068e07, part 2" (FINDING 4); the plan's "Closing slice" section; the full diff `e068e07..617c6d9`.
+- **Scope check (preflight):** `git diff --stat e068e07 617c6d9 -- Makefile api/` is empty. `shasum -a 256 Makefile` = `e9d7c58edc93ed4e95daa9ebb3553736864b5346cd10ca4004ad7f79c9f5d02c`, equal to the pin in `.github/pinned-makefiles.yml`. The pins-file change is a comment only.
+
+(Sections below are appended as the run proceeds.)
+
+## 1. Lanes (all run by me in the clean clone at 617c6d9, darwin/arm64, GNU Make 3.81)
+
+| command | exit | counts / result |
+|---|---|---|
+| `make ci` (MAKEFLAGS, VERSION unset) | **0** | fmt-check clean; vet; echo-containment; build; contract-drift **365** tests / 4 pkgs / 0 failures / none deselected; `test` (-race) 7 pkgs ok; test-noskip: **664 tests / 7 packages / 0 skipped / 0 failed** (suite floor 470; scripts 277, httpapi 146, hmacauth 109, config 84, contract 26, cmd 16, buildinfo 6, each at or above floor); tidy-check tidy; vendor-contract-selftest **17/17** |
+| `go test -count=1 -v ./scripts/ ./internal/httpapi/` | **0** | **423 `--- PASS`, 0 `--- FAIL`, 0 `--- SKIP`**; `ok scripts 23.2s`, `ok internal/httpapi 7.0s` |
+| — of which the new/changed tests | | `TestTheMakeLaunchInventorySeesEveryListedForm`: 31 matched + 10 not matched + 2 fails-closed subtests PASS; `TestNamedMakefileConstructsAreRefusedBeforeMake`: 28 subtests PASS (25 + `$@`, `$<`, `$X`); `TestARecipeBeginningWithAnEscapedDollarIsNotRefused` PASS; `TestEnvironmentTakenVariablesNeverReachMake`: 2/2 PASS, each logging 2 make processes (`-q Makefile`, `--dry-run …`) with `planted: none`; `TestEveryPlaceThatStartsMakeIsGated` PASS, sites = `[scripts/makegate.py:448]` |
+| `python3 scripts/ci-hardening-demo.py` | **0** | **54/54 rows behaved as declared** (tree = HEAD 617c6d9, no working-tree changes) |
+| `env -i PATH HOME GOPATH GOCACHE bash scripts/ci-required-guard.sh` | **0** | `passed (11 required check(s), 11 checked lane(s))` |
+| `env -i … ./scripts/make-integrity-guard.sh --workflow` | **0** | `passed (9 gate target(s); make ran 21 time(s), by /usr/bin/make, only on the pinned bytes of Makefile, which are unchanged)`; last check line: "`make -q Makefile` again at the end: still nothing would be remade" (N-3) |
+| `env -i … python3 scripts/vendor-contract.py --check` | **0** | `vendor-contract: OK — every vendored file matches the manifest.` |
+
+All of the builder's local numbers are reproduced exactly: 664/0 skips, 423 PASS, 54/54, guards 0, 21 make runs.
+
+**GitHub CI on 617c6d9** (read with `gh api …/commits/617c6d9…/check-runs`; not re-run): 13 check runs. All 12 workflow jobs, `ci-required` included, `completed/failure`, and the `ci-required` annotation reads "The job was not started because recent account payments have failed or your spending limit needs to be increased." GitGuardian `success`. **CI: BLOCKED (billing).** No job executed, so the required-checks manifest cannot be compared with jobs that ran.
+
+## 2. Red/green
+
+### 2a. The committed new tests against e068e07's gate files (the repo's own history)
+A second worktree at 617c6d9 with `git checkout e068e07 -- scripts/makegate.py scripts/make-integrity-guard.py` (sha256 of both equal to `git show e068e07:<file>`: `c98b2fb7…`, `0fefd96f…`). Command: `go test -count=1 -v -run 'TestNamedMakefileConstructsAreRefusedBeforeMake|TestEnvironmentTakenVariablesNeverReachMake|TestARecipeBeginningWithAnEscapedDollarIsNotRefused' ./scripts/`.
+
+| state | exit | result |
+|---|---|---|
+| e068e07 gate + 617c6d9 tests | **1** | **M-3 red for the stated reason:** `recipe_that_begins_with_$@`, `$<`, `$X (a one-letter variable)` FAIL: `exit 0; want "begins with an expansion" refused with 0 make processes started`. Every other named-construct row PASS. **M-4 red for the stated reason:** both subtests FAIL: `a make process received a variable the Makefile takes from the environment: MAKE-ENV -q Makefile \| planted: VERSION,COMMIT,CORE,GOFLAGS` and the same for `MAKE-ENV --dry-run --no-print-directory`, for `contract-drift-guard.py recipe` and for `makegate.py -- --dry-run contract-drift`. The `$$` control PASSES (it was never refused, as expected). |
+| restored (`git checkout 617c6d9 -- …`, `git status` clean) | **0** | 33 PASS, 0 FAIL, 0 SKIP |
+
+### 2b. FINDING 4 against e068e07's inventory
+A worktree at e068e07 with only `scripts/ci-hardening-demo.py` copied from 617c6d9; `python3 scripts/ci-hardening-demo.py --only <row>` for C4…C10, one row each. **Every row: `MUTATED : exit 0 -> *** NOT RED AS DECLARED`, `RESTORED: exit 0 -> GREEN`, harness exit 1.** The e068e07 inventory misses all seven planted literal forms. FINDING 4 reproduced; matches the builder's `closing/finding4-planted-forms-at-e068e07-BEFORE.txt`.
+
+### 2c. Builder's rows C1–C10 at 617c6d9 (from the full demo run in section 1)
+C1 (makegate back to `$(`/`${` only), C2 (refuse every leading `$`, so `$$` too), C3 (`env=clean_env()` in run_make), C4–C10 (planted Go/Python/shell forms): each `MUTATED : exit 1 -> RED as declared` (the harness requires the row's declared text in the output), restored byte-identical (sha256 printed), `RESTORED: exit 0 -> GREEN`. **10/10 reproduced.**
+
+## 3. Test strength (reading, plus evaluation of committed matchers on sample strings)
+
+Method note: where I say "evaluated", I imported the committed function or pattern (for example `makegate.reviewed_bytes_problems`, `make-integrity-guard.logical_recipe_lines`, `makegate._REF_RE`, the Go `makeShellPattern` const, the `pyMakeCalls` program extracted verbatim from scripts_test.go) into a throwaway Python process and fed it an inert string. Nothing was written as a Makefile, nothing was run by make, and the repository was not touched. One sample `.py` file was written under my scratch dir, read by the extracted matcher, and deleted. No safety classifier stopped anything.
+
+- **`TestEnvironmentTakenVariablesNeverReachMake` observes the real child environment, not the guard's belief.** It runs the caller under `runpy` with `subprocess.run` wrapped. For every call whose argv[0] basename is `make`/`gmake`, it records which of the four hard-coded planted names are in the `env` mapping handed to `subprocess.run`. That mapping is exactly what `execve` gives make. It is independent of `environment_taken()`'s output. It asserts per process, requires at least 2 make processes (so a recorder that sees nothing is red), and covers both non-anchor callers. It went red at e068e07 (2a) and under C3. Limits: it observes the spawn boundary, not make's own view (`$(origin VERSION)`); it plants 4 of the 7 names (not BUILD_TIME, IMAGE, CORE_REMOTE); and it would not see a make started through another API, which the inventory covers. Its success `t.Logf` ("none received …") also prints on failure (seen in 2a); cosmetic. **Adequate.**
+- **The inventory's negative controls show it does not match everything, but they do not prove it never over-matches.** The 10 controls cover a commented call, make in a non-exec call, a non-make program through exec, make in a message, a subprocess call without make, a commented Python call, a shell comment, `echo make ci`, a `make-`prefixed script path, and `command -v make`. The strongest evidence of no practical over-match is the real tree: exactly one site, `scripts/makegate.py:448`. Evaluated over-match: the shell line `echo "done; make sure"` is a HIT. That fails safe (red), so it is not a guarantee problem.
+- **The 2 parse-failure cases fail closed.** A `.go` or `.py` file that does not parse becomes a `problems` entry ("does not parse, so it is not cleared"). `TestEveryPlaceThatStartsMakeIsGated` calls `t.Errorf` on every problem, and the subtest asserts exactly one problem. A `.py` file with a `UnicodeDecodeError` or `ValueError` is also a problem. If the Python half cannot run at all, the result is `t.Fatalf("BLOCKED …")`. If python3 or PyYAML is missing, `requirePython` fails the test; it does not skip. **Yes, fail-closed.**
+- **Evaluated reach of the widened shell pattern** (the committed const, which the test says Python's `re` and RE2 agree on):
+  - HIT: `time make`, `{ make ci; }`, `` `make ci` ``, `nohup make`, `sudo make`, `else make`, `while make -q`, `x=1; exec make`, `echo x | make`, `command make`, and a tab or space before make.
+  - MISS: **`env -u X make ci`** and **`sudo -u bob make ci`**, meaning env or sudo with a flag that takes a separate argument (FINDING 6). `xargs make`, `timeout 60 make`, `nice make` and `builtin make` also miss; AGENTS.md names these as review-only or they are "not listed".
+
+## 4. Sentences against "no false-guarantee merges"
+
+| sentence (at 617c6d9) | verdict |
+|---|---|
+| M-2 narrowing: AGENTS.md:545-562, makegate.py docstring step 2 (:32-41), the block comment (:250-257), the anchor docstring (:82-99): named constructs "in its LITERAL spelling at the start of a line"; computed names "NOT refused" | **Accurate.** It matches `_SPECIAL_TARGET_RE`, `_ASSIGN_CONTROLLED_RE` and `_DEFINE_CONTROLLED_RE`, which are all `^\s*`-anchored. |
+| M-1 narrowing: the pattern, suffix, implicit, `.DEFAULT` and `$`-named-prerequisite recipes are "NOT scanned" (AGENTS.md:598-605, :655-666; anchor docstring :43-46, :93-95; `prerequisite_closure` docstring :399-416; GATE_TARGETS comment) | **The named exclusions are accurate. The positive half still overclaims:** "the text of the EXPLICIT rules of the named gate targets and of their prerequisite closure … may carry no `-` prefix and no `\|\| true`-family suffix". Two explicit-rule forms are not scanned: (a) a recipe written on the rule line after `;` (evaluated: `logical_recipe_lines(["test: ; -true"], 1)` → `[]`, while the tab form gives `[(2, '-true')]`); (b) a closure target that is not the FIRST name of a multi-target rule (`bar foo:`). The definitions match is `^foo\s*:`, so `foo` gets no definition and is only printed as a "note", and its tab recipe is never scanned (read at make-integrity-guard.py:592-610, :621-644). **FINDING 5.** |
+| M-3: "A recipe line whose body (after any `@`/`-`/`+`) begins with `$` other than `$$` … is refused" (AGENTS.md:560-563, makegate.py:39-41, anchor docstring :90-91); "`+` recipe lines … refused" (AGENTS.md:551, makegate.py:38, anchor :90) | **Accurate for TAB-started recipe lines; overclaims for the `;` inline recipe.** Evaluated: `reviewed_bytes_problems("Makefile", "t:\n\t$@x\n")` gives 1 problem, but `"t: ; $@x\n"` gives 0; `"t:\n\t+true\n"` gives 1, but `"t: ; +true\n"` gives 0. The check runs only under `if raw.startswith("\t")` (makegate.py:284). **FINDING 5.** |
+| M-4: "every make process, whichever caller opened the gate, also runs without the variables the pinned makefiles take from the environment (`?=` names, names referenced and never assigned, and GOFLAGS; today VERSION … GOFLAGS)" (AGENTS.md:566-570; makegate docstring step 3; `environment_taken` docstring) | **The mechanism is accurate** (`run_make` computes `environment_taken` from the pin on every call; 2a and C3 demonstrate it), **and the today-list is exact** (evaluated: `['BUILD_TIME','COMMIT','CORE','CORE_REMOTE','GOFLAGS','IMAGE','VERSION']`). "Referenced" is narrower than make's meaning: `_REF_RE` sees only `$(NAME)`/`${NAME}`. Evaluated misses: `$(V:a=b)`, `$V`, `ifdef V`, `$(origin V)`, `$(value V)`. A name read before its `:=` assignment is also not taken. None occurs in today's Makefile. **FINDING 7 (SHOULD).** |
+| FINDING 4 narrowing: AGENTS.md:521-537 (what is matched) and :642-648 (review-only); makegate.py:9-14; test comment scripts_test.go:1261-1286; pins-file header | **Mostly accurate, and the seven P3 forms are now matched (2b/2c).** Two overclaims remain. (1) "`env`/`nohup`/`sudo` (with flags and `VAR=value` words)" at AGENTS.md:537 and scripts_test.go:1285: `env -u X make` and `sudo -u bob make` are not matched. (2) The Go half "(under any import name)" at scripts_test.go:1267-1268: a dot-import of os/exec (`Command("make")`, an `*ast.Ident`, not a selector) is not matched. The AGENTS.md Go sentence does not say "any import name". **FINDING 6.** |
+| N-1: `ci-required-guard.py` "of the siblings it checks only `GNUmakefile`/`makefile`; a remake source … is caught only by the `make -q` probe" (AGENTS.md:584-588) | **Accurate. N-1 closed.** |
+| N-2: evidence README:33-36, "as far as `TestEveryPlaceThatStartsMakeIsGated` can tell … make started through a variable, a wrapper or a form it does not match is review-only" | **Accurate. N-2 closed.** NIT: it says "see the closing slice below", but the closing slice section is ABOVE it (README:3). |
+| N-3: "it ends with the same `make -q` probe again" | **Accurate.** The code is at make-integrity-guard.py:943-952, and the anchor log's last check line shows it ran. |
+| AGENTS.md:531 (the old "aligned with vizra-core PR #10"), now "derived from … PR #10; core has since moved on to B5b … whose computed-name refusals this list does NOT have" | **Accurate. The stale claim is removed.** |
+| Deviation: "a `$`-named prerequisite is dropped from core's closure too (read at 29387da, its make-integrity-guard.py:812), so that one is refused in neither repo yet" | **Line 812 confirmed:** I fetched core's file at 29387da with `gh api …/contents?ref=29387da`, and line 812 is `prereqs[n].extend(d for d in deps if not d.startswith("$"))`. "Refused in neither repo" is the builder's reading; I did not audit all of core for another refusal. This is an attributed cross-repo statement, not a search control. |
+| Unchanged: "What it guarantees, exactly: make runs only on reviewed bytes …"; the remake-probe paragraph; "The same names are refused statically as job- or workflow-level `env:`"; "The direct lane … only through `scripts/makegate.py`" | Consistent with the code and with the committed tests I ran (unchanged from e068e07, where part 2 judged them consistent). |
+| evidence README "Host for all of these: … go1.27.1" | NIT: the two BEFORE transcripts record `go version go1.26.2`. |
+| evidence README "three controls are widened … FINDING 4 (the make-launch inventory reads Go with `go/ast`, Python with `ast` …)" | Mostly true, but the Python half is narrower than e068e07's in one form. **FINDING 8 (SHOULD).** |
+
+## 5. Scope and deleted-line audit (`e068e07..617c6d9`)
+- The Makefile and `api/` are unchanged (empty diff), and the Makefile's sha256 equals its pin. `.github/pinned-makefiles.yml` has a comment-only change.
+- Deleted lines by file: scripts_test.go −40, make-integrity-guard.py −49, makegate.py −23, AGENTS.md −15, README −1, pins −1.
+  - scripts_test.go −40 is the old regex inventory. Its only assertion, `t.Errorf("… starts make outside scripts/makegate.py")`, reappears in the new `TestEveryPlaceThatStartsMakeIsGated` together with the non-vacuity `t.Fatal`. Parse failures are now also errors.
+  - make-integrity-guard.py −49: the environment-taken code moved to makegate and is re-exported. `check_environment_overrides` keeps its `--workflow` refusal, which the R-2 `VERSION=x` row still covers.
+  - No `g.fail` was removed. No assertion was weakened. No `t.Skip` was added (grep of added lines). 0 skips in every run.
+- One narrowing of detection that the brief does not ask about (see FINDING 8): the e068e07 Python regex matched any list literal starting with `"make"` on any line. The new ast half matches only inside a subprocess/os call's arguments. Evaluated on a sample, `ARGV = ["make", "ci"]` followed by `subprocess.run(ARGV)`: the old regex hits line 2 and the new matcher returns `[]`. AGENTS.md does list "make named through a variable" as review-only, so this is disclosed as a class but not as a regression.
+
+## Findings
+
+```
+FINDING 5: the `;` inline recipe and the non-first name of a multi-target rule are outside the scans the narrowed sentences describe
+Severity:    REQUIRED  (blocking under the chair's "no false-guarantee merges" rule; reviewed-bytes only)
+Confidence:  high for the code paths (evaluated/read); make's handling of an inline recipe's prefix is per the GNU Make
+             manual §5.1 ("the first recipe line may be attached to the target-and-prerequisites line with a semicolon")
+             and §5.5; NOT measured here (the brief forbids building new hostile Makefiles)
+Affected:
+  repo:      vizra-search
+  files:     scripts/makegate.py:284-295 (`if raw.startswith("\t")`: the `+` and leading-`$` checks see TAB lines only);
+             scripts/make-integrity-guard.py:450-466 (logical_recipe_lines: TAB lines after the rule line only),
+             :592-610 (definitions keyed on `^target\s*:`, so only the FIRST name of a rule line), :621-644
+             (a closure target with no first-name definition is only a "note");
+             sentences: AGENTS.md:551, :560-563, :598-605, :655-666; makegate.py:38-41; make-integrity-guard.py:43-46,
+             :90-95, :399-416
+  requirements: VZ-CI-ANCHOR-DIGEST (proposed)
+Observed:
+  Evaluated with the committed functions on inert strings:
+    reviewed_bytes_problems("Makefile", "t:\n\t+true\n")  -> 1 problem;  "t: ; +true\n" -> 0
+    reviewed_bytes_problems("Makefile", "t:\n\t$@x\n")    -> 1 problem;  "t: ; $@x\n"   -> 0
+    logical_recipe_lines(["test:", "\t-true"], 1) -> [(2, '-true')];  logical_recipe_lines(["test: ; -true"], 1) -> []
+  Read: for a closure prerequisite `foo` defined only as `bar foo:` (foo not first), `re.match(r"^foo\s*:", …)` never
+  matches, so definitions["foo"] stays empty and foo is listed under "note … treated as file dependencies"; its
+  explicit recipe is not passed to check_recipe.
+Failure:
+  The closing slice rewrote these sentences to say exactly what is refused and scanned. They still say that the text of
+  "the EXPLICIT rules of the named gate targets and of their prerequisite closure" carries no `-` prefix, that `+`
+  recipe lines are refused, and that a recipe line whose body begins with `$` is refused. A reviewer who trusts them
+  would not look for `test: ; -go test …`, `test: ; +cmd` (runs under the anchor's own -n/-pn) or `lint foo:` with a
+  `-` recipe. The dry-run cannot show the `-`. This is the same class as M-1/M-3.
+Perspective: developer, operator
+Recommendation:
+  Smallest: add both forms to the not-scanned / not-refused lists in every sentence named above (for example, "TAB-started
+  recipe lines only; a recipe written after `;` on the rule line, and a target that is not the first name of its rule
+  line, are not read"). Better, and still small: in reviewed_bytes_problems, refuse a `;` on a non-TAB rule line
+  outside a variable assignment; in the anchor, fail a closure target whose rule names it anywhere other than first.
+Acceptance criteria:
+  Either every listed sentence names both forms as not scanned, or pinned inert fixtures `t: ; +true`, `t: ; $@x` and
+  a closure target defined as `x t:` with a `-` recipe are red before make with 0 make processes (the repo's
+  TestNamedMakefileConstructsAreRefusedBeforeMake idiom), and the clean Makefile stays green.
+Tests: rows in scripts/scripts_test.go TestNamedMakefileConstructsAreRefusedBeforeMake (re-pinned, refusal by name,
+  0 make, ci-required-guard parity); no new harness needed.
+Cross-repo implications:
+  core: appears shared. At 29387da core uses the same RULE_RE (:782) and logical_recipe_lines (:827) shape. UNVERIFIED
+  whether a core check catches the inline form. | user: none | search: this PR | meta: none
+Challenge:
+  "Reviewed bytes only, and an inline `-` recipe is conspicuous." True, and the same was said of M-3's `$@`. The chair's
+  rule is about what the sentence promises, and the sentence promises this shape is refused or scanned.
+```
+
+```
+FINDING 6: the inventory sentence says `env`/`sudo` "with flags" are matched, but a flag that takes an argument is not
+Severity:    REQUIRED  (FINDING 4's class under the chair's rule; a narrow wording or one-regex fix)
+Confidence:  high (evaluated the committed makeShellPattern)
+Affected:
+  repo:      vizra-search
+  files:     AGENTS.md:535-537; scripts/scripts_test.go:1282-1289 (makeShellPattern and its comment), :1267-1268
+             (Go "(under any import name)")
+  requirements: none (R-1 of the security desk review)
+Observed:
+  makeShellPattern is `(?:env|nohup|sudo)\s+(?:-\S+\s+)*(?:VAR=\S*\s+)*`, so a flag's separate argument
+  breaks the match. Evaluated: `env -u X make ci` MISS, `sudo -u bob make ci` MISS; `env -i PATH=/usr/bin make ci` HIT
+  (the committed test row). The Go half checks `call.Fun.(*ast.SelectorExpr)`, so a dot-import of os/exec
+  (`Command("make")`) is not matched, although the test comment says Go calls are matched "under any import name".
+Failure:
+  The re-verification asked that the sentences "name exactly the forms matched and list the rest as review-only". These
+  two forms are literal make launches that the sentences place inside the matched set.
+Perspective: developer
+Recommendation: say "flags without a separate argument" (or widen `-\S+(?:\s+[^-\s]\S*)?`, at the cost of over-match),
+  and drop "under any import name" for Go or name the dot-import as review-only. Add the misses to the review-only list.
+Acceptance criteria: AGENTS.md and the test comment match the evaluated behaviour, or the forms are added to
+  TestTheMakeLaunchInventorySeesEveryListedForm as matched rows.
+Tests: rows in TestTheMakeLaunchInventorySeesEveryListedForm (`sh behind env -u NAME`, `sh behind sudo -u user`, `go a dot-import`).
+Cross-repo implications: none
+Challenge: these are unusual in this repo's scripts. They are also exactly what "(with flags …)" tells a reader is covered.
+```
+
+```
+FINDING 7: environment_taken's "referenced" is `$(NAME)`/`${NAME}` only
+Severity:    SHOULD
+Confidence:  high (evaluated makegate._REF_RE)
+Affected:    vizra-search scripts/makegate.py:410-439; AGENTS.md:566-570; makegate docstring step 3
+Observed:    `$(V:a=b)`, `$V`, `ifdef V`, `$(origin V)` and `$(value V)` yield no reference, and a name read before its `:=`
+             assignment is counted as assigned. None occurs in today's Makefile, so the today-list is exact.
+Failure:     A future pinned Makefile could read an environment value that run_make does not drop, while the sentence says every
+             make runs without "the variables the pinned makefiles take from the environment". An earlier step must plant
+             the variable, which is the declared residual.
+Recommendation: word the sentence as the regex ("names referenced as `$(NAME)`/`${NAME}` and never assigned"), or widen the
+             reading to substitution references, `ifdef`/`ifndef`, `$(origin …)` and `$(value …)`.
+Tests:       a table test of environment_taken over inert text rows.
+Cross-repo:  core: its equivalent reading is unexamined. Others: none.
+Challenge:   M-4 was a SHOULD, and nothing in today's bytes is affected.
+```
+
+```
+FINDING 8: the "widened" Python inventory no longer matches a make argv list held in a variable, which e068e07 matched
+Severity:    SHOULD
+Confidence:  high (the old regex and the new pyMakeCalls, both evaluated on one inert sample)
+Affected:    vizra-search scripts/scripts_test.go (pyMakeCalls vs the deleted pyList regex); evidence README "three controls are widened"
+Observed:    `ARGV = ["make", "ci"]` / `subprocess.run(ARGV)`: the e068e07 regex hits line 2; the new matcher returns [].
+Failure:     A detection that existed is silently dropped in a change described as widening. AGENTS.md does list "make named
+             through a variable" as review-only, so there is no false guarantee, but there is an undisclosed regression.
+Recommendation: also report any list or tuple literal whose first element matches PROG, anywhere in a .py file (the old rule),
+             or record the narrowing in the README.
+Tests:       a matched row "py an argv list held in a variable" in TestTheMakeLaunchInventorySeesEveryListedForm.
+Cross-repo:  none
+Challenge:   variable-held argv is review-only by the stated contract. It was nonetheless caught before this commit.
+```
+
+NITs (3):
+- The evidence README:35 says "see the closing slice below", but that section is above (README:3).
+- The evidence README says the host was go1.27.1 for all transcripts, but the two BEFORE transcripts record go1.26.2.
+- `TestEnvironmentTakenVariablesNeverReachMake` logs "none received …" (scripts_test.go:1784) even on a failing subtest. The FAIL status is still correct, but the log line reads as success.
+
+### Closed at 617c6d9 (reproduced or read)
+- **M-3 (code):** closed for TAB recipe lines. It goes red at e068e07 and green now, C1 and C2 reproduce, and `$$` stays green. The inline-recipe gap is in FINDING 5.
+- **M-4 (code):** closed. It goes red at e068e07 and green now, C3 reproduces, and the test observes the spawn environment.
+- **FINDING 4:** the seven P3 forms are now matched. C4–C10 are red now and all 7 were missed at e068e07. The residual wording is in FINDING 6.
+- **M-1 and M-2:** the named exclusions (computed names; pattern, suffix and implicit rules, `.DEFAULT`, `$`-named prerequisites) are stated accurately. The positive claim about explicit rules still overreaches (FINDING 5).
+- **N-1, N-2 and N-3:** closed.
+
+## What did not run
+- **GitHub CI:** BLOCKED by billing. No job started on 617c6d9, and I did not re-run it.
+- **GNU Make 4.3:** nothing ran on it (host 3.81 only).
+- **Live make behaviour of the FINDING 5 forms:** not measured, because the brief forbids new hostile Makefiles. The code paths were evaluated; the make semantics come from the manual.
+- **Core:** I read one line of core (29387da:812) and no more.
+
+## Instruction-shaped text in tool output
+None observed. The demo, test, guard, gh and git outputs contained no instruction-shaped text.
+
+## Cleanup
+- Removed my two worktrees (`wt-mix`, `wt-e068`) and my `mktemp -d` scratch directory by exact path. The demo harness removed its own `tempfile.mkdtemp` copy (its `finally`). No container or image was created.
+
+## Head at end
+`gh pr view 5 --json headRefOid` = `617c6d92b34c1acb68556f5f02a5b12793344cf5`; `git ls-remote` `refs/heads/chore/m0-ci-hardening` and `refs/pull/5/head` = `617c6d92b34c1acb68556f5f02a5b12793344cf5`. The head did not move.
+
+## Verdict
+Every lane is green locally, and every number the builder reported reproduces: `make ci` 664/0 skips, 423 PASS, demo 54/54, guards 0, vendor check 0. The M-3, M-4 and FINDING 4 tests go red on e068e07's code and green on 617c6d9. C1–C10 reproduce. The Makefile, its pin and `api/` are unchanged, and no assertion was weakened.
+
+The slice's own goal was "every gate sentence claims no more than its control", and two REQUIRED false-guarantee findings remain:
+- FINDING 5: the narrowed "EXPLICIT rules" and "recipe line whose body begins with `$`" / "`+` recipe lines" sentences do not hold for a `;` inline recipe or for a closure target that is not the first name of its rule line.
+- FINDING 6: "`env`/`sudo` with flags" and Go "under any import name" name forms the inventory does not match.
+
+Both can be fixed by rewording alone. CI remains BLOCKED by billing.
+
+FINAL VERDICT: FAIL — SHA 617c6d92b34c1acb68556f5f02a5b12793344cf5
