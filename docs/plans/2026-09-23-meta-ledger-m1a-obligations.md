@@ -40,7 +40,25 @@ Commands (from repo root of the worktree):
 8. Demonstration: a reference to `VZ-AUDIT-001` in an issue file is RED against the base ledger and GREEN against the head ledger (scratch, not committed).
 
 ## Progress and evidence
-(appended below as commands run)
+State: IMPLEMENTED on the branch, READY_FOR_REVIEW. Not VERIFIED (a separate verifier judges it).
+
+Environment: macOS arm64 (Darwin 25.5.0), `/usr/bin/python3` 3.9.6 (CommandLineTools), PyYAML 6.0.3, git 2.50.1.
+
+- Base reproduces before any edit: generator output at `6b8158c` byte-identical to the committed `features.json` (`cmp`, exit 0), `OK 191 requirements; core=141`.
+- Ledger commit `dd7955e`: sources edited (`s1_install_ops.py`, `s2_identity.py`), `features.json` regenerated — `OK 192 requirements; core=142`, exit 0.
+- Additions-only script (scratch, compares base and head JSON field by field): base 191, head 192, added `['VZ-AUDIT-001']`, removed `[]`; existing entries changed: `VZ-INSTALL-003`, `VZ-ADMIN-USERS-001`; no case, surface, title, area, provenance, profile, dependency, evidence or status string lost; every base outcome is a prefix of the head outcome; `VZ-INSTALL-003` recovery still `['Restart re-mints; old token invalid']`; all 192 entries PLANNED/UNVERIFIED. Exit 0.
+- Lane at `dd7955e` (all exit 0): `check-generated-ledger.sh` (reproduces byte-for-byte, UTF-8 and C/POSIX locales); `check-quality-json.py` (4 JSON files, 192 ids, 191 written refs → 287 ids, 204 distinct, 14 docs, all resolve); `check-doc-links.py` (no relative links across 95 markdown files; 7 external URLs recorded, not fetched); `ci-required-guard.sh` (6/7/10 fixtures at floor); `check-workflows.py`; `check-action-pins.py --required .github/required-checks.txt`; `check-lane-integrity.py --required .github/required-checks.txt`.
+- Red/green demonstrations: `docs/evidence/warroom/meta-m1a-ledger-builder-transcripts/2026-09-23-red-green-demos.txt`.
+  - A: a `VZ-AUDIT-001` reference in `docs/issues/README.md` → `check-quality-json.py` exit 1 at base (`DANGLING REQUIREMENT ID(S)`), exit 0 at `dd7955e`.
+  - B: `VZ-AUDIT-001` dependency mutated to `VZ-ACCOUNT-999` → `build.py` exit 1; restored → exit 0 and output byte-identical to the committed file.
+  - C: `VZ-AUDIT-001.implementation_status` hand-edited to `IMPLEMENTED` in the generated JSON and committed → `check-generated-ledger.sh` exit 1 (`GENERATED FILE IS NOT REPRODUCIBLE`); mutation dropped → exit 0.
+- Recorded counts made stale by this change updated: `docs/quality/COMMANDS.md` "Last run" lines (191 → 192, core 141 → 142) and the generator `README.md` "Last run" line. Line 78 of COMMANDS.md (`print("OK 191 requirements; core=141")`) is a quote of the historical gutted generator and is left as is.
+
+Findings (pre-existing, not fixed here, out of scope):
+1. `build.py` reports an unknown dependency by crashing: the core-closure loop (`next(...)` at line 27) raises `StopIteration` before the collected `unknown dependency` error is printed. The exit code is still non-zero, so the gate holds, but the message is a traceback.
+2. Apple's `/usr/bin/python3` writes bytecode under `~/Library/Caches/com.apple.python` (`sys.pycache_prefix`). A same-size source edit and restore within one second reused stale bytecode during the first demo attempt, so a regenerated ledger could reflect a source that is no longer on disk. The committed demos ran with `PYTHONDONTWRITEBYTECODE=1`; CI's fresh runner is not affected. Candidate hardening: `PYTHONDONTWRITEBYTECODE=1` inside `check-generated-ledger.sh`.
+3. `docs/quality/COMMANDS.md` records `6 external URL(s)` for `check-doc-links.py`; the base already reports 7. Not touched.
 
 ## Blockers and handoff
-- CI: BLOCKED (billing) — no Actions run is expected for this PR.
+- CI: BLOCKED (billing) — no Actions run is expected for this PR. Evidence is local only.
+- For the chair: `VZ-ADMIN-USERS-001` notes record an interpretation of ADR-003 ("owner is single and cannot be demoted" read as "no other actor demotes the owner; the owner's own transfer is the only way the role moves"), to be confirmed at the implementing slice's plan review.
