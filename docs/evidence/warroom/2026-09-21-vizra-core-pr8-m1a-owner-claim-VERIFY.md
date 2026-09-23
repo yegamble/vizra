@@ -2037,3 +2037,132 @@ The delta is exactly as claimed: floors, one AGENTS.md row, and the harness/READ
 **Check 4 fails.** The M1-B citation is present and a valid token is indeed 429ed once the cap is hit. But the row's and `allowSetupRequest`'s "fixed window … until the window rolls" is false on the cache-backed path (FINDING R4-A, measured). The fix is a text correction plus an owner/seat ruling on the real residual, or a one-line limiter change. The head was `37601f5` at start and at end. CI is blocked by billing and was not re-run.
 
 FINAL VERDICT: FAIL — SHA 37601f5f0b3e85582080b1762985743cd04bd2a1
+
+---
+---
+
+# Re-confirmation at 385fc51 (R4-A: fixed-window limiter) — 2026-09-23
+
+- **SHA:** `385fc51245f34cf8a04ea069c8c3769f7bda5c66`. PR head at start = `385fc51…` (13 commits). `compare 37601f5...385fc51` = ahead 3 / behind 0: `085d78b` fix, `2ad370e` floors, `385fc51` transcripts.
+- **CI BLOCKED by billing** — not re-run. Local verdict only. Written incrementally.
+
+## R5-1. Delta scope — within the allowed set
+
+`git diff --stat 37601f5 385fc51`: `AGENTS.md` (+3/−2), `docs/evidence/m1a-owner-claim/{01-integration-pg18.txt, 02-mutations.txt, 06-unit.txt, 09-limiter-red-green.txt (new), README.md, demonstrate.sh}`, `internal/cache/ratelimit.go` (+17/−?), `internal/httpapi/setup_limits.go`, `internal/integration/ratelimit_test.go` (new, 238 lines), `scripts/test-floors.json`. Filtering the names against the allowed set leaves **nothing**. No migration, API, workflow, Makefile or `go.mod`/`go.sum` change.
+
+## R5-2a. The fix, and whether MULTI/EXEC is really atomic here (measured on both servers)
+
+`internal/cache/ratelimit.go` `FallbackLimiter.Allow`: `pipe.Expire(ctx, k, window)` → `pipe.ExpireNX(ctx, k, window)` inside the existing `TxPipeline` (MULTI/EXEC). `ExpireNX` is a real go-redis v9.22.0 API: `generic_commands.go:94` sends `expire <key> <secs> NX`. `go.mod` is unchanged at `github.com/redis/go-redis/v9 v9.22.0`.
+
+`redis-cli` / `valkey-cli` against my own Valkey 9.1.2 and Redis 7.2.16 (CI digest), identical on both:
+
+| Transaction | Result | Meaning |
+|---|---|---|
+| `MULTI; INCR k; EXPIRE k 900 NX; EXEC; TTL k` (new key) | `1 1` → TTL `900` | window opened, TTL set |
+| same again | `2 0` → TTL `900` | NX leaves the running window alone (0 = not set) |
+| `PERSIST k` → TTL `-1`, then the same transaction | `3 1` → TTL `900` | a TTL-less key is given one on its next call |
+| `MULTI; INCR q; EXPIRE q; EXEC` (arity error, as a pre-7.0 server raises for `NX`) | `EXECABORT`, `EXISTS q` = 0 | queue-time errors discard the whole transaction |
+| `SET s notanumber; PERSIST s; MULTI; INCR s; EXPIRE s 900 NX; EXEC` | INCR → `ERR value is not an integer`; EXPIRE NX → `1`; TTL `900` | **a runtime error inside EXEC does NOT roll back the other command** |
+
+**Answer.** EXEC is atomic with respect to other clients and to a crash (the queued commands run as one unit; a crash before EXEC applies nothing), and queue-time errors abort everything. It is **not** "both or neither" for runtime errors: Redis/Valkey have no rollback. Could that leave a counter without a TTL? The only runtime error either command can realistically raise here is `INCR` on a non-integer value. In that case `INCR` fails and `EXPIRE NX` still applies, so the key still ends up with a TTL. `EXPIRE k 900 NX` has no realistic runtime error after a successful `INCR` on the same key. And any TTL-less counter, however it arises, is given a TTL on its next call (measured above, and through the handler in R5-2b). **No path leaves a permanent TTL-less counter.** The wording "the server applies both or neither" (ratelimit.go:77, AGENTS.md:287, README:235) is stronger than Redis guarantees; see NIT R5-N1.
+
+On a server below 7.0, `NX` is an arity error, so every call EXECABORTs and the limiter falls back to the per-process counter with readiness degraded. It never leaves a TTL-less key. ADR-001 (meta `docs/adr/ADR-001-stack-pins-and-licences.md` l.35–37) sets EXTERNAL at "any RESP-compatible server ≥ 7.2 … only the Redis 7.2 / Valkey 7.2 command set". `EXPIRE … NX` (7.0+) is inside that set, and `vizra doctor`'s `CheckCacheFloor` (`internal/doctor/doctor.go:129-150`) refuses a server below 7.2, failing closed. **The citation is accurate.**
+
+## R5-4. Every caller of the limiter (repo-wide grep, not only setup_limits.go)
+
+`grep -rnE '\.Allow\(' --include='*.go' . | grep -v _test.go` → exactly four production call sites, all in `internal/httpapi/setup_limits.go`, all with `claimRateWindow` (15 min). Plus the two internal fallback delegations inside `ratelimit.go`. The limiter is constructed once (`cmd/api/main.go:96`, `cache.NewFallbackLimiter`). The only other production use is `Degraded()` in the readiness probe (`internal/httpapi/probes.go:185`). No worker, search or CLI code uses it.
+
+| Call site | Bucket(s) | Limit | Builder's stated change (PR body) | Verified |
+|---|---|---|---|---|
+| `:84` `allowSetupRequest` | `ceiling.claim` / `ceiling.status` | 600 / 3000 | sliding lockout → fixed window | ✓ (R5-2b measured) |
+| `:106` `consumeClaimFailure` | per-origin failure budget | 10 | a failing caller never got budget back → fixed window | ✓ same code path |
+| `:110` `consumeClaimFailure` | global failure budget | 60 | same → fixed window | ✓ |
+| `:157` `claimLimitTransition` | `audited` | 1 | a sustained flood wrote ONE `rate_limited` row for its whole duration → one row per 15-min window of flooding | ✓. This also makes the round-2 AGENTS.md "exactly ONE `rate_limited` row per bucket per window" true on the cache path |
+
+**The PR body's caller table matches this grep exactly, with no caller missing.** Test-only callers (`internal/cache/ratelimit_test.go`, `internal/integration/golden_test.go`, and the `recordingLimiter` in `owner_claim_test.go`) use 1-minute or 20-ms windows, and none waits across a window expecting a refresh. **No existing test assertion changed:** `git diff 37601f5 385fc51 -- '*_test.go'` adds only the new `internal/integration/ratelimit_test.go` (+238) and removes or edits no existing test line.
+
+## R5-5. Docs at measured strength
+
+- **AGENTS.md:286** (the hard-ceiling row) now says the window "starts at the first request and its end never moves … the lockout ends at most 15 minutes after the window opened". It states the residual plainly: "**an attacker who sends 600 claim-owner requests in every 15-minute window (about 0.67 per second, sustained) holds claim-owner closed to everyone, the operator included, for as long as they keep it up** … a concurrency bound, which is M1-B's". It also records the pre-R4-A sliding behaviour as fixed. ✓ True at measured strength (R5-2b), with one qualification: after an out-of-band `PERSIST`, the next call opens a fresh 15-minute TTL, so "at most 15 minutes after the window opened" is measured from that call. That case needs someone altering the cache directly.
+- **AGENTS.md:287** (the new limiter row) says: fixed window on every path, TTL-less keys self-heal, and the cache and fallback paths agree. It lists every bucket with its limit and cites the four tests and MUT-62/63. ✓, except the "applies both or neither" clause (NIT R5-N1).
+- **`allowSetupRequest` comment** (setup_limits.go:70-78): "the window starts at its first request and its end never moves … An attacker who spends the whole budget at the start of EVERY window — 600 claim-owner requests per 15 minutes — therefore holds the route closed for as long as they keep doing it … M1-B's". ✓ Now true.
+- **README.md:217 correction note:** "**Corrected in round 4 (verifier R4-A):** 'until the window rolls' was false at the time. The cache path refreshed the window's TTL on every request, so it was a sliding lockout that one request per window held closed indefinitely." ✓
+- `internal/cache/ratelimit.go:11` ("Limiter is a fixed-window counter") and `:100` (MemoryLimiter "a fixed window, like the cache implementation") are M0 comments that were false before and are **now true**.
+
+## R5-2b. My R4-A measurement repeated through the real handler — now a FIXED window, on BOTH caches
+
+Verifier probe `TestVZV5_FixedWindowThroughTheRealHandler` (scratch clone only). It runs through the real handler with the real `FallbackLimiter`, using a fresh claim env on its own database and a dedicated probe cache per leg, and the real 15-minute `claimRateWindow` (no shortened window).
+
+| Step | Valkey 9.1.2 | Redis 7.2.16 (CI digest) |
+|---|---|---|
+| 600 claim-owner requests (all `415`, each counted by the ceiling first) | key `…ceiling.claim` = 600, TTL **14m59s** | = 600, TTL **14m59s** |
+| 8 s later | TTL **14m51s** | TTL **14m51s** |
+| request #601 | **429**; TTL after it **14m51s** (not reset) | **429**; TTL **14m51s** |
+| 5 more requests, 2 s apart | TTL **14m41s**, strictly non-increasing | TTL **14m41s** |
+| operator's VALID-token claim inside the capped window | **429** `rate_limited` (the stated residual); count 607, TTL 14m41s | same |
+| `PERSIST` the `ceiling.status` key mid-window | TTL 15m0s → **−1 (no expiry)** → next call: count 4, TTL **15m0s** restored | identical |
+| wait for the claim window to roll | key gone **14m41s** later, ~15m11s after its first request, with no reset by any of the intervening requests | identical |
+| operator's VALID-token claim after the roll | **201** | **201** |
+
+`--- PASS` on both (901.1 s and 901.6 s). R4-A's sliding lockout is gone on both CI cache images, and the valid claim succeeds once the window rolls.
+
+## R5-3. The four new tests: red on the old limiter, green on the fix, on both caches
+
+A tree at 385fc51 with ONLY `internal/cache/ratelimit.go` replaced by its 37601f5 version (unconditional `pipe.Expire`), against a pristine 385fc51 tree. `-run` names the four tests, and each cell runs on its own database and cache:
+
+| Test | old code, Valkey | old code, Redis 7.2 | fix, Valkey | fix, Redis 7.2 |
+|---|---|---|---|---|
+| `TestTheCacheLimiterDoesNotRefreshTheTTLWithinTheWindow` | **FAIL** — "1.5s and three requests later the TTL is 9.999s … a request REFRESHED the window" | **FAIL** (same) | PASS | PASS |
+| `TestTheCacheLimiterReopensWhenTheWindowRolls` | **FAIL** — "a request 3.307s after the window opened (window 3s) was refused" | **FAIL** | PASS | PASS |
+| `TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne` | PASS (as declared: the old code set a TTL on every call, so it cannot be red there) | PASS | PASS | PASS |
+| `TestTheCacheAndFallbackLimitersAgreeOnFixedWindowSemantics` | **FAIL** — "step 4 (+6.3s): [cache up] allowed=false, want true" and step 5 | **FAIL** | PASS | PASS |
+
+This matches the builder's `09-limiter-red-green.txt` and its stated exception exactly.
+
+## R5-6. Floors, lanes and guards at 385fc51
+
+**Floors.** `37601f5 → 385fc51` changes only integration `internal/integration` 140 → **144** and integration `min_tests` 1147 → **1150**. Mechanically compared old vs new: **nothing lowered**; unit unchanged. From MY runs at 385fc51, `go-test-report.py --emit-floors`:
+- unit: `min_tests` **1006** = committed; 17/17 package floors match.
+- integration (Valkey leg): `min_tests` **1150** = committed; 18/18 package floors match; `internal/integration` measured **169**, floor **144**.
+
+No floor is set above what was executed. The Linux-parity argument of R4-2 still holds: the only new tests are in `internal/integration` (integration tag only) and are not platform-conditional.
+
+| Lane (CI's pinned `-json` + `go-test-report.py` shapes, my containers) | go test exit | report exit | Executed / skipped |
+|---|---|---|---|
+| `make ci` (10 lanes incl. both #9 guards) | — | — | **exit 0**, all lanes passed |
+| unit (`go test -race -count=1 -json ./...`) | 0 | 0 | **1184 / 0**, floor 1006 met |
+| integration, Valkey 9.1.2 | 0 | 0 | **1353 / 0**; `internal/integration` **169** (floor 144); floor 1150 met |
+| `./scripts/ci-required-guard.sh` | **0** | — | `passed (6 required check(s))` |
+| `./scripts/make-integrity-guard.sh --workflow` | **0** | — | `passed (8 gate target(s))` |
+| `go test -count=1 ./scripts/` | **0** | — | 189 pass, 0 fail, 0 skip |
+| integration, Redis 7.2.16 (CI digest) | 0 | 0 | **1353 / 0**; `internal/integration` **169**; floor 1150 met |
+| `demonstrate.sh` (all cases), pristine clone, own database and cache | exit **0** | — | **62 passed, 0 failed, 0 harness-fail**; restore byte-identical (`git status`/`git diff HEAD` empty) |
+
+**MUT-62** (the unconditional EXPIRE restored) is red: `TestTheCacheAndFallbackLimitersAgreeOnFixedWindowSemantics` "step 4 (+6.3s): [cache up] allowed=false, want true". The other two tests in its `-run` were independently shown red on the old code in R5-3. **MUT-63** (set the TTL only when INCR returns 1) is red: `TestTheCacheLimiterGivesATTLToAKeyFoundWithoutOne` "after a call the TTL-less key's PTTL is -1ns … a counter with no expiry never resets, which is a permanent lockout". Both are green restored.
+
+**MUT-id audit at 385fc51:** 67 cited = 62 scored + 5 review-only (MUT-4, 4b, 14, 36, 53); **0 dangling**.
+
+## R5-7. Finding (non-blocking)
+
+**R5-N1 (NIT) — "the server applies both or neither" is stronger than Redis guarantees.** Sites: `internal/cache/ratelimit.go:77`, AGENTS.md:287, README.md:235. Measured on both servers (R5-2a): a runtime error inside EXEC does not roll back the other command. The property that actually holds, and that the sentences exist to support, is "no path leaves a counter without a TTL". Queue-time errors discard the transaction. EXEC is not interleaved and cannot be half-applied by a crash. The only realistic runtime error, `INCR` on a non-integer, still leaves the TTL set. And any TTL-less key is given a TTL on its next call. Suggested wording: "INCR and EXPIRE NX run in one MULTI/EXEC (not interleaved; a crash applies none), and a counter found without a TTL is given one on its next call, so no path leaves a permanent lockout." This does not affect behaviour and does not block.
+
+## R5-8. Verdict at 385fc51
+
+R4-A is closed, reproduced by my own measurement through the real handler on both CI cache images:
+- the TTL counts down and is not reset by request #601, by later requests or by the operator's valid claim;
+- the window rolls about 15 minutes after its first request, and the valid claim then gets **201**;
+- a `PERSIST`ed key regains a TTL on its next call.
+
+**The rest of the delta:**
+- **Scope:** exactly the allowed set.
+- **The fix:** `ExpireNX` is a real go-redis v9.22.0 API.
+- **Tests:** the four new tests are red on the old code (TTL-less excepted, as declared) and green on the fix, on both caches.
+- **Mutations:** MUT-62/63 reproduce, and all 62 harness cases pass.
+- **Callers:** every caller is accounted for by a repo-wide grep; no existing test assertion changed.
+- **Docs:** they state the residual plainly — 600 claim-owner requests in every 15-minute window hold the route closed until M1-B's concurrency bound. The README carries the correction note.
+- **Floors:** they equal the generator's output from my own runs, and none was lowered.
+- **Lanes:** unit 1184/0, integration 1353/0 on Valkey and on Redis, both guards, and `scripts` 189/189 are green.
+
+One NIT on atomicity wording (R5-N1). The head was `385fc51` at start and at end. CI is blocked by billing and was not re-run, so `ci-required` on this SHA is still **not obtained**. The merge waits for the owner and a green `ci-required`.
+
+FINAL VERDICT: PASS (local; CI BLOCKED) — SHA 385fc51245f34cf8a04ea069c8c3769f7bda5c66
