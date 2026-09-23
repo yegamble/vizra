@@ -1038,3 +1038,765 @@ the controls behind them, and this area does not get the benefit of the doubt on
 that any more.
 
 FINAL VERDICT: FAIL — SHA e0960539f20d2a484e430dab70718d2e3dd49c7c
+
+---
+---
+
+# Re-verification at `4158b10` (2026-09-21 → 2026-09-22)
+
+- **SHA verified:** `4158b10f8291e23cd726e2499db760aead195f4a` — seven commits on top of
+  `e096053` (`bcc3bb4 1647f19 d818527 2bb8cb7 b0a9adb cf3753a 4158b10`), no amend, no
+  force-push (`e096053` is still an ancestor in the PR's commit list). Confirmed unmoved
+  via `gh api …/pulls/8` at the start, again after a machine restart, and at the end.
+- **Interrupted once.** The machine restarted part-way through. Measurements taken before
+  the restart are recorded below as such; my scratch clone did not survive, so everything
+  after it was re-done from a NEW clean clone at the same SHA. Docker was restarted
+  underneath me; I created no containers or images in this round, so there was nothing of
+  mine to remove (the exited `vizra-m1a-*`, `vzb2-*`, `vzv9-*`, `vidra-*` containers are
+  not mine and were left alone).
+- **Environment:** macOS Darwin 25.5.0 arm64, node v22.14.0, npm 10.9.2, Playwright 1.63.0,
+  clean clones under a private `mktemp -d`, `npm ci` exit 0 (415 packages).
+
+## R2-1. `npm run ci` at the head (before the restart)
+
+`npm run ci` exit 0 — **16 files / 423 tests / 0 skipped**. Matches the claim.
+
+## R2-2. My mutation table against the new head (before the restart)
+
+Same method as §2: `bash scripts/ci/check-e2e-lane.sh` on a sandbox copy, one mutation
+at a time, restored between cases, baseline exit 0 before and after.
+
+### The 11 that were green at `e096053`
+
+| Case | At `e096053` | At `4158b10` |
+|---|---|---|
+| step-level `PLAYWRIGHT_NO_COPY_PROMPT: ""` (my FINDING 2) | green | **RED** — "also sets … may appear at JOB level and nowhere else" |
+| workflow-level `env: DEBUG: pw:api` (FINDING 3) | green | **RED** — "the workflow sets `DEBUG` … refused at every scope" |
+| `pree2e` script (FINDING 10) | green | **RED** — "npm runs as part of `npm run e2e`" |
+| `poste2e` script (FINDING 10) | green | **RED** |
+| `$GITHUB_STEP_SUMMARY` via a shell variable **inside** `run:` (`S="$GITHUB_STEP_SUMMARY"; echo >> "$S"`) | green* | **RED** |
+| `$GITHUB_STEP_SUMMARY` via an **`env:` map** (`env: S: ${{ env.GITHUB_STEP_SUMMARY }}`, then `echo >> "$S"`) — at step AND at job level | green | **GREEN** — see R2-FINDING A |
+| uploader in a DIFFERENT workflow file, `path: .` | green | green — **named in § Residuals** with bounds; bounds checked below |
+| `gh release upload` in `run:` | green | green — stated residual |
+| `curl --upload-file` in `run:` | green | green — stated residual |
+| `$GITHUB_STEP_SUMMARY` written by a helper script | green | green — **named in § Residuals** |
+| stray second Playwright config with `globalSetup` | green | green — **named in § Residuals** as inert; checked below |
+
+\* my e096053 case C3 used the `env:`-map spelling; the in-`run:` shell-variable spelling
+is the one the builder closed, and it is closed.
+
+### Checking the four review-only bounds by measurement
+
+- **A second workflow file with an uploader.** `path: .` in `zz-probe.yml` → green, as
+  § Residuals says. But the ruling's cross-file clause holds: `path: .vizra-e2e` in a
+  second file → **RED**, and `.vizra-e2e/stamp-key.json` buried in a multi-line `path:`
+  of a second file → **RED**. So "outside every assertion" is NOT what the bullet
+  claims, and it is not the case: the deny sweep crosses files; clauses (a)–(e) do not.
+  The bullet says exactly that. Accurate.
+- **A stray second config is unselectable.** Read Playwright 1.63.0's own resolution
+  (`playwright/lib/common/index.js:1467-1485`, `resolveConfigFile2`): with no `--config`,
+  it takes the FIRST of `[".ts", ".js", ".mts", ".mjs", ".cts", ".cjs"]` that exists in
+  cwd. `playwright.config.ts` is first, so `playwright.config.mts` / `.js` beside it
+  cannot win (my `.mts` and `.js` cases are guard-green and **inert**). There is no
+  `package.json` `playwright` key read by `resolveConfigLocation` (it takes only the
+  `--config` argument or cwd), so that case is inert too. `--config=…` / `-c` on the lane
+  step → **RED** (the step must be exactly `npm run e2e`); `PLAYWRIGHT_CONFIG` → **RED**;
+  `PW_TEST_*` → **RED**; `npm_config_*` → **RED**; an `.npmrc` line only becomes an
+  `npm_config_*` variable, which Playwright does not read — inert. **The residual is
+  accurate.**
+- **`run:` exfiltration and helper-script summary writes.** Green as stated.
+
+### F2 — the effective-value logic, attacked
+
+| Case | Guard | Real effect in Actions | Classification |
+|---|---|---|---|
+| job-level `1` as a YAML **int** | green | Actions stringifies to `"1"`, truthy | **green, harmless** |
+| job-level `'1'` single-quoted | green | `"1"` | **green, harmless** |
+| job-level `"1 "` (trailing space) | **RED** | truthy — over-strict, safe | red |
+| job-level `true` | **RED** | `"true"` truthy — over-strict, safe | red |
+| key duplicated in one mapping (`"1"` then `""`) | **RED** (the `yaml` parser rejects the duplicate) | — | red |
+| YAML **alias** `*snap` injecting the key at step level | **RED** | — | red |
+| YAML **merge key** `<<: *envbase` injecting `PLAYWRIGHT_NO_COPY_PROMPT: ""` at step level | **green** | see note | green — see R2-FINDING B |
+| another step writes `PLAYWRIGHT_NO_COPY_PROMPT=` to `$GITHUB_ENV` | **green** | depends on `$GITHUB_ENV` vs job-`env:` precedence | green — see R2-FINDING B |
+| NO_COPY_PROMPT at WORKFLOW level instead of job | **RED** | — | red |
+| `unset` / `export VAR=` / `env -u` / `VAR= npm run e2e` / `VAR=0 npm run e2e` / `declare -x VAR=` / a sourced file / a computed name | all **RED** | — | red — but NOT for the reason the four greps give: the lane step's `run:` must be EXACTLY `npm run e2e`, so every spelling on the lane step is already refused by that older rule. The four greps matter only on OTHER steps, where an unset does not reach the lane step anyway (each `run:` is its own shell) — except via `$GITHUB_ENV`, which they do not see. |
+
+### Regression — every case that was red at `e096053` is still red
+
+`path:` glob; `index.html` re-added (names the base64 ZIP); `actions/cache`; retention 14;
+`include-hidden-files: true`; `scripts.e2e --trace on`; `globalSetup`; reusable workflow;
+a second job uploading `.`; `DEBUG` at job and step level; `--config`; `PLAYWRIGHT_CONFIG`;
+`PW_TEST_*`; `npm_config_*`. All **RED** by name.
+
+### Re-confirmed after the restart, in a new clone at the same SHA
+
+```
+dup key in the job env map                         RED   (the yaml parser rejects the duplicate)
+merge key `<<: *envbase` at the lane step          GREEN
+$GITHUB_ENV write (echo) on a step before the lane GREEN
+$GITHUB_ENV write (printf) on a step before lane   GREEN
+unset on a DIFFERENT step (the new grep)           RED   "removes … with `unset`"
+export VAR= on a different step                    RED   "… with an empty `export`"
+summary via a STEP env map                         GREEN
+summary via a JOB env map                          GREEN
+restored baseline                                  exit 0
+```
+
+`ALLOWED_UPLOAD_PATHS` now has exactly three entries; `e2e-failure-summary/` is gone, with
+a comment giving the right reason ("nothing is allowlisted before it exists"). My round-1
+FINDING 9(a) is closed.
+
+`grep -c GITHUB_ENV` = **0** in `check-e2e-lane.mjs`, in `AGENTS.md` and in the evidence
+README. The guard has no model of that channel at all.
+
+## R2-3. The redactors — 33 shapes through BOTH shipped redactors (after the restart)
+
+Runtime-minted marker. `redact.ts` compiled from the file at this SHA with the repo's own
+`typescript`; `redact-artifacts.sh` run as shipped on one file per shape.
+
+| Shape | Claimed? | `redact.ts` | `redact-artifacts.sh` |
+|---|---|---|---|
+| my round-1 #1 `//host.example:8443/p?q` | yes | redacted | redacted |
+| my #2 `[::1]:3000/p?q`, `[2001:db8::1]/p?q` | yes | redacted | redacted |
+| my #3 **fully** JSON-escaped `{"u":"https:\/\/host.example\/p?q"}` | yes ("optional backslash-escaped slashes") | redacted | **SURVIVES** |
+| AGENTS.md's own example `{"u":"https:\/\/h/p?q"}` (only the scheme slashes escaped) | yes | redacted | redacted |
+| realistic `{"u":"https:\/\/host.example\/media\/p.jpg?X-Amz-Signature=…"}` | yes | redacted | **SURVIVES** |
+| my #4 `HTTPS://…?q` | yes | redacted | redacted |
+| builder's shapes: absolute, `host:3219/…` (PR #3 F13 verbatim), dotted `host:port`, `localhost:3000`, IPv4:port, `//host/p?q`, `/path?q`, `ws://` | yes | all redacted | all redacted |
+| uppercase `//HOST.EXAMPLE:8443/p?q` | implied | redacted | redacted |
+| userinfo `https://u:pw@host/p?q` | implied | redacted | redacted |
+| URL followed by `.` / inside `( )` / `[ ]` / `' '` / followed by `,` | implied | all redacted | all redacted |
+| fragment-only secret `https://h/cb#access_token=…`, `/cb#access_token=…`, `host:3000/cb#…` | yes (fragments) | all redacted | all redacted |
+| double-escaped `https:\\/\\/h\\/p?q` (JSON inside JSON) | no | survives | survives |
+| IPv6 with zone id `[fe80::1%25eth0]:3000/p?q`, `[fe80::1%eth0]/p?q` | "bracketed IPv6" | survives | survives |
+| scheme-less userinfo `user@host.example:3000/p?q` | no | survives | survives |
+| `%3F` (a path, not a query) | by design | survives | survives |
+| secret in a path segment | by design, stated residual | survives | survives |
+| undotted host, no port `myhost/p?q` | by design, stated | survives | survives |
+| query-less URL; `see step 3/4? yes`; `what? /usr/bin is fine` | must be untouched | **byte-identical** | **byte-identical** |
+
+**The two redactors are NOT the same program for the escaped shape.** The mechanism:
+
+```
+redact-artifacts.sh:78   ((?:https?|wss?|ftp):(?:\\?/){2}[^\s"'<>\\)\]]*?)[?\#]…   /gi
+redact.ts:67             \b(?:https?|wss?|ftp):(?:\\?\/){2}[^\s'"<>()[\]]+          /gi
+```
+
+Both accept `\/\/` after the scheme. But the shell's host/path class **excludes backslash**
+(`\\`), so it stops at the first `\/` in the PATH and then needs `?` or `#` immediately —
+which is not there — and the whole match fails. `redact.ts`'s class allows backslash. The
+test that pins this shape (`e2e/harness/redact.test.ts:188`) uses
+`'{"u":"https:\\/\\/host/p?sig=' + M + '"}'` — escaped scheme slashes, **unescaped path
+slash** — the one spelling where the two agree. A serializer that escapes `/` escapes every
+`/` (PHP's `json_encode` default; Go's and JS's encoders do not escape `/` at all), so the
+pinned spelling is not one any serializer produces, and the realistic one survives the
+redactor that touches UPLOADED bytes. → R2-FINDING C.
+
+**ReDoS — none found.** `redact.ts` on eight pathological 1 MB single-line inputs
+(repeated `a.`, a 1 MB label then `:1/?`, `/a` with no `?`, `[:`, `https:\/`, `//a:1`,
+`a-`, and 12 000 realistic URLs in JSON): **19–35 ms** each. The shell redactor
+(all five perl passes, whole script) on nine such 1 MB lines: **0.16–1.13 s** each, all
+exit 0. Linear enough; not a finding.
+
+## R2-4. `check-source-hygiene.mjs` (after the restart)
+
+**Baseline:** `OK: 274 text source(s) carry no literal control bytes, and 13
+mutation-digest line(s) match this tree.` — matches the claim.
+
+**Is it in a REQUIRED lane? Yes.** `package.json` `ci` is now
+`npm run check:hygiene && npm run lint && npm run typecheck && npm run test && npm run build`,
+and `frontend-ci.yml` (required, NOT path-filtered) runs `npm run ci`. `ci-guard`
+(optional, path-filtered) additionally runs its unit cases via `require-checks_test.sh`.
+
+**Planted into a TRACKED `.ts`, `.mjs` and `.sh`** (`redact.ts`, `check-e2e-lane.mjs`,
+`redact-artifacts.sh`), one at a time, restored between, `git status` clean after:
+
+| Byte | `.ts` | `.mjs` | `.sh` |
+|---|---|---|---|
+| NUL 0x00 | **RED** by name, with count | **RED** | **RED** |
+| BEL 0x07 | **RED** | **RED** | **RED** |
+| ESC 0x1B | **RED** | **RED** | **RED** |
+| VT 0x0B | **RED** | **RED** | **RED** |
+| DEL 0x7F | **RED** | **RED** | **RED** |
+| lone CR 0x0D (not part of CRLF) | green | green | green |
+| UTF-8 BOM prefix | green | green | green |
+| U+2028 LINE SEPARATOR | green | green | green |
+
+CR is allowed on purpose (tab/LF/CR are the script's stated exceptions), and BOM / U+2028
+are not C0 bytes, so these three are inside the script's stated scope — recorded, not
+findings. (A lone CR is the same "rewrite the terminal line" class the sanitiser exists
+to stop in page text; a NIT at most.)
+
+**The ledger half:**
+
+| Mutation | Result |
+|---|---|
+| one digest changed by one hex character | **RED** — names the label, both digests, the file |
+| a byte-pinned file (`worker-guard.ts`) edited, ledger left stale | **RED** — names the label and both digests |
+| the ledger FILE deleted | **RED** ("is missing") |
+| the ledger's first LINE deleted | **green** — "12 mutation-digest line(s) match" |
+| the ledger EMPTIED (0 bytes) | **green** — "**0** mutation-digest line(s) match this tree" |
+
+The script carries its own vacuity guard —
+`if (ledgerLines.length > 0 && checked === 0) add("… it would have passed vacuously.")` —
+and it does not fire for an empty file, because `ledgerLines.length` is 0. So the check
+refuses a ledger that CONTRADICTS the tree but accepts one that has stopped describing
+it, and the cheapest way to turn its red back to green after editing a pinned file is to
+delete that file's ledger lines. The README's "verifies every `BEFORE`/`RESTORED` digest
+against the file at the current revision" is true of the lines present. → R2-FINDING D.
+
+## R2-5. End-to-end survivor scan on a red Lane-A run (after the restart)
+
+Same method as §1, with probe files rebuilt from scratch (the originals were lost in the
+restart): localhost-only fixture server, markers from `crypto.randomBytes`, the SHIPPED
+config, `PLAYWRIGHT_NO_COPY_PROMPT=1`, lane exit 1 as intended. One marker added this
+round — `escsigned`: the spec prints a signed-URL-shaped string whose slashes are
+backslash-escaped (what a slash-escaping JSON serializer emits), to test whether
+R2-FINDING C is reachable through the real lane.
+
+**Positive control:** all seven markers found before redaction, including inside
+`index.html::base64` and `playwright-report/data/*.zip`.
+
+Shipped `redact-artifacts.sh test-results playwright-report` → `OK … 23 file(s) and 2
+archive(s)`, exit 0. Then **only the upload set** (`test-results/`,
+`playwright-report/results.json`):
+
+| Marker | Survives the upload set? | Where |
+|---|---|---|
+| scheme-less signed URL (`page.goto`) | **no** | — |
+| **slash-escaped signed URL printed by the spec** | **YES** | `playwright-report/results.json`, `trace.zip::test.trace` |
+| `page.fill` value | YES | `trace.zip::1-trace.trace`, `::test.trace` |
+| assertion's received value | YES | `error-context.md`, `trace.zip::attachments/…`, `::test.trace`, `results.json` |
+| page console text | YES | `error-context.md`, `trace.zip::1-trace.trace`, `::attachments/…`, `::resources/….html`, `::test.trace`, `results.json` |
+| page `<title>` | YES | `trace.zip::1-trace.trace`, `::resources/….html` |
+| plain stdout token | YES | `trace.zip::test.trace`, `results.json` |
+
+The surviving bytes, marker masked, from the two UPLOADED files:
+
+```
+results.json          "text": "{\"u\":\"https:\\/\\/host.example\\/media\\/p.jpg?X-Amz-Signature=<MARKER>
+trace.zip::test.trace "text":"{\"u\":\"https:\\/\\/host.example\\/media\\/p.jpg?X-Amz-Signature=<MARKER>
+```
+
+Playwright JSON-encodes captured text, so a URL printed with `\/` lands on disk as
+`\\/` — the double-escaped shape that NEITHER redactor handles (R2-3). **R2-FINDING C
+is therefore reachable, not hypothetical**: any slash-escaped URL a spec or page prints
+reaches two uploaded files with its query intact. Reachability today is low — no spec
+authenticates, and vizra-core's Go `encoding/json` does not escape `/` — but PHP's
+`json_encode` does by default, and the charter includes Chevereto (PHP) import and
+federation with other instances' content.
+
+`playwright-report/index.html` and `playwright-report/data/*.zip` still carry every
+marker and are still **not** uploaded — FINDING 3's fix holds.
+
+`error-context.md` sections: `# Instructions`, `# Test info`, `# Error details` — **no
+`# Page snapshot`** (F10 holds) and, again, **no `# Test source`** (see R2-8).
+
+**Does AGENTS.md's new "WHAT A RED LANE A ACTUALLY PUBLISHES" table say exactly this?**
+Very nearly, and far better than before: it names `results.json` (with the assertion's
+received value and captured stdout/stderr), says `trace.zip` carries headers, bodies, DOM
+snapshots, console text and `fill()` values with "URLs only" redacted, says the page
+snapshot is suppressed, and says `playwright-report/` is not uploaded. Two gaps: its
+"Redacted? — URLs only" cell for `results.json` and `trace.zip` is not true of
+slash-escaped URLs (R2-FINDING C), and it still lists a `# Test source` section that
+has not appeared in any of my four red runs across both rounds (over-description in the
+safe direction; not a finding).
+
+## R2-6. CI on `4158b10` (read with `gh`, after the restart)
+
+All **9** check-runs `completed` / `success`: `frontend`, `contract`, `guard`,
+`docker-build`, `e2e`, `deps-scan`, `image-scan`, `GitGuardian Security Checks`, and
+`ci-required` — which finished **last** (10:26:39Z, after `e2e` at 10:26:22Z).
+
+`.github/required-checks.txt` at the head has git blob `f2f23454…`, **identical** to
+main's — unchanged. It declares `frontend`, `contract`, `?guard`, `?docker-build`, `e2e`;
+all five ran and succeeded (`docker-build` ran this time because `package.json` changed,
+which is in its path filter). Manifest matches the jobs that ran; nothing skipped,
+cancelled or timed out.
+
+`e2e` run `35588546930` (attempt 1, success) log: `18 passed (12.6s)`,
+`e2e coverage floor: OK (desktop-chromium-1440=9/9 mobile-chromium-390=9/9)`,
+`e2e harness stamp: OK (18 succeeding result(s) verified)`,
+`PLAYWRIGHT_NO_COPY_PROMPT: 1` in every step's env, and
+`OK: the harness canary failed all 4 fault-injection fixtures, each with the exact set of
+record kinds it demonstrates and no others`. Artifacts on the run: **0** — correct for a
+green run. **There is still no RED run on any SHA of this PR**, so the uploaded set has
+never been observed in GitHub; R2-5 is my local reproduction of it.
+
+## R2-7. Regression sweep of what I confirmed at `e096053` (after the restart)
+
+| Item | At `4158b10` |
+|---|---|
+| `index.html` not uploaded, and re-adding it refused | holds — K2 RED naming the base64 ZIP; R2-5 shows it still carries every marker and is not in the upload set |
+| F10 red/green: `# Page snapshot` absent with `PLAYWRIGHT_NO_COPY_PROMPT=1` | holds (R2-5); the job env still sets it, and the CI log shows it in every step |
+| sanitiser on a live lane | holds — plus round-1 FINDING 5 is **closed**: `"  ::"`, `"\t::"`, NBSP-`::` and U+3000-`::` are all broken with U+200B; `"Foo::bar"` mid-line untouched; CR/LF → `⏎`; `%0A` → `%250A`; 300 chars → capped |
+| tokenising call check vs the three old defeats | holds — trailing comment RED `absent`, string RED `absent`, `void f()` RED `void-discarded`, shadowed RED `shadowed`; `const _ = f()` and `if (false) f()` GREEN, the stated review-only class |
+| `globalSetup` refusal | holds (K7 RED) |
+| tripwire `no-credentials-in-specs.test.ts` | 10/10 passed |
+| no spec or demo changed in round 2 | `git diff --name-only e096053..4158b10 -- e2e/specs e2e/demos` is empty |
+| no credential-shaped literal in the 7 commits | 0 hits (`ghp_`, `github_pat_`, `gh[ousr]_`, `AKIA`/`ASIA`, PEM, JWT, Slack, `sk-`, Google API key), and no long `X-Amz-Signature=` value; GitGuardian `success` |
+| e2e 18 passed, floor 9/9 9/9, 18 stamps, canary 4/4 | holds in CI on this SHA (R2-6); my local run is in R2-10 |
+
+**`.npmrc`** — the guard now reads it. `script-shell=…` and `ignore-scripts=true` →
+**RED** by name, as the PR body says. `playwright_trace=on` → green and inert
+(Playwright does not read `npm_config_*`). **`node-options=--require ./x.js` → green** —
+examined in R2-FINDING E.
+
+## R2-8. `npm run ci` at every one of the seven new commits (after the restart)
+
+A separate clone; for each commit `git checkout --force`, `git clean -fdx -e node_modules`,
+`rm -rf node_modules/.vite node_modules/.cache` (cold), then `npm run ci`. No lockfile
+change in round 2, so `node_modules` was reused. **The machine was NOT quiet:** load
+averages 58–75 from other work on this host throughout (only this one run of mine was
+active).
+
+| Commit | Exit | Files | Tests | Notes |
+|---|---|---|---|---|
+| `bcc3bb4` | 0 | 16 | 409 | no hygiene check yet |
+| `1647f19` | 0 | 16 | 423 | no hygiene check yet |
+| `d818527` | **1** | 1 failed \| 15 passed | 1 failed \| 422 passed | `browser-errors.test.ts > … applies the guarded-import rule to every one of them — Test timed out in 5000ms`; hygiene OK (274 / 13) |
+| `2bb8cb7` | 0 | 16 | 423 | the shared-ESLint commit |
+| `b0a9adb` | 0 | 16 | 423 | |
+| `cf3753a` | 0 | 16 | 423 | **declared red by the builder; green in my run** |
+| `4158b10` | 0 | 16 | 423 | the timeout commit |
+
+0 skipped everywhere. Lint at every commit, head included: **1 warning** —
+`e2e/harness/redact.ts:156:5 Unused eslint-disable directive (no problems were reported
+from 'no-control-regex')`, the leftover I reported at `e096053`; still there (NIT).
+
+**The truth per commit:** every commit before `4158b10` carries the same timing flake,
+and whether it shows is a matter of load — the builder saw it at `cf3753a`, I saw it at
+`d818527`. The honest statement is "`4158b10` is the first commit that is not flaky under
+load", not "green at every boundary except `cf3753a`". The PR body's "Counts, honestly"
+section says round 2 is "**green at all five new commit boundaries**" — there are
+**seven**, and the same body's own "Two things I got wrong" section says `cf3753a` was
+pushed with `npm run ci` exit 1. The retraction is plain and honest; the counts sentence
+above it was not updated to match it. No evidence file in the tree claims green at every
+boundary (`grep -rn "every commit\|all five\|cf3753a\|green at all"` over `docs/` and
+`AGENTS.md`: no hits). → part of R2-FINDING F.
+
+## R2-9. The ESLint flake at `4158b10` (after the restart)
+
+A true "quiet" condition was not available: other work on this host held the 1-minute
+load average between 34 and 100 before I added anything. So: 10 cold runs at that
+**ambient** load, then 10 cold runs with **eight additional `yes > /dev/null` busy
+loops** of mine (killed by exact PID afterwards; `pgrep -x yes` = 0). Cold = `git clean
+-fdx -e node_modules` and `rm -rf node_modules/.vite node_modules/.cache` before each run.
+
+| Condition | Runs | Exit 0 | Tests | Timeouts | 1-min load average | Wall time |
+|---|---|---|---|---|---|---|
+| ambient | 10 | **10** | 423/423 each | **0** | 34 – 100 | 38 – 85 s |
+| ambient + 8 busy loops | 10 | **10** | 423/423 each | **0** | 49 – 242 | 77 – 192 s |
+
+**20/20 green, zero timeouts,** at a far heavier load than either the builder's 46 or the
+condition that produced my round-1 observation.
+
+**Is 30 s hiding a hang?** Five further cold runs of `browser-errors.test.ts` alone
+(`--reporter=json`) with the eight busy loops, load ~145–153:
+
+```
+max ms   min ms   case
+ 10764     7853   applies the guarded-import rule to every one of them   <- builds the shared ESLint, lints every spec
+   291       47   … overriding `page`, `context` or `browser` stays legal
+   258       39   e2e/harness stays exempt
+   (every other case under 0.3 s; all 265 case-results passed)
+```
+
+No. The one slow case is the one that constructs the shared instance and lints every
+spec; its time is real and bounded (8–11 s at load ~150), and every other ESLint case
+reuses the instance and takes under 0.3 s. A hang would still exceed 30 s and fail. The
+timeout is scoped to the nine ESLint cases, as claimed. One précising note: my worst
+case gives the 30 s ceiling **2.8×** headroom, not the builder's "≈4× the worst
+cold-contended run observed" — at a load average ~3× theirs. Not a finding.
+
+**The builder's two declared process failures, weighed.** (1) Publishing "the mechanism is
+removed" on ten quiet runs, then retracting it within the hour: the retraction is in
+`4158b10`'s own commit message ("RETRACTION. … That claim was FALSE") and in the PR body,
+not amended away — handled correctly, and the final fix measures well above the load it
+was tested at. (2) Pushing `cf3753a` with `npm run ci` exit 1: declared plainly in the PR
+body; the only defect is the stale counts sentence (R2-8, R2-FINDING F).
+
+## R2-10. F2's control, switched off by one line in a file the guard now reads (after the restart)
+
+The guard now parses the committed `.npmrc` and refuses `script-shell` and
+`ignore-scripts` "because [they change] how every `npm run` in this lane is executed",
+and it refuses `NODE_OPTIONS` in the workflow/job/step env at every scope. It does not
+refuse the `.npmrc` key that becomes `NODE_OPTIONS` for every `npm run` script:
+`node-options`.
+
+**One committed line, no other file:**
+
+```
+.npmrc:  node-options=--import=data:text/javascript,process.env.PLAYWRIGHT_NO_COPY_PROMPT=%22%22
+
+bash scripts/ci/check-e2e-lane.sh                                     -> exit 0
+node scripts/ci/check-source-hygiene.mjs                              -> exit 0
+inside a process npm starts:  NODE_OPTIONS="--import=data:…"  PLAYWRIGHT_NO_COPY_PROMPT=""
+```
+
+**End to end, the exact lane script, with `PLAYWRIGHT_NO_COPY_PROMPT=1` in the
+environment exactly as the `e2e` job sets it** (probe spec, localhost fixture server,
+runtime marker; filtered to one spec for speed — the injection does not depend on the
+filter):
+
+```
+with the .npmrc line:   error-context.md sections: # Instructions  # Test info  # Error details  # Page snapshot
+                        - textbox [active] [ref=f1e2]: <TYPED-MARKER>         (typed marker: 1 occurrence)
+control, no .npmrc:     error-context.md sections: # Instructions  # Test info  # Error details
+                        (typed marker: 0 occurrences)
+```
+
+A two-file variant (`node-options=--require ./zz-preload.cjs` + a two-line preload) gives
+the same result, also guard-green and hygiene-green. Sandbox restored and `git status`
+clean after each.
+
+What is written about it: the guard's source comment says "The FILE half is checked only
+for this one key, because a committed `.npmrc` is a reviewed file and enumerating
+everything npm reads from it is a different job" — a disclosure, in a source comment. But
+the same file's F2 block says the new rule "**has no shape where the guard is green and
+the variable is not "1"**", the PR body says "the **effective value** is computed",
+`AGENTS.md` still says "`check-e2e-lane.mjs` asserts it is set", and `AGENTS.md` does not
+mention `.npmrc` or `node-options` anywhere (`grep -ci` = 0). → R2-FINDING E.
+
+## R2-11. Lanes at `4158b10`, run by me (after the restart)
+
+| Lane | Result |
+|---|---|
+| `npm run ci` | exit 0 — 16 files / 423 tests / 0 skipped (plus 20 more cold runs in R2-9, all exit 0) |
+| `bash scripts/ci/require-checks_test.sh` | exit 0 — **164 cases, 171 assertions, 0 failed** (matches the claim) |
+| `bash scripts/ci/check-e2e-lane.sh` | exit 0 |
+| `bash scripts/ci/check-required-floor.sh` | exit 0 |
+| `bash scripts/ci/check-image-pins.sh` | exit 0 |
+| `npm run check:contract` | exit 0 |
+| `node scripts/ci/check-source-hygiene.mjs` | exit 0 — 274 sources, 13 ledger lines (the PR body says 273; stale by one — NIT) |
+| `npx playwright test` (production build, `PLAYWRIGHT_NO_COPY_PROMPT=1`) | exit 0 — **18 passed**, floor OK (9/9 9/9), **18 stamps** |
+| `node scripts/ci/harness-canary.mjs` | exit 0 — failed all 4 fault-injection fixtures, each for its own kind |
+| credential tripwire | 10/10 |
+
+## R2-12. `npm run e2e:demos` at `4158b10` (after the restart)
+
+Two full runs in a dedicated clone, production build per the script's own instruction,
+tree reset (`git checkout -- . && git clean -fd`) before the second, **nothing else of mine
+running and nothing edited during either run**. The host was NOT quiet: other work held
+the load averages high throughout.
+
+| Run | Load (1, 5, 15) at start → end | Passed | Blocked | Failed | Exit |
+|---|---|---|---|---|---|
+| 1 | 43.8 86.6 114.6 → 62.5 92.4 103.0 | 122 | 0 | 1 | **1** |
+| 2 | 35.6 81.8 98.6 → 40.0 75.8 112.7 | 121 | 0 | 2 | **1** |
+
+The failing halves:
+
+- **`d14-late-fault-600ms-is-the-LIMIT-GREEN` — failed in BOTH runs.** This GREEN half
+  demonstrates a *documented limit*: a fault fired 600 ms after the test body returns is
+  MISSED, so the test passes. Under load the worker is slower to tear down, the fault
+  lands while the worker guard is still listening, and the late-edge orphan assertion
+  catches it: `1 browser signal(s) were produced AFTER THE LAST TEST in this worker
+  finished … [pageerror] … late fault demonstration (D14)` → exit 1. The builder's
+  committed transcript for the same half ends `1 passed … [exit 0]`. So the guard caught
+  MORE than its documented limit — the safe direction — and the demonstration of the limit
+  is timing-dependent.
+- **`d11f-in-process-reporter-deleted-GREEN` — run 2 only.** A product spec inside the
+  half (`home`, mobile-chromium-390) hit `TimeoutError: locator.click: Timeout 10000ms
+  exceeded` under load: `1 failed | 19 passed`. Load-induced; nothing to do with the
+  control the half demonstrates.
+
+Neither failure is infrastructure in the new script's sense — the production server was
+answering, so the liveness discriminator correctly did not call them BLOCKED — and neither
+indicates a weaker control. But **I could not reproduce the claimed 123 / 0 / 0.** The
+builder ran at load average 46 and calls that "the exact condition that produced the
+verifier's misclassification"; at the loads this host carried today (5-minute averages
+76–92), the suite fails two timing-dependent halves and reports "a demonstration did not
+demonstrate". → R2-FINDING G.
+
+Not measured: whether a TRANSIENT server stall (down, then back before the post-failure
+liveness probe runs) is classified BLOCKED. By reading `demonstrate.sh:254-262`, the probe
+runs once, after the half has failed; a server that has already recovered is "alive", so
+such a half would be FAIL, not BLOCKED — which was the shape of my round-1 run, where later
+halves passed. Stated as a reading, not a measurement.
+
+Also still open from round 1: **no committed F10 red/green demonstration** (my round-1
+FINDING 9(b); `grep -n NO_COPY_PROMPT scripts/e2e/demonstrate.sh` → nothing). The PR body
+does not claim it was added.
+
+## Status of my round-1 findings at `4158b10`
+
+| # | Round-1 finding | At `4158b10` |
+|---|---|---|
+| 1 | demos: infrastructure reported as a failed demonstration | **partly closed** — a liveness probe now yields BLOCKED (exit 2) for a server that stays down; load-induced timing failures are still reported as failed demonstrations (R2-FINDING G) |
+| 2 | step-level `PLAYWRIGHT_NO_COPY_PROMPT: ""` (BLOCKER) | **closed for every env-map shape I tried** (step, workflow, alias, duplicate, `"1 "`, `true`); **re-opened by a different route**: one `.npmrc` line (R2-FINDING E) |
+| 3 | workflow-level `env:` unread | **closed** |
+| 4 | five URL shapes named as covered and not | **closed for those five shapes**; a sixth (fully escaped JSON) and a divergence between the two redactors remain (R2-FINDING C) |
+| 5 | leading-whitespace `::` | **closed** |
+| 6 | no control-byte check, ledger never read back | **closed** for control bytes and for contradicting digests; an emptied or trimmed ledger still passes (R2-FINDING D) |
+| 7 | ledger ordering; "409 at every boundary" false; ESLint flake | **closed** — README note; body corrected for round 1; flake fixed and holds at load 242 (R2-9). Round 2's own counts sentence is stale (R2-FINDING F) |
+| 8 | NOT-covered table never named `results.json` | **closed** — the new file-by-file table is accurate apart from R2-FINDING C |
+| 9 | (a) `e2e-failure-summary/` allowlisted; (b) no F10 demo pair | (a) **closed**; (b) **open**, not claimed |
+| 10 | `pree2e`/`poste2e` | **closed** |
+| 11 | other workflow files | **closed** — named in § Residuals with bounds, and the bounds are accurate |
+
+## Findings at `4158b10`
+
+```
+R2-FINDING E: F2's control is switched off by ONE line in the committed `.npmrc` —
+              a file the guard now parses — and the guard stays green
+Severity:    BLOCKER
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     scripts/ci/check-e2e-lane.mjs:1046-1062 (the `.npmrc` loop refuses only
+             `script-shell` and `ignore-scripts`), :1090 (REFUSED_ENV has NODE_OPTIONS,
+             env maps only), and the F2 block's claim that the rule "has no shape where
+             the guard is green and the variable is not "1""
+             AGENTS.md ("`check-e2e-lane.mjs` asserts it is set"; no mention of `.npmrc`)
+  requirements: VZ-FOUND-008
+
+Observed:
+  Committed `.npmrc`, one line, no other file:
+      node-options=--import=data:text/javascript,process.env.PLAYWRIGHT_NO_COPY_PROMPT=%22%22
+
+      bash scripts/ci/check-e2e-lane.sh          -> exit 0
+      node scripts/ci/check-source-hygiene.mjs   -> exit 0
+      inside any process `npm run` starts:  NODE_OPTIONS="--import=data:…"  PLAYWRIGHT_NO_COPY_PROMPT=""
+
+  End to end, `npm run e2e` (the exact lane script) with PLAYWRIGHT_NO_COPY_PROMPT=1 in
+  the environment exactly as the e2e job sets it, on a failing probe spec:
+      with the line:   error-context.md has "# Page snapshot" and
+                       "- textbox [active] [ref=f1e2]: <TYPED-MARKER>"
+      without it:      no "# Page snapshot", typed marker absent
+  A two-file variant (`node-options=--require ./preload.cjs`) behaves identically.
+
+Failure:
+  This is round-1 FINDING 2's outcome — the page snapshot restored, a `fill()` value
+  verbatim in an uploaded file, the guard green — reached through a different door. The
+  fix computes the value the YAML DECLARES, not the value the Playwright process SEES.
+  The guard already knows both halves of this attack: it refuses `NODE_OPTIONS` in every
+  env map, and it reads `.npmrc` to refuse keys that "change how every `npm run` in this
+  lane is executed". `node-options` is exactly such a key and is what npm turns into
+  NODE_OPTIONS. The source comment says other `.npmrc` keys are not enumerated; but the
+  same file says the rule has "no shape where the guard is green and the variable is not
+  "1"", the PR body says "the effective value is computed", and AGENTS.md says nothing
+  about `.npmrc` at all.
+
+Perspective: developer, then member
+
+Recommendation:
+  1. Refuse `node-options` in the committed `.npmrc` (same loop, one more key). Better:
+     refuse ANY key in a committed `.npmrc` that is not on a short allowlist — the repo
+     has no `.npmrc` today, so an allowlist of zero keys costs nothing and is default-deny,
+     which is how every other part of this guard now works.
+  2. Correct the F2 block's "no shape where the guard is green" sentence to say what is
+     computed: the declared value across the three YAML scopes.
+  3. Consider asserting the variable where it takes effect: the harness itself can refuse
+     to start in CI (`process.env.CI`) unless PLAYWRIGHT_NO_COPY_PROMPT is truthy in the
+     worker. That is the only check that sees the value Playwright reads, whatever route
+     changed it — and it is one line in a file the stamp already guards.
+
+Acceptance criteria:
+  require-checks_test.sh: `.npmrc` `node-options=…` RED by name; any unlisted `.npmrc`
+  key RED (if the allowlist route is chosen). If (3) is done: a demonstration half in
+  which `.npmrc` blanks the variable and the lane FAILS by name.
+
+Tests: scripts/ci/require-checks_test.sh (+ one demonstrate.sh half if (3)).
+Cross-repo implications: core: none | user: as above | search: none | meta: none
+Challenge:
+  "A committed `.npmrc` is a reviewed file." So is `e2e.yml`, where the same outcome
+  was ruled a blocker one round ago; and the line above does not read like a privacy
+  change to a reviewer who does not know what `node-options` does.
+```
+
+```
+R2-FINDING C: the shell redactor — the one that touches uploaded bytes — does not
+              redact a fully slash-escaped URL, though AGENTS.md says both redactors
+              carry the same programs; and the real lane produces that shape
+Severity:    REQUIRED
+Confidence:  high
+
+Affected:
+  repo:      vizra-user
+  files:     scripts/ci/redact-artifacts.sh:78 (host/path class excludes backslash)
+             e2e/harness/redact.ts:67 (does not) ; e2e/harness/redact.test.ts:188 (pins
+             the one half-escaped spelling where the two agree)
+             AGENTS.md "Covered" table (absolute: "with optional backslash-escaped slashes";
+             "Both redactors carry the same four programs")
+  requirements: VZ-FOUND-008
+
+Observed:
+  {"u":"https:\/\/h/p?sig=M"}                        both redact (AGENTS.md's example, the pinned test)
+  {"u":"https:\/\/h\/p?sig=M"}                       redact.ts redacts; redact-artifacts.sh: SURVIVES
+  {"u":"https:\/\/host.example\/media\/p.jpg?X-Amz-Signature=M"}   same
+  "https:\\/\\/h\\/p?sig=M" (double-escaped)         both: SURVIVE
+  Through the real lane (R2-5): a spec that prints a slash-escaped URL -> Playwright
+  JSON-encodes it -> the double-escaped form, with the query intact, in
+  playwright-report/results.json AND trace.zip::test.trace — both uploaded — after the
+  shipped redactor reported OK.
+Failure:
+  The table's claim is broader than the shell program, the two redactors are not the
+  same program, and the test pins the one spelling no slash-escaping serializer emits.
+  Same class as round-1 FINDING 4. Reachability today is low (no spec authenticates; Go
+  and JS encoders do not escape "/"), but PHP's json_encode does, and Chevereto import is
+  in the charter.
+Recommendation:
+  Allow `\\` in the shell's host/path class as redact.ts does, and accept one or two
+  backslashes before each `/`; pin the fully-escaped and double-escaped forms in
+  redact.test.ts AND in a require-checks case that runs the SHIPPED shell script; or
+  narrow the table to "escaped scheme slashes only". Also: the table says "bracketed IPv6"
+  and `[fe80::1%25eth0]:3000/p?q` (a zone id) survives both — name it or cover it.
+Acceptance criteria: the fully-escaped and double-escaped forms redact through the
+  shipped shell script, asserted by a test that runs that script.
+Tests: e2e/harness/redact.test.ts, scripts/ci/require-checks_test.sh.
+Cross-repo: core: none | user: as above | search: none | meta: none
+Challenge: "Nothing emits `\/` today." The lane emits `\\/` the moment anything prints
+  `\/`, and the section's own rule is "do not widen this claim again without a
+  measurement".
+```
+
+```
+R2-FINDING A: `$GITHUB_STEP_SUMMARY` through an `env:` map is green, and § Residuals
+              says the indirect form is refused
+Severity:    SHOULD
+Confidence:  high
+Affected: vizra-user; scripts/ci/check-e2e-lane.mjs (the refusal greps `run:` text only);
+  AGENTS.md § Residuals, "A `run:` step that writes through a HELPER SCRIPT is not seen"
+Observed:
+  `env: { S: ${{ env.GITHUB_STEP_SUMMARY }} }` at step or job level, then
+  `run: echo hi >> "$S"`  -> guard exit 0.
+  `S="$GITHUB_STEP_SUMMARY"; echo >> "$S"` inside `run:` -> RED (the builder's case).
+  The bullet says: "writing the summary from an inline command — even indirectly, via a
+  shell variable — is refused". The env-map spelling is an inline command writing via a
+  shell variable, and it is not refused.
+Recommendation: also scan env-map VALUES in the e2e job for `GITHUB_STEP_SUMMARY`, or
+  narrow the sentence to "a shell variable assigned inside the same `run:`".
+Acceptance: a require-checks case for the env-map spelling, or the narrowed sentence.
+Challenge: "It is the run: class." Then the sentence should not say it is refused.
+```
+
+```
+R2-FINDING B: `$GITHUB_ENV` — the one `run:` channel that crosses into the lane step —
+              is not modelled or named; the four unset greps sit on channels that cannot
+Severity:    SHOULD
+Confidence:  high (guard behaviour); medium (Actions precedence for the same key)
+Affected: vizra-user; scripts/ci/check-e2e-lane.mjs (`grep -c GITHUB_ENV` = 0);
+  AGENTS.md (0), the evidence README (0)
+Observed:
+  - `echo "PLAYWRIGHT_NO_COPY_PROMPT=" >> "$GITHUB_ENV"` on an earlier step -> exit 0.
+    Whether this overrides the JOB-level `env:` value for later steps depends on Actions'
+    precedence, which I did not measure (I cannot run Actions from here).
+  - `echo 'NODE_OPTIONS=--import=data:…PLAYWRIGHT_NO_COPY_PROMPT=%22%22' >> "$GITHUB_ENV"`
+    on an earlier step -> exit 0. No precedence question here — NODE_OPTIONS is refused in
+    every env map, so nothing competes with it — and R2-FINDING E shows what that value
+    does inside the lane.
+  - The four new unset greps (`unset`, empty `export`, `env -u`, `VAR= cmd`) fire on
+    OTHER steps (verified). But every `run:` is its own shell, so an unset on another step
+    cannot reach the lane step; and on the lane step every spelling is already refused by
+    the older "the lane's `run` must be exactly `npm run e2e`" rule.
+  - YAML merge key `<<: *anchor` injecting `PLAYWRIGHT_NO_COPY_PROMPT: ""` at step level
+    -> exit 0. The guard's `yaml` parser does not expand merge keys; whether Actions does,
+    I did not measure.
+Failure: this is inside the stated `run:` class, so not a blocker — but the four greps are
+  presented as early warnings for the unset route, and the route that actually works is
+  the one they do not see.
+Recommendation: refuse `GITHUB_ENV` writes that name PLAYWRIGHT_*, NODE_OPTIONS, DEBUG or
+  PWDEBUG in any e2e-job `run:` (same grep style); refuse `<<` in env maps (or measure);
+  name `$GITHUB_ENV` in § Residuals.
+Acceptance: require-checks cases for the three spellings, or a residual bullet naming them.
+```
+
+```
+R2-FINDING D: the digest-ledger check passes an EMPTIED or TRIMMED ledger, and its own
+              vacuity guard does not fire
+Severity:    SHOULD
+Confidence:  high
+Affected: vizra-user; scripts/ci/check-source-hygiene.mjs:158-160; README "verifies every
+  BEFORE/RESTORED digest"; PR body "Refuses to pass vacuously"
+Observed: one digest altered -> RED; pinned file edited, ledger stale -> RED; ledger file
+  deleted -> RED; first line deleted -> green ("12 … match"); file emptied -> green
+  ("0 mutation-digest line(s) match this tree"). The guard is
+  `if (ledgerLines.length > 0 && checked === 0)`, which an empty file skips.
+Failure: the cheapest way to clear a stale-ledger red is to delete the stale lines; and
+  "refuses to pass vacuously" is false for the most vacuous input there is.
+Recommendation: fail on `checked === 0` unconditionally, and pin the expected set of
+  labels (or a minimum count) so a trimmed ledger is red.
+Acceptance: empty ledger RED; a deleted line RED.
+Tests: require-checks_test.sh, two cases.
+```
+
+```
+R2-FINDING G: `e2e:demos` does not reproduce 123/0/0 on a loaded host; the D14 LIMIT
+              half is timing-dependent and fails 2 of 2 runs
+Severity:    SHOULD
+Confidence:  high
+Affected: vizra-user; scripts/e2e/demonstrate.sh:1625 (d14 LIMIT half), e2e/demos/late-fault.demo.ts
+Observed: two clean runs at 5-minute load averages 76–92: 122/0/1 and 121/0/2, exit 1 both.
+  `d14-late-fault-600ms-is-the-LIMIT-GREEN` failed both times — the late-edge assertion
+  CAUGHT the 600 ms fault it is documented to miss; `d11f` failed once on a product-spec
+  `locator.click: Timeout 10000ms` inside the half.
+Failure: both in the fail-closed direction; neither weakens a control. But the PR body
+  presents load 46 as proof of robustness to "the exact condition" of my round-1 run, and
+  at the loads this host carried, the suite reports "a demonstration did not demonstrate"
+  for timing reasons again.
+Recommendation: make the LIMIT half assert what is invariant (the fault is either missed,
+  or caught only as an ORPHAN — never charged to the test) or give it a margin that holds
+  under load, and say in the README that the documented limit is a fast-machine number.
+Acceptance: two consecutive runs exit 0 at a load average above 80, or the half rewritten
+  so its outcome does not depend on teardown speed.
+```
+
+```
+R2-FINDING F: the PR body's round-2 counts sentence is stale
+Severity:    NIT
+Confidence:  high
+Observed: "green at all five new commit boundaries" — there are seven, the same body's
+  "Two things I got wrong" says cf3753a was pushed with exit 1, and under load I measured
+  d818527 red (cf3753a was green for me): every pre-4158b10 commit carries the flake.
+  Also: hygiene "273 sources" (I measure 274); the round-1 lint warning at
+  redact.ts:156 (unused eslint-disable) is still present at every commit; the new
+  file-by-file table lists a `# Test source` section no red run of mine has produced.
+Recommendation: say "4158b10 is the first commit that is not flaky under load; every
+  earlier one may go red on the ESLint timeout, and cf3753a did". Fix the lint warning.
+```
+
+## Verdict at `4158b10`
+
+A substantial round. Of my eleven round-1 findings, six are fully closed, two are closed
+for every shape they named (2 and 4), and three are partly closed (1, 6, 9) — each
+verified by measurement, not by reading: the effective-value
+rule survives every YAML env-map attack I built (step, workflow, alias, duplicate key,
+`"1 "`, `true`); workflow-level `env:` and the npm lifecycle hooks are refused; the five
+URL shapes redact in both redactors and nothing regressed; the sanitiser handles every
+leading-whitespace `::`; the new hygiene check is in the required `frontend` lane and
+refuses every C0 byte I planted in `.ts`, `.mjs` and `.sh`; the ESLint flake is fixed and
+held through 20 cold runs at load averages up to 242, with the one slow case measured at
+8–11 s, not hung; the file-by-file publication table is honest; the four review-only
+bounds in § Residuals are accurate — I checked Playwright's own config resolution order
+to confirm a stray config is inert; the two declared process failures are disclosed
+plainly and not amended away. CI is green on this SHA (9/9, `ci-required` last, manifest
+unchanged and matched). No redactor has a ReDoS path on 1 MB inputs. No credential-shaped
+literal was added, and no spec was touched.
+
+I am returning **FAIL** on one blocker, which is round-1 FINDING 2 again, through a
+different door. **R2-FINDING E:** one committed `.npmrc` line
+(`node-options=--import=data:…`) empties `PLAYWRIGHT_NO_COPY_PROMPT` inside every process
+`npm run` starts. Both the lane guard and the hygiene check stay green, and on a red lane
+`# Page snapshot` comes back with a `fill()` value verbatim — I drove that end to end with
+the variable set exactly as CI sets it. The guard already refuses `NODE_OPTIONS` in every
+env map and already reads `.npmrc` for keys that change how `npm run` executes; it misses
+the key that is literally `NODE_OPTIONS`. The file also claims the rule "has no shape
+where the guard is green and the variable is not '1'". I held round 1 to this standard
+and I hold round 2 to it: the published sentence is stronger than the control.
+
+**R2-FINDING C** (required) is round-1 FINDING 4's class again: the two redactors are not
+the same program on a fully slash-escaped URL, and the real lane puts such a URL,
+double-escaped with its query intact, into `results.json` and `trace.zip` after the
+shipped redactor reports OK. FINDINGS A, B, D and G are should-fix; F is a nit.
+
+Nothing I found is a live disclosure: nothing authenticates, the hard rule stands and is
+asserted, the tripwire passes 10/10, and no red CI run has ever uploaded anything for this
+PR.
+
+FAIL is not a judgement on the quality of this round, which is high. It is that the
+headline privacy control can still be switched off without the guard noticing, and that
+is the one thing this area is not allowed to ship.
+
+FINAL VERDICT: FAIL — SHA 4158b10f8291e23cd726e2499db760aead195f4a
