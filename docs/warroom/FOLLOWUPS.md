@@ -31,6 +31,8 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 meta #11 R1-6: `test_an_uncommitted_decision_grants_nothing` also passes against the old checker, so it proves nothing on its own (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
 - 2026-11-10 meta #9 V-1: the board row for an open PR should carry the head SHA, not "see PR" (evidence: `docs/evidence/warroom/2026-11-10-meta-pr9-records-VERIFY.md`)
 - 2026-11-10 core #16 F-1: ADR-001 lines 18, 93, 94 still say Go 1.27.1 and Echo ≥ v5.3.1; its bump policy wants the same diff. Editing an Accepted ADR is owner-only (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
+- 2026-11-10 core #17 F-5: compose never sets `VIZRA_STORAGE_ROOT`; the `media_data` mount matches the default only because two literals agree (queue 3c) (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`)
+- 2026-11-10 user #11 D-7: the design docs under `docs/design/figma/` still say PROPOSED after the acceptance of 2026-11-10 (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`)
 
 ## vizra-core
 
@@ -40,11 +42,15 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 core #16 F-2: `api/openapi.yaml:437` example and dated comments still name go1.27.1 (examples, not pins) (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
 - 2026-11-10 core #16 F-3: the `govulncheck` recipe does not scan test or integration-tagged code (same on main before the PR) (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
 - 2026-11-10 core #16 F-4: GO-2026-5932 (`x/crypto/openpgp`) is reported at module level only, not called; keep it visible (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
+- 2026-11-10 core #17 F-1…F-4: `busy` cleared after the result is sent (false 503 only with a fake clock); `healthcheck.go:30` text says PostgreSQL is the only 503; no test for the absolute-path rule; a timed-out probe is cached as 503 for 2 s (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`)
 
 ## vizra-user
 
 - 2026-11-10 user #10 parts A–F: recorders off, lane guard, runtime recorder check, upload gate; superseded by the allowlist re-plan on branch `allowlist/pr10-work` `7fb1365` (UNVERIFIED). Must land before any spec authenticates (queue 2f) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 - 2026-11-10 user #10: `e2e.yml:231-233` says the repo is private; it is public (queue 2q) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
+- 2026-11-10 user #11: `next` 16.3.5 (critical), `sharp` and dev-chain advisories turn `deps-scan` and `image-scan` red; `next` and `sharp` ship in the image: bump PR (queue 11) (evidence: `docs/evidence/warroom/2026-11-10-vizra-user-pr11-design-001-VERIFY.md`)
+- 2026-11-10 user #11: plain `<a>` with an eslint-disable instead of `next/link`, because the router cancels its own `?_rsc=` fetch and the harness counts it; `design/HANDOFF.md` is cited and absent; local Turbopack build fails on macOS arm64 (`@tailwindcss/oxide`), CI is green (evidence: `docs/evidence/warroom/2026-11-10-vizra-user-pr11-design-001-VERIFY.md`)
+- 2026-11-10 user #11 D-1…D-6: skip link hidden at 1440; CATALOG counts 133 declarations, 97 names; light `accent` on `bg-tint` is 4.40:1 (unused pair); `main` may show a focus ring after the skip link; top bar border against `elevation/1` (evidence: `docs/evidence/warroom/2026-11-10-vizra-user-pr11-design-001-VERIFY.md`)
 
 ## vizra-search
 

@@ -94,6 +94,14 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 | CI repair | VZ-CI-001/002/004 | M0 | several hardening items | no ID or item for "required lanes green on main in all four repos today" |
 | Audit trail | VZ-AUDIT-001 | none | none | in the ledger (192 entries, core profile) since meta #5, but in no row of `docs/MILESTONES.md` and not in `docs/quality/release-profiles/core.json` (141 ids against the ledger's 142) |
 
+### 15
+
+**VZ-FOUND-005: Redis in readiness (new 2026-11-10, tick 260).** The ledger outcome says `/readyz` "fails when DB/Redis/storage unavailable". vizra-core returns 200 with `degraded` when the cache is down and tests that on purpose (`TestReadyzCacheDownIs200Degraded`), following ADR-002. One of the two has to change before the ID can be recorded; changing the ledger text or the ADR is yours. Evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`.
+
+### 16
+
+**Acceptance bullets and ADR-001 (new 2026-11-10, tick 260).** (a) These ledger cases have no acceptance bullet in `docs/issues/VZ-ISSUE-001.md`, and adding one changes the acceptance target: VZ-FOUND-002 both generated-client cases; VZ-FOUND-003 migrate up from the image, sqlc-verify, DROP COLUMN, dirty ledger; VZ-FOUND-006 key delivery, `vizra setup` keys, key without consumer, log denylist (`docs/evidence/warroom/2026-11-10-found-002-003-006-AUDIT.md`). (b) ADR-001 lines 18, 93, 94 still say Go 1.27.1 and Echo ≥ v5.3.1 after core #16 raised both; its bump policy wants them in step, and editing an Accepted ADR is yours.
+
 ## Closed
 
 ### 0

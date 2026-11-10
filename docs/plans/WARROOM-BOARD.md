@@ -10,7 +10,7 @@ Everything else lives in `docs/warroom/`:
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
-**Ledger on `main`: 192 entries, 0 IMPLEMENTED, 0 VERIFIED.** 16 candidates were tried on 2026-11-10 and none is honestly recordable ([why, per ID](../evidence/warroom/2026-11-10-ledger-status-candidates.md)). Live state in September terms: [reconcile](../warroom/RECONCILE-2026-11-10.md).
+**Ledger on `main`: 192 entries, 0 IMPLEMENTED, 0 VERIFIED.** Ticks 258–260 merged four milestone PRs and recorded no status: each verifier named what its ID still lacks (queue rows 2, 3a–3c, 11, 14). 16 candidates were tried on 2026-11-10 and none is honestly recordable ([why, per ID](../evidence/warroom/2026-11-10-ledger-status-candidates.md)). Live state in September terms: [reconcile](../warroom/RECONCILE-2026-11-10.md).
 
 Rulesets (`ci-required` required, linear history, no force-push, no deletion) are active on all four repos (vizra-core `26972947` since tick 259).
 
@@ -20,9 +20,7 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 2: storage check in `/readyz` | vizra-core | VZ-FOUND-005 | none yet | branch `feat/readyz-storage-check` from `ce805b4` | building since tick 259 | 0/0/0/1 |
-| Queue 3: tag VZ-ISSUE-001 bullets, audit the three claims | vizra | VZ-FOUND-002, VZ-FOUND-003, VZ-FOUND-006 | none yet | branch `docs/found-002-003-006-audit` from `e5a5715` | building since tick 258, first session ran out of time, continued in tick 259 | 0/0/0/2 |
-| Queue 14: tokens, typed icon registry, app shell, security headers | vizra-user | VZ-DESIGN-001 | none yet | branch `feat/design-system-tokens-shell` from `783483f` | building since tick 258, first session ran out of time, continued in tick 259 | 0/0/0/2 |
+| none | | | | | all three builder slots are free after tick 260; next dispatch is queue 3a, 3b, 3c | |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -39,8 +37,10 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 
 | # | Slice | Repo | IDs | Depends on |
 |---|---|---|---|---|
-| 2 | Storage check in `/readyz` with a failing-storage test | vizra-core | VZ-FOUND-005 | 1 |
-| 3 | Tag each VZ-ISSUE-001 acceptance bullet with its id (no target change); audit "every route", the compatibility window and config coverage; a verifier writes evidence ending in a verdict line for core #1, user #1, search #1 | vizra | VZ-FOUND-002, VZ-FOUND-003, VZ-FOUND-006 | nothing |
+| 2 | `/readyz`: storage merged (core #17). Left: schema-behind is not a `/readyz` component; no DB-recovery test; transcript on a compose stack and rendered-model assertion; Redis-down is 200 `degraded` against the ledger text (inbox 15) | vizra-core | VZ-FOUND-005 | inbox 15 for the Redis part |
+| 3a | Contract test skips wildcard routes (`openapi_contract_test.go:89`); `migrate-lint.sh:92` misses `DROP x` without `COLUMN` and split lines | vizra-core | VZ-FOUND-002, VZ-FOUND-003 | nothing |
+| 3b | Re-vendor the core contract (4 of 6 operations) and regenerate the client | vizra-user | VZ-FOUND-002 | nothing |
+| 3c | Compose and env carry `VIZRA_OWNER_CLAIM_ANNOUNCE`, `VIZRA_OWNER_CLAIM_TTL`, `VIZRA_STORAGE_ROOT`; refresh the `env/registry/core.json` snapshot so coverage is checked against core main | vizra | VZ-FOUND-006 | nothing; cases with no acceptance bullet are inbox 16 |
 | 4 | Tombstone rule in all four `ci-required` guards; vizra-user's two "required only if it ran" lanes | all four | VZ-CI-001 | 1 for core |
 | 5 | `bootstrap.sh`; pin the libvips binding and Lucide | vizra + vizra-core + vizra-user | VZ-FOUND-001, VZ-FOUND-004 | 1 |
 | 6 | Installer, one command, idempotent (reference: `vidra/install.sh`) | vizra | VZ-INSTALL-001 | compose on main |
@@ -51,7 +51,7 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 | 11 | Scan lanes required and green; secret-scan lane | vizra-core + vizra-user | VZ-CI-004 | 1; inbox 9 for the image CVEs |
 | 12 | `vizra doctor`, status, logs, restart, update | vizra-core | VZ-OPS-002, VZ-OPS-003 | 7 |
 | 13 | Logs, metrics, tracing with privacy-safe fields | vizra-core | VZ-OPS-005 | none |
-| 14 | Tokens, typed icon registry, app shell, security headers (design accepted 2026-11-10) | vizra-user | VZ-DESIGN-001 | none |
+| 14 | Tokens, icon registry, shell and CSP merged (user #11). Left: components with variants and states, brand mark, `design/HANDOFF.md` with node references, first-slice screens | vizra-user | VZ-DESIGN-001 | none |
 | 15 | Host and image security posture | vizra + vizra-core | VZ-OPS-008 | inbox 9 |
 | 16 | M1, not blocked by 4a or 8b: registration and sessions, roles, the claim page | vizra-core + vizra-user | VZ-AUTH-001, VZ-AUTH-004, VZ-INSTALL-003 | M0 boot |
 | 17 | M1: durable jobs, local storage, quota, JPEG/PNG upload, the rest of the fixture corpus | vizra-core | VZ-JOBS-001, VZ-STORAGE-001, VZ-QUOTA-001, VZ-UPLOAD-001, VZ-FOUND-007 | 16 |
@@ -87,3 +87,5 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | 11 | Scrub local paths from committed evidence on the public repos? |
 | 12 | VZ-FOUND-008 acceptance text against Lane A with pixels off |
 | 13 | Coverage gaps: installer, wizard, IPFS topology, QA, security testing, rehearsal, CI repair, VZ-AUDIT-001 |
+| 15 | VZ-FOUND-005: should `/readyz` fail when Redis is down (ledger) or stay 200 `degraded` (ADR-002, today's code)? |
+| 16 | Ledger cases of VZ-FOUND-002/003/006 with no acceptance bullet in VZ-ISSUE-001; ADR-001 still names Go 1.27.1 and Echo v5.3.1 |

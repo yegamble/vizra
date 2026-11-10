@@ -32,3 +32,112 @@
 
 ## Blockers and handoff
 (filled in at the end)
+
+## Demonstrations, red then green (builder session 2, 2026-11-10T19:16:35Z, source 854db27 + lint fix, node v24.21.0)
+
+### D1 icon registry: an entry naming an export lucide-react 1.46.0 does not have
+```
+mutation: components/icons/registry.ts import 'Bell,' -> 'BellZzz as Bell,'
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+RED
+
+$ npx vitest run components/icons
+TypeError: Cannot read properties of undefined (reading 'displayName')
+ ❯ components/icons/registry.test.ts:84:93
+     82|       .map((part) => part.trim())
+     83|       .filter((part) => part !== "" && !part.startsWith("type "));
+     84|     const canonical = entries.map(([, component]) => (component as { d…
+       |                                                                                             ^
+     85|     expect([...imported].sort()).toEqual([...canonical].sort());
+     86|     expect(source).not.toMatch(/import \* as|DynamicIcon|lucide-react\…
+ ❯ components/icons/registry.test.ts:84:31
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+ Test Files  1 failed (1)
+      Tests  3 failed | 82 passed (85)
+   Start at  14:16:36
+   Duration  308ms (tests 58%, import 31%, transform 10%, worker 1%)
+exit=1
+Updated 1 path from the index
+GREEN after restore
+
+$ npx vitest run components/icons
+ RUN  v5.0.1 /Users/yosefgamble/github/vizra/.claude/worktrees/user-design-001
+ ✓ components/icons/registry.test.ts (85 tests) 149ms
+ Test Files  1 passed (1)
+      Tests  85 passed (85)
+   Start at  14:16:37
+   Duration  496ms (tests 59%, import 30%, transform 10%, worker 1%)
+exit=0
+```
+
+### D2 @ts-expect-error fixture: tsc fails when the expected error is absent
+```
+mutation: components/icons/icon.typecheck.tsx unknownName = "sparkles" -> "favorite"
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+RED
+
+$ npx tsc --noEmit
+components/icons/icon.typecheck.tsx(21,1): error TS2578: Unused '@ts-expect-error' directive.
+exit=2
+Updated 1 path from the index
+GREEN after restore
+
+$ npx tsc --noEmit
+exit=0
+```
+
+### D3 security headers: one header removed
+```
+mutation: lib/security/headers.ts Referrer-Policy entry deleted
+ 2 files changed, 2 deletions(-)
+RED
+
+$ npx vitest run lib/security
+     89|     const got = new Map(STATIC_SECURITY_HEADERS.map(({ key, value }) =…
+     90|     expect([...got.keys()].sort()).toEqual(Object.keys(REQUIRED_STATIC…
+       |                                    ^
+     91|     for (const [key, pattern] of Object.entries(REQUIRED_STATIC)) expe…
+     92|   });
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+ FAIL  lib/security/headers.test.ts > the static security headers > are applied by next.config.ts to every path
+TypeError: .toMatch() expects to receive a string, but got undefined
+ ❯ lib/security/headers.test.ts:100:67
+     98|     const got = new Map((rules?.[0]?.headers ?? []).map(({ key, value …
+     99|     for (const [key, pattern] of Object.entries(REQUIRED_STATIC)) {
+    100|       expect(got.get(key), `next.config.ts does not send ${key}`).toMa…
+       |                                                                   ^
+    101|     }
+    102|   });
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+ FAIL  lib/security/headers.test.ts > proxy.ts > also carries every static header
+TypeError: .toMatch() expects to receive a string, but got object
+ ❯ lib/security/headers.test.ts:139:76
+    137|     const response = run();
+    138|     for (const [key, pattern] of Object.entries(REQUIRED_STATIC)) {
+    139|       expect(response.headers.get(key), `the proxy response lacks ${ke…
+       |                                                                            ^
+    140|     }
+    141|   });
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+ Test Files  1 failed (1)
+      Tests  3 failed | 16 passed (19)
+   Start at  14:16:41
+   Duration  214ms (import 43%, transform 33%, tests 22%, worker 2%)
+exit=1
+Updated 1 path from the index
+GREEN after restore
+
+$ npx vitest run lib/security
+ RUN  v5.0.1 /Users/yosefgamble/github/vizra/.claude/worktrees/user-design-001
+ ✓ lib/security/headers.test.ts (19 tests) 19ms
+ Test Files  1 passed (1)
+      Tests  19 passed (19)
+   Start at  14:16:41
+   Duration  182ms (import 39%, transform 36%, tests 23%, worker 2%)
+exit=0
+```
+
+git status after:
+```
+ M app/page.tsx
+```
