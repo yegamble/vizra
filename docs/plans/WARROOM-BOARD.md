@@ -6,9 +6,13 @@ Everything else lives in `docs/warroom/`:
 
 [tick log](../warroom/TICK-LOG.md) · [owner inbox](../warroom/OWNER-INBOX.md) · [owner decisions](../warroom/OWNER-DECISIONS.md) · [merged](../warroom/MERGED.md) · [follow-ups](../warroom/FOLLOWUPS.md) · [board through tick 257](../warroom/archive/WARROOM-BOARD-through-tick-257.md)
 
-**Loop: STOPPED.** Last tick 257 (2026-09-23). Next tick is 258. The rework PR (#11) merged 2026-11-10 as `82e9529`. Restart waits for the after-merge steps below.
+**Loop: STOPPED, ready to restart at tick 258.** Last tick 257 (2026-09-23). The rework (#11, `82e9529`) and the records (#9, `27be92a`) are on `main`; the after-merge steps are done ([record](../evidence/warroom/2026-11-10-after-merge-TRIAGE.md)).
 
-**Ledger on `main`: 192 entries, 0 IMPLEMENTED, 0 VERIFIED.** 257 ticks moved no ledger status. Live state: [reconcile of 2026-11-10](../warroom/RECONCILE-2026-11-10.md).
+Before the first tick the owner must put the main checkout on `main` (inbox 14): it is on an old records branch, so it has the old `/warroom` and no Stop hook.
+
+**Ledger on `main`: 192 entries, 0 IMPLEMENTED, 0 VERIFIED.** 16 candidates were tried on 2026-11-10 and none is honestly recordable ([why, per ID](../evidence/warroom/2026-11-10-ledger-status-candidates.md)). Live state in September terms: [reconcile](../warroom/RECONCILE-2026-11-10.md).
+
+Rulesets (`ci-required` required, linear history, no force-push, no deletion) are active on vizra, vizra-user and vizra-search. vizra-core gets its ruleset when queue 1 is green.
 
 ## In flight
 
@@ -16,39 +20,43 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| records, ticks 239–257 | vizra | QUEUE-records | #9 | see PR | main merged in (board conflict resolved to main's board; the old board is the archive); plus the two working-tree-only items; awaits verifier | 0/0/0/0 |
-| M1-A sentinel follow-ups | vizra-core | QUEUE-2t | #14 | `1d57ad8` | FAIL at round 2; conflicts with main; 3 unpushed local commits. Triage by the new bar | old rules: spent |
-| Lane A records no pixels | vizra-user | VZ-FOUND-008 | #10 | `5c5c971` | re-planned as an allowlist gate; uncommitted local work. Triage by the new bar | old rules: 1 re-plan |
-| vendor tool, second manifest | vizra-search | QUEUE-2o-5 | none | `ed9f9cc` | 2 commits, unpushed, no PR. Triage by the new bar | old rules: n/a |
+| none | | | | | all three builder slots are free | |
 
-## After-merge steps (chair, in this order; rework PR merged 2026-11-10)
+## Parked (closed by the triage of 2026-11-10; pushed, not merged, not in flight)
 
-1. Land the records: PR #9 plus the two working-tree-only items named in the reconcile.
-2. Apply the approved rulesets; vizra-core after its CI repair is green.
-3. Triage core #14, user #10, the search vendor branch and queue 2o: one final bounded round only for parts that meet the bar; the rest to follow-ups.
-4. Remove worktrees and local branches whose PR is confirmed merged; list anything unmerged.
-5. Record ledger status for merged work where the evidence satisfies the status checker (its own verified PR).
-6. Seed the queue below with slice briefs, then restart the loop.
+| Branch | Repo | State |
+|---|---|---|
+| `fix/m1a-sentinel-followups` `e43d501` | vizra-core | #14 closed unmerged; parts are in the core follow-up batch |
+| `fix/lane-a-pixels-off` `5c5c971` | vizra-user | #10 closed unmerged; superseded by the allowlist branch |
+| `allowlist/pr10-work` `7fb1365` | vizra-user | one WIP commit, UNVERIFIED, no PR; the base for queue 2f |
+| `feat/vendor-tool-second-manifest` `ed9f9cc` | vizra-search | UNVERIFIED, no PR; waits for the 2o engine in core |
 
-## Queue (milestone order; lowest milestone with a not-VERIFIED ID first)
+## Queue (milestone order; within M0, the IDs closest to recordable first)
+
+Every row names what is missing for the ID to be recorded, from the candidates record. A slice is done when its ID's record is on `main`, not when its PR merges.
 
 | # | Slice | Repo | IDs | Depends on |
 |---|---|---|---|---|
-| 1 | CI repair: `govulncheck` is a required lane and is red on main since 2026-10-12 (16 advisories) | vizra-core | VZ-CI-004 | nothing; every core PR is red until it lands |
-| 2 | Record status for merged work, only where the evidence satisfies `status.py` | vizra | candidates: VZ-FOUND-001…008, VZ-INSTALL-003, VZ-TOPOLOGY-001…003 | nothing |
-| 3 | Installer, one command, idempotent (reference: `vidra/install.sh`) | vizra | VZ-INSTALL-001 | compose on main |
-| 4 | `vizra setup`: interview, `--web` loopback wizard, `--yes`, `--check` | vizra-core + vizra | VZ-INSTALL-002 | 3 |
-| 5 | Deterministic bundle and the `bundle` lane | vizra | VZ-INSTALL-004 | 3 |
-| 6 | `boot` lane: production-mode stack boots in CI | vizra | VZ-CI-003 (M1), closes M0 "boot lane green" | 3, 5 |
-| 7 | `vizra doctor`, status, logs, restart, update | vizra-core | VZ-OPS-002, VZ-OPS-003 | 4 |
-| 8 | Logs, metrics, tracing with privacy-safe fields | vizra-core | VZ-OPS-005 | none |
-| 9 | Tokens, typed icon registry, app shell, security headers (design accepted 2026-11-10) | vizra-user | VZ-DESIGN-001 | none |
-| 10 | Host and image security posture | vizra + vizra-core | VZ-OPS-008 | inbox 9 for the image CVEs |
-| 11 | M1, not blocked by 4a or 8b: registration and sessions, roles | vizra-core + vizra-user | VZ-AUTH-001, VZ-AUTH-004 | M0 boot; M1-A merged |
-| 12 | M1: durable jobs, local storage, quota, JPEG/PNG upload | vizra-core | VZ-JOBS-001, VZ-STORAGE-001, VZ-QUOTA-001, VZ-UPLOAD-001 | 11 |
-| 13 | M1: backup and restore on a clean target (reference: vidra deploy order) | vizra-core + vizra | VZ-BACKUP-001, VZ-BACKUP-002, VZ-OPS-001 | 12; rehearsal host |
+| 1 | CI repair: `govulncheck` is a required lane and is red on main since 2026-10-12 (16 advisories); then apply the core ruleset | vizra-core | VZ-CI-004 (part) | nothing; every core PR is red until it lands |
+| 2 | Storage check in `/readyz` with a failing-storage test | vizra-core | VZ-FOUND-005 | 1 |
+| 3 | Tag each VZ-ISSUE-001 acceptance bullet with its id (no target change); audit "every route", the compatibility window and config coverage; a verifier writes evidence ending in a verdict line for core #1, user #1, search #1 | vizra | VZ-FOUND-002, VZ-FOUND-003, VZ-FOUND-006 | nothing |
+| 4 | Tombstone rule in all four `ci-required` guards; vizra-user's two "required only if it ran" lanes | all four | VZ-CI-001 | 1 for core |
+| 5 | `bootstrap.sh`; pin the libvips binding and Lucide | vizra + vizra-core + vizra-user | VZ-FOUND-001, VZ-FOUND-004 | 1 |
+| 6 | Installer, one command, idempotent (reference: `vidra/install.sh`) | vizra | VZ-INSTALL-001 | compose on main |
+| 7 | `vizra setup`: interview, `--web` loopback wizard, `--yes`, `--check` | vizra-core + vizra | VZ-INSTALL-002, closes VZ-CI-002 with 8 | 6 |
+| 8 | Deterministic bundle and the `bundle` lane | vizra | VZ-INSTALL-004 | 6 |
+| 9 | `boot` lane: production-mode stack boots in CI, including the external PostgreSQL and Redis shapes with fault injection | vizra | VZ-CI-003 (M1), VZ-TOPOLOGY-001…003 | 6, 8 |
+| 10 | Harness boots the real API, PostgreSQL and Redis; axe runs | vizra-user | VZ-FOUND-008 | 9; the artifact gate (2f) before any spec signs in |
+| 11 | Scan lanes required and green; secret-scan lane | vizra-core + vizra-user | VZ-CI-004 | 1; inbox 9 for the image CVEs |
+| 12 | `vizra doctor`, status, logs, restart, update | vizra-core | VZ-OPS-002, VZ-OPS-003 | 7 |
+| 13 | Logs, metrics, tracing with privacy-safe fields | vizra-core | VZ-OPS-005 | none |
+| 14 | Tokens, typed icon registry, app shell, security headers (design accepted 2026-11-10) | vizra-user | VZ-DESIGN-001 | none |
+| 15 | Host and image security posture | vizra + vizra-core | VZ-OPS-008 | inbox 9 |
+| 16 | M1, not blocked by 4a or 8b: registration and sessions, roles, the claim page | vizra-core + vizra-user | VZ-AUTH-001, VZ-AUTH-004, VZ-INSTALL-003 | M0 boot |
+| 17 | M1: durable jobs, local storage, quota, JPEG/PNG upload, the rest of the fixture corpus | vizra-core | VZ-JOBS-001, VZ-STORAGE-001, VZ-QUOTA-001, VZ-UPLOAD-001, VZ-FOUND-007 | 16 |
+| 18 | M1: backup and restore on a clean target (reference: vidra deploy order) | vizra-core + vizra | VZ-BACKUP-001, VZ-BACKUP-002, VZ-OPS-001 | 17; rehearsal host |
 
-Rows 3 to 13 are a starting order, not briefs. The chair writes each brief from the ledger entry and `docs/issues/` when the slice is dispatched.
+Rows are a starting order, not briefs. The chair writes each brief from the ledger entry and `docs/issues/` when the slice is dispatched.
 
 ## Blocked
 
@@ -66,7 +74,7 @@ Rows 3 to 13 are a starting order, not briefs. The chair writes each brief from 
 | 3 | Mockup controls with no ledger ID: add, mark unavailable, or drop |
 | 4a | ADR-001 AVIF/HEIC split is not implementable as written. Blocks VZ-MEDIA-001 |
 | 4b | ADR-009 fixture tooling and ADR-004 / ADR-002 wording, for the same amending ADR |
-| 5 | Fork-PR workflow approval setting (`all_external_contributors`?). Rulesets part decided |
+| 5 | Fork-PR workflow approval setting (`all_external_contributors`?). Rulesets applied on three repos |
 | 6 | Cross-repo contract freshness: token or meta fan-in lane |
 | 7 | Q-008, Q-041, Q-042; the rehearsal host; Q-036 domain before M6 |
 | 8a | Ledger wording for the VZ-INSTALL-003 recovery case |
@@ -78,3 +86,4 @@ Rows 3 to 13 are a starting order, not briefs. The chair writes each brief from 
 | 11 | Scrub local paths from committed evidence on the public repos? |
 | 12 | VZ-FOUND-008 acceptance text against Lane A with pixels off |
 | 13 | Coverage gaps: installer, wizard, IPFS topology, QA, security testing, rehearsal, CI repair, VZ-AUDIT-001 |
+| 14 | Put the main checkout on `main` and reset the stale local `main`, or tell the chair to |
