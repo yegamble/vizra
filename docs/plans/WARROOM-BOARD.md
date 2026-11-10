@@ -10,7 +10,9 @@ Everything else lives in `docs/warroom/`:
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
-**Ledger on `main`: 192 entries, 0 IMPLEMENTED, 0 VERIFIED.** Ticks 258–260 merged four milestone PRs and recorded no status: each verifier named what its ID still lacks (queue rows 2, 3a–3c, 11, 14). 16 candidates were tried on 2026-11-10 and none is honestly recordable ([why, per ID](../evidence/warroom/2026-11-10-ledger-status-candidates.md)). Live state in September terms: [reconcile](../warroom/RECONCILE-2026-11-10.md).
+**Ledger on `main`: 192 entries, 0 IMPLEMENTED, 0 VERIFIED.** 16 candidates were tried on 2026-11-10 and none is honestly recordable ([why, per ID](../evidence/warroom/2026-11-10-ledger-status-candidates.md)). Live state in September terms: [reconcile](../warroom/RECONCILE-2026-11-10.md).
+
+Ticks 258–260 merged four milestone PRs and recorded no status: each verifier named what its ID still lacks (queue 2, 3a–3c, 11, 14).
 
 Rulesets (`ci-required` required, linear history, no force-push, no deletion) are active on all four repos (vizra-core `26972947` since tick 259).
 
