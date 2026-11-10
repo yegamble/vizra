@@ -4,6 +4,7 @@ Append new rows at the top of the table. A merge is not a ledger status: the sta
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-11-10 | vizra-core | #16 `govulncheck` green: Go toolchain 1.27.4, Echo v5.4.4 (VZ-CI-004, part) | `d2edaf4` → `ce805b4` (squash, `--match-head-commit`) | PASS `d2edaf4` (`docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`); `ci-required` success (run 42881058299), all six manifest lanes ran | nothing recorded: VZ-CI-004 also needs the scan lanes required and green (queue 11) |
 | 2026-11-10 | vizra | #13 #12 verifier evidence; close inbox 14 (records, no ledger ID) | `75498e6` → `8680fb4` (squash, `--match-head-commit`) | `docs/evidence/warroom/2026-11-10-meta-pr13-records-VERIFY.md` PASS at `75498e6`; `ci-required` success (run 42879617837) | no ledger ID (QUEUE-records) |
 | 2026-11-10 | vizra (meta) | #9 chair records, ticks 239–257, plus two working-tree-only plans | `57f8f2b` → `27be92a` (squash, `--match-head-commit`) | PASS `57f8f2b` (`docs/evidence/warroom/2026-11-10-meta-pr9-records-VERIFY.md`); `ci-required` and `validate` green | no ledger ID (QUEUE-records) |
 | 2026-11-10 | vizra (meta) | #11 war-room rework: loop governors, blocking bar, Stop hook, board diet | `a875a80` (docs-only head `83384de`) → `82e9529` (squash, merged by the owner) | PASS `e796cca` → fix round 1 (G-1, G-9) → PASS `a875a80` (`docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`) | no ledger ID (QUEUE-warroom-rework) |

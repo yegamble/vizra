@@ -30,12 +30,16 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 meta #11 R1-5: malformed grant amounts or a malformed profile give a Python traceback (exit 1) instead of UNUSABLE (exit 2); no crash exits 0 (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
 - 2026-11-10 meta #11 R1-6: `test_an_uncommitted_decision_grants_nothing` also passes against the old checker, so it proves nothing on its own (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
 - 2026-11-10 meta #9 V-1: the board row for an open PR should carry the head SHA, not "see PR" (evidence: `docs/evidence/warroom/2026-11-10-meta-pr9-records-VERIFY.md`)
+- 2026-11-10 core #16 F-1: ADR-001 lines 18, 93, 94 still say Go 1.27.1 and Echo ≥ v5.3.1; its bump policy wants the same diff. Editing an Accepted ADR is owner-only (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
 
 ## vizra-core
 
 - 2026-11-10 core #14 S-0002: a re-mint racing a claim can clear `consumed_at`; not redeemable, so below the bar, but it is a broken invariant in auth code: do it first in this batch (about 45 lines, stands alone) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 - 2026-11-10 core #14 S-0003…S-0007, S-0009, S-0010 and commit `e8a8b66`: validator, audit rows, log causes, strict decode, TTL bound, `isOwnCancellation` tests; all on closed branch `fix/m1a-sentinel-followups` `e43d501` (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 - 2026-11-10 queue 2o-1…2o-4: one Makefile-anchor engine in `scripts/makeanchor/`; none meets the bar (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
+- 2026-11-10 core #16 F-2: `api/openapi.yaml:437` example and dated comments still name go1.27.1 (examples, not pins) (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
+- 2026-11-10 core #16 F-3: the `govulncheck` recipe does not scan test or integration-tagged code (same on main before the PR) (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
+- 2026-11-10 core #16 F-4: GO-2026-5932 (`x/crypto/openpgp`) is reported at module level only, not called; keep it visible (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
 
 ## vizra-user
 

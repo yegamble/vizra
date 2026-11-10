@@ -12,7 +12,7 @@ The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom
 
 **Ledger on `main`: 192 entries, 0 IMPLEMENTED, 0 VERIFIED.** 16 candidates were tried on 2026-11-10 and none is honestly recordable ([why, per ID](../evidence/warroom/2026-11-10-ledger-status-candidates.md)). Live state in September terms: [reconcile](../warroom/RECONCILE-2026-11-10.md).
 
-Rulesets (`ci-required` required, linear history, no force-push, no deletion) are active on vizra, vizra-user and vizra-search. vizra-core gets its ruleset when queue 1 is green.
+Rulesets (`ci-required` required, linear history, no force-push, no deletion) are active on all four repos (vizra-core `26972947` since tick 259).
 
 ## In flight
 
@@ -20,9 +20,9 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 1: `govulncheck` green by fixing the advisories | vizra-core | VZ-CI-004 (part) | none yet | branch `fix/govulncheck-green` from `27cee54` | building since tick 258 | 0/0/0/1 |
-| Queue 3: tag VZ-ISSUE-001 bullets, audit the three claims | vizra | VZ-FOUND-002, VZ-FOUND-003, VZ-FOUND-006 | none yet | branch `docs/found-002-003-006-audit` from `e5a5715` | building since tick 258 | 0/0/0/1 |
-| Queue 14: tokens, typed icon registry, app shell, security headers | vizra-user | VZ-DESIGN-001 | none yet | branch `feat/design-system-tokens-shell` from `783483f` | building since tick 258 | 0/0/0/1 |
+| Queue 2: storage check in `/readyz` | vizra-core | VZ-FOUND-005 | none yet | branch `feat/readyz-storage-check` from `ce805b4` | building since tick 259 | 0/0/0/1 |
+| Queue 3: tag VZ-ISSUE-001 bullets, audit the three claims | vizra | VZ-FOUND-002, VZ-FOUND-003, VZ-FOUND-006 | none yet | branch `docs/found-002-003-006-audit` from `e5a5715` | building since tick 258, first session ran out of time, continued in tick 259 | 0/0/0/2 |
+| Queue 14: tokens, typed icon registry, app shell, security headers | vizra-user | VZ-DESIGN-001 | none yet | branch `feat/design-system-tokens-shell` from `783483f` | building since tick 258, first session ran out of time, continued in tick 259 | 0/0/0/2 |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -39,7 +39,6 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 
 | # | Slice | Repo | IDs | Depends on |
 |---|---|---|---|---|
-| 1 | CI repair: `govulncheck` is a required lane and is red on main since 2026-10-12 (16 advisories); then apply the core ruleset | vizra-core | VZ-CI-004 (part) | nothing; every core PR is red until it lands |
 | 2 | Storage check in `/readyz` with a failing-storage test | vizra-core | VZ-FOUND-005 | 1 |
 | 3 | Tag each VZ-ISSUE-001 acceptance bullet with its id (no target change); audit "every route", the compatibility window and config coverage; a verifier writes evidence ending in a verdict line for core #1, user #1, search #1 | vizra | VZ-FOUND-002, VZ-FOUND-003, VZ-FOUND-006 | nothing |
 | 4 | Tombstone rule in all four `ci-required` guards; vizra-user's two "required only if it ran" lanes | all four | VZ-CI-001 | 1 for core |

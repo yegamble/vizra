@@ -263,3 +263,4 @@ Append-only. One line per tick. A wake-up where nothing happened is not a tick a
 ## Ticks 258 onwards, oldest first
 
 - Tick 258 (2026-11-10) — loop restarted on the owner's word. Meta #13 (records; closes inbox 14) verifier PASS at `75498e6`, merged as `8680fb4`. Dispatched three milestone slices: core queue 1 (VZ-CI-004 part, `govulncheck`), meta queue 3 (VZ-FOUND-002/003/006 audit), user queue 14 (VZ-DESIGN-001). No ledger status moved.
+- Tick 259 (2026-11-10) — core #16 (`govulncheck` green; VZ-CI-004 part) verifier PASS at `d2edaf4`, merged as `ce805b4` on owner decision 2026-11-10 #11; core ruleset `26972947` applied. Dispatched core queue 2 (VZ-FOUND-005). Meta queue 3 and user queue 14 builders ran out of session time and were continued. No ledger status moved: VZ-CI-004 still needs queue 11.
