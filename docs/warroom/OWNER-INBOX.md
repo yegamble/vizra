@@ -94,10 +94,6 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 | CI repair | VZ-CI-001/002/004 | M0 | several hardening items | no ID or item for "required lanes green on main in all four repos today" |
 | Audit trail | VZ-AUDIT-001 | none | none | in the ledger (192 entries, core profile) since meta #5, but in no row of `docs/MILESTONES.md` and not in `docs/quality/release-profiles/core.json` (141 ids against the ledger's 142) |
 
-### 14
-
-**The main checkout is not on `main` (new 2026-11-10).** `/Users/yosefgamble/github/vizra` is on `chore/warroom-records-2026-09-21` with 5 modified and 9 untracked record files. All of that content is on `main` since meta #9 (12 files byte-identical, 2 landed from the working tree; verifier claim B in `docs/evidence/warroom/2026-11-10-meta-pr9-records-VERIFY.md`). Local `main` is `bf25303`, stale and unrelated to `origin/main`. Until the checkout is on current `main`, `/warroom` there is the September command file and no Stop hook runs. The chair has not touched the checkout or the local `main`. Either do it yourself (`git stash -u`, `git branch -f main origin/main`, `git switch main`) or tell the chair to.
-
 ## Closed
 
 ### 0
@@ -135,3 +131,9 @@ Free disk space — 19 GiB free limits Docker and Playwright work.
 > CLOSED by owner decision 2026-11-10 #7: residual accepted and documented; Lane B is open.
 
 **Stamp-key (V-D) design authorship (user PR B item 1).** Two agent sessions were stopped by a safety classifier while designing how to keep the per-run stamp key out of the Playwright main process during spec collection (measured: the key is defined at spec module scope in the main process, undefined in workers). The chair does not route a classifier-stopped task to another agent. Options: you (or a human reviewer) author the item-1 design in `docs/plans/2026-09-23-vizra-user-artifact-privacy-b.md`; or accept "main-process code during collection is trusted-by-review" as a documented residual. Until then Lane B (authenticated specs) stays closed, which blocks M1 auth UI e2e tests.
+
+### 14
+
+> CLOSED 2026-11-10 by the owner's answer "Chair does it: stash the 14 files, reset local main to origin/main, switch to main": the 14 record files are in `stash@{0}` of the main checkout (kept), local `main` is `e5a5715` = `origin/main`, the checkout is on `main`. The owner also answered "Remove the local worktrees and branches; keep them on GitHub only" for the four parked branches; done after checking each local head is on its origin branch.
+
+**The main checkout is not on `main` (new 2026-11-10).** `/Users/yosefgamble/github/vizra` is on `chore/warroom-records-2026-09-21` with 5 modified and 9 untracked record files. All of that content is on `main` since meta #9 (12 files byte-identical, 2 landed from the working tree; verifier claim B in `docs/evidence/warroom/2026-11-10-meta-pr9-records-VERIFY.md`). Local `main` is `bf25303`, stale and unrelated to `origin/main`. Until the checkout is on current `main`, `/warroom` there is the September command file and no Stop hook runs. The chair has not touched the checkout or the local `main`. Either do it yourself (`git stash -u`, `git branch -f main origin/main`, `git switch main`) or tell the chair to.

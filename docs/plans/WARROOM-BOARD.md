@@ -8,7 +8,7 @@ Everything else lives in `docs/warroom/`:
 
 **Loop: STOPPED, ready to restart at tick 258.** Last tick 257 (2026-09-23). The rework (#11, `82e9529`) and the records (#9, `27be92a`) are on `main`; the after-merge steps are done ([record](../evidence/warroom/2026-11-10-after-merge-TRIAGE.md)).
 
-Before the first tick the owner must put the main checkout on `main` (inbox 14): it is on an old records branch, so it has the old `/warroom` and no Stop hook.
+The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
 **Ledger on `main`: 192 entries, 0 IMPLEMENTED, 0 VERIFIED.** 16 candidates were tried on 2026-11-10 and none is honestly recordable ([why, per ID](../evidence/warroom/2026-11-10-ledger-status-candidates.md)). Live state in September terms: [reconcile](../warroom/RECONCILE-2026-11-10.md).
 
@@ -22,7 +22,7 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 |---|---|---|---|---|---|---|
 | none | | | | | all three builder slots are free | |
 
-## Parked (closed by the triage of 2026-11-10; pushed, not merged, not in flight)
+## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
 | Branch | Repo | State |
 |---|---|---|
@@ -86,4 +86,3 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | 11 | Scrub local paths from committed evidence on the public repos? |
 | 12 | VZ-FOUND-008 acceptance text against Lane A with pixels off |
 | 13 | Coverage gaps: installer, wizard, IPFS topology, QA, security testing, rehearsal, CI repair, VZ-AUDIT-001 |
-| 14 | Put the main checkout on `main` and reset the stale local `main`, or tell the chair to |
