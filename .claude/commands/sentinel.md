@@ -7,7 +7,9 @@ You are the **chair of a sentinel sweep**. The sentinel team hunts for things th
 Arguments: `$ARGUMENTS`. If empty, run a default `sweep`.
 
 ## 1. Choose the scope (keep the fan-out small)
-Read `docs/sentinel/FINDINGS.md` (what is already known), `docs/sentinel/WORKFLOWS.md` (the rotation) and `docs/plans/WARROOM-BOARD.md` (what merged recently, and which areas are under construction).
+Read `docs/sentinel/FINDINGS.md` (what is already known), `docs/sentinel/WORKFLOWS.md` (the rotation), `docs/plans/WARROOM-BOARD.md` (which areas are under construction) and `docs/warroom/MERGED.md` (what merged recently).
+
+A sweep is non-milestone work: under `/warroom` it takes the one meta slot and runs only after a batch of three or more milestone merges, never on a timer.
 - `sweep` dispatches three agents in ONE message, so they run concurrently:
   - `vizra-sentinel-workflows` on the 2–3 catalogue entries with the oldest **Last swept**;
   - `vizra-sentinel-bugs` on the area with the most recently merged, security-relevant code (e.g. `core: owner claim + limiter + httpapi logging` after M1-A);
@@ -26,10 +28,9 @@ For each sweep or PR file:
 1. **De-duplicate** against `FINDINGS.md` by dedupe key.
 2. **Spot-check the severity of every BLOCKER or MAJOR.** Re-run its reproducer yourself, or ask a fresh `vizra-verifier` to. The register accepts no unconfirmed finding.
 3. **Add confirmed findings** to `FINDINGS.md`, with the next `S-NNNN` id and status `CONFIRMED`.
-4. **Route each confirmed finding:**
-   - BLOCKER: a war-room queue item at the top of the queue, plus the owner inbox if it touches release, data loss or privacy;
-   - MAJOR: a queue item;
-   - MINOR and NIT: batched into one "sentinel sweep follow-ups" queue item per repo.
+4. **Route each confirmed finding by the blocking bar** (AGENTS.md "Blocking findings"), not by the hunter's severity label:
+   - **meets the bar** — exploitable or wrong in today's tree for privacy, auth, data loss or a false-green product gate, with a reproducer: a queue item at the top of the queue, charged to the ledger ID it breaks, plus the owner inbox if it touches release, data loss or privacy. On a PR review it blocks that PR's merge;
+   - **everything else, whatever its severity label:** one line under the repo in `docs/warroom/FOLLOWUPS.md`. It blocks nothing and gets no queue row of its own; the chair dispatches the batch as one slice per repo.
 
    Set the status to `ROUTED`, naming the queue item.
 5. **Learn.**
@@ -39,7 +40,7 @@ For each sweep or PR file:
 
 ## 3. Record
 - Commit the sweep and PR files, `FINDINGS.md`, `RULES.md` and `WORKFLOWS.md` on the war-room records branch, then push and read the remote back.
-- Add one line to the board's tick log: "sentinel sweep: N confirmed (B/M/m/n), K routed, L false positives".
+- Add one line at the end of `docs/warroom/TICK-LOG.md`: "sentinel sweep: N confirmed, B meet the blocking bar, F to follow-ups, L false positives", and a `sentinel_sweep` event in that tick's `docs/warroom/ticks.jsonl` line.
 - Report to the owner in a few lines: the top findings with severity, what was routed, and anything that needs an owner decision.
 
 ## Guardrails

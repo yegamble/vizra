@@ -1,0 +1,264 @@
+# War-room tick log
+
+Append-only. One line per tick. A wake-up where nothing happened is not a tick and gets no line.
+
+- Ticks 258 onwards: add one line at the END of this file, and one JSON line to `ticks.jsonl` (schema in `scripts/warroom-check.py`). The JSON line is what the checks read.
+- Ticks 0–257 (2026-09-20 … 2026-09-23) are below, copied verbatim from the old board ([archive](archive/WARROOM-BOARD-through-tick-257.md)), newest first. Do not edit them.
+
+## Ticks 0–257, verbatim, newest first
+
+- Tick 257 (2026-09-23) — meta #8 merged (`a1ffa28`); 15 merges today.
+- Tick 256 (2026-09-23) — user #10 plan APPROVE WITH CHANGES; results.json only; GO; 2ac queued; inbox 5 fork-PR setting.
+- Tick 255 (2026-09-23) — 2o architect review → split 2o-1…7; 2o-5 dispatched.
+- Tick 254 (2026-09-23) — meta #8 BLOCKED on a stale merge ref → update-branch `31bebdb` → re-confirm.
+- Tick 253 (2026-09-23) — core #15 merged (`27cee54`); 14 merges today.
+- Tick 252 (2026-09-23) — user #10 allowlist plan → security seat; core #15 `e161af7` → re-confirm; inbox 12 widened.
+- Tick 251 (2026-09-23) — core #14 FAIL at `1d57ad8` (R1-F1, R1-F3) → final round 2.
+- Tick 250 (2026-09-23) — sentinel core #14 re-review: F-1…F-4 closed, not blocking; S-0022/S-0023; 2ab.
+- Tick 249 (2026-09-23) — core #15 PASS at `434abe5`, held for a docs-only R1 fix.
+- Tick 248 (2026-09-23) — meta #10 merged (`b5829d8`); 13 merges today; meta #8 → verifier.
+- Tick 247 (2026-09-23) — user #10 FAIL at `5c5c971` (10–15) → RE-PLANNED as an allowlist gate (R3); fresh builder, plan first.
+- Tick 246 (2026-09-23) — sentinel-pr user #10: 2 MAJOR blocking (unscanned upload file; HAR recorder); inbox 12.
+- Tick 245 (2026-09-23) — core #15 at `434abe5` → re-verify; 2aa queued.
+- Tick 244 (2026-09-23) — core #14 at `1d57ad8` → re-verify + sentinel re-review; 2z queued.
+- Tick 243 (2026-09-23) — meta #10 (2x) → verifier; 2y queued.
+- Tick 242 (2026-09-23) — user #10 at `5c5c971` → fresh verifier + sentinel-pr.
+- Tick 241 (2026-09-23) — core #15 FAIL (T4 red = build failure) → fix round 1 with sentinel F-1…F-5.
+- Tick 240 (2026-09-23) — meta self-test fixture broken by #7's merge → 2x; R24; user #10 READY at `03baf75`, held for recorders.ts:44 (R1).
+- Tick 239 (2026-09-23) — meta #7 merged (`608ffbf`); 12 merges today; sentinel-pr core #15: 5 NIT, none blocking; core #14 fix builder resumed.
+- Tick 238 (2026-09-23) — core #14 verifier PASS; sentinel findings consolidated into fix round 1 of 2.
+- Tick 237 (2026-09-23) — core #15 (test stability) → verifier + sentinel-pr.
+- Tick 236 (2026-09-23) — quiet.
+- Tick 235 (2026-09-23) — sentinel-pr on core #14: 4 confirmed (rolling-deploy claim break, dead mutation cases, 0006 wording, 5xx log drop); held for the verifier's verdict.
+- Tick 234 (2026-09-23) — user #10 FAIL at `b68294b` (gate scope overclaimed) → re-planned; meta #7 (records) → verifier.
+- Tick 233 (2026-09-23) — meta #7 and core #15 opened.
+- Tick 232 (2026-09-23) — core #14 (2t) → verifier + sentinel-pr; user #10 last round → re-verifying.
+- Tick 231 (2026-09-23) — meta #6 merged (`e4f625e`); 11 merges today; 2u dispatched.
+- Tick 230 (2026-09-23) — quiet.
+- Tick 229 (2026-09-23) — core #12 merged (`a6bc77d`); 10 merges today; user #10 FAIL (runtime check fooled) → last round: gate pixels at upload.
+- Tick 228 (2026-09-23) — meta #6 FAIL at `b694813` (CODEOWNERS claim; duplicate keys; self-written evidence); last round sent.
+- Tick 227 (2026-09-23) — core #13 merged (`3994893`); 9 merges today; meta #6 re-verifying.
+- Tick 226 (2026-09-23) — quiet.
+- Tick 225 (2026-09-23) — core #12 round 1 at `25f62ac` → re-verifying.
+- Tick 224 (2026-09-23) — core #13 PASS (comment fix held); user #10 round 1 → re-verifying.
+- Tick 223 (2026-09-23) — quiet.
+- Tick 222 (2026-09-23) — core #13 (B5d allowlist grammar) → verifier.
+- Tick 221 (2026-09-23) — meta #6 FAIL at `36913d2` (status reaches the output from a section source); output-side check ruled, round 1 of 2.
+- Tick 220 (2026-09-23) — sentinel spot-check: 2 MAJOR confirmed, 2 lowered to MINOR; workflow sentinel severity rule tightened.
+- Tick 219 (2026-09-23) — quiet.
+- Tick 218 (2026-09-23) — sentinel workflows sweep: 10 confirmed (4 MAJOR) → 2v; rules R19–R21; MAJOR spot-check dispatched.
+- Tick 217 (2026-09-23) — meta #6 (ledger status gate) → verifier; queue 2u (records onto main).
+- Tick 216 (2026-09-23) — sentinel sweep (bugs): 9 confirmed / 9 routed (2t) / 0 FP; rules R16–R18.
+- Tick 215 (2026-09-23) — user #10 FAIL at `a01a396` (text reader bypasses; E6 one-line `test.use`); runtime effective-option check ruled, round 1 of 2.
+- Tick 214 (2026-09-23) — quiet.
+- Tick 213 (2026-09-23) — core #12 FAIL at `6edaf83` (redaction overclaim); redactor extension ruled, round 1 of 2.
+- Tick 212 (2026-09-23) — sentinel team built (owner request); first sweep dispatched; PR B plan r5 approved for phase 2.
+- Tick 211 (2026-09-23) — PR B plan r4 seat check (R4-1 effective launch options, R4-2 test.use).
+- Tick 210 (2026-09-23) — PR B plan r4 (R3-1 deviation: one screened launch per worker; chair proposes deep-equality) → seat check.
+- Tick 207–209 (2026-09-23) — PR B plan r2/r3 seat passes; F8 verbatim text recorded; user #10 (pixels off) → verifier.
+- Tick 206 (2026-09-23) — core #12 (B3) ready at `6edaf83` → verifier; leaked test temp dirs removed (6.1 GB); queue 2s.
+- Tick 205 (2026-09-23) — core #11 merged (`96d19b3`); 8 merges today; core 2p dispatched.
+- Tick 204 (2026-09-23) — user #9 merged (`783483f`); PR B plan approved with required changes (F1 blocker); Q3 pixel-channels PR now; queue 2r.
+- Tick 203 (2026-09-23) — meta #4 merged (`b2c5b96`); meta 2i dispatched.
+- Tick 202 (2026-09-23) — core #11 on main at `238a9ca` → re-confirming; user #9 FAIL (retention sentence) → docs fix; queue 2q.
+- Tick 201 (2026-09-23) — quiet.
+- Tick 200 (2026-09-23) — disk freed (owner-approved cache prune); user PR B plan → security review; user #9 → verifier.
+- Tick 199 (2026-09-23) — core #10 merged (`36a72df`); #11 being brought onto main.
+- Tick 198 (2026-09-23) — user PR B item 1 (V-D design) → owner inbox 10 after a second classifier stop; items 2–4 continue; visibility docs PR; inbox 5 (rulesets now free) and 11 (public-repo consequences).
+- Tick 197 (2026-09-23) — core #10 re-pinned at `33b951a` (CI running, re-confirming); user PR B plan scoped by ruling (a) after a classifier stop.
+- Tick 196 (2026-09-23) — meta #4 FAIL at `ddec39c` (hand-coded line numbers vs "never quietly wrong"); fix dispatched; user PR B (plan) and core B3 dispatched.
+- Tick 195 (2026-09-23) — merged meta #5, user #8, search #5, core #8; core #10 re-pin dispatched.
+- Tick 194 (2026-09-23) — owner: repos made public (secret pre-scan clean); Actions runs again; CI re-run on all verified heads.
+- Tick 193 (2026-09-23) — loop resumed; billing probe still refused.
+- Tick 192 (2026-09-23) — search PR #5 PASS (local; CI BLOCKED) at `1d28281`; loop paused: six verifier-PASSed PRs wait only on GitHub Actions billing; nothing dispatchable without merges or owner decisions.
+- Tick 191 (2026-09-23) — quiet.
+- Tick 190 (2026-09-23) — search PR #5 PASS (local; CI BLOCKED) at `6646ccd`; final docs-only narrowing (F17) before merge.
+- Tick 189 (2026-09-23) — search PR #5 F16 follow-up at `6646ccd` → short re-confirmation.
+- Tick 188 (2026-09-23) — quiet.
+- Tick 187 (2026-09-23) — search PR #5 PASS (local; CI BLOCKED) at `854a337` after re-plan; one small F16 commit held before merge.
+- Tick 186 (2026-09-23) — quiet.
+- Tick 185 (2026-09-23) — search PR #5 re-plan at `854a337` (one line reader) → verifier.
+- Tick 184 (2026-09-23) — quiet.
+- Tick 183 (2026-09-23) — search PR #5 FAIL at `e711d33` (continued comment splits readers); re-planned with a fresh builder: one line reader.
+- Tick 182 (2026-09-23) — quiet.
+- Tick 181 (2026-09-23) — search PR #5 last round at `e711d33` (allowlist grammar) → re-verifying.
+- Tick 180 (2026-09-23) — quiet.
+- Tick 179 (2026-09-23) — core PR #11 PASS (local; CI BLOCKED) at `0243f2e`; five PRs verifier-PASSed and waiting on billing.
+- Tick 178 (2026-09-23) — search PR #5 closing FAIL at `888a51b` (F9–F11); chair ruled an allowlisted Makefile grammar (default-deny per line); last round sent; core B5d queued.
+- Tick 177 (2026-09-23) — core #11 round 2 (last) at `0243f2e` (fail-closed database scan, closure equality) → re-verifying.
+- Tick 176 (2026-09-23) — search PR #5 closing round 1 at `888a51b` (simple rule-line grammar enforced; inventory + env drop widened) → re-verifying.
+- Tick 175 (2026-09-23) — quiet.
+- Tick 174 (2026-09-23) — core #11 FAIL at `5488eb0` (post-make database scan fails open); last round sent.
+- Tick 173 (2026-09-23) — core #11 round 1 at `5488eb0` (inline/multi-target/`$`-prerequisite/`.POSIX` refused; database recipe scan) → re-verifying.
+- Tick 172 (2026-09-23) — core #11 cross-check GAP X-1 (inline/multi-target recipes unscanned) → folded into #11 with B5c, round 1 of 2.
+- Tick 171 (2026-09-23) — search PR #5 closing FAIL at `617c6d9` (inline `;` recipes / multi-target rules; wrapper flags); refuse-don't-narrow ruling; round 1 of 2; core #11 cross-check dispatched.
+- Tick 170 (2026-09-23) — user PR #8 PASS (local; CI BLOCKED) at `c2ff445`; five verifier-PASSed PRs wait on billing.
+- Tick 169 (2026-09-23) — user PR #8 PASS (local; CI BLOCKED) at `cf053a3`; one comment-only fix held before merge.
+- Tick 168 (2026-09-23) — search PR #5 closing slice at `617c6d9` → fresh verifier.
+- Tick 167 (2026-09-23) — quiet; four PASSed PRs wait on billing.
+- Tick 166 (2026-09-23) — user PR #8 closing round 2 at `cf053a3` (sentences only) → re-verifying incl. e2e:demos.
+- Tick 165 (2026-09-23) — user PR #8 closing FAIL at `f6d245f` on wording (V-A2: `BASH_ENV`/`$GITHUB_PATH` routes); last round, sentences only.
+- Tick 164 (2026-09-23) — core PR #11 (B5b) PASS (local; CI BLOCKED) at `29387da`; follows #10 after rebase + re-confirmation.
+- Tick 163 (2026-09-23) — core PR #8 PASS (local; CI BLOCKED) at `0cc906e`; merge-ready except CI.
+- Tick 162 (2026-09-23) — search PR #5 FAIL at `e068e07` (inventory and closure/named-construct sentences overclaim) → re-planned with a fresh closing builder; queue 2o (search adopts core's anchor); core #8 PASS at `66b3f3d`, last sentence fix sent.
+- Tick 161 (2026-09-23) — core PR #8 PASS (local; CI BLOCKED) at `385fc51` (R4-A closed on both caches); docs-only R5-N1 wording fix requested before merge.
+- Tick 160 (2026-09-23) — search PR #5 BLOCKED (verifier classifier stop; not re-routed) → committed-suite reading + security desk review; core B5b opened as draft PR #11 → verifier.
+- Tick 159 (2026-09-23) — search PR #5 final round at `e068e07` → re-verifying; core B5b ready at `29387da` (per-target `.IGNORE` passes #10's anchor) → stacked draft PR for early verification.
+- Tick 158 (2026-09-23) — quiet.
+- Tick 157 (2026-09-23) — user PR #8 closing fix round 1 at `f6d245f` (GITHUB_ACTIONS anchor, install hooks, pinned `with:`, docs narrowed); verifier re-verifying.
+- Tick 156 (2026-09-23) — core PR #8 limiter fix: security seat NO BLOCKER; lockout residual → owner inbox 8e + queue 2n.
+- Tick 155 (2026-09-23) — quiet: heads match, billing refusing CI.
+- Tick 154 (2026-09-23) — core PR #10 PASS (local; CI BLOCKED) at `398ac4f`; B5b (`.IGNORE`/`.DEFAULT`/`.EXTRA_PREREQS`, implicit-rule scan, matrix sentence) prepared locally; core #8 limiter fix at `385fc51` under verifier + security seat.
+- Tick 153 (2026-09-23) — core PR #10 round 2 (last) at `398ac4f`; re-verifying with a GNU Make feature sweep.
+- Tick 152 (2026-09-23) — user PR #8 closing slice FAIL at `f0f702e` (doc over-claims V-A/V-D; SHOULD V-B/V-C); round 1 of 2 sent.
+- Tick 151 (2026-09-23) — quiet: heads match, billing refusing CI.
+- Tick 150 (2026-09-23) — core PR #8 FAIL at `37601f5`: M0 limiter refreshes TTL on every request (cheap indefinite owner-claim lockout); chair ruled a true fixed window, builder fixing.
+- Tick 149 (2026-09-23) — core PR #10 FAIL at `08a59a9` (pinned `.RECIPEPREFIX` hides a `-` gate prefix on Make 4.3); round 2 of 2 (last) sent; core #8 floors delta pushed at `37601f5`, re-confirming.
+- Tick 148 (2026-09-23) — core PR #8 PASS (local; CI BLOCKED) at `56504c1` (race absent in 630 contended runs); floors delta released for push, then re-confirmation.
+- Tick 147 (2026-09-23) — quiet: heads match, billing refusing CI.
+- Tick 146 (2026-09-23) — core PR #10 round 1 at `08a59a9` (single `make -q` over every pinned file; shared pin reader; checks before make); verifier re-verifying.
+- Tick 145 (2026-09-23) — user PR #8 closing slice ready at `f0f702e` → fresh verifier; core #8 floors staged locally (not pushed) pending its verifier.
+- Tick 143–144 (2026-09-23) — quiet: heads unchanged, billing still refusing CI (user #8's CI last ran green at 05:29Z; refusals from 08:08Z).
+- Tick 142 (2026-09-23) — core PR #10 FAIL at `62d16aa` (per-file `make -q` leaves pinned includes remakeable); round 1 of 2 sent; search #5 builder given the corrected probe design.
+- Tick 141 (2026-09-23) — meta PR #5 re-confirmed PASS (local; CI BLOCKED) at `c3bb02e`; two ledger NITs to queue 2i; merge waits on billing.
+- Tick 140 (2026-09-23) — meta PR #5 corrections at `c3bb02e` (F1–F4; generator text only); same verifier re-confirming.
+- Tick 139 (2026-09-23) — meta PR #5 PASS (local; CI BLOCKED); small corrections requested; owner inbox 8d (owner transfer vs ADR-003).
+- Tick 138 (2026-09-23) — search PR #5 FAIL at `c3b2021` (unpinned newer `Makefile.sh` rewrites the Makefile under the anchor's own `make -pn`); final round sent, aligning with core #10's fix.
+- Tick 137 (2026-09-23) — meta PR #5 (ledger obligations incl. VZ-AUDIT-001) ready at `cd4c0f2`; CI refused; verifier dispatched.
+- Tick 136 (2026-09-23) — core #10 ready (Makefile digest; sibling-remake hole closed) → verifier; core #8 backend seat two cheap blockers (ledger ID via a meta PR; floors staged); search #5 desk re-review: no blocker, two REQUIRED → round 2 pending the verifier.
+- Tick 135 (2026-09-23) — security seat re-review of core PR #8 at `56504c1`: no blocking finding (NEW-1/NEW-4 closed; classification adds no oracle or amplification; no audit row or charge on a claimed instance; seam unreachable from production; 0005 DDL identical); F-1 (unredacted generic 500 log) → B3; F-2 NIT (a comment points at an AGENTS.md row that does not exist) held for the other verdicts.
+- Tick 134 (2026-09-23) — search PR #5 round 1 at `c3b2021` (Makefile digest gate; scanner retired; SIGPIPE flake fixed); verifier + desk reviewer re-judging; CI billing-blocked.
+- Tick 133 (2026-09-23) — core PR #8 closing slice at `56504c1` (race closed, 800 green iterations; main merged in with floors); CI billing-blocked; verifier + both seats re-judging locally.
+- Tick 132 (2026-09-23) — desk review: the text scanner is passable and core has no pre-flight; chair ruled a committed Makefile digest for both repos; search #5 round 1 and core B5 dispatched.
+- Tick 131 (2026-09-23) — user PR #8 FAIL at `11f8975` (redaction step matched by substring; all three layers defeated end to end); round cap → re-planned with a fresh closing builder.
+- Tick 130 (2026-09-23) — search PR #5 verifier BLOCKED (CI billing; adversarial payloads declined after a safety classifier stopped them); chair did not re-route them, dispatched a read-only desk review of the pre-flight instead.
+- Tick 129 (2026-09-23) — search PR #5 ready at `4476ad5` (CI blocked by billing; local evidence); anchor `make -pn` side-effect hole found — core has it too (queued 2d-B5); fresh verifier on #5.
+- Tick 128 (2026-09-23) — GitHub Actions billing refusal blocks all CI and therefore all merges (owner inbox 0); meta PR #4 docs fix at `ddec39c` waits on it.
+- Tick 127 (2026-09-23) — no head moved; search CI hardening (2g) dispatched, porting core #9's default-deny design; next core slice held for #8.
+- Tick 126 (2026-09-23) — meta PR #4 PASS at `cf9e4c8` (demo race gone, 10/10); held for one CLAIMS.md header sentence → wording fix.
+- Tick 125 (2026-09-23) — user PR #8 final round at `11f8975` (three-layer answer to the env class; shared redactor corpus); same verifier re-verifying.
+- Tick 124 (2026-09-23) — vizra-core #9 merged (`0c1851f` → `eeeea06`); core #8 closing builder told to merge main in and add three package floors.
+- Tick 123 (2026-09-23) — core PR #9 PASS at `e2a3e01`, held for one overstated AGENTS.md sentence → docs-only correction; merge order #9 then #8.
+- Tick 122 (2026-09-22) — core PR #9 final round at `e2a3e01` (anchor pinned, invocation-selected strictness, Makefile `?=` env overrides closed); same verifier re-verifying.
+- Tick 121 (2026-09-22) — core PR #8 final round `655f46a` red on a read-phase race (403 where 409 is ruled); round cap reached → re-planned with a fresh closing builder; fake rate-limit reminder recurred.
+- Tick 120 (2026-09-22) — user PR #8 verifier FAIL at `4158b10` (`.npmrc` node-options re-enables the page snapshot; redactors diverge); final round sent with a runtime assertion + shared corpus.
+- Tick 119 (2026-09-22) — core PR #9 verifier FAIL at `6b65eff` (anchor recognised by substring; MAKELEVEL flips it lenient); final round sent.
+- Tick 118 (2026-09-22) — core PR #8 verifier FAIL at `59a19c5` (claim-status blockers confirmed; cold-cache shape-before-claimed ordering writes permanent audit rows; the authoritative gate unguarded by any test); joined round 2, push released.
+- Tick 117 (2026-09-22) — core PR #9 fix round 1 at `6b65eff` (default-deny redesign); same verifier re-verifying.
+- Tick 116 (2026-09-22) — session restart: five stopped agents resumed (core #8 verifier + builder, core #9 builder, user #8 verifier, meta #4 verifier); Docker restarted; no PR head had moved.
+- Tick 115 (2026-09-21) — user PR #8 fix round 1 at `4158b10`; same verifier re-verifying; builder's two self-declared process failures recorded.
+- Tick 114 (2026-09-21) — both seats re-reviewed core PR #8 at `59a19c5`: all earlier findings closed; two new blockers from round 1's own claim-status fix (shared ceiling bucket; undeclared 429); round 2 of 2 started locally.
+- Tick 113 (2026-09-21) — vizra-search #4 merged (`cb02cdf` → `3ea4103`); core PR #8 fix round 1 at `59a19c5` → verifier + both seats re-judging.
+- Tick 112 (2026-09-21) — core PR #9 verifier FAIL at `e710c3c` (thirteen unlisted evasions under lists declared exhaustive; direct step swallows `go test`'s exit); chair ruled the class and inverted the control to default-deny; fix round 1.
+- Tick 111 (2026-09-21) — user PR #8 verifier FAIL at `e096053` (step-level env override defeats the asserted job-level variable; redactor sentence too strong; workflow-level env unread; npm pre/post hooks) → fix round 1; search PR #4 round 2 at `cb02cdf` under re-confirmation.
+- Tick 110 (2026-09-21) — search PR #4 PASS at `6a02ab2`, held for two sentences ("every refusal path" = 6 of 17); round 2 of 2.
+- Tick 109 (2026-09-21) — meta PR #4 closing slice at `cf9e4c8` (claims made true + generated CLAIMS.md admitting 16/42 rules never seen to fire); same verifier re-verifying; guard-script pipe race queued as 2l.
+- Tick 108 (2026-09-21) — core PR #8 verifier FAIL at `32b616d` (concurrent boots both mint; the CLI has no test; two false AGENTS.md sentences); joined the builder's round 1, push released.
+- Tick 107 (2026-09-21) — core PR #9 (sweep B1) ready at `e710c3c`; fresh verifier dispatched; #8/#9 concurrency rule recorded (second to merge takes `main` in and is re-confirmed).
+- Tick 106 (2026-09-21) — user PR #8 (artifact privacy PR A) ready at `e096053`; fresh verifier dispatched.
+- Tick 105 (2026-09-21) — backend seat's code review of core PR #8 filed (six blockers); chair's consolidated ruling; builder on fix round 1 locally, push gated on the verifier.
+- Tick 104 (2026-09-21) — security seat's code review of core PR #8 filed: one blocker (already-claimed 409 audits every anonymous request into an undeletable table), three required; held for a consolidated round.
+- Tick 103 (2026-09-21) — search PR #4 fix round 1 at `6a02ab2` (pin deleted, no-echo asserted, image step checks the text); same verifier re-verifying.
+- Tick 102 (2026-09-21) — core PR #8 (M1-A owner claim) ready at `32b616d`; verifier + security and backend seats dispatched on the code.
+- Tick 101 (2026-09-21) — search PR #4 verifier FAIL at `852b382` on docs-vs-control only; chair reversed its own brief (search ignores non-runtime values instead of validating core's vocabulary); fix round 1.
+- Tick 100 (2026-09-21) — meta PR #4 verifier FAIL at `9c4b5d3` (two documented guarantees the code does not deliver, a dead rule, a pipe race, drift blind to the secret flag); round cap reached → re-planned with a fresh builder, closed fix list + claims audit.
+- Tick 99 (2026-09-21) — search PR #4 (`VIZRA_MODE` rename) ready at `852b382`; fresh verifier dispatched; meta follow-up PR (real probes + ruled names) queued as 2k.
+- Tick 98 (2026-09-21) — infrastructure seat's final re-review of meta PR #4: nothing blocking; chair confirmed one documented-but-nonexistent control ("fails in both directions") in three files → to be made true, consolidated with the verifier's verdict; healthcheck values recorded for the follow-up meta PR.
+- Tick 97 (2026-09-21) — vizra-core #7 merged (`6829285` → `5eb2829`); security seat's review of the user artifact-privacy plan filed, chair ruled two PRs, builder on PR A; core sweep B1 dispatched; M1-A builder told to rebase.
+- Tick 96 (2026-09-21) — meta PR #4 round 2 pushed at `9c4b5d3` (derived secret set, gated-probe rule, operator disclosures, caps + shm); verifier and infrastructure seat on the new head.
+- Tick 95 (2026-09-21) — vizra-search #3 merged (`2997e64` → `3619fed`); search `VIZRA_MODE` rename dispatched with a precise refusal rule.
+- Tick 94 (2026-09-21) — user artifact-privacy plan ready (load-bearing measurement: `error-context.md` is written even with tracing off); security seat reviewing it before code.
+- Tick 93 (2026-09-21) — core PR #7 (healthcheck + runtime image) ready at `6829285`; non-required `image-scan` red on unfixable Debian base CVEs (owner inbox 9); fresh verifier dispatched.
+- Tick 92 (2026-09-21) — search PR #3 fix round 1 at `2997e64` (full-refname resolver, remote URL check, offline selftest); same verifier re-verifying.
+- Tick 91 (2026-09-21) — meta PR #4 verifier PASS at `3261ad3` with five non-blocking findings (R-1: new secrets are not forced into the redaction set); joined the already-staged round 2; builder released to push.
+- Tick 90 (2026-09-21) — vizra-user #7 merged (`f0ee8f1` → `6bf0a0e`); no user re-vendor needed (blob identical to core main); meta PR #4 round 2 staged locally; user artifact privacy II dispatched plan-first.
+- Tick 89 (2026-09-21) — user PR #7 docs-only commit `f0ee8f1` (comment-only change to the lane script confirmed by the chair); same verifier re-confirming.
+- Tick 88 (2026-09-21) — search PR #3 verifier FAIL at `aa1c3fb`: artifact right, the new vendoring tool's `main` guard is a suffix test that writes a false `source_ref`; fix round 1 of 2.
+- Tick 87 (2026-09-21) — infrastructure seat: no blocking finding open on meta PR #4 at `3261ad3`; chair held it anyway for three untrue operator-facing statements → builder round 2 of 2 (local, push gated on the verifier's verdict).
+- Tick 86 (2026-09-21) — core M1-A: security seat's plan review filed, chair's consolidated rulings filed, builder in phase 2; user PR #7 PASS at `07f2c6e` but HELD (AGENTS.md overstates the comment-stripping lane check; `globalSetup` unnamed; stale PR body) → docs-only round 2 of 2; three owner-inbox items added (ledger recovery sentence, ADR-003 interpretations, erasure vs audit).
+- Tick 85 (2026-09-21) — backend seat's plan review for core M1-A filed (`docs/evidence/warroom/2026-09-21-vizra-core-m1a-owner-claim-PLAN-REVIEW-backend.md`): six blocking-before-code, twelve required, rulings on OQ-1…OQ-10 + new OQ-11; chair rules once the security seat reports.
+- Tick 84 (2026-09-21) — meta PR #4 round 1 pushed at `3261ad3`; GitGuardian red on an intermediate commit's fake marker literals (history left alone; squash keeps it off main); verifier + infrastructure seat re-judging.
+- Tick 83 (2026-09-21) — search PR #3 re-vendor ready at `aa1c3fb` (adds the vendoring command the repo lacked); fresh verifier dispatched.
+- Tick 82 (2026-09-21) — core M1-A owner-claim plan ready with ten open questions (OQ-10: does ADR-003's setup-wizard row bind the public claim API?); security + backend seats reviewing the plan before code.
+- Tick 81 (2026-09-21) — user PR #7 fix round 1 at `07f2c6e` (worker-scoped listening, test-scoped accounting); same verifier re-verifying with a brief to attack the new worker-scope boundary.
+- Tick 80 (2026-09-21) — vizra-core #6 merged (`1c12fd9` → `4a80a1e`); compose builder released for F1 + push; dispatched core sweep B2 (healthcheck + runtime image), core M1-A owner claim (plan phase, seats review the plan before code), search re-vendor.
+- Tick 79 (2026-09-21) — core PR #6 docs-only commit `1c12fd9` (chair: guard scripts AST-identical bar docstrings) → same verifier re-confirming; meta PR #4 round 1 staged locally, push gated on core #6's merge SHA.
+- Tick 78 (2026-09-21) — core PR #6 verifier PASS at `f56dc03`; chair HELD it (residual list omits the workflow-line `make -i` evasion) → docs-only round; scratchpad name collision between two verifiers traced and fixed in the role files.
+- Tick 77 (2026-09-21) — meta PR #4 verifier FAIL at `69e197e`: bullets MET, but the renderer writes unredacted models under a `secret_values_redacted: true` stamp (placeholders only — no incident), `["NONE"]` healthchecks pass, unenumerated profiles are never asserted; consolidated into the builder's round 1 with the infrastructure blockers; single push gated on core #6.
+- Tick 76 (2026-09-21) — infrastructure seat on meta PR #4: four blocking findings (retired HMAC key name delivered by compose; template promises an unimplemented MFA re-seal; healthcheck that cannot fail gates `frontend`; worker default 4 with no memory limits) → PR HELD; merge order core #6 → meta #4; builder round 1 of 2 started locally, push withheld until the verifier's verdict on `69e197e`.
+- Tick 75 (2026-09-21) — core PR #6 ready at `f56dc03`; verifier dispatched.
+- Tick 74 (2026-09-21) — meta PR #4 ready at `69e197e`; verifier + infrastructure seat dispatched; naming rulings 2h and ledger-status slice 2i queued.
+- Tick 73 (2026-09-21) — reconcile only; records-branch upstream fixed after three ticks went unpushed.
+- Tick 72 (2026-09-21) — user PR #7 verifier FAIL at `7730500` on the early edge (`beforeAll` navigation); chair declined a docs-only remedy; round 1 sent: worker-scoped listening.
+- Tick 71 (2026-09-21) — vizra-core #5 merged (`56920fe` → `c043df7`); compose topology (VZ-ISSUE-002) and core hardening sweep A dispatched; public search contract held for the M1 asset model.
+- Tick 70 (2026-09-21) — resumed after a machine restart; Docker restarted; core PR #5 verifier dispatched; user PR #7 verifier and the fixtures builder resumed.
+- Tick 69 (2026-09-21) — meta PR #2 merged to main (`6b8158c`, merge commit); records branch `chore/warroom-records-2026-09-21` opened; user PR #7 verifier dispatched.
+- Tick 68 (2026-09-21) — PR #2 verifier FAIL on the stale PR description (outside the tree); chair corrected it without moving the head; re-check requested.
+- Tick 67 (2026-09-21) — meta #3 merged into the baseline branch (`4920786`); worktree removed; PR #2 gains CI; branch frozen for verification.
+- Tick 66 (2026-09-21) — meta PR #3 final round at `f9b8553`; confirmation dispatched.
+- Tick 65 (2026-09-21) — meta PR #3 re-verify PASS at `5dfa75c`; final accuracy round sent (merge-commit provenance, date-shaped-path false red).
+- Tick 64 (2026-09-21) — meta PR #3 fix round at `5dfa75c`; builder declined to gate docs/plans (proposed ids dangle by design); re-verification dispatched.
+- Tick 63 (2026-09-21) — meta PR #3 verifier PASS with a false green and an overstated id check; small fix round sent.
+- Tick 62 (2026-09-21) — vizra-user #6 merged (`ca23fef` → `90896be`); harness hardening dispatched.
+- Tick 61 (2026-09-21) — meta validate lane ready (PR #3 at `e667b60`); verifier dispatched.
+- Tick 60 (2026-09-21) — user re-vendor PR #6 ready at `ca23fef` (spec byte-identical; provenance fixed); verifier dispatched.
+- Tick 59 (2026-09-21) — vizra-core #4 merged (`bfd2d5f` → `9e44d30`); core fixture corpus dispatched.
+- Tick 58 (2026-09-21) — vizra-user #3 merged (`3b566c3` → `f49bca4`); user re-vendor and the meta validate lane dispatched.
+- Tick 57 — core PR2 fix round at `bfd2d5f` (wait on the observable; safeError at 11/11 sites; 0/120); re-verify dispatched; `.gitguardian.yaml` shown not to affect the App check.
+- Tick 56 — user PR3 docs-only correction at `3b566c3`; verifier confirmation dispatched.
+- Tick 55 — user PR3 re-verify PASS at `c669e40`; F12–F14 queued as harness hardening / artifact privacy II; docs-only merge condition sent.
+- Tick 54 — user PR3 at `c669e40`: stamp and guard merged into one browser-level automatic fixture; re-verification dispatched.
+- Tick 53 — core PR2 verifier FAIL at `1a6d8bd`: root cause proven, but a new flake in the PR's own test; round 1 sent.
+- Tick 52 — core PR2 (#4) green at `1a6d8bd` but the builder was stuck on a monitor; nudged; verifier dispatched with a reproduce-the-flake brief.
+- Tick 51 — user PR3 re-verify FAIL at `f6f1f59` on Finding 11 (fixture override separates stamp from guard); round 1 sent: browser-level guard.
+- Tick 50 — user PR3 structural re-plan at `f6f1f59`; re-verification dispatched.
+- Tick 49 — vizra-search #2 merged (`744c607` → `808a549`) after the verifier closed the docs merge condition.
+- Tick 48 — search PR2 docs-only correction at `744c607`; chair appended a correction to the earlier builder's plan file; verifier confirmation dispatched.
+- Tick 47 — search PR2 PASS at `7babbd3` with the docs merge condition still open (SHELL/MAKEFLAGS overrides no-op every make lane); docs-only correction dispatched; cross-repo hardening item 2g queued.
+- Tick 46 — search PR2 final round at `7babbd3` (guard anchored outside make; honest residuals); short re-verification dispatched.
+- Tick 45 — user PR3 re-verify FAIL at `0ac9fb6` (out-of-tree spec bypass); two-round cap reached; chair re-planned with a structural brief (runtime stamp + reporter + CI canary) and a fresh builder.
+- Tick 44 — search PR2 re-verify PASS at `e219fc6`; held on a false guarantee in the guard docs; final small round sent.
+- Tick 43 — user PR3 final round at `0ac9fb6` (noInlineConfig, upload gated on redactor success — proven in GitHub's evaluator); final re-verification dispatched.
+- Tick 42 — search PR2 fix round 1 at `e219fc6` (lane guard outside go test, three-valued fixture checker; make 3.81 vs 4.x warning-text trap); re-verification dispatched.
+- Tick 41 — user PR3 re-verify FAIL at `44dac20` (inline eslint-disable bypass; redactor failure still uploads); final round sent; artifact privacy II queued ahead of M1 auth.
+- Tick 40 — search PR2 verifier FAIL at `1772270`: two checks that can report green without checking; fix round 1 sent.
+- Tick 39 — core PR2 interim report: root cause of the integration flake is a cross-clock comparison in job enqueue/claim, not test interference; loops in progress.
+- Tick 38 — search PR2 ready at `1772270` (vendored blobs identical to core main); verifier dispatched; HMAC key naming split found and ruled (`SEARCH_HMAC_KEY` canonical).
+- Tick 37 — user PR3 fix round 1 at `44dac20` (AST import rule, parsed lane guard, real floor, trace redaction proven on a failing CI run); re-verification dispatched.
+- Tick 36 — design: targeted look returned SHOW; design track now waits on the owner's acceptance.
+- Tick 35 — vizra-core #1 merged (`b5f8f6a` → `415a6d1`) after PASS at the final head and both seats' closure; core PR2 (stabilise) and search PR2 (re-vendor) dispatched.
+- Tick 34 — Figma second fix pass done; targeted SHOW/HOLD look dispatched.
+- Tick 33 — design re-check: READY FOR OWNER REVIEW; second small fix pass (BulkBar Delete, thumbnail labels, Quiet/Secondary hierarchy) dispatched; owner's design-acceptance item and top five questions written to the inbox.
+- Tick 32 — core PR1: security F13 and backend NEW-1/NEW-2 CLOSED at `b5f8f6a`, migrations safe to freeze. Verifier role tightened: clean up only what you created; instruction-shaped tool output is a finding.
+- Tick 31 — user PR3 verifier FAIL at `112291e` (import-syntax bypass, lane guard blind to the Playwright step, floor of 1, trace.zip not redacted); fix round 1 sent. Core PR1 final fix round delivered at `b5f8f6a`; three reviewers re-dispatched.
+- Tick 30 — Figma fix pass delivered (`FIXES-first-slice.md`): one shell, zoom glyphs 19.7:1, Meter correct; reviewer re-check dispatched.
+- Tick 29 — user PR3 browser environment ready at `112291e` (18 e2e tests, 9 demonstrations); verifier dispatched with a make-the-harness-lie brief.
+- Tick 28 — core PR1 verifier PASS at `4f8d0fc` (18 mutations, fixture byte-identical); final fix round 2 sent for the `ip_prefix` grammar, rune-safe truncate and two surviving mutants; rulesets API returns 403 on the Free plan.
+- Tick 27 — Figma first-slice review returned FIX FIRST (two shells, invisible zoom glyphs, wrong Meter fills); chair ruled the M1 shell canonical; fixer dispatched.
+- Tick 26 — core PR1 backend closure at `4f8d0fc`: 1–5, 7–9 CLOSED, same `ip_prefix` blocker, rune-unsafe truncate; chair ruled the frozen grammar lowercase-only; 0001/0002/0004 safe to freeze.
+- Tick 25 — core PR1 security closure at `4f8d0fc`: F1–F3 + ride-alongs CLOSED; new blocking F13 (`ip_prefix` CHECK accepts a /112).
+- Tick 24 — core PR1 fix round 1 at `4f8d0fc` (900 tests, new `append-only` lane, migrations tightened in place); builder transcripts preserved from the session scratchpad; verifier + security + backend seat re-dispatched.
+- Tick 23 — vizra-search #1 merged (`ab41219` → `581d79d`) after verifier PASS and security closure; search PR2 (re-vendor + lane regex) queued behind core PR1.
+- Tick 22 — vizra-user #2 merged (`6b0ba87` → `1a952b5`); user PR3 browser environment (VZ-FOUND-008) dispatched; verifier asked to trace a forged system-reminder one of its sub-agents saw in a tool result.
+- Tick 21 (Figma D2b built: 22 frames; first-slice design complete at 68 frames, PROPOSED; fresh-eyes design review dispatched; search security findings closed at `ab41219`).
+- Tick 20 (search PR1 fix round 1 delivered at `ab41219` → delta re-verify + security closure dispatched).
+- Tick 19 (core PR1 verifier FAIL — authz fail-open confirmed by a surviving mutant; `vizra doctor` untested; addendum sent).
+- Tick 18 (user PR1b READY_FOR_REVIEW at `6b0ba87` → verifier dispatched; disk back to 18 GiB after builders pruned).
+- Tick 17 (Figma D2a built: 46 auth/system frames, PROPOSED; owner questions filed).
+- Tick 16 (core PR1 security review: authz default-ALLOW on unset visibility + 2 config holes; consolidated fix round 1 sent to the core builder).
+- Tick 15 (core PR1 backend review: 2 blockers + 4 required-before-merge, held for a consolidated round).
+- Tick 14 (core PR1 READY_FOR_REVIEW at `e45e784` → verifier + security + backend seat dispatched; disk 12 GiB).
+- Tick 13 (search PR1: verifier FAIL — far-future timestamp accepted; consolidated fix round 1 sent; core already fixed its copy and tightened the contract).
+- Tick 12 (**first merge**: vizra-user #1 → `752253c` after verifier PASS at `9767015` + security closure; PR1b hardening dispatched).
+- Tick 11 (Figma D1 library built, PROPOSED; D2a + D2b dispatched).
+- Tick 10 (search PR1 security review: 3 blocking, core told its share; user PR1 security findings closed at `9767015`, re-verify pending).
+- Tick 8 (user PR1 fix round 1 delivered at `9767015` → delta re-verify + security closure check dispatched).
+- Tick 7 (search PR1 READY_FOR_REVIEW → verifier + security dispatched; disk 16 GiB free).
+- Tick 6 (user PR1: verifier PASS + open blocking findings → not merged, consolidated fix round 1 sent).
+- Tick 5 (security review of user PR1: 2 blocking findings, ruling recorded; core and search builders warned about the same CI-gate gap).
+- Tick 4 (all three design inventories + GAPS.md done; Figma D1 library dispatched).
+- Tick 2 (user PR1 READY_FOR_REVIEW → verifier + security dispatched; Search inventory done; remaining inventories + GAPS.md in progress).
+- Tick 0 — war room created; wave 1 dispatched. A first dispatch was stopped by the owner for a session restart so the `vizra-builder`/`vizra-verifier` agent types would register; it left no branches, commits or PRs. Wave 1 was re-dispatched with the registered types.
+
+## Ticks 258 onwards, oldest first
+

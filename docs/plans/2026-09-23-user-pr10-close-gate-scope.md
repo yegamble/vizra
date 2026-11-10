@@ -276,3 +276,49 @@ Then push fast-forward, and wait for `ci-required` green, read with my own `gh a
 4. **The Q-1 sweep reads `supply-chain.yml`'s two upload paths.** Editing them will then also need this guard's allowlist edited.
 5. **The Meta `docs/quality/COMMANDS.md` and other meta docs, if they describe the upload set.** They are not touched here, because they are meta-owned. They are reported for the chair.
 6. **The pre-existing historical transcript paths (R14).** Scrub, or leave; the chair decides.
+
+### Chair's provisional rulings on § F (2026-09-23; the security seat may overrule)
+1. `browser-signals.json` is attached by path: YES.
+2. A `run:`-class write into `e2e-artifacts/` after the gate is stated as a residual, unless the seat names a cheap mitigation.
+3. VZ-FOUND-008 traces: owner inbox 12 is widened to traces. The builder does not edit the ledger.
+4. Real-CI proof: YES, but on a throwaway draft PR from a separate branch that is closed afterwards. No extra commits go on PR #10.
+5. Scrub of historical transcripts: NO. It is queued separately. Only the regenerated transcripts get the `$TMPDIR` rule.
+
+State: still PLANNED. No code until the chair says go. The read-only worktree `.claude/worktrees/user-pr10-allowlist` is left in place for the seat.
+
+### GO for Step B (2026-09-23): security seat APPROVE WITH CHANGES (`docs/evidence/warroom/2026-09-23-vizra-user-pr10-allowlist-PLAN-REVIEW-security.md`), chair's final rulings folded in
+These rulings SUPERSEDE §§ B–D wherever the two disagree:
+- **S-1 (BLOCKER).** `error-context.md` is DROPPED from the allowlist. The gate stages exactly ONE file, `playwright-report/results.json`.
+  - The gate also refuses the upload if the parsed JSON has any `errorContext` key, or any string value holding a line that is `# Page snapshot` or starts with a ```` ```yaml ```` fence.
+  - Code read at 1.63.0: `toTestInfoErrorPayload` (`playwright/lib/common/index.js:1807`) copies `message`, `stack`, `value` and `cause` across IPC. `errorContext`, set in `testInfoError` (`workerProcessEntry.js:828-833`), therefore does not reach `results.json`. The D-row with a missing element and a typed marker is to MEASURE this. The backstop stays either way.
+  - S-6 is moot. The depth-1 traversal and the 500-file cap go.
+- **S-2.** `playwright.config.ts` gets the literal `captureGitInfo: { commit: false, diff: false }`, which the lane guard reads as an early warning. `results.json` must carry no `gitDiff` or `gitCommit`. `metadata.ci` stays: it is PR-author text.
+- **S-3.** AGENTS.md and the PR body carry the seat's residuals R-A, R-B, R-C and R-D verbatim (adjusted to one file).
+  - Every "nothing is published" claim says ARTIFACT. The public job log is read by no gate.
+  - B4's "write unprompted" sentence is withdrawn; R-A replaces it.
+  - The log filter is a separate slice.
+- **S-4.** A unit test derives N from `required-projects` and the CI retry count, and asserts the result is ≤ 89. A refusal names the file, the rule, the alphabet, the run length and the byte offset, and never content.
+- **S-5.** The gate works in this order:
+  1. staging directories are made singly and each is `lstat`-verified;
+  2. the output file is opened `O_CREAT|O_EXCL|O_NOFOLLOW`;
+  3. the source is opened `O_NOFOLLOW|O_NONBLOCK`;
+  4. last, `e2e-artifacts/` is re-walked, and must be exactly the written set: `nlink` 1, the same size and sha256.
+- **S-8.** R7 is stated as an early control only, with the spec-written list.
+- **S-9.**
+  - The `browser-signals.json` write is awaited and fails the test on error.
+  - `/e2e-artifacts` is added to `.gitignore`.
+  - The guard refuses a tracked `e2e-artifacts/`.
+- **Real-CI proof.** It runs on a throwaway draft PR BASED ON `fix/lane-a-pixels-off`, with an inert title, and is closed afterwards with its branch deleted. Its artifacts are not deleted.
+  - Run (a): a missing-element failure. The artifact must hold only `results.json`, with no git metadata and no snapshot.
+  - Run (b): a failure carrying a 90-character inert marker. The gate must be red, with 0 artifacts.
+  - `ci-required` must be red on both.
+- **Exit codes:**
+
+| Code | Meaning |
+|---|---|
+| 1 | page snapshot, or `errorContext` |
+| 2 | read, write or tool error (fail closed) |
+| 3 | `results.json` absent |
+| 4 | content rule |
+| 5 | non-regular file, or unexpected staged content |
+| 6 | the staging directory already exists |
