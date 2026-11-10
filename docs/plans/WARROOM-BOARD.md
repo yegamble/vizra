@@ -6,7 +6,7 @@ Everything else lives in `docs/warroom/`:
 
 [tick log](../warroom/TICK-LOG.md) · [owner inbox](../warroom/OWNER-INBOX.md) · [owner decisions](../warroom/OWNER-DECISIONS.md) · [merged](../warroom/MERGED.md) · [follow-ups](../warroom/FOLLOWUPS.md) · [board through tick 257](../warroom/archive/WARROOM-BOARD-through-tick-257.md)
 
-**Loop: STOPPED.** Last tick 257 (2026-09-23). Next tick is 258. Restart waits for the rework PR to merge and for the after-merge steps below.
+**Loop: STOPPED.** Last tick 257 (2026-09-23). Next tick is 258. The rework PR (#11) merged 2026-11-10 as `82e9529`. Restart waits for the after-merge steps below.
 
 **Ledger on `main`: 192 entries, 0 IMPLEMENTED, 0 VERIFIED.** 257 ticks moved no ledger status. Live state: [reconcile of 2026-11-10](../warroom/RECONCILE-2026-11-10.md).
 
@@ -16,13 +16,12 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| war-room rework | vizra | QUEUE-warroom-rework | #11 | verified `a875a80` | PASS at `e796cca`, then PASS at `a875a80` after fix round 1 (G-1, G-9); 0 blocking, 21 follow-ups open; `ci-required` green. Owner merges | 2/1/0/0 |
-| records, ticks 239–257 | vizra | QUEUE-records | #9 draft | `ce2a352` | open; lands after the rework PR | n/a |
+| records, ticks 239–257 | vizra | QUEUE-records | #9 | see PR | main merged in (board conflict resolved to main's board; the old board is the archive); plus the two working-tree-only items; awaits verifier | 0/0/0/0 |
 | M1-A sentinel follow-ups | vizra-core | QUEUE-2t | #14 | `1d57ad8` | FAIL at round 2; conflicts with main; 3 unpushed local commits. Triage by the new bar | old rules: spent |
 | Lane A records no pixels | vizra-user | VZ-FOUND-008 | #10 | `5c5c971` | re-planned as an allowlist gate; uncommitted local work. Triage by the new bar | old rules: 1 re-plan |
 | vendor tool, second manifest | vizra-search | QUEUE-2o-5 | none | `ed9f9cc` | 2 commits, unpushed, no PR. Triage by the new bar | old rules: n/a |
 
-## After the rework PR merges (chair, in this order)
+## After-merge steps (chair, in this order; rework PR merged 2026-11-10)
 
 1. Land the records: PR #9 plus the two working-tree-only items named in the reconcile.
 2. Apply the approved rulesets; vizra-core after its CI repair is green.
