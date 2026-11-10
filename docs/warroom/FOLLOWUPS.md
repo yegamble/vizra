@@ -25,6 +25,10 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 meta #11 G-10: `core.json` lists 12 gates in snake_case; the gate matrix `exit` reads has 13 names (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
 - 2026-11-10 meta #11 G-11: `tests/warroom/` and the shellcheck line run in no CI lane; wire them into `validate` in an owner-reviewed PR (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
 - 2026-11-10 meta #11 D-1: a verifier appending to FOLLOWUPS.md in the main checkout leaves an uncommitted change that trips the Stop hook; say where and how those lines are committed (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 R1-1: an `owner_grant` citing a real numbered decision that merely mentions the id (even one saying it stays blocked) raises the budget by any amount; make the decision text state the amounts (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
+- 2026-11-10 meta #11 R1-4: `exit` accepts a committed directory or any committed file under `docs/evidence/` as a gate's PASS evidence; require a regular file and read its verdict line (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
+- 2026-11-10 meta #11 R1-5: malformed grant amounts or a malformed profile give a Python traceback (exit 1) instead of UNUSABLE (exit 2); no crash exits 0 (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
+- 2026-11-10 meta #11 R1-6: `test_an_uncommitted_decision_grants_nothing` also passes against the old checker, so it proves nothing on its own (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
 
 ## vizra-core
 
