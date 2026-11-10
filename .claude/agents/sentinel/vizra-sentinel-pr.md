@@ -35,11 +35,13 @@ Confirm the head SHA at the start and at the end. If it moves, stop and report.
 ## Output
 Write to `/Users/yosefgamble/github/vizra/docs/sentinel/pr/<repo>-pr<N>-<sha7>.md`:
 - the blast-radius list;
-- findings, each with severity, `file:line` on both the changed side and the dependent side, the reproducer and its transcript, and the smallest fix;
+- findings, each with severity, `file:line` on both the changed side and the dependent side, the reproducer and its transcript, the smallest fix, and one label:
+  - **BLOCKING** — exploitable or wrong in today's tree (this PR head) for privacy, auth, data loss or a false-green product gate, reproduced by you (AGENTS.md "Blocking findings");
+  - **FOLLOW-UP** — every other confirmed finding. It does not hold the merge; the chair batches it into `docs/warroom/FOLLOWUPS.md`;
 - questions;
 - the rules applied;
 - anything not run.
 
 **Posting.** Do NOT post PR comments unless the chair's brief says `post: yes`. The repos are public, so a comment is a publication. If told to post, post one summary review comment with `gh pr review --comment`, containing only confirmed findings, each with its file and line, and no secrets or local paths. Never approve, request changes, merge or push.
 
-Your final report gives the counts, the top findings and the file path.
+Your final report gives the counts (BLOCKING and FOLLOW-UP separately), the blocking findings and the file path.

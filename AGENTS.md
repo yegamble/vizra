@@ -28,6 +28,15 @@ Tests must challenge the implementation: demonstrate the relevant test fails bef
 ### Merge authorization (owner decision, 2026-09-20)
 The owner authorized verifier-gated merging for the war room (`/warroom`). The chair may squash-merge a PR only when all of these hold: an independent verifier that did not write the code returned PASS with an evidence file under `docs/evidence/warroom/`; `ci-required` is green on the verified SHA; the head has not moved since the verdict; no blocking specialist finding is open. A builder never merges or verifies its own work. This authorizes merges only — release approval, production deploy, DNS, cloud spend, and deleting resources remain owner-only, and a merge never makes a ledger entry VERIFIED without the independent evidence.
 
+### Deploy authorization (owner decision, 2026-11-10)
+The owner's words: "Autonomous deploy to one disposable rehearsal host that I provide; production deploy, DNS, cloud spend and deleting resources stay owner-only". The war-room chair may therefore deploy to that one host, once the owner has named it in `docs/warroom/OWNER-DECISIONS.md`, and to nothing else. This authorizes rehearsal deploys only; it changes nothing in "Merge authorization" and is not release approval.
+
+### Blocking findings (owner decision, 2026-11-10)
+A review finding blocks a merge only if it is exploitable or wrong in today's tree for privacy, auth, data loss or a false-green product gate, and the reviewer reproduced it on the PR head. Everything else goes to one batched follow-up item per repo (`docs/warroom/FOLLOWUPS.md`) and does not hold the merge. An acceptance bullet the PR claims and the verifier could not reproduce is still a FAIL. For pull requests that were already open, the owner's words: "Triage by the new bar: one final bounded round only for parts that fix an exploitable auth, privacy, data-loss or false-green defect; close the rest into one batched follow-up per repo". This bar decides what holds a merge; it does not lower what VERIFIED or a release gate requires.
+
+### Git hygiene (2026-11-10)
+Commit early and push often: unpushed work does not exist. Finished means merged, or open with a pushed PR that is listed on the war-room board. Delete a branch and its worktree as soon as its PR is merged, and sweep for leftovers each session; never delete unmerged work. This does not change who may merge: "Merge authorization" above still decides that, and nobody merges their own work. `.claude/hooks/finished-means-merged.sh` checks these rules when a session stops.
+
 If an external blocker persists after two materially different attempts, preserve a runnable reproducer and exact missing input. Continue only independent in-scope work; stop claiming that blocked item is complete. No endless audit or retry loop.
 
 ## Engineering guardrails

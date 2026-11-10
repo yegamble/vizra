@@ -1,0 +1,63 @@
+$ python3 -m unittest discover -s tests/warroom -p 'test_*.py' -v   # Python 3.9.6
+test_red_and_green (test_warroom_check.Board) ... ok
+test_an_uncommitted_decision_grants_nothing (test_warroom_check.Budget) ... ok
+test_green_spent_slice_marked_blocked_then_red_if_worked_again (test_warroom_check.Budget) ... ok
+test_green_within_budget (test_warroom_check.Budget) ... ok
+test_owner_grant_must_cite_a_recorded_decision (test_warroom_check.Budget) ... ok
+test_red_a_replan_does_not_reset_the_counters (test_warroom_check.Budget) ... ok
+test_red_second_replan_fifth_verdict_and_thirteenth_tick (test_warroom_check.Budget) ... ok
+test_red_spent_slice_still_holding_a_slot (test_warroom_check.Budget) ... ok
+test_green_go_candidate (test_warroom_check.Exit) ... ok
+test_red_a_forged_working_tree_profile_is_not_read (test_warroom_check.Exit) ... ok
+test_red_an_empty_queue_with_gates_open_is_not_an_exit (test_warroom_check.Exit) ... ok
+test_red_an_evidence_file_that_is_not_committed (test_warroom_check.Exit) ... ok
+test_red_gates_pass_but_a_profile_id_is_not_verified (test_warroom_check.Exit) ... ok
+test_red_records_that_prove_nothing (test_warroom_check.Exit) ... ok
+test_green_one_meta_slot (test_warroom_check.MetaCap) ... ok
+test_green_two_meta_slots_when_everything_open_is_blocked_or_held (test_warroom_check.MetaCap) ... ok
+test_ranges_and_lists_expand_like_the_real_file (test_warroom_check.MetaCap) ... ok
+test_red_an_empty_ready_claim_is_checked_against_the_milestones (test_warroom_check.MetaCap) ... ok
+test_red_four_builder_slots (test_warroom_check.MetaCap) ... ok
+test_red_two_meta_slots_while_milestone_work_waits (test_warroom_check.MetaCap) ... ok
+test_the_real_milestones_expand_to_the_ledger (test_warroom_check.RealRepository) ... ok
+test_a_claimed_sha_that_is_not_on_the_ref_is_refused (test_warroom_check.Stall) ... ok
+test_an_idle_wake_up_is_not_a_tick (test_warroom_check.Stall) ... ok
+test_green_a_change_inside_the_window (test_warroom_check.Stall) ... ok
+test_green_fewer_than_fifteen_ticks (test_warroom_check.Stall) ... ok
+test_green_implemented_to_verified_is_movement (test_warroom_check.Stall) ... ok
+test_red_a_change_before_the_window_does_not_count (test_warroom_check.Stall) ... ok
+test_red_fifteen_ticks_and_no_ledger_change (test_warroom_check.Stall) ... ok
+test_replay_red_then_green (test_warroom_check.Stall) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 6.822s
+
+OK
+exit 0
+
+$ python3 scripts/warroom-check.py stall --replay docs/warroom/TICK-LOG.md   # the real September history; origin/main = a1ffa28de2d0c720768d88e69c809f2e02a0fb99
+STALL: 252 ticks logged (0-257), 0 ledger status change(s) on origin/main
+exit 1
+
+$ python3 scripts/warroom-check.py stall
+OK: 0 tick(s) recorded; the stall rule needs 15
+exit 0
+
+$ python3 scripts/warroom-check.py budget
+OK: every slice is within budget
+exit 0
+
+$ python3 scripts/warroom-check.py meta-cap
+OK: no ticks recorded
+exit 0
+
+$ python3 scripts/warroom-check.py board
+OK: docs/plans/WARROOM-BOARD.md is 81 lines, longest 282 characters
+exit 0
+
+$ python3 scripts/warroom-check.py exit
+OPEN: the core profile on origin/main is not frozen (source_sha is not a commit on that ref)
+OPEN: 13 of 13 gates have no PASS record for the frozen profile; first: Baseline completeness
+OPEN: 141 of 141 profile ids are not VERIFIED; first: VZ-FOUND-001
+NOT AN EXIT: derive the next slice from the first open item, or stop as OWNER-BLOCKED, STALLED or BUDGET
+exit 1
