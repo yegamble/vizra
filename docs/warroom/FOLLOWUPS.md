@@ -30,7 +30,6 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 meta #11 R1-5: malformed grant amounts or a malformed profile give a Python traceback (exit 1) instead of UNUSABLE (exit 2); no crash exits 0 (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
 - 2026-11-10 meta #11 R1-6: `test_an_uncommitted_decision_grants_nothing` also passes against the old checker, so it proves nothing on its own (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
 - 2026-11-10 meta #9 V-1: the board row for an open PR should carry the head SHA, not "see PR" (evidence: `docs/evidence/warroom/2026-11-10-meta-pr9-records-VERIFY.md`)
-- 2026-11-10 step 17: local branch `docs/m1-manifest-wording` (PR #8 merged) could not be deleted by the tool guard; nothing local-only (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 
 ## vizra-core
 
