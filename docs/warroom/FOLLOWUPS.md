@@ -6,6 +6,26 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 
 ## vizra (meta)
 
+- 2026-11-10 meta #11 H-1: Stop hook exits 0 for commits made on a detached HEAD (worktree or main checkout) (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 H-2: Stop hook does not look at stashes; untracked files are a stated limit (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 H-3: Stop hook matches branch names with awk numerically (`1e2` equals `100`); force a string comparison (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 H-4: Stop hook accepts a local branch as upstream, so "pushed" is not proven (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 H-5: Stop hook compares the PR head oid only for merged PRs, not open ones (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 H-6: a `VIZRA_*_ROOT` override pointing nowhere hides that repo from the Stop hook (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 H-7: by design the Stop hook blocks on leftovers the stopping session does not own (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-1: `owner_grant` accepts any `ref` that is a substring of OWNER-DECISIONS.md (ref "a" raises the caps); require a dated decision heading (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-2: a back-dated `meta_main` (older ancestor) makes `stall` see old movement as new (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-3: keeping fewer than 15 lines in `ticks.jsonl` keeps `stall` green; refuse a file that shrank against `origin/main` (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-4: `stall` counts any record change as movement, including a regression; count only forward moves (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-5: renaming a `QUEUE-` label each tick resets its budget (ledger ids cannot be renamed) (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-6: omitting `slots`, or using id-less events, hides ticks spent on a slice from `budget` (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-7: a meta slot tagged with any ledger id counts as milestone work for `meta-cap` (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-8: `meta-cap` trusts chair-declared `blocked_ids` and reads only the last tick (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-9: `exit` reads the working-tree profile, so a forged uncommitted `core.json` yields GO-CANDIDATE; read the profile and evidence from `origin/main` and require `source_sha` to be a commit (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-10: `core.json` lists 12 gates in snake_case; the gate matrix `exit` reads has 13 names (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 G-11: `tests/warroom/` and the shellcheck line run in no CI lane; wire them into `validate` in an owner-reviewed PR (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+- 2026-11-10 meta #11 D-1: a verifier appending to FOLLOWUPS.md in the main checkout leaves an uncommitted change that trips the Stop hook; say where and how those lines are committed (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
+
 ## vizra-core
 
 ## vizra-user
