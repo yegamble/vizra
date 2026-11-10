@@ -29,12 +29,24 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 meta #11 R1-4: `exit` accepts a committed directory or any committed file under `docs/evidence/` as a gate's PASS evidence; require a regular file and read its verdict line (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
 - 2026-11-10 meta #11 R1-5: malformed grant amounts or a malformed profile give a Python traceback (exit 1) instead of UNUSABLE (exit 2); no crash exits 0 (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
 - 2026-11-10 meta #11 R1-6: `test_an_uncommitted_decision_grants_nothing` also passes against the old checker, so it proves nothing on its own (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY-round1.md`)
+- 2026-11-10 meta #9 V-1: the board row for an open PR should carry the head SHA, not "see PR" (evidence: `docs/evidence/warroom/2026-11-10-meta-pr9-records-VERIFY.md`)
+- 2026-11-10 step 17: local branch `docs/m1-manifest-wording` (PR #8 merged) could not be deleted by the tool guard; nothing local-only (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 
 ## vizra-core
 
+- 2026-11-10 core #14 S-0002: a re-mint racing a claim can clear `consumed_at`; not redeemable, so below the bar, but it is a broken invariant in auth code: do it first in this batch (about 45 lines, stands alone) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
+- 2026-11-10 core #14 S-0003…S-0007, S-0009, S-0010 and commit `e8a8b66`: validator, audit rows, log causes, strict decode, TTL bound, `isOwnCancellation` tests; all on closed branch `fix/m1a-sentinel-followups` `e43d501` (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
+- 2026-11-10 queue 2o-1…2o-4: one Makefile-anchor engine in `scripts/makeanchor/`; none meets the bar (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
+
 ## vizra-user
 
+- 2026-11-10 user #10 parts A–F: recorders off, lane guard, runtime recorder check, upload gate; superseded by the allowlist re-plan on branch `allowlist/pr10-work` `7fb1365` (UNVERIFIED). Must land before any spec authenticates (queue 2f) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
+- 2026-11-10 user #10: `e2e.yml:231-233` says the repo is private; it is public (queue 2q) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
+
 ## vizra-search
+
+- 2026-11-10 queue 2o-5: vendoring tool second manifest, on branch `feat/vendor-tool-second-manifest` `ed9f9cc` (UNVERIFIED, no PR); 2o-6 adopts the engine after core 2o-4; 2o-7 waits for `releases/` (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
+- 2026-11-10 contract-drift never compares against core `main` (by design); decide a staleness check (chair ruling Q4) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 
 ## September queue, verbatim, not yet triaged
 
