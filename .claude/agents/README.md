@@ -62,12 +62,20 @@ binding the moment that repo exists.
   - `vizra-design` is the one seat that also carries `Edit`/`Write`, for
     *direct* invocation outside a council run, and defaults to read-only when
     ambiguous.
-- **No "finished means merged" Stop hook here, deliberately.** Vidra's meta
-  repo enforces self-merge on green CI. Vizra's `AGENTS.md` forbids self-merge
-  and requires independent verification before anything is VERIFIED; the
-  session close-out rule is "checkpoint unfinished work in `docs/plans/`
-  rather than conceal it". A hook that pushes agents to merge would contradict
-  the contract.
+- **A "finished means merged, or open with a pushed PR" Stop hook (2026-11-10).**
+  `.claude/hooks/finished-means-merged.sh`, wired in `.claude/settings.json`,
+  audits the meta repo, the three nested repos and every worktree on each
+  Stop. It blocks on tracked uncommitted changes, unpushed commits, a branch
+  with no upstream, a branch with no open or merged PR (except `main` and
+  `chore/warroom-records-*`), and a branch or worktree whose PR is merged but
+  still exists. It is adapted from Vidra's hook, not copied: Vidra's demands a
+  merge to `main`, and Vizra's `AGENTS.md` forbids self-merge, so here an open,
+  pushed PR passes and the hook never asks an agent to merge. A `gh` or fetch
+  failure is "unverified" and blocks. The reminder counter never turns into a
+  bypass. Tests: `bash tests/warroom/stop_hook_test.sh`. The earlier rule
+  ("no hook, checkpoint in `docs/plans/`") left about 25 merged branches,
+  unpushed commits in two repos and uncommitted work in a worktree by
+  2026-11-10 (`docs/warroom/RECONCILE-2026-11-10.md`).
 - **`vizra-media-storage` is a seat Vidra does not have.** In a photo product
   the originals, derivatives, EXIF/GPS policy and provider matrix are the
   centre of gravity, and they deserve a reviewer whose whole job it is.
@@ -100,7 +108,7 @@ Four agents under `.claude/agents/sentinel/` hunt for broken things that nobody 
 | `vizra-sentinel-contracts` | Drift between OpenAPI, handlers, clients, vendored copies, config names, CI manifests, and doc or ledger claims. |
 | `vizra-sentinel-pr` | Blast-radius review of an open PR against the whole codebase, alongside the verifier. It posts nothing publicly unless asked. |
 
-Run a sweep with `/sentinel` (see `.claude/commands/sentinel.md`); `/warroom` also schedules sweeps when builder slots are free.
+Run a sweep with `/sentinel` (see `.claude/commands/sentinel.md`); `/warroom` runs one after a batch of milestone merges, inside its one slot for non-milestone work. A sentinel finding blocks a merge only if it meets the blocking bar in `AGENTS.md`; the rest is batched in `docs/warroom/FOLLOWUPS.md`.
 - Learned rules: `docs/sentinel/RULES.md`.
 - Findings register: `docs/sentinel/FINDINGS.md` (the chair edits it).
 - Sweep outputs: `docs/sentinel/sweeps/` and `docs/sentinel/pr/`.

@@ -1,0 +1,147 @@
+$ shellcheck .claude/hooks/*.sh .claude/council/quiet.sh tests/warroom/*.sh
+exit 0
+
+$ bash tests/warroom/stop_hook_test.sh -v   # /bin/bash 3.2.57(1)-release, git version 2.50.1 (Apple Git-155), Darwin arm64
+ok   green: clean main in all four repos (exit 0)
+ok   green: pushed branch with an open PR (never asked to merge) (exit 0)
+ok   green: pushed worktree branch with an open PR (exit 0)
+ok   green: same, session started inside the worktree (exit 0)
+ok   green: pushed records branch with no PR (exit 0)
+ok   red: dirty tracked file (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra-user: uncommitted changes to tracked files in /private/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/vz-stop-hook-e5MJie/case-mvXLAd/vizra/vizra-user
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   red: unpushed commit on main (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra: branch 'main' has 1 commit(s) not pushed to its upstream
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   red: unpushed commit on an open-PR branch (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra-core: branch 'feat/x' has 1 commit(s) not pushed to its upstream
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   red: branch with no upstream (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra-search: branch 'feat/nopush' has no upstream; push it
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   red: pushed branch with no PR (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra-core: branch 'feat/nopr' (checked out at /private/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/vz-stop-hook-e5MJie/case-qSQNl6/vizra/vizra-core) has no open or merged PR; push it and open one
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   red: merged branch not deleted (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra-user: PR #9 is merged but branch 'feat/done' still exists; remove the worktree and delete the branch
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   red: still blocking after 9 Stops (the reminder cap is not a bypass) (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra-user: PR #9 is merged but branch 'feat/done' still exists; remove the worktree and delete the branch
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 6/6 is
+     | not permission to declare done.
+ok   red: merged worktree not removed (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra: PR #4 is merged but branch 'feat/wtdone' still exists (checked out at /private/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/vz-stop-hook-e5MJie/case-uO2Znc/wt); remove the worktree and delete the branch
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   red: commits after a merged PR are not called deletable (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra-core: branch 'feat/reused' (checked out at /private/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/vz-stop-hook-e5MJie/case-vF9LlA/vizra/vizra-core) has commits that are not in merged PR #5 and no open PR; push them and open a PR (do not delete)
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   red: closed-unmerged PR with no open PR (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra-core: PR #6 for branch 'feat/closed' (checked out at /private/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/vz-stop-hook-e5MJie/case-mzIHUJ/vizra/vizra-core) was closed unmerged and no PR is open; open a PR, or confirm it is pushed and delete only the LOCAL branch
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   red: gh failure is unverified, not a pass (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra: gh could not list pull requests; PR state is unverified
+     |   - vizra-core: gh could not list pull requests; PR state is unverified
+     |   - vizra-user: gh could not list pull requests; PR state is unverified
+     |   - vizra-search: gh could not list pull requests; PR state is unverified
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   red: fetch failure is unverified, not a pass (exit 2)
+     | AGENTS.md "Git hygiene" is not satisfied:
+     | 
+     |   - vizra-search: cannot fetch origin; pushed and merged state is unverified
+     | 
+     | Commit and push your own work and open a PR; an open, pushed PR is enough.
+     | Delete branches and worktrees whose PR is merged. Never delete unmerged work,
+     | never merge a PR to satisfy this hook (AGENTS.md "Merge authorization" decides
+     | merges), and do not commit changes that predate this task or belong to someone
+     | else: report them. This hook stays blocking; reminder 1/6 is
+     | not permission to declare done.
+ok   green: malformed payload still audits
+stop hook: 18 passed, 0 failed
+exit 0
