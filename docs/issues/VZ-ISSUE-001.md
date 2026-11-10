@@ -11,12 +11,12 @@ Developer: `vizra-core`, `vizra-user` and `vizra-search` exist with AGENTS.md, l
 One focused PR per session; complete vertical slice (migration/query → API → real UI → tests → operations/docs) for the IDs above. Anything not listed stays in `docs/quality/features.json` and is not narrowed by this issue.
 
 ## Acceptance (observable)
-- Repositories created: yegamble/vizra-core, yegamble/vizra-user, yegamble/vizra-search (private, README-only, created 2026-09-15; content still PLANNED)
-- ADR-001 stack pins and licences (Echo v5 + otelhttp tracing path with spike transcript, Q-003; Valkey managed + go-redis with Valkey/Redis 7.2 matrix, Q-004; govips/libvips LGPL with digest-pinned build and loader list, Q-034)
+- (VZ-FOUND-001) Repositories created: yegamble/vizra-core, yegamble/vizra-user, yegamble/vizra-search (private, README-only, created 2026-09-15; content still PLANNED)
+- (VZ-FOUND-004) ADR-001 stack pins and licences (Echo v5 + otelhttp tracing path with spike transcript, Q-003; Valkey managed + go-redis with Valkey/Redis 7.2 matrix, Q-004; govips/libvips LGPL with digest-pinned build and loader list, Q-034)
 - `make ci` in core/search and `npm run ci` in user execute real checks
-- Route-without-spec and spec-without-route both fail CI (demonstrated)
-- Hand-edited sqlc output fails drift check (demonstrated)
-- Production boot refuses dev secrets (demonstrated)
+- (VZ-FOUND-002) Route-without-spec and spec-without-route both fail CI (demonstrated)
+- (VZ-FOUND-003) Hand-edited sqlc output fails drift check (demonstrated)
+- (VZ-FOUND-006) Production boot refuses dev secrets (demonstrated)
 - Fixture corpus (VZ-FOUND-007): the pinned generator reproduces the twelve M0 fixtures byte-identically against the committed sha256 manifest, and a changed fixture fails the manifest check (demonstrated)
 - Browser-test environment (VZ-FOUND-008): the Playwright harness runs in CI against the production build image on desktop and mobile projects, and a console or network error fails the lane (demonstrated)
 
