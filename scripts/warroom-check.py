@@ -20,7 +20,13 @@ counted PER ID, so a re-plan, a "closing slice", a new builder or a new PR for
 the same ids inherits the counters. A tick with no event is not a tick.
 
 Ledger movement is read from git (status_records.json at each tick's
-`meta_main` and at the ref), never from what a tick line claims.
+`meta_main` and at the ref), never from what a tick line claims. `exit` reads
+the gate matrix, the profile and the evidence files from the ref too, so an
+uncommitted or unmerged profile proves nothing.
+
+An `owner_grant` event raises a budget only when its `ref` is "<date> #<n>",
+that numbered item exists under the "## <date>" heading of OWNER-DECISIONS.md
+on the ref, and the item's text names every id the grant covers.
 
 Exit codes: 0 green, 1 red (reason printed), 2 unusable input.
 """
@@ -119,6 +125,38 @@ def check_ids(where, ids, allow_empty):
     for item in ids:
         if not isinstance(item, str) or not ID_RE.match(item):
             raise Unusable("%s: %r is neither a ledger id nor QUEUE-<label>" % (where, item))
+
+
+def show(root, ref, path):
+    shown = git(root, "show", "%s:%s" % (ref, path))
+    if shown.returncode != 0:
+        raise Unusable("cannot read %s at %s" % (path, ref))
+    return shown.stdout
+
+
+GRANT_REF = re.compile(r"^(\d{4}-\d{2}-\d{2}) #(\d+)$")
+
+
+def decision_text(decisions, ref):
+    """The text of numbered item <n> under '## <date>', or None."""
+    match = GRANT_REF.match(ref if isinstance(ref, str) else "")
+    if not match:
+        return None
+    in_section, item = False, None
+    for line in decisions.splitlines():
+        if line.startswith("## "):
+            if item is not None:
+                break
+            in_section = line[3:].strip() == match.group(1)
+        elif in_section:
+            start = re.match(r"^(\d+)\. ", line)
+            if start and item is not None:
+                break
+            if start and start.group(1) == match.group(2):
+                item = line
+            elif item is not None:
+                item += "\n" + line
+    return item
 
 
 def records_at(root, ref):
@@ -247,11 +285,14 @@ def cmd_budget(args):
                 e = entry(item)
                 if kind == "owner_grant":
                     if decisions is None:
-                        decisions = read(args.root, DECISIONS)
-                    ref = event.get("ref")
-                    if not ref or ref not in decisions:
-                        raise Unusable("tick %d: owner_grant for %s cites nothing found in %s"
-                                       % (tick["tick"], item, DECISIONS))
+                        decisions = show(args.root, args.ref, DECISIONS)
+                    decision = decision_text(decisions, event.get("ref"))
+                    if decision is None:
+                        raise Unusable("tick %d: owner_grant ref %r is not a numbered decision '<date> #<n>' in %s on %s"
+                                       % (tick["tick"], event.get("ref"), DECISIONS, args.ref))
+                    if not re.search(r"(?<![A-Za-z0-9-])%s(?![A-Za-z0-9-])" % re.escape(item), decision):
+                        raise Unusable("tick %d: decision %s does not name %s"
+                                       % (tick["tick"], event["ref"], item))
                     for key in e["caps"]:
                         e["caps"][key] += int(event.get(key, 0))
                     e["blocked"] = False
@@ -332,7 +373,8 @@ def cmd_meta_cap(args):
 
 
 def cmd_exit(args):
-    text = read(args.root, GATES)
+    # Everything is read from the ref: a working-tree profile is only a claim.
+    text = show(args.root, args.ref, GATES)
     section = text.split("## Gate matrix", 1)
     if len(section) != 2:
         raise Unusable("%s has no '## Gate matrix' section" % GATES)
@@ -344,32 +386,40 @@ def cmd_exit(args):
     if not gates:
         raise Unusable("%s lists no gates" % GATES)
     try:
-        profile = json.loads(read(args.root, args.profile))
+        profile = json.loads(show(args.root, args.ref, args.profile))
     except ValueError as error:
-        raise Unusable("%s: %s" % (args.profile, error))
+        raise Unusable("%s at %s: %s" % (args.profile, args.ref, error))
+    source = str(profile.get("source_sha") or "")
+    frozen = bool(SHA_RE.match(source)) \
+        and git(args.root, "cat-file", "-e", source + "^{commit}").returncode == 0 \
+        and git(args.root, "merge-base", "--is-ancestor", source, args.ref).returncode == 0
+    required = profile.get("required_feature_ids") or []
     passed = set()
     for record in profile.get("evidence") or []:
         if not isinstance(record, dict) or record.get("status") != "PASS":
             continue
         path = str(record.get("evidence_file", ""))
         inside = path.startswith("docs/evidence/") and ".." not in path.split("/")
-        if inside and os.path.isfile(os.path.join(args.root, path)) and SHA_RE.match(str(record.get("source_sha", ""))) \
-                and record["source_sha"] == profile.get("source_sha"):
+        committed = inside and git(args.root, "cat-file", "-e", "%s:%s" % (args.ref, path)).returncode == 0
+        if committed and frozen and record.get("source_sha") == source:
             passed.add(record.get("gate"))
     open_gates = [g for g in gates if g not in passed]
     recorded = records_at(args.root, args.ref)
-    waiting = [i for i in profile.get("required_feature_ids") or [] if recorded.get(i) != "VERIFIED"]
-    if not profile.get("source_sha"):
-        print("OPEN: the %s profile is not frozen (source_sha is null)" % profile.get("profile"))
-    if open_gates or waiting or not profile.get("source_sha"):
+    waiting = [i for i in required if recorded.get(i) != "VERIFIED"]
+    if not frozen:
+        print("OPEN: the %s profile on %s is not frozen (source_sha is not a commit on that ref)"
+              % (profile.get("profile"), args.ref))
+    if not required:
+        print("OPEN: the profile names no required ids")
+    if open_gates or waiting or not frozen or not required:
         print("OPEN: %d of %d gates have no PASS record for the frozen profile; first: %s"
               % (len(open_gates), len(gates), open_gates[0] if open_gates else "-"))
         print("OPEN: %d of %d profile ids are not VERIFIED; first: %s"
-              % (len(waiting), len(profile.get("required_feature_ids") or []), waiting[0] if waiting else "-"))
+              % (len(waiting), len(required), waiting[0] if waiting else "-"))
         print("NOT AN EXIT: derive the next slice from the first open item, or stop as OWNER-BLOCKED, STALLED or BUDGET")
         return 1
     print("GO-CANDIDATE: all %d gates carry a PASS record for %s at %s. Stop for the owner's release decision."
-          % (len(gates), profile.get("profile"), profile["source_sha"][:7]))
+          % (len(gates), profile.get("profile"), source[:7]))
     return 0
 
 

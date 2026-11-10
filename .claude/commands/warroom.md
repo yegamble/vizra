@@ -60,7 +60,7 @@ A builder that reported READY_FOR_REVIEW gets a **fresh** `vizra-verifier` on th
 
 **Return** on FAIL: send only the BLOCKING findings to the same builder.
 
-**Slice budget — keyed by acceptance IDs, never reset.** Per ID: at most **4 verifier verdicts, 2 fix rounds, 1 re-plan, 12 ticks** holding a slot. A re-plan, a "closing slice", a new builder, a new branch or a new PR for the same IDs inherits the counters. Splitting a slice does not reset them either: each ID keeps its own count. When a budget is spent the slice is **BLOCKED**: the PR stays open, the reproducer and the reason go to the owner inbox, the slot is freed, and nothing more is dispatched for those IDs until the owner answers (an `owner_grant` event citing the decision recorded in `OWNER-DECISIONS.md`).
+**Slice budget — keyed by acceptance IDs, never reset.** Per ID: at most **4 verifier verdicts, 2 fix rounds, 1 re-plan, 12 ticks** holding a slot. A re-plan, a "closing slice", a new builder, a new branch or a new PR for the same IDs inherits the counters. Splitting a slice does not reset them either: each ID keeps its own count. When a budget is spent the slice is **BLOCKED**: the PR stays open, the reproducer and the reason go to the owner inbox, the slot is freed, and nothing more is dispatched for those IDs until the owner answers (an `owner_grant` event whose `ref` is `<date> #<n>`: that numbered decision must be on `origin/main` in `OWNER-DECISIONS.md` and must name the ID).
 
 ## 4. Dispatch
 
@@ -97,7 +97,7 @@ Release approval, production deploy, DNS, cloud spend, deleting resources, packa
 
 Run `python3 scripts/warroom-check.py exit`.
 
-- **GO-CANDIDATE** (exit 0): every gate in `docs/RELEASE_ACCEPTANCE.md` has a PASS evidence record for the frozen profile (`docs/quality/release-profiles/core.json`, in its `evidence` list: `gate`, `status`, `evidence_file`, `source_sha` equal to the profile's) and every profile ID is VERIFIED. Report it and stop for the owner's release decision. The check is necessary, not sufficient: GO is the owner's.
+- **GO-CANDIDATE** (exit 0): every gate in `docs/RELEASE_ACCEPTANCE.md` has a PASS evidence record for the frozen profile (`docs/quality/release-profiles/core.json`, in its `evidence` list: `gate`, `status`, `evidence_file`, `source_sha` equal to the profile's) and every profile ID is VERIFIED. The check reads the gate matrix, the profile and the evidence files from `origin/main`, and the profile's `source_sha` must be a commit on it: nothing uncommitted or unmerged counts. Report it and stop for the owner's release decision. The check is necessary, not sufficient: GO is the owner's.
 - **An empty queue with gates open is not an exit.** Take the first open gate or the first not-VERIFIED ID the check prints, derive the next slice from it, and dispatch.
 - Otherwise the loop ends only as one of these, naming the item:
   - **OWNER-BLOCKED** — every remaining ID waits on a named inbox item;

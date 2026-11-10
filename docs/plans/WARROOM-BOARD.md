@@ -16,7 +16,7 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| war-room rework | vizra | QUEUE-warroom-rework | #11 | verified `e796cca` | Verifier PASS, 0 blocking, 19 follow-ups; `ci-required` green. Owner merges (it edits AGENTS.md and `.claude/`) | 1/0/0/0 |
+| war-room rework | vizra | QUEUE-warroom-rework | #11 | see PR | PASS at `e796cca`; owner asked for follow-ups G-1 and G-9 to be fixed first; fix round 1 awaits its verdict. Owner merges | 1/1/0/0 |
 | records, ticks 239–257 | vizra | QUEUE-records | #9 draft | `ce2a352` | open; lands after the rework PR | n/a |
 | M1-A sentinel follow-ups | vizra-core | QUEUE-2t | #14 | `1d57ad8` | FAIL at round 2; conflicts with main; 3 unpushed local commits. Triage by the new bar | old rules: spent |
 | Lane A records no pixels | vizra-user | VZ-FOUND-008 | #10 | `5c5c971` | re-planned as an allowlist gate; uncommitted local work. Triage by the new bar | old rules: 1 re-plan |

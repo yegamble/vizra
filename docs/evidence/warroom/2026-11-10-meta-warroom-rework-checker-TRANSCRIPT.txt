@@ -1,5 +1,6 @@
 $ python3 -m unittest discover -s tests/warroom -p 'test_*.py' -v   # Python 3.9.6
 test_red_and_green (test_warroom_check.Board) ... ok
+test_an_uncommitted_decision_grants_nothing (test_warroom_check.Budget) ... ok
 test_green_spent_slice_marked_blocked_then_red_if_worked_again (test_warroom_check.Budget) ... ok
 test_green_within_budget (test_warroom_check.Budget) ... ok
 test_owner_grant_must_cite_a_recorded_decision (test_warroom_check.Budget) ... ok
@@ -7,7 +8,9 @@ test_red_a_replan_does_not_reset_the_counters (test_warroom_check.Budget) ... ok
 test_red_second_replan_fifth_verdict_and_thirteenth_tick (test_warroom_check.Budget) ... ok
 test_red_spent_slice_still_holding_a_slot (test_warroom_check.Budget) ... ok
 test_green_go_candidate (test_warroom_check.Exit) ... ok
+test_red_a_forged_working_tree_profile_is_not_read (test_warroom_check.Exit) ... ok
 test_red_an_empty_queue_with_gates_open_is_not_an_exit (test_warroom_check.Exit) ... ok
+test_red_an_evidence_file_that_is_not_committed (test_warroom_check.Exit) ... ok
 test_red_gates_pass_but_a_profile_id_is_not_verified (test_warroom_check.Exit) ... ok
 test_red_records_that_prove_nothing (test_warroom_check.Exit) ... ok
 test_green_one_meta_slot (test_warroom_check.MetaCap) ... ok
@@ -27,7 +30,7 @@ test_red_fifteen_ticks_and_no_ledger_change (test_warroom_check.Stall) ... ok
 test_replay_red_then_green (test_warroom_check.Stall) ... ok
 
 ----------------------------------------------------------------------
-Ran 26 tests in 5.168s
+Ran 29 tests in 6.822s
 
 OK
 exit 0
@@ -53,7 +56,7 @@ OK: docs/plans/WARROOM-BOARD.md is 81 lines, longest 282 characters
 exit 0
 
 $ python3 scripts/warroom-check.py exit
-OPEN: the core profile is not frozen (source_sha is null)
+OPEN: the core profile on origin/main is not frozen (source_sha is not a commit on that ref)
 OPEN: 13 of 13 gates have no PASS record for the frozen profile; first: Baseline completeness
 OPEN: 141 of 141 profile ids are not VERIFIED; first: VZ-FOUND-001
 NOT AN EXIT: derive the next slice from the first open item, or stop as OWNER-BLOCKED, STALLED or BUDGET

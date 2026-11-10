@@ -40,7 +40,9 @@ class Fixture(unittest.TestCase):
         self.git("init", "-q", "-b", "main")
         self.write("docs/MILESTONES.md", MILESTONES)
         self.write("docs/RELEASE_ACCEPTANCE.md", GATES)
-        self.write("docs/warroom/OWNER-DECISIONS.md", "2026-11-10 grant G-1\n")
+        self.write("docs/warroom/OWNER-DECISIONS.md",
+                   "# Owner decisions\n\n## 2026-11-10\n\n1. Unrelated.\n"
+                   "2. One more verdict for VZ-FOUND-001.\n\n## 2026-11-11\n\n1. Other.\n")
         self.shas = [self.ledger({})]
 
     def git(self, *args):
@@ -186,11 +188,23 @@ class Budget(Fixture):
 
     def test_owner_grant_must_cite_a_recorded_decision(self):
         lines = [self.tick(1, events=[self.event("verdict", result="FAIL")] * 4 + [self.event("blocked")])]
-        grant = self.event("owner_grant", ref="grant G-1", verdicts=1)
+        grant = self.event("owner_grant", ref="2026-11-10 #2", verdicts=1)
         self.ticks(lines + [self.tick(2, events=[grant, self.event("verdict", result="PASS")])])
         self.assertEqual(self.run_check("budget")[0], 0)
-        grant["ref"] = "grant G-404"
-        self.ticks(lines + [self.tick(2, events=[grant])])
+        # A substring of the file, a missing item, and a real decision about something else.
+        for ref, reason in (("a", "is not a numbered decision"), ("2026-11-10 #9", "is not a numbered decision"),
+                            ("2026-11-10 #1", "does not name VZ-FOUND-001"),
+                            ("2026-11-11 #1", "does not name VZ-FOUND-001")):
+            grant["ref"] = ref
+            self.ticks(lines + [self.tick(2, events=[grant])])
+            code, out = self.run_check("budget")
+            self.assertEqual(code, 2, ref)
+            self.assertIn(reason, out)
+
+    def test_an_uncommitted_decision_grants_nothing(self):
+        self.write("docs/warroom/OWNER-DECISIONS.md", "## 2026-11-12\n\n1. Ten more verdicts for VZ-FOUND-001.\n")
+        grant = self.event("owner_grant", ref="2026-11-12 #1", verdicts=10)
+        self.ticks([self.tick(1, events=[grant])])
         self.assertEqual(self.run_check("budget")[0], 2)
 
 
@@ -237,14 +251,17 @@ class MetaCap(Fixture):
 
 
 class Exit(Fixture):
-    def profile(self, evidence, source_sha=SHA):
+    def profile(self, evidence, source_sha="frozen", commit=True, ids=("VZ-FOUND-001",)):
         self.write("docs/quality/release-profiles/core.json", json.dumps({
-            "profile": "core", "source_sha": source_sha, "required_feature_ids": ["VZ-FOUND-001"],
-            "evidence": evidence}))
+            "profile": "core", "source_sha": self.shas[0] if source_sha == "frozen" else source_sha,
+            "required_feature_ids": list(ids), "evidence": evidence}))
+        if commit:
+            self.git("add", "-A")
+            self.git("commit", "-q", "-m", "profile")
 
     def record(self, gate, **extra):
         self.write("docs/evidence/release/%s.md" % gate[:5], "x")
-        return dict({"gate": gate, "status": "PASS", "source_sha": SHA,
+        return dict({"gate": gate, "status": "PASS", "source_sha": self.shas[0],
                      "evidence_file": "docs/evidence/release/%s.md" % gate[:5]}, **extra)
 
     def test_red_an_empty_queue_with_gates_open_is_not_an_exit(self):
@@ -269,8 +286,29 @@ class Exit(Fixture):
                     self.record("Backup/restore", source_sha="b" * 40)):
             self.profile([good, bad])
             self.assertEqual(self.run_check("exit")[0], 1, bad)
-        self.profile([good, self.record("Backup/restore")], source_sha=None)
-        self.assertIn("not frozen", self.run_check("exit")[1])
+        for unfrozen in (None, SHA):  # null, and 40 hex digits that are not a commit
+            self.profile([good, self.record("Backup/restore")], source_sha=unfrozen)
+            code, out = self.run_check("exit")
+            self.assertEqual(code, 1, out)
+            self.assertIn("not frozen", out)
+        self.profile([good, self.record("Backup/restore")], ids=())
+        self.assertIn("names no required ids", self.run_check("exit")[1])
+
+    def test_red_a_forged_working_tree_profile_is_not_read(self):
+        self.ledger({"VZ-FOUND-001": "VERIFIED"})
+        self.profile([self.record("Clean install")])
+        # Uncommitted: every gate PASS, no ids. The committed profile still has one gate open.
+        self.profile([self.record("Clean install"), self.record("Backup/restore")], commit=False, ids=())
+        code, out = self.run_check("exit")
+        self.assertEqual(code, 1, out)
+        self.assertIn("first: Backup/restore", out)
+
+    def test_red_an_evidence_file_that_is_not_committed(self):
+        self.ledger({"VZ-FOUND-001": "VERIFIED"})
+        self.profile([self.record("Clean install"),
+                      self.record("Backup/restore", evidence_file="docs/evidence/release/later.md")])
+        self.write("docs/evidence/release/later.md", "x")
+        self.assertEqual(self.run_check("exit")[0], 1)
 
     def test_red_gates_pass_but_a_profile_id_is_not_verified(self):
         self.profile([self.record("Clean install"), self.record("Backup/restore")])
