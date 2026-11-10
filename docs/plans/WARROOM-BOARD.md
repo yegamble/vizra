@@ -6,7 +6,7 @@ Everything else lives in `docs/warroom/`:
 
 [tick log](../warroom/TICK-LOG.md) · [owner inbox](../warroom/OWNER-INBOX.md) · [owner decisions](../warroom/OWNER-DECISIONS.md) · [merged](../warroom/MERGED.md) · [follow-ups](../warroom/FOLLOWUPS.md) · [board through tick 257](../warroom/archive/WARROOM-BOARD-through-tick-257.md)
 
-**Loop: STOPPED, ready to restart at tick 258.** Last tick 257 (2026-09-23). The rework (#11, `82e9529`) and the records (#9, `27be92a`) are on `main`; the after-merge steps are done ([record](../evidence/warroom/2026-11-10-after-merge-TRIAGE.md)).
+**Loop: RUNNING since tick 258 (2026-11-10), restarted on the owner's word.** Previous tick 257 (2026-09-23). The rework (#11, `82e9529`) and the records (#9, `27be92a`) are on `main`; the after-merge steps are done ([record](../evidence/warroom/2026-11-10-after-merge-TRIAGE.md)).
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
@@ -20,7 +20,9 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| none | | | | | all three builder slots are free | |
+| Queue 1: `govulncheck` green by fixing the advisories | vizra-core | VZ-CI-004 (part) | none yet | branch `fix/govulncheck-green` from `27cee54` | building since tick 258 | 0/0/0/1 |
+| Queue 3: tag VZ-ISSUE-001 bullets, audit the three claims | vizra | VZ-FOUND-002, VZ-FOUND-003, VZ-FOUND-006 | none yet | branch `docs/found-002-003-006-audit` from `e5a5715` | building since tick 258 | 0/0/0/1 |
+| Queue 14: tokens, typed icon registry, app shell, security headers | vizra-user | VZ-DESIGN-001 | none yet | branch `feat/design-system-tokens-shell` from `783483f` | building since tick 258 | 0/0/0/1 |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
