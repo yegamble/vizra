@@ -15,8 +15,18 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - (VZ-FOUND-004) ADR-001 stack pins and licences (Echo v5 + otelhttp tracing path with spike transcript, Q-003; Valkey managed + go-redis with Valkey/Redis 7.2 matrix, Q-004; govips/libvips LGPL with digest-pinned build and loader list, Q-034)
 - `make ci` in core/search and `npm run ci` in user execute real checks
 - (VZ-FOUND-002) Route-without-spec and spec-without-route both fail CI (demonstrated)
+- (VZ-FOUND-002) Generated client diff is empty after regeneration
+- (VZ-FOUND-002) Hand-edited generated file is rejected by a drift check
 - (VZ-FOUND-003) Hand-edited sqlc output fails drift check (demonstrated)
+- (VZ-FOUND-003) `migrate up` from the release image applies cleanly on empty DB
+- (VZ-FOUND-003) sqlc-verify passes
+- (VZ-FOUND-003) A DROP COLUMN in *.up.sql fails migrate-lint
+- (VZ-FOUND-003) Dirty migration ledger is detected and reported, not auto-fixed
 - (VZ-FOUND-006) Production boot refuses dev secrets (demonstrated)
+- (VZ-FOUND-006) Every key read by config.Load reaches api and worker containers (asserted from rendered compose)
+- (VZ-FOUND-006) Every key `vizra setup` writes exists in the template
+- (VZ-FOUND-006) A key added to config without template/compose consumer fails CI
+- (VZ-FOUND-006) Log denylist test proves tokens/passwords/signed URLs never appear
 - Fixture corpus (VZ-FOUND-007): the pinned generator reproduces the twelve M0 fixtures byte-identically against the committed sha256 manifest, and a changed fixture fails the manifest check (demonstrated)
 - Browser-test environment (VZ-FOUND-008): the Playwright harness runs in CI against the production build image on desktop and mobile projects, and a console or network error fails the lane (demonstrated)
 
