@@ -66,6 +66,7 @@ RULES = frozenset({
     "service-key-unknown",
     "template-key-unused",
     "variable-untemplated",
+    "registry-key-untemplated",
     "hatch-in-production-template",
     "api-worker-asymmetry",
     "alias-floor",
@@ -392,6 +393,27 @@ def main(argv):
             "a compose file interpolates it but no env template declares it, so "
             "an operator has no documented place to set it",
         )
+
+    # --- 3b. An operator-settable COMPONENT key is in EVERY template. --------
+    #
+    # `variable-untemplated` above is satisfied by the UNION of the templates,
+    # which is right for a variable only one deployment kind has (the memory
+    # limits, the VIZRA_DEV_* hatches) and wrong for a key a component reads in
+    # every mode: deleting VIZRA_OWNER_CLAIM_ANNOUNCE from the production
+    # template alone left the lane green because the development template still
+    # named it (VZ-FOUND-006 N2, reproduced before this rule existed). A key is
+    # operator-settable exactly when a component registry declares it AND
+    # compose interpolates a variable of that name.
+    registry_keys = {k["name"] for reg in registries.values() for k in reg["keys"]}
+    for name, keys in templates.items():
+        for key in sorted((registry_keys & consumed) - set(keys)):
+            violation(
+                "registry-key-untemplated",
+                f"env/{name}.env.example/{key}",
+                "a component reads it and compose interpolates it, so an "
+                "operator can set it, but this template has no line for it - "
+                "the other template naming it does not document it here",
+            )
 
     # --- 4. No development escape hatch in the production template. ---------
     for key in templates["production"]:
