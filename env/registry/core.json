@@ -1,12 +1,13 @@
 {
   "component": "vizra-core",
-  "source_commit": "4a80a1e3f36b8001c2954d0568bea29268e739fe",
+  "source_commit": "5f615d74e840b23d2201b1d78dd89abfef07701b",
   "source_files": [
     "internal/config/keys.go",
     "internal/config/config.go",
     ".env.example"
   ],
   "read_2026_09_21_by": "VZ-ISSUE-002 review round 1 (re-snapshotted from keys.go at core main)",
+  "read_2026_11_11_by": "VZ-FOUND-006 queue 3c (re-snapshotted from keys.go and cmd/vizra/main.go at core main 5f615d7: +VIZRA_STORAGE_ROOT, +VIZRA_OWNER_CLAIM_ANNOUNCE, +VIZRA_OWNER_CLAIM_TTL; healthcheck and claim-token shipped)",
   "services": [
     "api",
     "worker",
@@ -79,6 +80,14 @@
       "secret": false,
       "delivered_by": "template",
       "default": "default"
+    },
+    {
+      "name": "VIZRA_STORAGE_ROOT",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": "/var/lib/vizra/media",
+      "reason": "the in-container media root is a topology fact, not an operator choice: it must equal the container path of the media_data volume mount on api and worker, and scripts/check-compose-topology.py asserts that equality. Where the bytes live on the host is the volume's business."
     },
     {
       "name": "VIZRA_SESSION_SECRET",
@@ -165,6 +174,20 @@
       "secret": false,
       "delivered_by": "template",
       "default": "20s"
+    },
+    {
+      "name": "VIZRA_OWNER_CLAIM_ANNOUNCE",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "off"
+    },
+    {
+      "name": "VIZRA_OWNER_CLAIM_TTL",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "template",
+      "default": "1h"
     }
   ],
   "escape_hatches": [
@@ -197,7 +220,9 @@
   "commands": [
     "vizra version",
     "vizra doctor",
-    "vizra migrate"
+    "vizra migrate",
+    "vizra healthcheck",
+    "vizra claim-token"
   ],
   "commands_note": "The operator CLI's subcommands AS SHIPPED, read from vizra-core/cmd/vizra/main.go at source_commit. scripts/check-template-claims.py refuses a template or compose comment that tells an operator to run anything else, unless the reference is marked future by naming its slice - a sentence promising `vizra setup --rotate` is what that check exists to catch.",
   "retired_keys": [
@@ -214,8 +239,7 @@
     "vizra release": "VZ-ISSUE-004",
     "vizra status": "VZ-ISSUE-004",
     "vizra logs": "VZ-ISSUE-004",
-    "vizra restart": "VZ-ISSUE-004",
-    "vizra healthcheck": "queue 2h"
+    "vizra restart": "VZ-ISSUE-004"
   },
   "future_commands_note": "Commands docs/META_REPO.md \u00a75 names as targets, mapped to the MARKER that must appear in the comment block of any operator-facing file that names them. scripts/check-template-claims.py enforces it, so 'marked as future' is mechanical rather than a judgement about tone: either the sentence names the slice that will deliver the command, or it does not get to promise it.",
   "source_commit_rule": "Names a commit on this component's `main`. Confirmed at re-stamp time with `git -C <checkout> merge-base --is-ancestor <sha> origin/main`."

@@ -129,6 +129,7 @@ RULES = frozenset({
     "known-false-undisclosed",
     "known-false-stale-disclosure",
     "postgres-shm-floor",
+    "storage-root-mount",
     "gated-probe-unrecognised",
 })
 
@@ -862,6 +863,42 @@ def check_shm(shape, model, repo_root):
         )
 
 
+MEDIA_VOLUME = "media_data"
+STORAGE_ROOT_KEY = "VIZRA_STORAGE_ROOT"
+STORAGE_ROOT_SERVICES = ("api", "worker")
+
+
+def check_storage_root(shape, model, repo_root):
+    """VIZRA_STORAGE_ROOT is the container path of the media volume mount.
+
+    Two literals in docker-compose.yml say where media lives: the key vizra-core
+    reads and the target of the `media_data` mount. If they drift apart the
+    service writes originals into the container's own writable layer (or fails
+    /readyz on a read-only root) while the volume an operator backs up stays
+    empty. api and worker must both hold the pair, and hold the same pair.
+    """
+    for name in STORAGE_ROOT_SERVICES:
+        svc = (model.get("services") or {}).get(name)
+        if svc is None:
+            continue
+        root = (svc.get("environment") or {}).get(STORAGE_ROOT_KEY)
+        targets = [
+            v.get("target") for v in (svc.get("volumes") or [])
+            if isinstance(v, dict) and v.get("type") == "volume"
+            and v.get("source") == MEDIA_VOLUME
+        ]
+        if len(targets) != 1 or not root or root != targets[0]:
+            violation(
+                shape["id"], "storage-root-mount", name,
+                f"{STORAGE_ROOT_KEY}={root!r} but the `{MEDIA_VOLUME}` volume "
+                f"is mounted at {targets!r}. They must be one and the same "
+                f"path, with exactly one such mount: otherwise vizra-core "
+                f"stores media outside the volume, and a backup of the volume "
+                f"archives nothing",
+                locate_in_sources(shape["files"], name, "volumes", repo_root),
+            )
+
+
 def check_membership(shape, model):
     """A shape must render the services it declares, and none it forbids.
 
@@ -974,6 +1011,7 @@ def main(argv):
         check_probes(shape, model, known_false, seen_known_false, repo_root,
                      gated_probes)
         check_shm(shape, model, repo_root)
+        check_storage_root(shape, model, repo_root)
         checked += 1
 
     # A declaration that matches nothing is a declaration nobody can act on, and
