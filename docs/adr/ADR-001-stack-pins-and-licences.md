@@ -15,7 +15,7 @@ tracing path, the cache flavour and the image build are fixed.
 
 ## Decision
 **Go and HTTP.** Go toolchain line 1.27 (supported lines 1.26 and 1.27). Echo v5
-(`github.com/labstack/echo/v5`) ≥ v5.3.1. Satellites: `echo-contrib/v5` v5.0.1 for
+(`github.com/labstack/echo/v5`) ≥ v5.4.4. Satellites: `echo-contrib/v5` v5.0.1 for
 `echoprometheus` and `pprof`; its `session` package is not used; `echo-jwt` is not
 used at all, because Vizra issues no JWT (ADR-003). Tracing is `otelhttp`
 (`go.opentelemetry.io/contrib`) wrapping the Echo server handler plus an in-house
@@ -90,8 +90,8 @@ Nothing AGPL or GPL is shipped.
 
 | Component | Version | SPDX | SPDX verification | Notice obligation | In image |
 |---|---|---|---|---|---|
-| Go toolchain | 1.27.x (1.27.1) | BSD-3-Clause | SPDX to be re-verified from the upstream LICENSE file at pin time (PR1) | none (not distributed) | no |
-| `echo/v5` | ≥ v5.3.1 | MIT | SPDX to be re-verified from the upstream LICENSE file at pin time (PR1) | copyright + text | yes |
+| Go toolchain | 1.27.x (1.27.4) | BSD-3-Clause | SPDX to be re-verified from the upstream LICENSE file at pin time (PR1) | none (not distributed) | no |
+| `echo/v5` | ≥ v5.4.4 | MIT | SPDX to be re-verified from the upstream LICENSE file at pin time (PR1) | copyright + text | yes |
 | `echo-contrib/v5` | v5.0.1 | MIT | SPDX to be re-verified from the upstream LICENSE file at pin time (PR1) | copyright + text | yes |
 | sqlc | 1.31.1 | MIT | SPDX to be re-verified from the upstream LICENSE file at pin time (PR1) | none (not distributed) | no |
 | `pgx` | `[pin at PR time; verify]` | MIT | SPDX to be re-verified from the upstream LICENSE file at pin time (PR1) | copyright + text | yes |
@@ -173,3 +173,5 @@ not later. Reservation only: the HEIC option image and its licence review
 (VZ-MEDIA-010, M3), ffmpeg lanes (VZ-MEDIA-005, M3) and per-provider checksum
 configuration (Q-016, BLOCKED).
 
+## Editorial updates
+2026-11-11: editorial, Go 1.27.4 and Echo v5.4.4 as pinned by vizra-core #16 (owner decision 2026-11-11 #1)
