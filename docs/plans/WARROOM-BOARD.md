@@ -53,7 +53,7 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 | 11 | Scan lanes required and green; secret-scan lane | vizra-core + vizra-user | VZ-CI-004 | 1; inbox 9 for the image CVEs |
 | 12 | `vizra doctor`, status, logs, restart, update | vizra-core | VZ-OPS-002, VZ-OPS-003 | 7 |
 | 13 | Logs, metrics, tracing with privacy-safe fields | vizra-core | VZ-OPS-005 | none |
-| 14 | Tokens, icon registry, shell and CSP merged (user #11). Left: components with variants and states, brand mark, `design/HANDOFF.md` with node references, first-slice screens; a production-mode browser pass at desktop and mobile and the CSP mutation (owner 2026-11-11 #4) | vizra-user | VZ-DESIGN-001 | none |
+| 14 | Tokens, icon registry, shell and CSP merged (user #11). Left: components with variants and states, brand mark, `design/HANDOFF.md`, first-slice screens; owed: production-mode browser pass at desktop and mobile, and the CSP mutation (owner 2026-11-11 #4) | vizra-user | VZ-DESIGN-001 | none |
 | 15 | Host and image security posture | vizra + vizra-core | VZ-OPS-008 | inbox 9 |
 | 16 | M1, not blocked by 4a or 8b: registration and sessions, roles, the claim page | vizra-core + vizra-user | VZ-AUTH-001, VZ-AUTH-004, VZ-INSTALL-003 | M0 boot |
 | 17 | M1: durable jobs, local storage, quota, JPEG/PNG upload, the rest of the fixture corpus | vizra-core | VZ-JOBS-001, VZ-STORAGE-001, VZ-QUOTA-001, VZ-UPLOAD-001, VZ-FOUND-007 | 16 |
