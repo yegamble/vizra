@@ -116,8 +116,8 @@
       "Q-043"
     ],
     "by_implementation_status": {
-      "IMPLEMENTED": 1,
-      "PLANNED": 191
+      "IMPLEMENTED": 2,
+      "PLANNED": 190
     },
     "by_verification_status": {
       "UNVERIFIED": 192
@@ -11137,12 +11137,53 @@
       "unresolved": [],
       "decided": [],
       "notes": null,
-      "implementation_status": "PLANNED",
+      "implementation_status": "IMPLEMENTED",
       "verification_status": "UNVERIFIED",
-      "merge_status": "NOT_STARTED",
+      "merge_status": "MERGED",
       "release_status": "NOT_RELEASED",
       "test_ids": [],
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "status_record",
+          "status": "IMPLEMENTED",
+          "rationale": "Every ledger case is delivered on vizra-user main and each part was reproduced by an independent verifier. Tokens (spacing, type, radii, shadows, semantic colours), the typed Lucide icon registry with a test that every registered name is an export of the pinned lucide-react, and the app shell with a nonce CSP: vizra-user #11. Unknown icon name fails typecheck: #11 (the verifier's mutations: an unregistered name is a tsc error, and a non-export fails the registry test). Components with variants and states, and design/HANDOFF.md mirroring the accepted Figma file with node and revision references: #13 (17 components) and #15 (PhotoCard, TabBar Item, TabBar); with #15 every section-5 component of the accepted design has a file. Brand mark: the text wordmark, which owner decision 2026-11-12 #6 rules is the M0 brand mark; the final mark is VZ-BRAND-001 (M5). IMPLEMENTED, not VERIFIED: queue 14 (owner decision 2026-11-11 #4) still owes a production-mode browser pass at desktop and mobile and the CSP mutation, which the #11 verifier did not run locally. Acceptance bullets are the ledger cases copied word for word into VZ-ISSUE-008 under owner decision 2026-11-12 #5.",
+          "acceptance": [
+            {
+              "issue": "docs/issues/VZ-ISSUE-008.md",
+              "bullet": "(VZ-DESIGN-001) Everyone: approved tokens (spacing/type/radii/shadows/semantic colors), components with variants and states, Lucide icons behind a typed registry with verified exports, brand mark; mirrored from Figma into the repo with revision references."
+            },
+            {
+              "issue": "docs/issues/VZ-ISSUE-008.md",
+              "bullet": "(VZ-DESIGN-001) Token file + component catalog + icon registry test that every name exists in the pinned package"
+            },
+            {
+              "issue": "docs/issues/VZ-ISSUE-008.md",
+              "bullet": "(VZ-DESIGN-001) Unknown icon name fails typecheck"
+            }
+          ]
+        },
+        {
+          "kind": "merge",
+          "repo": "vizra-user",
+          "pr": 11,
+          "verified_head": "505fb281cd9fb4dd89f76aae7317a5bf8d9593c6",
+          "merge_commit": "33633d41a6d95da93cba00e6b8dffbe654efa505"
+        },
+        {
+          "kind": "merge",
+          "repo": "vizra-user",
+          "pr": 13,
+          "verified_head": "fa99ca384af1fe7dfc3d2affdefc7d25ead4d0ef",
+          "merge_commit": "0bb8dc6814e40b46d2db17bab39f4b0857dd1eac"
+        },
+        {
+          "kind": "merge",
+          "repo": "vizra-user",
+          "pr": 15,
+          "verified_head": "4f9918682eba78afcc6c0187d0d5b447506d13f6",
+          "merge_commit": "77c473846a1b81c346e8b074e06de447c857d9e6"
+        }
+      ]
     },
     {
       "id": "VZ-A11Y-001",
