@@ -152,7 +152,7 @@ services:
       # host and image silently invalidates text indexes.
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     # Docker gives every container a 64 MiB /dev/shm. PostgreSQL's
     # `dynamic_shared_memory_type` defaults to `posix`, which allocates dynamic
     # shared-memory segments there — so parallel sequential scans and parallel
