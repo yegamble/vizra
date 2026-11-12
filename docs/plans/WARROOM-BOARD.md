@@ -22,7 +22,7 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 3a: contract test walks wildcard routes; migrate-lint column drops | vizra-core | VZ-FOUND-002, VZ-FOUND-003 | #18 | `84f8ad1` | FAIL at `a627e1f`, fix round 1 pushed, `ci-required` green; re-verification allowed by owner grant 2026-11-12 #1 once it is on `main` | 002: 4/1/0/3 of 6/2/1/12; 003: 2/1/0/3 of 5/2/1/12 |
+| Queue 3a: contract test walks wildcard routes; migrate-lint column drops | vizra-core | VZ-FOUND-002, VZ-FOUND-003 | #18 | `84f8ad1` | FAIL at `a627e1f`, fix round 1 pushed, CI green; re-verify under owner grant 2026-11-12 #1 | 002: 4/1/0/3, cap 6 verdicts; 003: 2/1/0/3, cap 5 |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
