@@ -26,3 +26,8 @@ Branch `feat/install-004-bundle` from origin/main 791a020. Status: IN_PROGRESS �
 
 ## Remains
 deploy scripts, Caddyfile template, systemd units, release record generator (`vizra release`), real core schema from a pinned core tag, a separate required `bundle` check (out of scope: required-checks.txt is not mine to edit), release upload.
+
+## Session 2 — CI fix (validate run 43245146608)
+- Root cause: main gained the otel profile (meta #29) after the branch was cut; CI tests the merge, and `prod-otel-managed` failed to render from the bundle because `docker-compose.otel-{managed,external}.yml` and `deploy/otel/collector.yaml` were not in the include list. The hand-written `required.overlays` list could not notice, and the bind-mount check only scans *shipped* compose files, so collector.yaml was invisible too.
+- Fix: merged origin/main (no rebase); added the three files to `include`; removed the hand `overlays` list; check-bundle now requires every file of every production shape in the shipped `scripts/compose-shapes.json` (`missing: production shape <id> needs <file>`). collector.yaml is now covered by the bind-mount check because its overlay ships.
+- Red first: new case 9 (a shape pointing at a compose file absent from include) → `not ok - ... command succeeded` before the check existed; green after. `bash tests/bundle/bundle_test.sh` → PASS 10 cases, 13/13 production shapes rendered from the unpacked bundle.

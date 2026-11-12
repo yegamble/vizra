@@ -89,6 +89,19 @@ PY
 "$B" --tag v0.0.0-ci --out "$WORK/s3o" --src "$WORK/s3" --core-migrations "$MIG" >/dev/null
 expect_fail "an undeclared missing release item fails" "missing: systemd units" "$C" "$WORK/s3o/$TGZ" --no-render
 
+# negative: a production shape naming a compose file absent from the include list fails
+copy_src "$WORK/s4"
+cp "$WORK/s4/docker-compose.external-ipfs.yml" "$WORK/s4/docker-compose.probe-overlay.yml"
+python3 - "$WORK/s4/scripts/compose-shapes.json" <<'PY2'
+import json, sys; p = sys.argv[1]; c = json.load(open(p))
+s = next(x for x in c["shapes"] if x["id"] == "prod-external-ipfs")
+s["files"] = [f if f != "docker-compose.external-ipfs.yml" else "docker-compose.probe-overlay.yml" for f in s["files"]]
+json.dump(c, open(p, "w"))
+PY2
+"$B" --tag v0.0.0-ci --out "$WORK/s4o" --src "$WORK/s4" --core-migrations "$MIG" >/dev/null
+expect_fail "a shape file absent from the include list fails" \
+  "missing: production shape prod-external-ipfs needs docker-compose.probe-overlay.yml" "$C" "$WORK/s4o/$TGZ" --no-render
+
 # negative: a tampered file fails the manifest sha256
 rm -rf "$WORK/t"; mkdir -p "$WORK/t"; tar -xzf "$WORK/a/$TGZ" -C "$WORK/t"
 echo "# tampered" >> "$WORK/t/vizra-bundle_v0.0.0-ci/docker-compose.yml"

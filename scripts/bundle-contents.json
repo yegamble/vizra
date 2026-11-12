@@ -1,5 +1,5 @@
 {
-  "_note": "The release-bundle contract (VZ-INSTALL-004). `include` is the exact list shipped (no tree glob). `required` is every item the release contract (docs/META_REPO.md §3-§6) says a bundle carries; an item with no shipped path must be declared in `not_yet_shipped` with a reason, or check-bundle fails with 'missing: <item>'. `generated_bind_sources` are bind-mount sources written on the host by `vizra setup`, never shipped.",
+  "_note": "The release-bundle contract (VZ-INSTALL-004). `include` is the exact list shipped (no tree glob). `required` is every item the release contract (docs/META_REPO.md §3-§6) says a bundle carries; an item with no shipped path must be declared in `not_yet_shipped` with a reason, or check-bundle fails with 'missing: <item>'. Overlays are not hand-listed here: check-bundle requires every file of every production shape in scripts/compose-shapes.json. `generated_bind_sources` are bind-mount sources written on the host by `vizra setup`, never shipped.",
   "include": [
     "docker-compose.yml",
     "docker-compose.prod.yml",
@@ -7,6 +7,9 @@
     "docker-compose.external-redis.yml",
     "docker-compose.external-clickhouse.yml",
     "docker-compose.external-ipfs.yml",
+    "docker-compose.otel-managed.yml",
+    "docker-compose.otel-external.yml",
+    "deploy/otel/collector.yaml",
     "env/production.env.example",
     "env/registry/README.md",
     "env/registry/aliases.json",
@@ -29,7 +32,6 @@
   ],
   "required": {
     "compose files": ["docker-compose.yml", "docker-compose.prod.yml"],
-    "overlays": ["docker-compose.external-postgres.yml", "docker-compose.external-redis.yml", "docker-compose.external-clickhouse.yml", "docker-compose.external-ipfs.yml"],
     "env template": ["env/production.env.example"],
     "deploy scripts": ["deploy/deploy.sh", "deploy/backup.sh", "deploy/restore.sh", "deploy/rollback.sh"],
     "Caddyfile": ["deploy/Caddyfile"],

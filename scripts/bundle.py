@@ -169,6 +169,19 @@ def check(a):
             for p in paths:
                 if p.replace("<tag>", man["tag"]) not in shipped:
                     errors.append(f"missing: {item} ({p})")
+        # Every file a production shape renders with must ship: derived from the
+        # shipped compose-shapes.json, so a new overlay cannot be left out silently.
+        shapes_path = os.path.join(tree, "scripts/compose-shapes.json")
+        if not os.path.isfile(shapes_path):
+            errors.append("missing: scripts/compose-shapes.json")
+        else:
+            with open(shapes_path, encoding="utf-8") as fh:
+                for shape in json.load(fh)["shapes"]:
+                    if shape["kind"] != "production":
+                        continue
+                    for f in shape["files"]:
+                        if f not in shipped:
+                            errors.append(f"missing: production shape {shape['id']} needs {f}")
         gen = contract.get("generated_bind_sources", {})
         for cf in sorted(f for f in shipped if re.fullmatch(r"docker-compose[^/]*\.yml", f)):
             for s in bind_sources(os.path.join(tree, cf)):
