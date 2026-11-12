@@ -1,0 +1,9 @@
+{
+  "_note": "Fixture only: the shape bundle.py reads from releases/<tag>.json (docs/META_REPO.md §6). Not a real release.",
+  "tag": "v0.0.0-ci",
+  "components": {
+    "vizra-core": {"tag": "v0.0.0-ci", "schema_version": 3},
+    "vizra-user": {"tag": "v0.0.0-ci"},
+    "vizra-search": {"tag": "v0.0.0-ci", "search_schema_version": null}
+  }
+}

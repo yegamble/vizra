@@ -390,3 +390,11 @@ jobs:
       # not byte-identical afterwards.
       - name: every compose guard still fails against a controlled mutation
         run: bash docs/evidence/compose-topology/demo.sh
+
+      # VZ-INSTALL-004 bundle lane (run as a step of `validate`; no new required
+      # check name). Builds vizra-bundle_<tag>.tar.gz twice and cmp's them,
+      # checks manifest sha256s, excludes, bind-mount sources and the release
+      # contract, renders every production shape from the unpacked bundle with
+      # no component checkouts, and runs every negative case.
+      - name: deployment bundle is reproducible, complete and renders without checkouts (VZ-INSTALL-004)
+        run: bash tests/bundle/bundle_test.sh

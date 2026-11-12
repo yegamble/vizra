@@ -1,0 +1,4 @@
+$ MUTATION: wall-clock mtime in scripts/bundle.py
+/var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.hKvi9izkpf/a/vizra-bundle_v0.0.0-ci.tar.gz /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T/tmp.hKvi9izkpf/b/vizra-bundle_v0.0.0-ci.tar.gz differ: char 159, line 2
+not ok - two builds differ
+exit=1
