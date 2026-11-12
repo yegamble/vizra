@@ -1,8 +1,8 @@
 {
   "component": "vizra-core `vizra setup` interview (VZ-INSTALL-002)",
-  "note": "Snapshot of the setup interview's question id -> env template keys, read from vizra-core internal/setup/questions.go at source_commit. Refresh: `python3 -I scripts/snapshot-setup-keys.py <vizra-core checkout>` and paste source_commit + questions in one edit. Checked by scripts/check-config-coverage.py rules setup-key-untemplated and template-key-unasked. Like core.json, a green validate proves consistency with this snapshot, not that the snapshot is current.",
+  "note": "Snapshot of the setup interview's question id -> env keys, parsed from vizra-core internal/setup/questions.go at source_commit (named key lists such as `Keys: topoKeys` are resolved). Refresh: `python3 -I scripts/snapshot-setup-keys.py <vizra-core checkout>` and paste source_commit + questions + compose_keys in one edit. `scripts/snapshot-setup-keys.py --check <vizra-core checkout>` (validate lane) fails unless source_commit is an ancestor of vizra-core origin/main and the parse at that commit equals this file. Checked by scripts/check-config-coverage.py rules setup-key-untemplated and template-key-unasked.",
   "source_file": "internal/setup/questions.go",
-  "source_commit": "2c557ac62b04f6d6069e0ef04da0c2e2d2bf1e9b",
+  "source_commit": "46e9a332269a6e217e7a5d038b5a90e9543f6883",
   "questions": {
     "domain": [
       "VIZRA_DOMAIN"
@@ -20,23 +20,9 @@
       "VIZRA_USER_TAG",
       "VIZRA_SEARCH_TAG"
     ],
-    "s3_endpoint": [
-      "VIZRA_S3_ENDPOINT"
-    ],
-    "s3_bucket": [
-      "VIZRA_S3_BUCKET"
-    ],
-    "s3_access_key": [
-      "VIZRA_S3_ACCESS_KEY_ID"
-    ],
-    "s3_secret_key": [
-      "VIZRA_S3_SECRET_ACCESS_KEY"
-    ],
-    "storage": [
-      "VIZRA_STORAGE_BACKEND"
-    ],
     "postgres": [
-      "VIZRA_POSTGRES_MODE"
+      "COMPOSE_FILE",
+      "COMPOSE_PROFILES"
     ],
     "postgres_dsn": [
       "DATABASE_URL"
@@ -45,37 +31,25 @@
       "POSTGRES_PASSWORD"
     ],
     "redis": [
-      "VIZRA_REDIS_MODE"
+      "COMPOSE_FILE",
+      "COMPOSE_PROFILES"
     ],
     "redis_url": [
       "VIZRA_CACHE_URL"
     ],
     "analytics": [
-      "VIZRA_ANALYTICS_MODE"
+      "COMPOSE_FILE",
+      "COMPOSE_PROFILES"
     ],
     "clickhouse_password": [
       "CLICKHOUSE_PASSWORD"
     ],
     "ipfs": [
-      "VIZRA_IPFS_MODE"
+      "COMPOSE_FILE",
+      "COMPOSE_PROFILES"
     ],
     "search": [
       "VIZRA_SEARCH_MODE"
-    ],
-    "smtp": [
-      "VIZRA_SMTP_MODE"
-    ],
-    "smtp_url": [
-      "VIZRA_SMTP_URL"
-    ],
-    "smtp_from": [
-      "VIZRA_SMTP_FROM"
-    ],
-    "registration": [
-      "VIZRA_REGISTRATION_MODE"
-    ],
-    "import": [
-      "VIZRA_IMPORT_MODE"
     ],
     "session_secret": [
       "VIZRA_SESSION_SECRET"
@@ -87,28 +61,18 @@
       "SEARCH_HMAC_KEY"
     ]
   },
+  "compose_keys": {
+    "COMPOSE_FILE": "read by Docker Compose itself from the --env-file (vizra-core internal/setup/engine.go:79-80); computed from the postgres/redis/analytics/ipfs topology answers and checked against them by `vizra setup --check` (engine.go:136), so a hand-editable template line would only invite a mismatch",
+    "COMPOSE_PROFILES": "read by Docker Compose itself from the --env-file (vizra-core internal/setup/engine.go:79-80); computed from the topology answers together with COMPOSE_FILE, same reason"
+  },
+  "compose_keys_note": "Keys `vizra setup` writes that Docker Compose reads, not a container. Must equal vizra-core setup.ComposeKeys at source_commit. They count as handled for setup-key-untemplated and must NOT appear in env/production.env.example.",
   "setup_reads": {
     "VIZRA_DOMAIN": "internal/setup/edge.go RenderEdge (edge/Caddy site address)",
     "VIZRA_TLS_MODE": "internal/setup/edge.go RenderEdge (which edge file is rendered; external = no edge profile)"
   },
   "setup_reads_note": "Keys no compose file interpolates but `vizra setup` itself reads at the commit above. They count as consumed for template-key-unused. Do not add a key here without a file:function in vizra-core that reads it.",
-  "unread_keys": [
-    "VIZRA_STORAGE_BACKEND",
-    "VIZRA_S3_ENDPOINT",
-    "VIZRA_S3_BUCKET",
-    "VIZRA_S3_ACCESS_KEY_ID",
-    "VIZRA_S3_SECRET_ACCESS_KEY",
-    "VIZRA_POSTGRES_MODE",
-    "VIZRA_REDIS_MODE",
-    "VIZRA_ANALYTICS_MODE",
-    "VIZRA_IPFS_MODE",
-    "VIZRA_SMTP_MODE",
-    "VIZRA_SMTP_URL",
-    "VIZRA_SMTP_FROM",
-    "VIZRA_REGISTRATION_MODE",
-    "VIZRA_IMPORT_MODE"
-  ],
-  "unread_keys_note": "FINDING for vizra-core: the interview writes these but nothing reads them at source_commit (no compose interpolation, no core registry key, no setup code path). They are deliberately NOT in the template - a key nobody reads is a lie an operator can act on. Each leaves this list when its reader lands (storage, mail, registration, import, ClickHouse/IPFS and managed/external selection slices); setup-key-untemplated fails on any written key that is in neither the template nor this list.",
+  "unread_keys": [],
+  "unread_keys_note": "Keys the interview writes that nothing reads (no compose interpolation, no core registry key, no setup code path); they are deliberately NOT in the template. Empty at source_commit: merged core has no storage/S3, SMTP, registration or import question. setup-key-untemplated fails on a written key that is in none of the template, compose_keys or this list.",
   "not_asked": {
     "VIZRA_IMAGE_REGISTRY": "artefact source; fixed by the release, not an install-time choice",
     "VIZRA_IMAGE_OWNER": "artefact source; fixed by the release, not an install-time choice",

@@ -431,11 +431,12 @@ def main(argv):
         unevaluable("env/registry/setup.json records no questions.")
     written = {k for ks in questions.values() for k in ks}
     unread = set(setup.get("unread_keys") or [])
+    compose_keys = set(setup.get("compose_keys") or {})
     not_asked = set(setup.get("not_asked") or {})
     prod = set(templates["production"])
     for qid, ks in sorted(questions.items()):
         for key in ks:
-            if key not in prod and key not in unread:
+            if key not in prod and key not in unread and key not in compose_keys:
                 violation(
                     "setup-key-untemplated", f"{qid}/{key}",
                     f"`vizra setup` writes it (env/registry/setup.json at "
@@ -449,6 +450,13 @@ def main(argv):
     for key in sorted(unread - written):
         violation("setup-key-untemplated", key,
                   "is listed as unread_keys but no question writes it")
+    for key in sorted(compose_keys - written):
+        violation("setup-key-untemplated", key,
+                  "is listed as compose_keys but no question writes it")
+    for key in sorted(compose_keys & prod):
+        violation("setup-key-untemplated", key,
+                  "is listed as compose_keys (computed by `vizra setup`, read by "
+                  "Docker Compose) but env/production.env.example also carries it")
     for key in sorted(setup_reads - written):
         violation("setup-key-untemplated", key,
                   "is listed as setup_reads but no question writes it")
