@@ -116,7 +116,8 @@
       "Q-043"
     ],
     "by_implementation_status": {
-      "PLANNED": 192
+      "IMPLEMENTED": 1,
+      "PLANNED": 191
     },
     "by_verification_status": {
       "UNVERIFIED": 192
@@ -229,12 +230,46 @@
       "unresolved": [],
       "decided": [],
       "notes": null,
-      "implementation_status": "PLANNED",
+      "implementation_status": "IMPLEMENTED",
       "verification_status": "UNVERIFIED",
-      "merge_status": "NOT_STARTED",
+      "merge_status": "MERGED",
       "release_status": "NOT_RELEASED",
       "test_ids": [],
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "status_record",
+          "status": "IMPLEMENTED",
+          "rationale": "All three ledger cases are delivered on main and each was reproduced by an independent verifier. S1 (route without spec fails; spec without route fails): vizra-core #18 made the contract test walk wildcard routes and fail closed on shapes it cannot map; the verifier's own mutations on the real router went red in both directions. S2 (generated client diff empty after regeneration) and N1 (hand-edited generated file rejected): vizra-user #12 re-vendored the contract at core 5f615d7 and added an exact six-operation test; the verifier re-vendored from core main with no diff and saw the drift check reject a hand edit. IMPLEMENTED, not VERIFIED: the ledger's evidence_required asks for CI job output of the both-direction drift failure on a deliberate mutation, and every red run so far is a verifier-local transcript. Known limits, recorded in docs/warroom/FOLLOWUPS.md: no CI compares vizra-user's vendored contract with core main; the worker's metrics mux is outside what the contract test walks.",
+          "acceptance": [
+            {
+              "issue": "docs/issues/VZ-ISSUE-001.md",
+              "bullet": "(VZ-FOUND-002) Route-without-spec and spec-without-route both fail CI (demonstrated)"
+            },
+            {
+              "issue": "docs/issues/VZ-ISSUE-001.md",
+              "bullet": "(VZ-FOUND-002) Generated client diff is empty after regeneration"
+            },
+            {
+              "issue": "docs/issues/VZ-ISSUE-001.md",
+              "bullet": "(VZ-FOUND-002) Hand-edited generated file is rejected by a drift check"
+            }
+          ]
+        },
+        {
+          "kind": "merge",
+          "repo": "vizra-core",
+          "pr": 18,
+          "verified_head": "b1c1734f583a46f7abc295dcc55094f9d3f5717e",
+          "merge_commit": "58d658f128ed7dc4be7a218ae0cd5744b87d0601"
+        },
+        {
+          "kind": "merge",
+          "repo": "vizra-user",
+          "pr": 12,
+          "verified_head": "a3b8f942d566513b155971384bd2ee6b161d4520",
+          "merge_commit": "53a39a889ba0f456bbfdd4df7d5f241c12e7a1b5"
+        }
+      ]
     },
     {
       "id": "VZ-FOUND-003",
