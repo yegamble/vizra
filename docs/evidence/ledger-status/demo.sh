@@ -322,9 +322,39 @@ fi
 back_to_fixture
 
 echo "== D11 the summary counts disagree with the features (verify round 1, NIT 3)"
-mutate "$copy/docs/quality/features.json" 'import json,sys; p=sys.argv[1]; d=json.load(open(p,encoding="utf-8")); d["summary"]["by_implementation_status"]={"PLANNED":191,"VERIFIED":1}; open(p,"w",encoding="utf-8",newline="\n").write(json.dumps(d,indent=2,ensure_ascii=False))' \
-  && (cd "$copy" && git -c user.name=demo -c user.email=demo@invalid commit -qam "tamper summary") \
-  && red "D11" "summary.by_implementation_status is {'PLANNED': 191, 'VERIFIED': 1} but the features count {'PLANNED': 192}" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
+# Both dicts in the refusal are DERIVED from the copy's ledger, never hard-coded:
+# the true counts are whatever the committed features carry (they change with
+# every status record), and the tampered summary is the true counts with one
+# requirement moved from PLANNED to VERIFIED, so it differs in every ledger
+# state. Keys are written sorted, which is the order json.load hands back to the
+# checker, so the full message (both dicts) is still asserted exactly.
+if D11_PLAN="$(python3 - "$copy/docs/quality/features.json" <<'PY'
+import json, sys
+doc = json.load(open(sys.argv[1], encoding="utf-8"))
+counts = {}
+for f in doc["features"]:
+    counts[f.get("implementation_status")] = counts.get(f.get("implementation_status"), 0) + 1
+true = dict(sorted(counts.items()))
+if true.get("PLANNED", 0) < 1:
+    sys.exit(f"the ledger has no PLANNED requirement to move; counts are {true}")
+tampered = dict(true)
+tampered["PLANNED"] -= 1
+tampered["VERIFIED"] = tampered.get("VERIFIED", 0) + 1
+tampered = dict(sorted(tampered.items()))
+print(json.dumps(tampered))
+print(f"summary.by_implementation_status is {tampered} but the features count {true}")
+PY
+)"; then
+  D11_TAMPERED="$(sed -n 1p <<< "$D11_PLAN")"; D11_NEEDLE="$(sed -n 2p <<< "$D11_PLAN")"
+  export D11_TAMPERED
+  echo "  D11 tampered summary: $D11_TAMPERED"
+  mutate "$copy/docs/quality/features.json" 'import json,os,sys; p=sys.argv[1]; d=json.load(open(p,encoding="utf-8")); d["summary"]["by_implementation_status"]=json.loads(os.environ["D11_TAMPERED"]); open(p,"w",encoding="utf-8",newline="\n").write(json.dumps(d,indent=2,ensure_ascii=False))' \
+    && (cd "$copy" && git -c user.name=demo -c user.email=demo@invalid commit -qam "tamper summary") \
+    && red "D11" "$D11_NEEDLE" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
+else
+  echo "  FAIL  D11 could not derive a tampered summary from the ledger; the case did NOT run and is counted as a FAIL: $D11_PLAN"
+  FAILED=$((FAILED + 1))
+fi
 (cd "$copy" && git reset -q --hard base-commit)
 green "D11 restored" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
 
