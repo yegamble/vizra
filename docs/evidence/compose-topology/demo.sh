@@ -939,3 +939,4 @@ if [ -n "$dirty" ]; then
 fi
 echo "  tree is clean - every mutation was reverted"
 [ "$FAILED" = "0" ] || exit 1
+[ "$PASSED" -gt 0 ] || { echo "  FAIL  no demonstration ran"; exit 1; }

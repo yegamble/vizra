@@ -374,4 +374,4 @@ else
 fi
 
 echo "demo: $PASSED passed, $FAILED failed"
-[ "$FAILED" -eq 0 ]
+[ "$FAILED" -eq 0 ] && [ "$PASSED" -gt 0 ]
