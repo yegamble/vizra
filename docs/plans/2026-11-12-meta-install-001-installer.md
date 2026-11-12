@@ -1,0 +1,138 @@
+# Execution plan: VZ-INSTALL-001 — installer (`install.sh`)
+
+## Context
+Base origin/main 4a53e88, branch `feat/installer`, worktree `.claude/worktrees/meta-install-001`. Issue `docs/issues/VZ-ISSUE-004.md`; repo shape `docs/META_REPO.md` §1. Reference pattern: vidra `install.sh` (behaviour/order only).
+
+## Acceptance
+Ledger entry VZ-INSTALL-001 unchanged. Cases S1, S2, N1, N2, P1, R1. Non-goals here: the release bundle (VZ-INSTALL-004), a published CLI + checksums and `vizra setup` (VZ-INSTALL-002).
+
+## Implementation
+- `install.sh` (POSIX sh): `--yes --ref --dir --owner --git --cli --cli-sha256 --help`. Steps `docker, tree-meta, tree-core, tree-user, tree-search, cli` recorded in `DIR/.vizra-install.state`; resume skips recorded steps. Docker + Compose >= 2.24 detected; on Ubuntu/Debian installed from Docker's apt repo with key fingerprint `9DC858229FC7DD38854AE2D88D81803C0EBFCD88` pinned; never the convenience script. `verify_sha256` is used for the `--cli` override (checked before anything is written, then again on the copy); `manifest_sha256` reads the documented sha256sum-format manifest (`<64 hex>  <name>`) for the future bundle path. Bundle path refuses: `no release bundle is published for <ref>; use --git` (exit 3). No CLI -> exit 3 before hand-off. Hand-off: exec `vizra setup` if `vizra setup --help` succeeds, else print `next: cd DIR && DIR/bin/vizra setup` and exit 0. Never writes env/production.env, never runs compose up.
+- Test-only hooks (refused, exit 2, unless `VIZRA_INSTALL_TESTING=1`): `VIZRA_INSTALL_TEST_STOP_AFTER`, `VIZRA_INSTALL_SKIP_DOCKER`, `VIZRA_INSTALL_REPO_BASE`.
+- `tests/install/install_test.sh` (15 checks, local bare repos, no network); `docs/evidence/install/mutation-demo.sh` (7 controlled mutations, each must go red). Both wired as steps in the required `validate` job.
+
+## Verification
+`sh tests/install/install_test.sh`; `sh docs/evidence/install/mutation-demo.sh`; `shellcheck -s sh install.sh tests/install/install_test.sh docs/evidence/install/mutation-demo.sh`; meta check scripts.
+
+## Progress and evidence
+2026-11-12, macOS arm64 (/bin/sh = bash in sh mode), via quiet.sh:
+| command | exit | result |
+|---|---|---|
+| sh tests/install/install_test.sh | 0 | 15 passed, 0 failed (first run: 6 passed 9 failed — a test-driver arg bug and `cat` in `--help` under empty PATH; both fixed) |
+| sh docs/evidence/install/mutation-demo.sh | 0 | 7/7 RED as expected: skip-checksum->N1, no-tty-check->N2, rewrite-production-env->P1, no-resume->R1-resume-after-tree-core, help-needs-path->S2, rerun-touches-state->idempotent, bundle-pretends->bundle-refuses |
+| shellcheck -s sh (3 files) | 0 | clean |
+| check-workflows / check-action-pins / check-lane-integrity / check-doc-links / check-quality-json | 0 | pass |
+| check-generated-ledger.sh | 0 | 192 requirements |
+
+Red transcripts: the mutation demo output above (re-run in CI on every PR). Green: the install_test run above.
+
+| case | state | why |
+|---|---|---|
+| S1 | OPEN | tree + CLI land, but the interview cannot start: `vizra setup` does not exist (VZ-INSTALL-002); no clean Ubuntu 24.04 transcript yet |
+| S2 | closed (test) | `env -i PATH=/nonexistent /bin/sh install.sh --help`, empty cwd stays empty; dash/busybox not run locally — CI ubuntu /bin/sh is dash |
+| N1 | closed (test) | wrong sha256 -> exit 4, --dir byte-identical |
+| N2 | closed (test) | stdin /dev/null, no --yes -> exit 2, --dir not created |
+| P1 | closed (test) | existing production.env byte-identical across two runs; never created |
+| R1 | closed (test) | stop after each of 5 steps, rerun -> exit 0, tree + state equal an uninterrupted run |
+
+## Blockers and handoff
+Not run: clean-target `ubuntu:24.04` container run (Docker not running locally; not added to CI in this PR); real Docker apt install path (needs root on a clean host); busybox sh. Remaining: S1 needs VZ-INSTALL-002 (`vizra setup`) and a published CLI + checksum manifest (VZ-INSTALL-004 / vizra-core release); bundle path needs VZ-INSTALL-004 and should then use `manifest_sha256` + `verify_sha256`; add a digest-pinned ubuntu:24.04 container step with `--yes --git` to CI.
+
+## Session 2 (2026-11-12)
+- CI on 92825bf (validate attempt 2): failed again in "every recorded ledger status is proved against GitHub" (`gh api ... pulls/18: Service Unavailable`, plus fixture lines); installer steps were skipped there. Left to the chair; step untouched.
+- Added `--skip-docker` (documented in `--help`: "for environments that provide Docker otherwise"). The only existing skip was the test-only `VIZRA_INSTALL_SKIP_DOCKER`, refused outside `VIZRA_INSTALL_TESTING=1`.
+- Added `tests/install/clean_target.sh` + validate step "installer on a clean digest-pinned ubuntu:24.04". Image `ubuntu:24.04@sha256:2198e4c65076e9cb0b3d695219df667c0e3b0072da64ca3c2648aca17dcecaf5` (index; amd64 manifest `sha256:77eb101c…57ec`), confirmed with `docker buildx imagetools inspect ubuntu:24.04` on 2026-11-12.
+- Deviation: `--ref main`, not the PR head SHA — `--ref` applies to all four repos and a meta SHA does not exist in vizra-core/user/search.
+- The full run uses a PLACEHOLDER local CLI (a script that implements no command) because no vizra CLI is published; it proves only the hand-off message. S1 stays open.
+- Local (arm64, same index digest): `sh tests/install/clean_target.sh` exit 0 — /bin/sh is /usr/bin/dash; `--help` with --network none exit 0 and nothing written (root and ubuntu); no-CLI run exit 3 with the tree in place; placeholder-CLI run exit 0 naming `vizra setup`; third run gives the same tree-listing + state sha256 (root and ubuntu).
+- Local gates: install_test 15 passed 0 failed; mutation-demo PASS; shellcheck, check-workflows, check-action-pins, check-lane-integrity, check-doc-links all exit 0.
+
+## Session 3 (2026-11-12): CI evidence on abd9df2
+validate run 43230841779 success (job https://github.com/yegamble/vizra/actions/runs/43230841779/job/131225566183); ci-required run 43230841752 success. Log excerpts (`gh run view 43230841779 --log`):
+
+```
+installer tests (VZ-INSTALL-001):  ok S2-help / N2-non-tty-refuses / N1-checksum-mismatch / bundle-refuses / git-path-tree-cli-handoff / no-cli-stops / idempotent-second-run / P1-production-env-untouched / P1-never-creates-production-env / R1-resume-after-{docker,tree-meta,tree-core,tree-user,tree-search} / test-hook-refused
+13:49:36.3924477Z 15 passed, 0 failed
+mutation demo (no summary count line is printed; 7 lines, all RED):
+13:49:37.68Z RED as expected: skip-checksum -> FAIL N1-checksum-mismatch
+13:49:38.87Z RED as expected: no-tty-check -> FAIL N2-non-tty-refuses
+13:49:40.06Z RED as expected: rewrite-production-env -> FAIL P1-production-env-untouched
+13:49:41.23Z RED as expected: no-resume -> FAIL R1-resume-after-tree-core
+13:49:42.39Z RED as expected: help-needs-path -> FAIL S2-help
+13:49:43.37Z RED as expected: rerun-touches-state -> FAIL idempotent-second-run
+13:49:44.61Z RED as expected: bundle-pretends -> FAIL bundle-refuses
+clean target (ubuntu:24.04@sha256:2198e4c6…caf5):
+== --help, --network none, user root      -> /usr/bin/dash / help ok: exit 0, nothing written
+== --help, --network none, user ubuntu    -> /usr/bin/dash / help ok: exit 0, nothing written
+== full run, user root, dir /tmp/vz-target-root, ref main
+install.sh: no checksum-verified vizra CLI is published for main; pass --cli PATH --cli-sha256 HEX (tree is in place; a re-run resumes here)
+==> this vizra CLI has no 'setup' command yet (VZ-INSTALL-002); the interview did not start.
+==> next: cd /tmp/vz-target-root && /tmp/vz-target-root/bin/vizra setup
+c2f8b866…5b65  - / b389fb50…23a1  .vizra-install.state  -> idempotent ok (root)
+(same for user ubuntu, identical hashes) -> idempotent ok (ubuntu)
+clean target: all checks passed
+```
+Note: the no-CLI refusal's exit code 3 is asserted inside clean_target.sh, not printed; the log shows the refusal message only.
+
+## Fix round 1
+
+Finding (verifier, 2026-11-12): a state file listing `cli` skipped the checksum and ran an unverified `bin/vizra` as root. Fix: the state file skips work, never verification. Every run needs its own `--cli-sha256`, or it exits 3 without running anything. The state records `cli <sha256>`. If `bin/vizra` is missing the recorded sha or does not match it, the installer refuses (exit 4) and does not run or replace the binary. When the run's sha is new, the CLI is installed atomically (mktemp in `bin/`, verify, rename) and the `cli` line is replaced. `bin/vizra` is checked with `verify_sha256` again right before hand-off.
+
+Reproducer before (a31837f):
+```
+==> installed into $T/F1
+EVIL-UNVERIFIED setup
+exit 0
+```
+After:
+```
+install.sh: $T/F2/bin/vizra does not match the checksum recorded in $T/F2/.vizra-install.state; refusing to run or replace it (remove it to reinstall)
+exit 4
+```
+
+Red first, `sh tests/install/install_test.sh` on a31837f with the new tests:
+```
+FAIL V1-forged-state-refused (rc=0)
+FAIL V2-tampered-cli-refused (rc=0)
+FAIL V2-no-checksum-no-exec (rc=0)
+FAIL V3-upgrade-replaces-cli (rc=0)
+15 passed, 4 failed
+exit 1
+```
+Green:
+```
+ok   S2-help
+ok   N2-non-tty-refuses
+ok   N1-checksum-mismatch
+ok   bundle-refuses
+ok   git-path-tree-cli-handoff
+ok   no-cli-stops
+ok   idempotent-second-run
+ok   P1-production-env-untouched
+ok   P1-never-creates-production-env
+ok   R1-resume-after-docker
+ok   R1-resume-after-tree-meta
+ok   R1-resume-after-tree-core
+ok   R1-resume-after-tree-user
+ok   R1-resume-after-tree-search
+ok   V1-forged-state-refused
+ok   V2-tampered-cli-refused
+ok   V2-no-checksum-no-exec
+ok   V3-upgrade-replaces-cli
+ok   test-hook-refused
+19 passed, 0 failed
+exit 0
+```
+`sh docs/evidence/install/mutation-demo.sh`:
+```
+RED as expected: skip-checksum -> FAIL N1-checksum-mismatch
+RED as expected: no-tty-check -> FAIL N2-non-tty-refuses
+RED as expected: rewrite-production-env -> FAIL P1-production-env-untouched
+RED as expected: no-resume -> FAIL R1-resume-after-tree-core
+RED as expected: help-needs-path -> FAIL S2-help
+RED as expected: rerun-touches-state -> FAIL idempotent-second-run
+RED as expected: bundle-pretends -> FAIL bundle-refuses
+RED as expected: state-skips-verification -> FAIL V1-forged-state-refused
+mutations: 8 red of 8
+mut exit 0
+```
