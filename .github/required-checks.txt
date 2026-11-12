@@ -33,4 +33,3 @@
 # lane that does not exist would make `ci-required` wait forever for a check
 # nobody defined. They are added when the slices that create them land.
 
-validate
