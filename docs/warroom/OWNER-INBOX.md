@@ -100,6 +100,10 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 
 **VZ-FOUND-005: Redis in readiness (new 2026-11-10, tick 260).** The ledger outcome says `/readyz` "fails when DB/Redis/storage unavailable". vizra-core returns 200 with `degraded` when the cache is down and tests that on purpose (`TestReadyzCacheDownIs200Degraded`), following ADR-002. One of the two has to change before the ID can be recorded; changing the ledger text or the ADR is yours. Evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`.
 
+### 20
+
+**VZ-DESIGN-001: the brand mark (new 2026-11-12, tick 267).** The ledger outcome asks for a "brand mark". The accepted design does not define one: `docs/design/figma/README.md` §6 item 14 removed the mockup's mark, and Q-002 puts brand assets in a separate review with no branding repo. vizra-user ships a text wordmark today. The chair will not invent a mark. **Chair's recommendation:** rule that the text wordmark is the M0 brand mark for VZ-DESIGN-001, and track the final mark under Q-002 / VZ-BRAND-001 (M5). Until you answer, VZ-DESIGN-001 can reach IMPLEMENTED on everything else but its record cannot claim the brand mark; the components work continues.
+
 ## Closed
 
 ### 0
@@ -161,3 +165,9 @@ Free disk space — 19 GiB free limits Docker and Playwright work.
 > CLOSED 2026-11-12 by owner decision 2026-11-12 #3: the chair merges status record PRs after an independent PASS. Meta #19 merged as `0a204e8`.
 
 **Who merges a ledger status record the chair wrote (new 2026-11-12, tick 264).** Meta #19 records VZ-FOUND-002 IMPLEMENTED from vizra-core #18 and vizra-user #12. An independent verifier returned PASS at `5d8d281` and `ci-required` is green on it (`docs/evidence/warroom/2026-11-12-meta-pr19-ledger-found-002-round2-VERIFY.md`). The loop rules have the chair write status records, and the owner said on 2026-11-11 "nobody merges their own work", so the chair has not merged it. Either merge #19, or say the chair may merge status record PRs after an independent PASS, or have a builder write them.
+
+### 19
+
+> CLOSED 2026-11-12 without a ruling: the slice passed on its last verdict (vizra-core #19, PASS at `37a6d55`, merged `a6d4792`), so no grant is needed.
+
+**Budget for VZ-FOUND-003 (new 2026-11-12, tick 266; not blocking yet).** VZ-FOUND-003 has spent 4 of its 5 verdicts and both fix rounds on vizra-core #18 (migrate-lint), which is merged. The next slice for it (queue 3 (003): `migrate up` from the release image in CI, and a real dirty-ledger test) is different code and different ledger cases, and was dispatched at tick 266 on the one verdict left. If that verdict is FAIL, the ID becomes BLOCKED with no fix round. **Chair's recommendation:** grant VZ-FOUND-003 two more verdicts and one more fix round, for queue 3 (003) only. Until you answer, the slice runs on its last verdict; if it fails, it is marked BLOCKED here and the loop moves on.

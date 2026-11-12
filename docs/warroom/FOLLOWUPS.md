@@ -36,6 +36,7 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-11 meta #17: `check-config-coverage.py --drift` is all or nothing, so a core-only drift check cannot run alone; meta CI sees only the snapshot of core keys; `env/registry/search.json` is behind the search checkout (evidence: `docs/evidence/warroom/2026-11-11-meta-pr17-3c-VERIFY.md`)
 - 2026-11-11 meta #16: ADR-001 states Echo as a floor (≥ v5.4.4) while `go.mod` pins it exactly; the VZ-ISSUE-001 Outcome paragraph still says Echo ≥ 5.3.1 (evidence: `docs/evidence/warroom/2026-11-11-meta-pr17-3c-VERIFY.md`)
 - 2026-11-12 meta #19, #20: the VZ-FOUND-002 rationale omits the API's own metrics listener (`cmd/api/main.go:146`) from its known limits; no rule orders a record after its dependency (VZ-FOUND-001 is PLANNED); `by_verification_status` has no demo case; the D11 missing-PLANNED failure prints an empty reason (evidence: `docs/evidence/warroom/2026-11-12-meta-pr19-ledger-found-002-round2-VERIFY.md`)
+- 2026-11-12 `scripts/check-ledger-status-remote.py` has no retry: a GitHub 503 on `pulls/<n>` turned `validate` red on meta #24 (run 43228973389, re-run). A required lane that fails on a transient upstream error should retry a bounded number of times and stay fail-closed after that
 
 ## vizra-core
 
@@ -49,6 +50,7 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-11 core #18: a marker exempts every statement on the next line (same on main); a marker is honoured inside a block comment or mid-statement; drops inside `DO $$…$$` and after an `E'…'` string are not parsed; split-line `DROP CONSTRAINT` passes; `shellcheck` SC2207 at `migrate-lint.sh:59` predates the PR (evidence: `docs/evidence/warroom/2026-11-11-vizra-core-pr18-3a-VERIFY.md`)
 - 2026-11-11 core #18 F002-M4: the worker mux serves the Prometheus handler on every path but its probes, outside what the contract test walks (evidence: `docs/evidence/warroom/2026-11-11-vizra-core-pr18-3a-VERIFY.md`)
 - 2026-11-12 core #18 R3-F1…F4: a bare drop on a line starting `--` inside an open block comment is missed (main has the same hole); one marker exempts two added hits on its next line; a marker inside a block comment is honoured, as on main; the `E''` limit has no fixture (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr18-3a-round3-VERIFY.md`)
+- 2026-11-12 core #19: anchor the S1 version grep (the exact ledger check already stops a prefix match); a `-- allow-destructive:` marker exempts a statement anywhere, so a real compatibility window would need to refuse markers inside it (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr19-found-003-VERIFY.md`)
 
 ## vizra-user
 
@@ -58,6 +60,8 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 user #11: plain `<a>` with an eslint-disable instead of `next/link`, because the router cancels its own `?_rsc=` fetch and the harness counts it; `design/HANDOFF.md` is cited and absent; local Turbopack build fails on macOS arm64 (`@tailwindcss/oxide`), CI is green (evidence: `docs/evidence/warroom/2026-11-10-vizra-user-pr11-design-001-VERIFY.md`)
 - 2026-11-10 user #11 D-1…D-6: skip link hidden at 1440; CATALOG counts 133 declarations, 97 names; light `accent` on `bg-tint` is 4.40:1 (unused pair); `main` may show a focus ring after the skip link; top bar border against `elevation/1` (evidence: `docs/evidence/warroom/2026-11-10-vizra-user-pr11-design-001-VERIFY.md`)
 - 2026-11-11 user #12: no CI checks the vendored contract against core main; the expected-operations list must change with every re-vendor and `AGENTS.md` does not say so; the manifest comment on the `ci-guard` path filter does not match the workflow (evidence: `docs/evidence/warroom/2026-11-11-vizra-user-pr12-3b-VERIFY.md`)
+- 2026-11-12 user #13 design seat D1–D5: native Checkbox/Radio without `appearance-none` show browser outlines, not `color/line`; disabled uses `opacity-60` not the disabled tokens; IconButton Danger uses `danger-ink`; Dialog has an arbitrary width; short Tab labels can be under 44px wide. Components have no browser test (no production route)
+- 2026-11-12 user #13: no test fails if Toast gains a default success text (the code has none today); Dialog `showModal` and focus return are not exercised in a browser (no route renders it) (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr13-design-001-VERIFY.md`)
 
 ## vizra-search
 
