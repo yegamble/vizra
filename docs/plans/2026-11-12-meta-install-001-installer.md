@@ -46,3 +46,30 @@ Not run: clean-target `ubuntu:24.04` container run (Docker not running locally; 
 - The full run uses a PLACEHOLDER local CLI (a script that implements no command) because no vizra CLI is published; it proves only the hand-off message. S1 stays open.
 - Local (arm64, same index digest): `sh tests/install/clean_target.sh` exit 0 — /bin/sh is /usr/bin/dash; `--help` with --network none exit 0 and nothing written (root and ubuntu); no-CLI run exit 3 with the tree in place; placeholder-CLI run exit 0 naming `vizra setup`; third run gives the same tree-listing + state sha256 (root and ubuntu).
 - Local gates: install_test 15 passed 0 failed; mutation-demo PASS; shellcheck, check-workflows, check-action-pins, check-lane-integrity, check-doc-links all exit 0.
+
+## Session 3 (2026-11-12): CI evidence on abd9df2
+validate run 43230841779 success (job https://github.com/yegamble/vizra/actions/runs/43230841779/job/131225566183); ci-required run 43230841752 success. Log excerpts (`gh run view 43230841779 --log`):
+
+```
+installer tests (VZ-INSTALL-001):  ok S2-help / N2-non-tty-refuses / N1-checksum-mismatch / bundle-refuses / git-path-tree-cli-handoff / no-cli-stops / idempotent-second-run / P1-production-env-untouched / P1-never-creates-production-env / R1-resume-after-{docker,tree-meta,tree-core,tree-user,tree-search} / test-hook-refused
+13:49:36.3924477Z 15 passed, 0 failed
+mutation demo (no summary count line is printed; 7 lines, all RED):
+13:49:37.68Z RED as expected: skip-checksum -> FAIL N1-checksum-mismatch
+13:49:38.87Z RED as expected: no-tty-check -> FAIL N2-non-tty-refuses
+13:49:40.06Z RED as expected: rewrite-production-env -> FAIL P1-production-env-untouched
+13:49:41.23Z RED as expected: no-resume -> FAIL R1-resume-after-tree-core
+13:49:42.39Z RED as expected: help-needs-path -> FAIL S2-help
+13:49:43.37Z RED as expected: rerun-touches-state -> FAIL idempotent-second-run
+13:49:44.61Z RED as expected: bundle-pretends -> FAIL bundle-refuses
+clean target (ubuntu:24.04@sha256:2198e4c6…caf5):
+== --help, --network none, user root      -> /usr/bin/dash / help ok: exit 0, nothing written
+== --help, --network none, user ubuntu    -> /usr/bin/dash / help ok: exit 0, nothing written
+== full run, user root, dir /tmp/vz-target-root, ref main
+install.sh: no checksum-verified vizra CLI is published for main; pass --cli PATH --cli-sha256 HEX (tree is in place; a re-run resumes here)
+==> this vizra CLI has no 'setup' command yet (VZ-INSTALL-002); the interview did not start.
+==> next: cd /tmp/vz-target-root && /tmp/vz-target-root/bin/vizra setup
+c2f8b866…5b65  - / b389fb50…23a1  .vizra-install.state  -> idempotent ok (root)
+(same for user ubuntu, identical hashes) -> idempotent ok (ubuntu)
+clean target: all checks passed
+```
+Note: the no-CLI refusal's exit code 3 is asserted inside clean_target.sh, not printed; the log shows the refusal message only.
