@@ -51,6 +51,16 @@ jobs:
       - name: guard the manifest and the workflows
         run: ./scripts/ci-required-guard.sh
 
+      # VZ-CI-001 S1: a lane leaves the manifest only with a tombstone. The
+      # base manifest is read from git (fetched by SHA on this shallow
+      # checkout); the check fails closed when it cannot be read.
+      - name: a retired lane carries a tombstone
+        run: |
+          set -euo pipefail
+          bash tests/ci/test_required_tombstones.sh
+          bash tests/ci/test_ci_required_select.sh
+          ./scripts/check-required-tombstones.sh
+
       - name: every required check succeeded on this SHA
         env:
           GH_TOKEN: ${{ github.token }}
