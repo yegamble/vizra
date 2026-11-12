@@ -75,3 +75,18 @@ Rotate decisions (`internal/setup/engine.go` `rotateRefused`; `--yes-i-know` no 
 Done: echo restore on SIGINT/SIGTERM (`withEchoOff`, pure, tested); `RenderEdge`/`WriteEdge` render `deploy/Caddyfile.local` (meta caddy bind-mount, create_host_path:false) for acme/internal/plain-http and `deploy/nginx.example.conf` for external, sha256 marker header detects operator edits (refused without --yes), goldens under internal/setup/testdata/edge, caddy 2.11.4 `adapt` exit 0 on all three. Transcripts: internal/setup/testdata/transcripts/.
 Assumptions: no acme email question exists, so acme blocks carry no email; routes /api/* and /.well-known/* -> api:8080, rest -> frontend:3000.
 Remains: --web wizard; meta template keys; KEK re-wrap; pty test of real stty path; readNoEcho builds a fresh bufio.Reader per secret (may drop buffered piped input, interactive only).
+
+## Session 3 (2026-11-12, vizra-core PR #22)
+
+- CI fix: build-test run 43243050303 refused `internal/setup` (no floor). `scripts/test-floors.json`: internal/setup 14 (measured 16) and cmd/vizra 10 -> 12 (measured 14), both suites, generator formula, dated `_why` entry; nothing lowered. Commit 66d999b.
+- `--web` (commit 2c557ac): `internal/setup/web.go`. 127.0.0.1 only (`CheckLoopback` refuses 0.0.0.0, ::, localhost, other IPs); random port; 256-bit hex token, `subtle.ConstantTimeCompare`, expires (`--web-ttl`, default 15m), invalidated by a successful write, doubles as the form's CSRF field; exact Host match (DNS rebinding); CSP `default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`, no-store, X-Frame-Options DENY, Referrer-Policy no-referrer, nosniff; html/template form, no JS, labelled native controls, secrets as never-prefilled password inputs, posted secrets redacted from error text; `@file` and `-` indirections refused from the browser; same `Run` (Resolve + atomic 0600, existing values kept, --yes rule); edge file written after; process exits after write. Token printed once in the link, never logged elsewhere.
+- Tests: 8 in `web_test.go`, red (build failed) then green; mutations: Host check off -> TestWebHostRebinding FAIL; `used=true` removed -> TestWebSubmitWritesAndStops FAIL. Transcripts internal/setup/testdata/transcripts/web-*.txt.
+- Remains: meta template keys (16 PendingTemplateKeys, separate meta PR) -> S1 partial; KEK re-wrap; pty test of stty path. The web form is static, so conditional questions are all shown and ignored when not applicable.
+
+## Session 4 (2026-11-12) — dead-control fix (finding from meta PR #33)
+
+- Topology answers (postgres, redis, analytics, ipfs, with tls/search) now write only `COMPOSE_FILE` + `COMPOSE_PROFILES`; per-mode keys dropped. Combinations outside the production shapes in meta `scripts/compose-shapes.json` are refused (`not a supported compose shape`). Re-runs recover answers from COMPOSE_FILE/PROFILES.
+- Experiment (Compose v5.6.1): `docker compose --env-file my.env config --services` honours COMPOSE_FILE and COMPOSE_PROFILES from that file; paths resolve against the cwd, so the operator runs from the meta checkout root.
+- Removed questions (no core reader): storage + S3 (VZ-STORAGE-002), SMTP (VZ-EMAIL-001), registration (registration policy), import (import).
+- PendingTemplateKeys = VIZRA_DOMAIN, VIZRA_TLS_MODE (reader: internal/setup/edge.go). Meta PR #33 must refresh its env/registry/setup.json snapshot.
+- Red: internal/setup/testdata/transcripts/session4-red.txt. Core commit ab6e74d.

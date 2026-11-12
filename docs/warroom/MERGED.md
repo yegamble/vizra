@@ -4,6 +4,7 @@ Append new rows at the top of the table. A merge is not a ledger status: the sta
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-11-12 | vizra-core | #23 storage probe clears `busy` before reporting, so back-to-back probes never see a false 503 (QUEUE-readyz-flake) | `9a4fc39` → `22e7492` | PASS `9a4fc39` (`docs/evidence/warroom/2026-11-12-vizra-core-pr23-readyz-race-VERIFY.md`): 8/15 red on main, 0/900 on the fix | no ledger ID |
 | 2026-11-12 | vizra (meta) | #29 otel profile OFF/MANAGED/EXTERNAL (VZ-OPS-005) | `fa06a7a` → `cfce798` | PASS `fa06a7a` (`docs/evidence/warroom/2026-11-12-meta-pr29-otel-profile-VERIFY.md`) | IMPLEMENTED by the verifier's reading; record blocked on inbox 23 |
 | 2026-11-12 | vizra (meta) | #30 ledger-status remote check retries transient GitHub 5xx (QUEUE-ci-flake) | `fc39d2d` → `a20aa0c` | PASS `fc39d2d` (`docs/evidence/warroom/2026-11-12-meta-pr30-retry-VERIFY.md`) | no ledger ID |
 | 2026-11-12 | vizra-core | #21 tombstone rule (VZ-CI-001) | `71a1ff3` → `3f1def3` | BLOCKED x2 (verifier time), PASS (`docs/evidence/warroom/2026-11-12-ci-001-core-search-VERIFY.md`) | waits on N1 (inbox 22) |
