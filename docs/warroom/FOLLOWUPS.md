@@ -46,6 +46,13 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 meta #31 F-1: bundle check accepts an added file whose sha256 is also added to MANIFEST.json; compare manifest keys to the include list (evidence: `docs/evidence/warroom/2026-11-12-meta-pr31-bundle-VERIFY.md`)
 - 2026-11-12 meta #31 F-2: broken compose YAML surfaces as a Python traceback from bind_sources, not a `bundle: FAIL:` line (evidence: `docs/evidence/warroom/2026-11-12-meta-pr31-bundle-VERIFY.md`)
 - 2026-11-12 meta #31 F-3: bundle schema_version is proven only against fixtures; prove it against a pinned vizra-core tag (evidence: `docs/evidence/warroom/2026-11-12-meta-pr31-bundle-VERIFY.md`)
+- 2026-11-12 meta #34 F-1: no check binds issue acceptance bullets to ledger cases; a committed reworded VZ-OPS-005 bullet in VZ-ISSUE-004.md left every validate check green, so owner decision 2026-11-12 #5 "word for word" is enforced by review only (evidence: `docs/evidence/warroom/2026-11-12-meta-pr34-owner-rulings-VERIFY.md`)
+- 2026-11-12 meta #34 F-2: PR body says "compose demo + shellcheck reported in comments"; the PR's only comment is a bot advert, no such results (evidence: `docs/evidence/warroom/2026-11-12-meta-pr34-owner-rulings-VERIFY.md`)
+- 2026-11-12 meta #35 F-1: ADR-010 §2 leaves libheif `WITH_X264` and `WITH_OpenH264_DECODER` (default ON at v1.23.7) enabled and Decision 5 checks HEVC/VVC only, so the VZ-MEDIA-001 build must disable them or the check must list them to keep "AV1 only" (evidence: `docs/evidence/warroom/2026-11-12-meta-pr35-amending-adrs-round2-VERIFY.md`)
+- 2026-11-12 meta #35 F-2: ADR-010 Decision 1 still carries the `[pin at PR time; verify]` libheif version/SHA-256 placeholder (evidence: `docs/evidence/warroom/2026-11-12-meta-pr35-amending-adrs-round2-VERIFY.md`)
+- 2026-11-12 meta #35 F-3: ADR-011 ledger IDs (VZ-INSTALL-003, VZ-AUTH-001, VZ-SECURITY-003) were builder-chosen; chair to confirm (evidence: `docs/evidence/warroom/2026-11-12-meta-pr35-amending-adrs-round2-VERIFY.md`)
+- 2026-11-12 meta #33 R2-F1: `snapshot-setup-keys.py --check` validates only at source_commit, so a question added later on vizra-core main stays green until someone re-snapshots; also diff the parse at origin/main (evidence: `docs/evidence/warroom/2026-11-12-meta-pr33-template-keys-round2-VERIFY.md`)
+- 2026-11-12 meta #37 F-1: owner decision 2026-11-12 #5 literally covers IDs no issue lists; VZ-ISSUE-008 already listed VZ-DESIGN-001 without a bullet, so the owner should confirm #5 covers adding verbatim bullets there (evidence: `docs/evidence/warroom/2026-11-12-meta-pr37-design-001-record-round2-VERIFY.md`)
 
 ## vizra-core
 
@@ -73,6 +80,7 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-11 user #12: no CI checks the vendored contract against core main; the expected-operations list must change with every re-vendor and `AGENTS.md` does not say so; the manifest comment on the `ci-guard` path filter does not match the workflow (evidence: `docs/evidence/warroom/2026-11-11-vizra-user-pr12-3b-VERIFY.md`)
 - 2026-11-12 user #13 design seat D1–D5: native Checkbox/Radio without `appearance-none` show browser outlines, not `color/line`; disabled uses `opacity-60` not the disabled tokens; IconButton Danger uses `danger-ink`; Dialog has an arbitrary width; short Tab labels can be under 44px wide. Components have no browser test (no production route)
 - 2026-11-12 user #13: no test fails if Toast gains a default success text (the code has none today); Dialog `showModal` and focus return are not exercised in a browser (no route renders it) (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr13-design-001-VERIFY.md`)
+- 2026-11-12 user #17 F-1: Playwright skip check (VZ-CI-001 N1) is only reached via check-coverage-floor-ran.mjs; add a second enforcer so editing that script cannot drop it (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr17-ci-001-n1-VERIFY.md`)
 
 ## vizra-search
 

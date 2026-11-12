@@ -1,0 +1,90 @@
+{
+ "name": "desktop",
+ "status": 200,
+ "csp": "default-src 'self'; script-src 'self' 'nonce-NaPyt7ddA06nKkTcepi/5A==' 'strict-dynamic'; style-src 'self' 'nonce-NaPyt7ddA06nKkTcepi/5A=='; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+ "wm": {
+  "tag": "DIV",
+  "text": "Vizra",
+  "href": null,
+  "w": 1440,
+  "h": 64
+ },
+ "focusables": [
+  "A:Skip to content->#content",
+  "A:Vizra->/",
+  "A:/health->/health"
+ ],
+ "tabs": [
+  {
+   "d": "A:Skip to content->#content",
+   "outline": "solid 2px rgb(0, 91, 180)",
+   "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(14, 18, 24, 0.14) 0px 2px 6px 0px, rgba(14, 18, 24, 0.14) 0px 8px 24px -12px",
+   "visible": true
+  },
+  {
+   "d": "A:Vizra->/",
+   "outline": "solid 2px rgb(0, 91, 180)",
+   "shadow": "none",
+   "visible": true
+  },
+  {
+   "d": "A:/health->/health",
+   "outline": "solid 2px rgb(0, 91, 180)",
+   "shadow": "none",
+   "visible": true
+  },
+  null
+ ],
+ "acts": [
+  "A:Skip to content Enter -> http://127.0.0.1:3917/#content hash=#content active=MAIN#content",
+  "A:Vizra Enter -> http://127.0.0.1:3917/ hash= active=BODY#",
+  "A:/health Enter -> http://127.0.0.1:3917/health hash= active=BODY#"
+ ],
+ "cons": [],
+ "net": []
+}
+{
+ "name": "mobile",
+ "status": 200,
+ "csp": "default-src 'self'; script-src 'self' 'nonce-itYfd5at/3vI0FfhHjpDJA==' 'strict-dynamic'; style-src 'self' 'nonce-itYfd5at/3vI0FfhHjpDJA=='; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+ "wm": {
+  "tag": "DIV",
+  "text": "Vizra",
+  "href": null,
+  "w": 390,
+  "h": 64
+ },
+ "focusables": [
+  "A:Skip to content->#content",
+  "A:Vizra->/",
+  "A:/health->/health"
+ ],
+ "tabs": [
+  {
+   "d": "A:Skip to content->#content",
+   "outline": "solid 2px rgb(0, 91, 180)",
+   "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(14, 18, 24, 0.14) 0px 2px 6px 0px, rgba(14, 18, 24, 0.14) 0px 8px 24px -12px",
+   "visible": true
+  },
+  {
+   "d": "A:Vizra->/",
+   "outline": "solid 2px rgb(0, 91, 180)",
+   "shadow": "none",
+   "visible": true
+  },
+  {
+   "d": "A:/health->/health",
+   "outline": "solid 2px rgb(0, 91, 180)",
+   "shadow": "none",
+   "visible": true
+  },
+  null
+ ],
+ "acts": [
+  "A:Skip to content Enter -> http://127.0.0.1:3917/#content hash=#content active=MAIN#content",
+  "A:Vizra Enter -> http://127.0.0.1:3917/ hash= active=BODY#",
+  "A:/health Enter -> http://127.0.0.1:3917/health hash= active=BODY#"
+ ],
+ "cons": [],
+ "net": []
+}

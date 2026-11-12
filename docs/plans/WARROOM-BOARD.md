@@ -10,7 +10,7 @@ Everything else lives in `docs/warroom/`:
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
-**Ledger on `main`: 192 entries, 1 IMPLEMENTED (VZ-FOUND-002, meta #19 `0a204e8`, tick 265), 0 VERIFIED.**
+**Ledger on `main`: 192 entries, 2 IMPLEMENTED (VZ-FOUND-002 tick 265; VZ-DESIGN-001 meta #37 `83efd6d`, tick 283), 0 VERIFIED.**
 
 What each other ID still lacks, case by case, is in the queue rows 2, 3 (002, 003, 006), 11 and 14.
 
@@ -22,11 +22,10 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 2 remainder: `/readyz` schema component, PostgreSQL stop/recover test done; compose transcript and rendered-model assertion left | vizra-core | VZ-FOUND-005 | #24 (draft) | `4cf61dd` | builder continuing, tick 282 | 1/0/0/3 |
-| Queue 7 meta: setup key snapshot from merged core, COMPOSE_FILE/PROFILES templated | vizra | VZ-INSTALL-002 | #33 | `3b34e55` | FAIL, fix round 1 building | 3/1/0/5 |
-| Queue 2f: artifact allowlist; floor 9 was below today's 20 tests per project | vizra-user | VZ-FOUND-008 | #18 (draft) | `b1fe3cd` | builder continuing, tick 282 | 0/0/0/5 |
-| Rulings into docs: OPS-005 issue bullets, FOUND-005 ledger text (#34); ADR-010, ADR-011 (#35) | vizra | QUEUE-owner-rulings | #34 #35 | `e29477f` `71d8a55` | verifiers running | 0 verdicts |
-| Queue 4 remainder (N1) | vizra-user | VZ-CI-001 | #17 | `e6748c2` | ready; grant #4 on `main`, verifier next | 4/0/0/8 (cap 6) |
+| Queue 2 core: `/readyz` schema component, PostgreSQL stop/recover; integration 1911 pass | vizra-core | VZ-FOUND-005 | #24 (draft) | `a02610a` | builder continuing: image-scan red on head | 1/0/0/6 |
+| Queue 2 meta: api/worker healthcheck `vizra healthcheck`, `required-probe` topology rule | vizra | VZ-FOUND-005 | #39 (draft) | `2890020` | builder continuing: demo run, CI | shared |
+| Queue 2f: artifact allowlist; floor gap and D5 cache fixed | vizra-user | VZ-FOUND-008 | #18 (draft) | `b2fd64e` | builder finishing `e2e:demos` | 0/0/0/7 |
+| Records: VZ-CI-001, VZ-OPS-005 IMPLEMENTED | vizra | QUEUE-ledger-VZ-CI-001, -OPS-005 | #38 | `6ea3bf5` | verifier running | 0 verdicts |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -57,7 +56,7 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 | 11 | Scan lanes required and green; secret-scan lane | vizra-core + vizra-user | VZ-CI-004 | 1; inbox 9 for the image CVEs |
 | 12 | `vizra doctor`, status, logs, restart, update | vizra-core | VZ-OPS-002, VZ-OPS-003 | 7 |
 | 13 | Logs, metrics, tracing with privacy-safe fields | vizra-core | VZ-OPS-005 | none |
-| 14 | VZ-DESIGN-001: brand mark is the text wordmark (decision #6). Built on `main` (user #11, #13, #15). Left: record PR whose verifier runs the production browser pass at 390/1440 px and the CSP mutation | vizra + vizra-user | VZ-DESIGN-001 | #28 merged |
+| 14 | VZ-DESIGN-001 IMPLEMENTED (#37). VERIFIED needs a record citing the queue-14 PASS now on `main` once this records PR lands | vizra | VZ-DESIGN-001 | this records PR |
 | 16 | M1, not blocked by 4a or 8b: registration and sessions, roles, the claim page | vizra-core + vizra-user | VZ-AUTH-001, VZ-AUTH-004, VZ-INSTALL-003 | M0 boot |
 | 17 | M1: durable jobs, local storage, quota, JPEG/PNG upload, the rest of the fixture corpus | vizra-core | VZ-JOBS-001, VZ-STORAGE-001, VZ-QUOTA-001, VZ-UPLOAD-001, VZ-FOUND-007 | 16 |
 | 18 | M1: backup and restore on a clean target (reference: vidra deploy order) | vizra-core + vizra | VZ-BACKUP-001, VZ-BACKUP-002, VZ-OPS-001 | 17; rehearsal host |
@@ -68,8 +67,6 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 
 | Item | Waiting on |
 |---|---|
-| VZ-MEDIA-001 (derivatives) and what depends on it: VZ-MEDIA-003/004, VZ-VIEWER-001 | ADR-010 on `main` (decision #9), then M1 order |
-| M1-B (rest of the owner-claim issue) | ADR-011 on `main` (decision #10), then M1 order |
 | VZ-FOUND-003 compatibility window | budget, inbox 25 |
 | Deploy rehearsal, VZ-BACKUP-002 on a separate host | the disposable rehearsal host (inbox 7) |
 | Q-016, Q-021, Q-022, Q-036 | provider credentials and the owner's domain |
