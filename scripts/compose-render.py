@@ -648,6 +648,7 @@ def main():
                 "release_image_services": man.get("release_image_services") or [],
                 "known_false_disclosure": man.get("known_false_disclosure") or {},
                 "gated_probes": man.get("gated_probes") or {},
+                "required_probes": man.get("required_probes") or {},
             },
             fh, indent=2,
         )

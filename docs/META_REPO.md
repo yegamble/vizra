@@ -144,11 +144,14 @@ operator's env file, because compose injects it.
 This is the pattern for the next rename, not a one-off: snapshot the component
 at a `main` commit, list what it retired, and let the checker own the ordering.
 
-**2. `vizra healthcheck` must exist before the boot lane lands.** `api` and
-`worker` declare a healthcheck that runs `vizra version` — the same self-probe
-the image ships. It proves the binary runs; it does **not** prove `/readyz`
-answers, because the runtime image carries no curl or wget and `vizra-core` has
-no `healthcheck` subcommand (`vizra-search` ships exactly that).
+**2. `vizra healthcheck` must exist before the boot lane lands.** Done for
+`api` and `worker` (VZ-FOUND-005): they now run `vizra healthcheck api` /
+`vizra healthcheck worker`, which read each service's own `/readyz` over
+loopback, and the topology checker's `required-probe` rule refuses any rendered
+shape where either probe is anything else. frontend gates on api with
+`service_healthy`. The history below is kept because the mechanism still covers
+otel-collector: until VZ-FOUND-005, `api` and `worker` ran `vizra version`,
+which proves only that the binary runs.
 
 Rather than leave that as a comment, both probes are declared **known-false** in
 `scripts/compose-shapes.json`. `scripts/check-compose-topology.py` then:

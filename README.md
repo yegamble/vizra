@@ -88,11 +88,12 @@ Make 'done' an observable result enforced by tests and review, not an adjective 
 
 ## Running an instance: diagnosing this release
 
-**IGNORE THE `healthy` COLUMN.** `docker compose ps` reports api and worker
-healthy whenever the binary can execute — their probe is `vizra version`, which
-never opens a socket and never touches PostgreSQL. `docker compose up -d --wait`
-returns success against a wedged api for the same reason. frontend's probe is
-liveness-only too: it says the process renders, not that vizra-core is reachable.
+**IGNORE THE `healthy` COLUMN for otel-collector and frontend.** api and worker
+now run `vizra healthcheck api|worker`, which reads each service's own `/readyz`
+and goes unhealthy when PostgreSQL is unreachable (`degraded` still counts as
+healthy). otel-collector's probe is `/otelcol --version`, which never checks the
+pipeline, and frontend's probe is liveness-only: it says the process renders,
+not that vizra-core is reachable.
 
 Ask the API itself instead. The production overlay publishes it on loopback for
 exactly this:
