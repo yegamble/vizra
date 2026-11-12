@@ -8,12 +8,6 @@ Things only the owner can decide or supply. Item numbers are the old board's and
 
 Mockup controls with **no ledger ID** need a scope decision (add to the ledger, mark unavailable, or drop). Search page: Save/bookmark on cards and the "Saved" tab (is Save the same thing as Favorite, which the ledger has?), the "Series" scope and "Editorial series" facet, the view-density switcher, "Interesting" / "Most loved" / "Most viewed" as sort orders, the "Analog / Film" facet, the per-card `4K` badge, the public "refreshed moments ago" label, related-query chips; and the `RAW` badge contradicts VZ-MEDIA-002, which declines RAW. Public pages (25 items, `INVENTORY-public.md` §g): the whole "Series" entity, verified badge, commissions / "Hire", audio playback and the Editorial Journal, "For You", ⌘K palette, artist showcase + style tags, profile Featured tab, "Member since" / location / most-used camera, footer Share/Email, Help & Feedback, "New" badge, "refreshed hourly". Account pages (full list of 18 groups in `INVENTORY-account.md`): plan/subscription card (Vizra has no billing product), drafts as a state, the whole Push notification channel + quiet hours, weekly digest, muted tags, per-member comment filter, self-deactivation, tagline/pronouns/multi-link profile fields, commissions + booking, engagement rate, audience geography, passkeys, SMS 2FA, Instagram/Adobe connections, scheduled publish, "AI training" toggle, "Hire", RAW/TIFF upload chips, and the "goimg Pro" billing card (Vizra has no billing product).
 
-### 4a
-
-> Owner decision 2026-11-10 #2: ruled on separately. **VZ-MEDIA-001 stays blocked until this is ruled.**
-
-**Architecture ruling needed before M1 (VZ-MEDIA-001) — ADR-001's AVIF/HEIC split is not implementable as written.** The core builder found that libvips decodes AVIF *through libheif* (dav1d/aom are libheif's backends, not a separate path), so the current image — which excludes libheif and asserts `no heif` — also has no AVIF. Chair's recommendation: build libheif with AV1 backends only (dav1d decode, aom or svt encode) and WITHOUT libde265/x265, so AVIF works and HEIC/HEVC stays out by default (VZ-MEDIA-010 keeps HEIC as the opt-in); change the image assertion from "no heif loader" to "heif loader present, no HEVC codec". ADR-001 is Accepted and immutable, so this lands as a new amending ADR — owner approves.
-
 ### 4b
 
 > Owner decision 2026-11-10 #2: ruled on separately.
@@ -41,12 +35,6 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 > Owner decision 2026-11-10 #2: ruled on separately.
 
 **Ledger wording to ratify (VZ-INSTALL-003 recovery case).** The ledger says "Restart re-mints; old token invalid". The security seat showed that an unconditional re-mint at boot lets any restart (OOM, env edit, updater, crash loop) silently invalidate the token the operator is holding — a denial-of-claim — and, combined with printing the token at boot, writes a fresh live owner credential into the logs on every restart. Chair ruling (reversible in code, no schema impact): the token is delivered by `docker compose exec api vizra claim-token`, which ALWAYS supersedes the previous token and mints a new one; boot prints the command, not a credential; printing to stderr is an explicit opt-in. Proposed ledger sentence: "A lost token is recoverable: `vizra claim-token` mints a new one and invalidates the previous; an expired token is never accepted." Also touches PRODUCT_SPEC §15 step 4 and copy key `claim.help.body`.
-
-### 8b
-
-> Owner decision 2026-11-10 #2: ruled on separately. **M1-B stays blocked until this is ruled.**
-
-**ADR-003 interpretation to ratify + one-line amending ADR before M1-B merges.** (i) The CSRF table's "Setup wizard \| loopback bind and one-time X-Setup-Token and Host allowlist" row is read as the INSTALLER wizard (VZ-ISSUE-004), not `POST /api/v1/setup/claim-owner` — both seats concur, and the other reading makes the approved claim page unbuildable. Requested amendment: rename the row "Installer setup wizard" and add a row "Unauthenticated pre-claim JSON POST \| credential in body \| exact JSON content type; Origin / Sec-Fetch-Site must not be cross-site when present \| allow". (ii) "Vizra version tag… without a second column" is read as a plain standard PHC string whose embedded `m,t,p` are the version.
 
 ### 8c
 
@@ -94,63 +82,9 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 | CI repair | VZ-CI-001/002/004 | M0 | several hardening items | no ID or item for "required lanes green on main in all four repos today" |
 | Audit trail | VZ-AUDIT-001 | none | none | in the ledger (192 entries, core profile) since meta #5, but in no row of `docs/MILESTONES.md` and not in `docs/quality/release-profiles/core.json` (141 ids against the ledger's 142) |
 
-### 15
+### 25
 
-> RULED 2026-11-11 #2, conditionally; the condition for amending was NOT met, so this stays open. The chair checked vizra-core `5f615d7`: Redis carries **rate-limit counters**, not only cache. ADR-003 "Rate limits": "Counters live in Valkey; if Valkey is unreachable the api falls back to a per-process in-memory limiter and marks readiness degraded". In code: `internal/cache/ratelimit.go` (`FallbackLimiter`), wired at `cmd/api/main.go:96`, used by the owner-claim failure budget and the setup route ceilings (`internal/httpapi/setup_limits.go:81-111,154-158`), an auth surface. With Redis down the limits become per process, so N replicas allow N times the limit; `/readyz` says `degraded` (`probes.go:192-203`). Sessions are in PostgreSQL (ADR-003: "never in the cache") and job dispatch is PostgreSQL (ADR-004); the worker does not open the cache. Today nothing else is stored in Redis. Nothing was amended.
-
-**VZ-FOUND-005: Redis in readiness (new 2026-11-10, tick 260).** The ledger outcome says `/readyz` "fails when DB/Redis/storage unavailable". vizra-core returns 200 with `degraded` when the cache is down and tests that on purpose (`TestReadyzCacheDownIs200Degraded`), following ADR-002. One of the two has to change before the ID can be recorded; changing the ledger text or the ADR is yours. Evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`.
-
-### 20
-
-**VZ-DESIGN-001: the brand mark (new 2026-11-12, tick 267).** The ledger outcome asks for a "brand mark". The accepted design does not define one: `docs/design/figma/README.md` §6 item 14 removed the mockup's mark, and Q-002 puts brand assets in a separate review with no branding repo. vizra-user ships a text wordmark today. The chair will not invent a mark. **Chair's recommendation:** rule that the text wordmark is the M0 brand mark for VZ-DESIGN-001, and track the final mark under Q-002 / VZ-BRAND-001 (M5). Until you answer, VZ-DESIGN-001 can reach IMPLEMENTED on everything else but its record cannot claim the brand mark; the components work continues.
-
-### 21
-
-**VZ-FOUND-003: what the "compatibility window" is (new 2026-11-12, tick 273).** The ledger outcome says "migrate-lint rejects destructive statements inside the compatibility window". No window exists: migrate-lint rejects destructive statements everywhere unless the line before carries `-- allow-destructive: <reason>`, and nothing checks the reason, requires a review or ties the marker to a release. An independent verifier reproduced a marked `DROP COLUMN` that would break the previous release passing lint (`docs/evidence/warroom/2026-11-12-meta-pr25-ledger-found-003-VERIFY.md`). So VZ-FOUND-003 is recorded IMPLEMENTED at most, not VERIFIED. Two ways forward:
-- **(A, chair's recommendation) Build the window.** Define it as: the previous released version must keep working against the migrated schema. A destructive statement is allowed only if a checked-in compatibility record names the object, the release that stopped using it, and that release is older than the last published release; migrate-lint refuses any `allow-destructive` marker without such a record. This protects upgrade and rollback (VZ-UPGRADE-001/002, M4).
-- **(B) Reword the outcome** to "migrate-lint rejects destructive statements unless explicitly exempted with a stated reason", which is what exists today. Changing the acceptance target is yours.
-
-### 22
-
-**Budget grant for VZ-CI-001 (new 2026-11-12, tick 277).** The tombstone rule and the other VZ-CI-001 cases landed in all four repos (search #6, user #14, core #21, meta #27; independent PASS on all four). VZ-CI-001 has spent its 4 verifier verdicts: one PASS for user + meta, and three for core + search, of which two ended BLOCKED only because the verifier ran out of session time, with no defect found. One gap remains: in vizra-user a skipped vitest or Playwright test is caught only by count floors, so N1 ("A skipped required test fails the job") does not fully hold there. The fix is being built (vizra-user `fix/ci-001-skip-fails`) and needs one verdict. **Chair's recommendation:** grant VZ-CI-001 two more verdicts, for the vizra-user N1 slice only. Without it, VZ-CI-001 stays unrecorded.
-
-### 23
-
-**VZ-OPS-005 has no issue to cite (new 2026-11-12, tick 277).** Core #20 and meta #29 are merged and an independent verifier judged VZ-OPS-005 IMPLEMENTED: every outcome clause has an implementation (`docs/evidence/warroom/2026-11-12-meta-pr29-otel-profile-VERIFY.md`). It cannot be recorded: the status generator requires each record to cite acceptance bullets quoted from a `docs/issues/*.md` file, and no issue lists VZ-OPS-005. The same will hold for other ledger IDs no issue covers. **Chair's recommendation:** give the chair standing permission, like decision 2026-11-11 #1, to add a ledger ID to the `**Ledger IDs:**` line of the issue for its milestone (here VZ-ISSUE-004, M0 operations) and to add its ledger cases verbatim as acceptance bullets, through an independently verified PR, without changing the ledger. Until you answer, VZ-OPS-005 is blocked here.
-
-### 24
-
-**Loop STOPPED: STALLED at tick 280 (new 2026-11-12).** `scripts/warroom-check.py stall` is red: no ledger status changed on `origin/main` in ticks 266-280. Its output:
-
-```
-STALL: no ledger status changed on origin/main in the last 15 ticks (266-280). Slots were held by:
-   6 tick(s)  meta-install-001 [VZ-INSTALL-001]
-   3 tick(s)  core-ops-005 [VZ-OPS-005]
-   3 tick(s)  core-ci-001 [VZ-CI-001]
-   3 tick(s)  core-install-002 [VZ-INSTALL-002]
-   3 tick(s)  meta-install-004-bundle [VZ-INSTALL-004]
-   3 tick(s)  user-2f-artifact-allowlist [VZ-FOUND-008]
-   2 tick(s)  core-found-003-image-migrate-dirty [VZ-FOUND-003]
-   2 tick(s)  user-design-001-remainder [VZ-DESIGN-001]
-   2 tick(s)  search-ci-001-tombstone [VZ-CI-001]
-   2 tick(s)  meta-ci-001 [VZ-CI-001]
-   2 tick(s)  user-design-001-photocard-tabbar [VZ-DESIGN-001]
-   2 tick(s)  meta-ops-005-otel-profile [VZ-OPS-005]
-   2 tick(s)  user-ci-001-n1 [VZ-CI-001]
-   2 tick(s)  meta-found-001-bootstrap [VZ-FOUND-001]
-   1 tick(s)  search-govulncheck-green [VZ-CI-004]
-   1 tick(s)  user-ci-001 [VZ-CI-001]
-   1 tick(s)  meta-ledger-demo-origin-main [QUEUE-ledger-demo]
-   1 tick(s)  user-deps-scan [VZ-CI-004]
-   1 tick(s)  meta-ledger-remote-retry [QUEUE-ci-flake]
-   1 tick(s)  meta-install-002-template-keys [VZ-INSTALL-002]
-   1 tick(s)  core-readyz-probe-race [QUEUE-readyz-flake]
-```
-
-Work merged in those ticks was real (installer, `vizra setup`, observability, tombstone rule in four repos, components, CI repairs), but every ID it touched now waits on an owner ruling or on later features before an honest record is possible:
-- VZ-FOUND-003: inbox 21 (compatibility window). VZ-CI-001: inbox 22 (+2 verdicts for vizra-user #17). VZ-OPS-005: inbox 23 (no issue lists it). VZ-DESIGN-001: inbox 20 (brand mark). VZ-FOUND-005: inbox 15 (Redis). VZ-MEDIA-001: inbox 4a and 8b.
-- VZ-INSTALL-002: the outcome lists storage, SMTP, registration and import questions; none has a reader until M2+ features exist, so it cannot be recorded in M0 as written. VZ-INSTALL-001 and VZ-INSTALL-004 need a published release (CLI, bundle, release record) that no slice can produce without a release process.
-**Chair's recommendation:** answer 22 and 23 first (each unblocks one record immediately: VZ-CI-001 after one verdict on vizra-user #17, VZ-OPS-005 after an issue-bullet PR), then 20 and 21. Restart the loop after any of them; the open PRs below wait for it.
+**VZ-FOUND-003: verdict budget for the compatibility-window slice (new 2026-11-12, tick 281).** Decision 2026-11-12 #7 rules that the window is built. VZ-FOUND-003 has spent its budget: 5 of 5 verdicts (4 plus the grant of 2026-11-12 #1) and 2 of 2 fix rounds, so a new slice for the same ID would go over budget at its first verdict. The record PR is counted separately (`QUEUE-ledger-VZ-FOUND-003`). **Chair's recommendation:** grant VZ-FOUND-003 2 more verdicts and 1 more fix round, for the vizra-core compatibility-window slice only. Until then the slice is not dispatched; vizra-core works on VZ-FOUND-005.
 
 ## Closed
 
@@ -219,3 +153,81 @@ Free disk space — 19 GiB free limits Docker and Playwright work.
 > CLOSED 2026-11-12 without a ruling: the slice passed on its last verdict (vizra-core #19, PASS at `37a6d55`, merged `a6d4792`), so no grant is needed.
 
 **Budget for VZ-FOUND-003 (new 2026-11-12, tick 266; not blocking yet).** VZ-FOUND-003 has spent 4 of its 5 verdicts and both fix rounds on vizra-core #18 (migrate-lint), which is merged. The next slice for it (queue 3 (003): `migrate up` from the release image in CI, and a real dirty-ledger test) is different code and different ledger cases, and was dispatched at tick 266 on the one verdict left. If that verdict is FAIL, the ID becomes BLOCKED with no fix round. **Chair's recommendation:** grant VZ-FOUND-003 two more verdicts and one more fix round, for queue 3 (003) only. Until you answer, the slice runs on its last verdict; if it fails, it is marked BLOCKED here and the loop moves on.
+
+### 4a
+
+> CLOSED by owner decision 2026-11-12 #9.
+> Owner decision 2026-11-10 #2: ruled on separately. **VZ-MEDIA-001 stays blocked until this is ruled.**
+
+**Architecture ruling needed before M1 (VZ-MEDIA-001) — ADR-001's AVIF/HEIC split is not implementable as written.** The core builder found that libvips decodes AVIF *through libheif* (dav1d/aom are libheif's backends, not a separate path), so the current image — which excludes libheif and asserts `no heif` — also has no AVIF. Chair's recommendation: build libheif with AV1 backends only (dav1d decode, aom or svt encode) and WITHOUT libde265/x265, so AVIF works and HEIC/HEVC stays out by default (VZ-MEDIA-010 keeps HEIC as the opt-in); change the image assertion from "no heif loader" to "heif loader present, no HEVC codec". ADR-001 is Accepted and immutable, so this lands as a new amending ADR — owner approves.
+
+### 8b
+
+> CLOSED by owner decision 2026-11-12 #10.
+> Owner decision 2026-11-10 #2: ruled on separately. **M1-B stays blocked until this is ruled.**
+
+**ADR-003 interpretation to ratify + one-line amending ADR before M1-B merges.** (i) The CSRF table's "Setup wizard \| loopback bind and one-time X-Setup-Token and Host allowlist" row is read as the INSTALLER wizard (VZ-ISSUE-004), not `POST /api/v1/setup/claim-owner` — both seats concur, and the other reading makes the approved claim page unbuildable. Requested amendment: rename the row "Installer setup wizard" and add a row "Unauthenticated pre-claim JSON POST \| credential in body \| exact JSON content type; Origin / Sec-Fetch-Site must not be cross-site when present \| allow". (ii) "Vizra version tag… without a second column" is read as a plain standard PHC string whose embedded `m,t,p` are the version.
+
+### 15
+
+> CLOSED by owner decision 2026-11-12 #8.
+> RULED 2026-11-11 #2, conditionally; the condition for amending was NOT met, so this stays open. The chair checked vizra-core `5f615d7`: Redis carries **rate-limit counters**, not only cache. ADR-003 "Rate limits": "Counters live in Valkey; if Valkey is unreachable the api falls back to a per-process in-memory limiter and marks readiness degraded". In code: `internal/cache/ratelimit.go` (`FallbackLimiter`), wired at `cmd/api/main.go:96`, used by the owner-claim failure budget and the setup route ceilings (`internal/httpapi/setup_limits.go:81-111,154-158`), an auth surface. With Redis down the limits become per process, so N replicas allow N times the limit; `/readyz` says `degraded` (`probes.go:192-203`). Sessions are in PostgreSQL (ADR-003: "never in the cache") and job dispatch is PostgreSQL (ADR-004); the worker does not open the cache. Today nothing else is stored in Redis. Nothing was amended.
+
+**VZ-FOUND-005: Redis in readiness (new 2026-11-10, tick 260).** The ledger outcome says `/readyz` "fails when DB/Redis/storage unavailable". vizra-core returns 200 with `degraded` when the cache is down and tests that on purpose (`TestReadyzCacheDownIs200Degraded`), following ADR-002. One of the two has to change before the ID can be recorded; changing the ledger text or the ADR is yours. Evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`.
+
+### 20
+
+> CLOSED by owner decision 2026-11-12 #6.
+**VZ-DESIGN-001: the brand mark (new 2026-11-12, tick 267).** The ledger outcome asks for a "brand mark". The accepted design does not define one: `docs/design/figma/README.md` §6 item 14 removed the mockup's mark, and Q-002 puts brand assets in a separate review with no branding repo. vizra-user ships a text wordmark today. The chair will not invent a mark. **Chair's recommendation:** rule that the text wordmark is the M0 brand mark for VZ-DESIGN-001, and track the final mark under Q-002 / VZ-BRAND-001 (M5). Until you answer, VZ-DESIGN-001 can reach IMPLEMENTED on everything else but its record cannot claim the brand mark; the components work continues.
+
+### 21
+
+> CLOSED by owner decision 2026-11-12 #7.
+**VZ-FOUND-003: what the "compatibility window" is (new 2026-11-12, tick 273).** The ledger outcome says "migrate-lint rejects destructive statements inside the compatibility window". No window exists: migrate-lint rejects destructive statements everywhere unless the line before carries `-- allow-destructive: <reason>`, and nothing checks the reason, requires a review or ties the marker to a release. An independent verifier reproduced a marked `DROP COLUMN` that would break the previous release passing lint (`docs/evidence/warroom/2026-11-12-meta-pr25-ledger-found-003-VERIFY.md`). So VZ-FOUND-003 is recorded IMPLEMENTED at most, not VERIFIED. Two ways forward:
+- **(A, chair's recommendation) Build the window.** Define it as: the previous released version must keep working against the migrated schema. A destructive statement is allowed only if a checked-in compatibility record names the object, the release that stopped using it, and that release is older than the last published release; migrate-lint refuses any `allow-destructive` marker without such a record. This protects upgrade and rollback (VZ-UPGRADE-001/002, M4).
+- **(B) Reword the outcome** to "migrate-lint rejects destructive statements unless explicitly exempted with a stated reason", which is what exists today. Changing the acceptance target is yours.
+
+### 22
+
+> CLOSED by owner decision 2026-11-12 #4.
+**Budget grant for VZ-CI-001 (new 2026-11-12, tick 277).** The tombstone rule and the other VZ-CI-001 cases landed in all four repos (search #6, user #14, core #21, meta #27; independent PASS on all four). VZ-CI-001 has spent its 4 verifier verdicts: one PASS for user + meta, and three for core + search, of which two ended BLOCKED only because the verifier ran out of session time, with no defect found. One gap remains: in vizra-user a skipped vitest or Playwright test is caught only by count floors, so N1 ("A skipped required test fails the job") does not fully hold there. The fix is being built (vizra-user `fix/ci-001-skip-fails`) and needs one verdict. **Chair's recommendation:** grant VZ-CI-001 two more verdicts, for the vizra-user N1 slice only. Without it, VZ-CI-001 stays unrecorded.
+
+### 23
+
+> CLOSED by owner decision 2026-11-12 #5.
+**VZ-OPS-005 has no issue to cite (new 2026-11-12, tick 277).** Core #20 and meta #29 are merged and an independent verifier judged VZ-OPS-005 IMPLEMENTED: every outcome clause has an implementation (`docs/evidence/warroom/2026-11-12-meta-pr29-otel-profile-VERIFY.md`). It cannot be recorded: the status generator requires each record to cite acceptance bullets quoted from a `docs/issues/*.md` file, and no issue lists VZ-OPS-005. The same will hold for other ledger IDs no issue covers. **Chair's recommendation:** give the chair standing permission, like decision 2026-11-11 #1, to add a ledger ID to the `**Ledger IDs:**` line of the issue for its milestone (here VZ-ISSUE-004, M0 operations) and to add its ledger cases verbatim as acceptance bullets, through an independently verified PR, without changing the ledger. Until you answer, VZ-OPS-005 is blocked here.
+
+### 24
+
+> CLOSED by owner decision 2026-11-12 #11.
+**Loop STOPPED: STALLED at tick 280 (new 2026-11-12).** `scripts/warroom-check.py stall` is red: no ledger status changed on `origin/main` in ticks 266-280. Its output:
+
+```
+STALL: no ledger status changed on origin/main in the last 15 ticks (266-280). Slots were held by:
+   6 tick(s)  meta-install-001 [VZ-INSTALL-001]
+   3 tick(s)  core-ops-005 [VZ-OPS-005]
+   3 tick(s)  core-ci-001 [VZ-CI-001]
+   3 tick(s)  core-install-002 [VZ-INSTALL-002]
+   3 tick(s)  meta-install-004-bundle [VZ-INSTALL-004]
+   3 tick(s)  user-2f-artifact-allowlist [VZ-FOUND-008]
+   2 tick(s)  core-found-003-image-migrate-dirty [VZ-FOUND-003]
+   2 tick(s)  user-design-001-remainder [VZ-DESIGN-001]
+   2 tick(s)  search-ci-001-tombstone [VZ-CI-001]
+   2 tick(s)  meta-ci-001 [VZ-CI-001]
+   2 tick(s)  user-design-001-photocard-tabbar [VZ-DESIGN-001]
+   2 tick(s)  meta-ops-005-otel-profile [VZ-OPS-005]
+   2 tick(s)  user-ci-001-n1 [VZ-CI-001]
+   2 tick(s)  meta-found-001-bootstrap [VZ-FOUND-001]
+   1 tick(s)  search-govulncheck-green [VZ-CI-004]
+   1 tick(s)  user-ci-001 [VZ-CI-001]
+   1 tick(s)  meta-ledger-demo-origin-main [QUEUE-ledger-demo]
+   1 tick(s)  user-deps-scan [VZ-CI-004]
+   1 tick(s)  meta-ledger-remote-retry [QUEUE-ci-flake]
+   1 tick(s)  meta-install-002-template-keys [VZ-INSTALL-002]
+   1 tick(s)  core-readyz-probe-race [QUEUE-readyz-flake]
+```
+
+Work merged in those ticks was real (installer, `vizra setup`, observability, tombstone rule in four repos, components, CI repairs), but every ID it touched now waits on an owner ruling or on later features before an honest record is possible:
+- VZ-FOUND-003: inbox 21 (compatibility window). VZ-CI-001: inbox 22 (+2 verdicts for vizra-user #17). VZ-OPS-005: inbox 23 (no issue lists it). VZ-DESIGN-001: inbox 20 (brand mark). VZ-FOUND-005: inbox 15 (Redis). VZ-MEDIA-001: inbox 4a and 8b.
+- VZ-INSTALL-002: the outcome lists storage, SMTP, registration and import questions; none has a reader until M2+ features exist, so it cannot be recorded in M0 as written. VZ-INSTALL-001 and VZ-INSTALL-004 need a published release (CLI, bundle, release record) that no slice can produce without a release process.
+**Chair's recommendation:** answer 22 and 23 first (each unblocks one record immediately: VZ-CI-001 after one verdict on vizra-user #17, VZ-OPS-005 after an issue-bullet PR), then 20 and 21. Restart the loop after any of them; the open PRs below wait for it.
