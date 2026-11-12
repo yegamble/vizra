@@ -209,6 +209,14 @@ jobs:
       - name: relative documentation links resolve
         run: ./scripts/check-doc-links.py
 
+      # (c2) VZ-INSTALL-001: the installer, against local bare repos (no
+      #      network), and every installer guard still fails against a
+      #      controlled mutation.
+      - name: installer tests (VZ-INSTALL-001)
+        run: sh tests/install/install_test.sh
+      - name: every installer guard still fails against a controlled mutation
+        run: sh docs/evidence/install/mutation-demo.sh
+
       # ---------------------------------------------------------------------
       # (d) THE COMPOSE TOPOLOGY (VZ-ISSUE-002: VZ-TOPOLOGY-001/-002/-003/-006/
       #     -007, VZ-CI-002, VZ-OPS-008).
