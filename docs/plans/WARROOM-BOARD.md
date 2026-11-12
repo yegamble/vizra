@@ -22,7 +22,7 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 3a: contract test walks wildcard routes; migrate-lint column drops | vizra-core | VZ-FOUND-002, VZ-FOUND-003 | #18 | `84f8ad1` | BLOCKED at budget (inbox 17): FAIL at `a627e1f`, fix round 1 pushed, `ci-required` green, not re-verified | 002: 4/1/0/3; 003: 2/1/0/3 |
+| Queue 3a: contract test walks wildcard routes; migrate-lint column drops | vizra-core | VZ-FOUND-002, VZ-FOUND-003 | #18 | `84f8ad1` | FAIL at `a627e1f`, fix round 1 pushed, `ci-required` green; re-verification allowed by owner grant 2026-11-12 #1 once it is on `main` | 002: 4/1/0/3 of 6/2/1/12; 003: 2/1/0/3 of 5/2/1/12 |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -40,8 +40,8 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 | # | Slice | Repo | IDs | Depends on |
 |---|---|---|---|---|
 | 2 | `/readyz`: storage merged (core #17). Left: schema-behind is not a `/readyz` component; no DB-recovery test; transcript on a compose stack and rendered-model assertion; Redis-down is 200 `degraded` against the ledger text (inbox 15) | vizra-core | VZ-FOUND-005 | inbox 15 for the Redis part |
-| 3 (002) | VZ-FOUND-002 lacks: S1 until core #18 is re-verified and merged; `evidence_required` (the drift mutation red then green as CI job output, not local). S2 and N1 proven (user #12) | vizra-core | VZ-FOUND-002 | inbox 17 |
-| 3 (003) | VZ-FOUND-003 lacks: N1 until core #18 merges; S1 (no lane runs `migrate up` from the release image); R1 (no test sets a ledger dirty); the outcome's "compatibility window" does not exist. S2, N2 proven | vizra-core | VZ-FOUND-003 | inbox 17 for N1 |
+| 3 (002) | VZ-FOUND-002 lacks: S1 until core #18 is re-verified and merged; `evidence_required` (the drift mutation red then green as CI job output, not local). S2 and N1 proven (user #12) | vizra-core | VZ-FOUND-002 | core #18 |
+| 3 (003) | VZ-FOUND-003 lacks: N1 until core #18 merges; S1 (no lane runs `migrate up` from the release image); R1 (no test sets a ledger dirty); the outcome's "compatibility window" does not exist. S2, N2 proven | vizra-core | VZ-FOUND-003 | core #18 for N1 |
 | 3 (006) | VZ-FOUND-006 lacks: S2 (`vizra setup` does not exist, queue 7); N1 boot-refusal transcript; P1 (two integration tests not run); N2 limit: meta CI checks a snapshot of core's keys. S1 and N2 proven on the meta side (meta #17) | vizra + vizra-core | VZ-FOUND-006 | queue 7 for S2 |
 | 4 | Tombstone rule in all four `ci-required` guards; vizra-user's two "required only if it ran" lanes | all four | VZ-CI-001 | 1 for core |
 | 5 | `bootstrap.sh`; pin the libvips binding and Lucide | vizra + vizra-core + vizra-user | VZ-FOUND-001, VZ-FOUND-004 | 1 |
@@ -90,4 +90,3 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | 12 | VZ-FOUND-008 acceptance text against Lane A with pixels off |
 | 13 | Coverage gaps: installer, wizard, IPFS topology, QA, security testing, rehearsal, CI repair, VZ-AUDIT-001 |
 | 15 | VZ-FOUND-005: Redis carries rate-limit counters, not only cache, so the ledger text was not amended; `/readyz` 503 or 200 `degraded` when it is down? |
-| 17 | Budget: VZ-FOUND-002 has spent its 4 verdicts; core #18 (fixed, CI green) cannot be re-verified without a grant |
