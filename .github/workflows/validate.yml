@@ -375,6 +375,16 @@ jobs:
       - name: configuration-key coverage in both directions
         run: ./scripts/check-config-coverage.py build/compose-models
 
+      # env/registry/setup.json must be a snapshot of an interview that
+      # actually merged: source_commit an ancestor of vizra-core origin/main,
+      # and questions/compose_keys equal to questions.go parsed at it. A failed
+      # clone fails this step; it never skips to green.
+      - name: setup snapshot matches merged vizra-core
+        run: |
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/yegamble/vizra-core.git build/vizra-core
+          python3 -I scripts/snapshot-setup-keys.py --check build/vizra-core
+
       # An operator-facing file may not name a command that does not exist.
       # The sentence this exists to refuse shipped in env/production.env.example
       # and invited an operator to permanently destroy every stored MFA secret.

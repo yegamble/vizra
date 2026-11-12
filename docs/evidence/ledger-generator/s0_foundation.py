@@ -25,9 +25,9 @@ req("VZ-FOUND-004","Pinned, reviewed dependency versions and preserved licenses"
     evidence=["ADR with versions and license table; govulncheck/npm audit lane output"], decided=["Q-003","Q-004"],
     notes="Q-003/Q-004 decided 2026-09-15: Echo v5 ≥ 5.3.1 on Go 1.27.x, tracing via otelhttp + route middleware; Valkey managed (digest-pinned) + go-redis v9 with a Valkey/Redis 7.2 integration matrix.")
 req("VZ-FOUND-005","Health, readiness, version and schema probes",
-    "Operator: the API exposes /healthz, /readyz (fails when DB/Redis/storage unavailable), /version and a migration-state probe; readiness fails closed when the schema is behind.",
+    "Operator: the API exposes /healthz, /readyz (reports degraded when Redis is unavailable; fails only when DB or storage is unavailable), /version and a migration-state probe; readiness fails closed when the schema is behind.",
     "foundation", OPS, [{"source":"VIDRA-README","note":"/healthz /readyz /schemaz /version"}],
-    deps=["VZ-FOUND-003"], success=["/readyz 200 only when DB, Redis and storage root are reachable and schema is current"],
+    deps=["VZ-FOUND-003"], success=["/readyz 200 only when DB and storage root are reachable and schema is current; reports degraded (not failed) when Redis is unreachable"],
     negative=["Stopping PostgreSQL turns /readyz non-200 within the declared interval"], recovery=["Probe recovers without restart when dependency returns"],
     api=["GET /healthz","GET /readyz","GET /version"], evidence=EV_OPS)
 req("VZ-FOUND-006","Secure runtime configuration with fail-secure production validation",

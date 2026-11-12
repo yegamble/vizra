@@ -1,7 +1,7 @@
 # VZ-ISSUE-004: M0 — installer, `vizra setup` wizard, deployment bundle, boot lane
 
 **Status:** DRAFT (local only — not filed on GitHub; filing requires owner authorization)
-**Ledger IDs:** VZ-INSTALL-001, VZ-INSTALL-002, VZ-INSTALL-004, VZ-OPS-002, VZ-OPS-003, VZ-CI-003
+**Ledger IDs:** VZ-INSTALL-001, VZ-INSTALL-002, VZ-INSTALL-004, VZ-OPS-002, VZ-OPS-003, VZ-OPS-005, VZ-CI-003
 **Implementation status:** PLANNED · **Verification status:** UNVERIFIED
 
 ## Outcome
@@ -15,6 +15,9 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - Every wizard answer lands on a template key (CI assert); `--check` validates
 - Bundle byte-identical twice; renders with no checkouts
 - boot lane: /readyz 200; migrate one-shots exit 0
+- (VZ-OPS-005) Operator: JSON logs, Prometheus metrics, optional OpenTelemetry traces (otel profile OFF/MANAGED/EXTERNAL); sensitive-key denylist enforced.
+- (VZ-OPS-005) Metrics endpoint scrapeable; traces exported when enabled
+- (VZ-OPS-005) Denylist test
 
 ## Verification
 - Read `AGENTS.md`, the ledger entries above (success / negative / privacy / recovery cases), `docs/PRODUCT_SPEC.md`, and `docs/quality/COMMANDS.md` once it exists.
@@ -26,6 +29,7 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - install transcript with exit codes on the declared target
 - setup unit tests keyed by question
 - boot lane logs artifact
+- (VZ-OPS-005) scrape transcript; denylist test
 
 ## Dependencies / blockers
 Target VM access; lab hostname
