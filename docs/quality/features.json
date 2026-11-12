@@ -384,7 +384,7 @@
       "id": "VZ-FOUND-005",
       "title": "Health, readiness, version and schema probes",
       "area": "foundation",
-      "outcome": "Operator: the API exposes /healthz, /readyz (fails when DB/Redis/storage unavailable), /version and a migration-state probe; readiness fails closed when the schema is behind.",
+      "outcome": "Operator: the API exposes /healthz, /readyz (reports degraded when Redis is unavailable; fails only when DB or storage is unavailable), /version and a migration-state probe; readiness fails closed when the schema is behind.",
       "source_kind": "operator_requirement",
       "provenance": [
         {
@@ -402,7 +402,7 @@
       ],
       "cases": {
         "success": [
-          "/readyz 200 only when DB, Redis and storage root are reachable and schema is current"
+          "/readyz 200 only when DB and storage root are reachable and schema is current; reports degraded (not failed) when Redis is unreachable"
         ],
         "negative": [
           "Stopping PostgreSQL turns /readyz non-200 within the declared interval"
