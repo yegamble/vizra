@@ -22,9 +22,9 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 13 (meta part): otel compose profile OFF/MANAGED/EXTERNAL passing `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` | vizra | VZ-OPS-005 | none yet | waits for the meta writer slot | core half merged (core #20) | 1/0/0/2 |
-| Queue 4: tombstone rule | all four | VZ-CI-001 | search #6, user #14, core #21, meta #27 | see PRs | search and user ready; core and meta finishing; one verdict will cover all four | 0/0/0/3 |
-| Queue 14 remainder: PhotoCard, TabBar Item, TabBar | vizra-user | VZ-DESIGN-001 | user #15 | see PR | building | 2/0/0/6 |
+| Queue 8: deterministic bundle and content check | vizra | VZ-INSTALL-004 | none yet | branch `feat/install-004-bundle` | building since tick 276 | 0/0/0/1 |
+| Queue 4 remainder: a skipped vitest or Playwright test fails the lane (N1) | vizra-user | VZ-CI-001 | none yet | branch `fix/ci-001-skip-fails` | building; verdicts spent, waits on inbox 22 | 4/0/0/5 |
+| Queue 7: `vizra setup` engine, interview, --check, --rotate guards, Caddyfile/nginx, --web | vizra-core | VZ-INSTALL-002 | #22 (draft) | see PR | building, session 3 | 0/0/0/3 |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -94,3 +94,5 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | 15 | VZ-FOUND-005: Redis carries rate-limit counters, not only cache, so the ledger text was not amended; `/readyz` 503 or 200 `degraded` when it is down? |
 | 20 | VZ-DESIGN-001 brand mark: the accepted design defines none; chair recommends the text wordmark as the M0 mark, final mark under Q-002 |
 | 21 | VZ-FOUND-003 compatibility window: build it (chair recommends) or reword the outcome |
+| 22 | VZ-CI-001 budget: 4/4 verdicts spent; chair recommends +2 for the vizra-user N1 slice |
+| 23 | VZ-OPS-005 is IMPLEMENTED by the verifier's reading but no issue lists it, so no record can cite a bullet; chair asks standing permission to add issue bullets verbatim |

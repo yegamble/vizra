@@ -110,6 +110,14 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 - **(A, chair's recommendation) Build the window.** Define it as: the previous released version must keep working against the migrated schema. A destructive statement is allowed only if a checked-in compatibility record names the object, the release that stopped using it, and that release is older than the last published release; migrate-lint refuses any `allow-destructive` marker without such a record. This protects upgrade and rollback (VZ-UPGRADE-001/002, M4).
 - **(B) Reword the outcome** to "migrate-lint rejects destructive statements unless explicitly exempted with a stated reason", which is what exists today. Changing the acceptance target is yours.
 
+### 22
+
+**Budget grant for VZ-CI-001 (new 2026-11-12, tick 277).** The tombstone rule and the other VZ-CI-001 cases landed in all four repos (search #6, user #14, core #21, meta #27; independent PASS on all four). VZ-CI-001 has spent its 4 verifier verdicts: one PASS for user + meta, and three for core + search, of which two ended BLOCKED only because the verifier ran out of session time, with no defect found. One gap remains: in vizra-user a skipped vitest or Playwright test is caught only by count floors, so N1 ("A skipped required test fails the job") does not fully hold there. The fix is being built (vizra-user `fix/ci-001-skip-fails`) and needs one verdict. **Chair's recommendation:** grant VZ-CI-001 two more verdicts, for the vizra-user N1 slice only. Without it, VZ-CI-001 stays unrecorded.
+
+### 23
+
+**VZ-OPS-005 has no issue to cite (new 2026-11-12, tick 277).** Core #20 and meta #29 are merged and an independent verifier judged VZ-OPS-005 IMPLEMENTED: every outcome clause has an implementation (`docs/evidence/warroom/2026-11-12-meta-pr29-otel-profile-VERIFY.md`). It cannot be recorded: the status generator requires each record to cite acceptance bullets quoted from a `docs/issues/*.md` file, and no issue lists VZ-OPS-005. The same will hold for other ledger IDs no issue covers. **Chair's recommendation:** give the chair standing permission, like decision 2026-11-11 #1, to add a ledger ID to the `**Ledger IDs:**` line of the issue for its milestone (here VZ-ISSUE-004, M0 operations) and to add its ledger cases verbatim as acceptance bullets, through an independently verified PR, without changing the ledger. Until you answer, VZ-OPS-005 is blocked here.
+
 ## Closed
 
 ### 0
