@@ -4,6 +4,9 @@ Append new rows at the top of the table. A merge is not a ledger status: the sta
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-11-12 | vizra | #43 ledger record VZ-FOUND-006 VERIFIED | `457df28` → `3dc179b` | PASS `457df28` (`docs/evidence/warroom/2026-11-12-meta-pr43-found-006-record-VERIFY.md`) | **VZ-FOUND-006 VERIFIED** |
+| 2026-11-12 | vizra | #42 boot lane: production stack from source, env from `vizra setup`, migrate one-shots, never-exits negative, PostgreSQL stop/recover; postgres:18 volume path fix (VZ-CI-003, VZ-FOUND-005) | `d7627d7` → `814407d` | PASS `d7627d7` (`docs/evidence/warroom/2026-11-12-meta-pr42-boot-lane-VERIFY.md`) | upload + thumbnail open (M1); not a required check (owner) |
+| 2026-11-12 | vizra-core | #28 `vizra status/logs/restart/update` on the env-derived compose chain (VZ-OPS-003) | `135934b` → `54da336` | PASS `d83f143`, binary removed, PASS `135934b` (`docs/evidence/warroom/2026-11-12-vizra-core-pr28-ops-003-round2-VERIFY.md`) | status versions and update partial |
 | 2026-11-12 | vizra | #41 war-room records, ticks 284-286, inbox 26 and 27 | `6a28a35` → `e66b85d` | PASS `6a28a35` (`docs/evidence/warroom/2026-11-12-meta-pr41-records-VERIFY.md`) | records only |
 | 2026-11-12 | vizra-user | #20 staged artifacts withhold assertion values; media default-deny, never for @authenticated (QUEUE-2f F-1/F-2, VZ-FOUND-008) | `76401de` → `56a4500` | PASS `76401de` (`docs/evidence/warroom/2026-11-12-vizra-user-pr20-2f-leaks-VERIFY.md`) | sign-in gate stays closed: F-A, job log (user #21) |
 | 2026-11-12 | vizra-core | #27 `vizra doctor`: host checks, OK/FAIL/BLOCKED, exit 0/1/3 (VZ-OPS-002, first slice) | `b170e52` → `33a7187` | PASS `b170e52` (`docs/evidence/warroom/2026-11-12-vizra-core-pr27-doctor-VERIFY.md`) | DNS/TLS, closed ports, backup freshness open |

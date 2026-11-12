@@ -6,6 +6,7 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 
 ## vizra (meta)
 
+- 2026-11-12 meta #43 F1: VZ-FOUND-006 record rationale says "Core has no separate JWT secret", which no cited evidence file states; reword or cite (evidence: `docs/evidence/warroom/2026-11-12-meta-pr43-found-006-record-VERIFY.md`)
 - 2026-11-10 meta #11 H-1: Stop hook exits 0 for commits made on a detached HEAD (worktree or main checkout) (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
 - 2026-11-10 meta #11 H-2: Stop hook does not look at stashes; untracked files are a stated limit (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
 - 2026-11-10 meta #11 H-3: Stop hook matches branch names with awk numerically (`1e2` equals `100`); force a string comparison (evidence: `docs/evidence/warroom/2026-11-10-meta-warroom-rework-VERIFY.md`)
@@ -59,6 +60,8 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 meta #39 F1: no rule asserts frontend→api `service_healthy`; reverting to `service_started` stays green — add a required-gate rule + demo case (evidence: `docs/evidence/warroom/2026-11-12-meta-pr39-found-005-VERIFY.md`)
 - 2026-11-12 meta #39 F2: README.md:114, env/production.env.example:195 and META_REPO.md:156-160 still describe api/worker as known-false / not yet landed (evidence: `docs/evidence/warroom/2026-11-12-meta-pr39-found-005-VERIFY.md`)
 - 2026-11-12 meta #41 R-1: board at `6a28a35` lists core #27 and user #20 as open drafts and the boot lane as 'none yet'; since cut, #27 merged `33a7187`, #20 merged `56a4500`, boot lane is meta #42 — refresh next records PR (evidence: `docs/evidence/warroom/2026-11-12-meta-pr41-records-VERIFY.md`)
+- 2026-11-12 meta #42 F-1: boot-lane secret scan only checks values of keys named *SECRET*/*KEK*/*HMAC*/*PASSWORD* and not the job stdout; scan all credential-bearing values incl. URL userinfo (evidence: `docs/evidence/warroom/2026-11-12-meta-pr42-boot-lane-VERIFY.md`)
+- 2026-11-12 meta #42 F-2: boot lane exercises only postgres-down for VZ-FOUND-005; add redis-down stays 200 (degraded), storage-unreachable and stale-schema non-200 (evidence: `docs/evidence/warroom/2026-11-12-meta-pr42-boot-lane-VERIFY.md`)
 
 ## vizra-core
 
@@ -85,6 +88,11 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 core #27 F-3: disk free silently measures `.` when the storage root is missing; say so or report BLOCKED (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr27-doctor-VERIFY.md`)
 - 2026-11-12 core #27 F-4: schema is BLOCKED on an unmigrated database; report FAIL with `vizra migrate` (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr27-doctor-VERIFY.md`)
 - 2026-11-12 core #27 F-5: builder transcript uses REDIS_URL instead of VIZRA_CACHE_URL and is from aae8309; regenerate at final SHA (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr27-doctor-VERIFY.md`)
+- 2026-11-12 core #28 F-1: a 37 MB compiled `vizra` binary is committed at the repo root; remove it and gitignore it (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr28-ops-003-VERIFY.md`)
+- 2026-11-12 core #28 F-2: the VZ-OPS-003 ledger says "wrap compose.sh" but no compose.sh exists; the CLI builds the env-derived chain itself (equivalent), so fix the ledger wording (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr28-ops-003-VERIFY.md`)
+- 2026-11-12 core #28 F-3: `vizra status` queue depth is always BLOCKED on a `vizra setup` env (no DATABASE_URL, postgres not reachable from the host); measure it via the compose network or `exec` (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr28-ops-003-VERIFY.md`)
+- 2026-11-12 core #28 F-4: `vizra status` versions come from image refs, not OCI labels or running digests (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr28-ops-003-VERIFY.md`)
+- 2026-11-12 core #28 F-5: `vizra update` prints the detected Compose version without comparing it to the 2.24.4 floor (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr28-ops-003-VERIFY.md`)
 
 ## vizra-user
 
