@@ -54,6 +54,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import urllib.parse
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -65,16 +66,44 @@ SELF_TEST = os.path.join(ROOT, "scripts", "testdata", "ledger-status", "remote-c
 TIMEOUT = 60
 
 
-def gh_api(path):
-    """Returns (data, error). Never raises for an API-level failure."""
+# Transient GitHub failures (502/503/504, connection resets/timeouts) are retried;
+# 4xx and anything else fail at once. Waits between attempts: 3 attempts total.
+RETRY_DELAYS = (2, 5)
+TRANSIENT = ("http 502", "http 503", "http 504", "bad gateway", "service unavailable",
+             "gateway timeout", "connection reset", "i/o timeout", "tls handshake timeout",
+             "connection timed out")
+
+
+def _is_transient(text):
+    t = text.lower()
+    if any(code in t for code in ("http 401", "http 403", "http 404", "http 422")):
+        return False
+    return any(k in t for k in TRANSIENT)
+
+
+def _gh_api_once(path):
     try:
         p = subprocess.run(["gh", "api", "-H", "Accept: application/vnd.github+json", path],
                            capture_output=True, text=True, timeout=TIMEOUT)
     except subprocess.TimeoutExpired:
-        return None, f"gh api {path}: timed out after {TIMEOUT}s"
+        return None, f"gh api {path}: timed out after {TIMEOUT}s", True
     if p.returncode != 0:
         msg = (p.stdout.strip() or p.stderr.strip()).replace("\n", " ")[:300]
-        return None, f"gh api {path}: exit {p.returncode}: {msg}"
+        return None, f"gh api {path}: exit {p.returncode}: {msg}", _is_transient(p.stdout + " " + p.stderr)
+    return p, None, False
+
+
+def gh_api(path):
+    """Returns (data, error). Never raises for an API-level failure."""
+    for attempt, delay in enumerate(tuple(RETRY_DELAYS) + (None,), start=1):
+        p, err, transient = _gh_api_once(path)
+        if err is None or not transient or delay is None:
+            break
+        print(f"gh api {path}: transient failure (attempt {attempt}), retrying in {delay}s: {err}",
+              file=sys.stderr)
+        time.sleep(delay)
+    if err is not None:
+        return None, err
     try:
         return json.loads(p.stdout), None
     except ValueError:
