@@ -104,6 +104,12 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 
 **VZ-DESIGN-001: the brand mark (new 2026-11-12, tick 267).** The ledger outcome asks for a "brand mark". The accepted design does not define one: `docs/design/figma/README.md` §6 item 14 removed the mockup's mark, and Q-002 puts brand assets in a separate review with no branding repo. vizra-user ships a text wordmark today. The chair will not invent a mark. **Chair's recommendation:** rule that the text wordmark is the M0 brand mark for VZ-DESIGN-001, and track the final mark under Q-002 / VZ-BRAND-001 (M5). Until you answer, VZ-DESIGN-001 can reach IMPLEMENTED on everything else but its record cannot claim the brand mark; the components work continues.
 
+### 21
+
+**VZ-FOUND-003: what the "compatibility window" is (new 2026-11-12, tick 273).** The ledger outcome says "migrate-lint rejects destructive statements inside the compatibility window". No window exists: migrate-lint rejects destructive statements everywhere unless the line before carries `-- allow-destructive: <reason>`, and nothing checks the reason, requires a review or ties the marker to a release. An independent verifier reproduced a marked `DROP COLUMN` that would break the previous release passing lint (`docs/evidence/warroom/2026-11-12-meta-pr25-ledger-found-003-VERIFY.md`). So VZ-FOUND-003 is recorded IMPLEMENTED at most, not VERIFIED. Two ways forward:
+- **(A, chair's recommendation) Build the window.** Define it as: the previous released version must keep working against the migrated schema. A destructive statement is allowed only if a checked-in compatibility record names the object, the release that stopped using it, and that release is older than the last published release; migrate-lint refuses any `allow-destructive` marker without such a record. This protects upgrade and rollback (VZ-UPGRADE-001/002, M4).
+- **(B) Reword the outcome** to "migrate-lint rejects destructive statements unless explicitly exempted with a stated reason", which is what exists today. Changing the acceptance target is yours.
+
 ## Closed
 
 ### 0

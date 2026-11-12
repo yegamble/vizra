@@ -22,9 +22,9 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 13: JSON logs, denylist, request metrics, OTLP traces | vizra-core | VZ-OPS-005 | #20 (draft) | `5ce752f` | building since tick 267; denylist and metrics done, OTLP export in progress | 0/0/0/1 |
-| Queue 6: installer, `--git` path, checksum, resume, idempotence, clean ubuntu:24.04 step | vizra | VZ-INSTALL-001 | #24 (draft) | `abd9df2` | finishing: PR body and CI | 0/0/0/2 |
-| Queue 4: tombstone rule, part 1 (four-repo audit + vizra-search) | vizra-search | VZ-CI-001 | none yet | branch `feat/ci-001-tombstone` from `4810048` | building since tick 267 | 0/0/0/1 |
+| Queue 13 (meta part): otel compose profile OFF/MANAGED/EXTERNAL passing `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` | vizra | VZ-OPS-005 | none yet | waits for the meta writer slot | core half merged (core #20) | 1/0/0/2 |
+| Queue 4: tombstone rule | all four | VZ-CI-001 | search #6, user #14, core #21, meta #27 | see PRs | search and user ready; core and meta finishing; one verdict will cover all four | 0/0/0/3 |
+| Queue 14 remainder: PhotoCard, TabBar Item, TabBar | vizra-user | VZ-DESIGN-001 | user #15 | see PR | building | 2/0/0/6 |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -43,7 +43,7 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 |---|---|---|---|---|
 | 2 | `/readyz`: storage merged (core #17). Left: schema-behind is not a `/readyz` component; no DB-recovery test; transcript on a compose stack and rendered-model assertion; Redis-down is 200 `degraded` against the ledger text (inbox 15) | vizra-core | VZ-FOUND-005 | inbox 15 for the Redis part |
 | 3 (002) | VZ-FOUND-002 is IMPLEMENTED on `main`. VERIFIED lacks `evidence_required`: the both-direction drift mutation red then green as CI job output (only local transcripts exist) | vizra-core + vizra-user | VZ-FOUND-002 | nothing |
-| 3 (003) | VZ-FOUND-003: every case proven on `main` (core #18, #19; verifier PASS at `37a6d55`). Status record next, after this records PR lands the evidence | vizra | VZ-FOUND-003 | this records PR |
+| 3 (003) | VZ-FOUND-003: IMPLEMENTED record in meta #25 (VERIFIED was refused: no compatibility window). VERIFIED waits on inbox 21 | vizra | VZ-FOUND-003 | inbox 21 |
 | 3 (006) | VZ-FOUND-006 lacks: S2 (`vizra setup` does not exist, queue 7); N1 boot-refusal transcript; P1 (two integration tests not run); N2 limit: meta CI checks a snapshot of core's keys. S1 and N2 proven on the meta side (meta #17) | vizra + vizra-core | VZ-FOUND-006 | queue 7 for S2 |
 | 4 | Tombstone rule in all four `ci-required` guards; vizra-user's two "required only if it ran" lanes | all four | VZ-CI-001 | 1 for core |
 | 5 | `bootstrap.sh`; pin the libvips binding and Lucide | vizra + vizra-core + vizra-user | VZ-FOUND-001, VZ-FOUND-004 | 1 |
@@ -93,3 +93,4 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | 13 | Coverage gaps: installer, wizard, IPFS topology, QA, security testing, rehearsal, CI repair, VZ-AUDIT-001 |
 | 15 | VZ-FOUND-005: Redis carries rate-limit counters, not only cache, so the ledger text was not amended; `/readyz` 503 or 200 `degraded` when it is down? |
 | 20 | VZ-DESIGN-001 brand mark: the accepted design defines none; chair recommends the text wordmark as the M0 mark, final mark under Q-002 |
+| 21 | VZ-FOUND-003 compatibility window: build it (chair recommends) or reword the outcome |
