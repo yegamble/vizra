@@ -14,6 +14,9 @@ One focused PR per session; complete vertical slice (migration/query → API →
 - Keyboard-only journey recorded
 - axe serious/critical zero; manual keyboard/screen-reader review recorded with reviewer
 - No unlisted controls; no dead controls (audit)
+- (VZ-DESIGN-001) Everyone: approved tokens (spacing/type/radii/shadows/semantic colors), components with variants and states, Lucide icons behind a typed registry with verified exports, brand mark; mirrored from Figma into the repo with revision references.
+- (VZ-DESIGN-001) Token file + component catalog + icon registry test that every name exists in the pinned package
+- (VZ-DESIGN-001) Unknown icon name fails typecheck
 
 ## Verification
 - Read `AGENTS.md`, the ledger entries above (success / negative / privacy / recovery cases), `docs/PRODUCT_SPEC.md`, and `docs/quality/COMMANDS.md` once it exists.
@@ -24,6 +27,7 @@ One focused PR per session; complete vertical slice (migration/query → API →
 ## Evidence required
 - browser traces and screenshots
 - control inventory audit report
+- (VZ-DESIGN-001) design handoff record with node references
 
 ## Dependencies / blockers
 Prompt 02 design acceptance
