@@ -1,0 +1,12 @@
+$ bash tests/bundle/bundle_test.sh (restored)
+ok 1 - two builds are byte-identical (sha256 29ef1e4c77271c9deedefd69794ad7e2633959aaa2dabc5a30ecaae060ee1d74)
+ok 2 - schema_version read from a release record fixture
+ok 3 - content ok, manifest schema_version = migrations on disk, 11/11 production shapes rendered
+ok 4 - schema_version != migrations on disk fails
+ok 5 - a missing bind-mount source fails
+ok 6 - an excluded file in the include list is refused
+ok 7 - an excluded file sneaking into the bundle fails
+ok 8 - an undeclared missing release item fails
+ok 9 - a tampered file fails the manifest
+PASS: 9 cases
+exit=0

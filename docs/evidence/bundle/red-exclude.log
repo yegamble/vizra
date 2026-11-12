@@ -1,0 +1,5 @@
+$ MUTATION: exclude assertion disabled in scripts/bundle.py
+bundle: not yet shipped: systemd units — no systemd unit is specified or written yet.
+bundle: not yet shipped: release record — releases/<tag>.json is written by `vizra release`, which does not exist yet (docs/META_REPO.md §6-§7).
+not ok - an excluded file sneaking into the bundle fails: no 'excluded path present: docker-compose.override.yml'
+exit=1

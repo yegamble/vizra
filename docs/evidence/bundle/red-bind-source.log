@@ -1,0 +1,5 @@
+$ MUTATION: bind-source check disabled in scripts/bundle.py
+bundle: not yet shipped: release record — releases/<tag>.json is written by `vizra release`, which does not exist yet (docs/META_REPO.md §6-§7).
+bundle: content ok (16 files, tag v0.0.0-ci, schema_version 3)
+not ok - a missing bind-mount source fails: command succeeded
+exit=1
