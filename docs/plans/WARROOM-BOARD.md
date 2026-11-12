@@ -22,11 +22,10 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 12: `vizra doctor` OK/FAIL/BLOCKED, host checks | vizra-core | VZ-OPS-002 | #27 (draft) | see PR | building | 0/0/0/1 |
-| 2f leaks F-1/F-2: withhold assertion values, media default-deny; the hard gate stays closed until merged | vizra-user | VZ-FOUND-008 | #20 (draft) | see PR | building | 1/0/0/10 |
-| Queue 5 search pins | vizra-search | VZ-FOUND-001, VZ-FOUND-004 | #8 | `802776d` | verifier running | 2/4 |
-| Queue 2 meta: api/worker `vizra healthcheck`, `required-probe` rule | vizra | VZ-FOUND-005 | #39 | `1ee80cf` | verifier running | 2/4 |
-| Record: VZ-FOUND-006 (all cases closed: core #25, meta #17, #33) | vizra | QUEUE-ledger-VZ-FOUND-006 | after this records PR | | waits for core #25 evidence on `main` | |
+| Queue 12: `vizra doctor` OK/FAIL/BLOCKED, host checks, real-binary transcript | vizra-core | VZ-OPS-002 | #27 (draft) | `b170e52` | CI pending, then verifier | 0/0/0/2 |
+| 2f leaks F-1/F-2; the hard gate on signing-in specs stays closed until merged | vizra-user | VZ-FOUND-008 | #20 (draft) | `76401de` | builder finishing lanes and body | 1/0/0/8 |
+| Queue 9: boot lane, production stack in CI, migrate one-shots, PostgreSQL stop/recover | vizra | VZ-CI-003 (+ VZ-FOUND-005 transcript) | none yet | branch `feat/ci-003-boot-lane` | building | 0/0/0/1 |
+| Records: VZ-FOUND-001 and VZ-FOUND-006 VERIFIED | vizra | QUEUE-ledger | after this records PR | | evidence lands with this PR | |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 

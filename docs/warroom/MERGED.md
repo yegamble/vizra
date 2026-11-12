@@ -4,6 +4,8 @@ Append new rows at the top of the table. A merge is not a ledger status: the sta
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-11-12 | vizra-search | #8 stack pin test: go.sum, go/toolchain lines, every setup-go, Docker build stage tag+digest, ADR-001 rows (VZ-FOUND-001, VZ-FOUND-004, search) | `4c0867c` → `dab62ad` | FAIL `802776d` (Dockerfile check matched a comment), fix round 1, PASS `4c0867c` (`docs/evidence/warroom/2026-11-12-vizra-search-pr8-pins-round2-VERIFY.md`) | VZ-FOUND-001 record next |
+| 2026-11-12 | vizra | #39 api/worker healthchecks run `vizra healthcheck`; frontend gates on api `service_healthy`; `required-probe` topology rule fails closed (VZ-FOUND-005, meta) | `1ee80cf` → `d1988f9` | PASS `1ee80cf` (`docs/evidence/warroom/2026-11-12-meta-pr39-found-005-VERIFY.md`) | clean-target transcript: boot lane |
 | 2026-11-12 | vizra | #40 ledger record VZ-DESIGN-001 VERIFIED | `f255121` → `94e9c4b` | BLOCKED (CI pending) then PASS `f255121` (`docs/evidence/warroom/2026-11-12-meta-pr40-design-001-verified-round2-VERIFY.md`) | **VZ-DESIGN-001 VERIFIED** |
 | 2026-11-12 | vizra-core | #25 production boot refuses dev/blank secrets and a plain-http origin (real api and worker); signed URLs in the denylist test (VZ-FOUND-006) | `52b4326` → `99e7431` | PASS `52b4326` (`docs/evidence/warroom/2026-11-12-vizra-core-pr25-found-006-VERIFY.md`) | VZ-FOUND-006 record next |
 | 2026-11-12 | vizra-core | #26 stack pin check: go.sum, toolchain, setup-go, Echo/go-redis/sqlc pins vs ADR-001; govulncheck mutation (VZ-FOUND-001, VZ-FOUND-004, core) | `6b2fd73` → `0c79669` | PASS `6b2fd73` (`docs/evidence/warroom/2026-11-12-vizra-core-pr26-pins-VERIFY.md`) | search part (#8) pending |

@@ -56,6 +56,8 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 meta #38 F-1: `check-ledger-status-remote.py` does not require that each record's verified_head has a `PASS — SHA` line in a tracked evidence file, so a record citing untracked evidence passes (evidence: `docs/evidence/warroom/2026-11-12-meta-pr38-records-ci001-ops005-VERIFY.md`)
 - 2026-11-12 meta #36 F-1: board PR heads drift after records are cut (meta #39 1ee80cf vs 2890020, user #18 f8c67d2 vs b2fd64e, core #24 not draft, core #25 unlisted); `warroom-check.py board` does not compare heads with gh (evidence: `docs/evidence/warroom/2026-11-12-meta-pr36-records-VERIFY.md`)
 - 2026-11-12 meta #40 F-2: CSP-mutation failure count differs by placement (pr37 run 4 failed, pr40 round-2 run 3 failed); record the exact mutation line in queue-14 evidence (evidence: `docs/evidence/warroom/2026-11-12-meta-pr40-design-001-verified-round2-VERIFY.md`)
+- 2026-11-12 meta #39 F1: no rule asserts frontend→api `service_healthy`; reverting to `service_started` stays green — add a required-gate rule + demo case (evidence: `docs/evidence/warroom/2026-11-12-meta-pr39-found-005-VERIFY.md`)
+- 2026-11-12 meta #39 F2: README.md:114, env/production.env.example:195 and META_REPO.md:156-160 still describe api/worker as known-false / not yet landed (evidence: `docs/evidence/warroom/2026-11-12-meta-pr39-found-005-VERIFY.md`)
 
 ## vizra-core
 
@@ -100,6 +102,9 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 
 - 2026-11-10 queue 2o-5: vendoring tool second manifest, on branch `feat/vendor-tool-second-manifest` `ed9f9cc` (UNVERIFIED, no PR); 2o-6 adopts the engine after core 2o-4; 2o-7 waits for `releases/` (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 - 2026-11-10 contract-drift never compares against core `main` (by design); decide a staleness check (chair ruling Q4) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
+- 2026-11-12 search #8 F-2: stackpins_test accepts setup-go `go-version-file: go.mod`, contradicting its own note that this installs go1.26.0 (evidence: `docs/evidence/warroom/2026-11-12-vizra-search-pr8-pins-VERIFY.md`)
+- 2026-11-12 search #8 F-3: gopkg.in/yaml.v3 is a direct dependency with no ADR-001 row (on adrUnlisted exception list) (evidence: `docs/evidence/warroom/2026-11-12-vizra-search-pr8-pins-VERIFY.md`)
+- 2026-11-12 search #8 F-4: Dockerfile golang digest is not checked to be the golang:1.27.4 image index (evidence: `docs/evidence/warroom/2026-11-12-vizra-search-pr8-pins-VERIFY.md`)
 
 ## September queue, verbatim, not yet triaged
 
