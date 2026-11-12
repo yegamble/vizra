@@ -1,0 +1,7 @@
+# Controlled mutation for the boot lane's negative case (VZ-CI-003):
+# "Migration one-shot that starts a server instead of exiting times out the job".
+# Applied ONLY by scripts/boot-lane.sh's negative self-test (and by a temporary
+# demonstration commit). Never part of a deploy chain.
+services:
+  migrate:
+    command: ["sleep", "infinity"]
