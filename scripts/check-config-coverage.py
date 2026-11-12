@@ -74,6 +74,8 @@ RULES = frozenset({
     "registry-drift",
     "retired-key-delivered",
     "unclassified-secret-key",
+    "setup-key-untemplated",
+    "template-key-unasked",
 })
 
 # Secondary net only. The registry's explicit `"secret": true` is the primary
@@ -372,6 +374,8 @@ def main(argv):
     # --- 3. Template keys have a consumer, and consumed variables have a
     #        template entry. Compose is the authority on both sides. --------
     consumed = set(manifest.get("interpolation_variables") or [])
+    setup = read_json(os.path.join(REGISTRY_DIR, "setup.json"))
+    setup_reads = set(setup.get("setup_reads") or {})
     if not consumed:
         unevaluable(
             f"{manifest_path} records no interpolation variables, so every "
@@ -379,7 +383,7 @@ def main(argv):
         )
     for name, keys in templates.items():
         for key in keys:
-            if key not in consumed:
+            if key not in consumed and key not in setup_reads:
                 violation(
                     "template-key-unused",
                     f"env/{name}.env.example/{key}",
@@ -414,6 +418,58 @@ def main(argv):
                 "operator can set it, but this template has no line for it - "
                 "the other template naming it does not document it here",
             )
+
+    # --- 3c. `vizra setup` answer coverage (VZ-INSTALL-002 S1, VZ-CI-002). ---
+    #
+    # env/registry/setup.json snapshots core's interview: question id -> the
+    # template keys it writes. Every written key must have a line in the
+    # production template (or be a declared unread_keys finding: written but
+    # read by nothing, so deliberately untemplated), and every production
+    # template key must be asked by a question or listed in not_asked.
+    questions = setup.get("questions") or {}
+    if not questions:
+        unevaluable("env/registry/setup.json records no questions.")
+    written = {k for ks in questions.values() for k in ks}
+    unread = set(setup.get("unread_keys") or [])
+    compose_keys = set(setup.get("compose_keys") or {})
+    not_asked = set(setup.get("not_asked") or {})
+    prod = set(templates["production"])
+    for qid, ks in sorted(questions.items()):
+        for key in ks:
+            if key not in prod and key not in unread and key not in compose_keys:
+                violation(
+                    "setup-key-untemplated", f"{qid}/{key}",
+                    f"`vizra setup` writes it (env/registry/setup.json at "
+                    f"{setup.get('source_commit', '?')[:12]}) but "
+                    f"env/production.env.example has no line for it",
+                )
+    for key in sorted(unread & prod):
+        violation("setup-key-untemplated", key,
+                  "is listed as unread_keys but the template now carries it; "
+                  "drop it from unread_keys and name its reader")
+    for key in sorted(unread - written):
+        violation("setup-key-untemplated", key,
+                  "is listed as unread_keys but no question writes it")
+    for key in sorted(compose_keys - written):
+        violation("setup-key-untemplated", key,
+                  "is listed as compose_keys but no question writes it")
+    for key in sorted(compose_keys & prod):
+        violation("setup-key-untemplated", key,
+                  "is listed as compose_keys (computed by `vizra setup`, read by "
+                  "Docker Compose) but env/production.env.example also carries it")
+    for key in sorted(setup_reads - written):
+        violation("setup-key-untemplated", key,
+                  "is listed as setup_reads but no question writes it")
+    for key in templates["production"]:
+        if key not in written and key not in not_asked:
+            violation(
+                "template-key-unasked", key,
+                "is operator-configurable in env/production.env.example but no "
+                "setup question writes it and setup.json not_asked gives no reason",
+            )
+    for key in sorted(not_asked & written):
+        violation("template-key-unasked", key,
+                  "is listed as not_asked but a setup question writes it")
 
     # --- 4. No development escape hatch in the production template. ---------
     for key in templates["production"]:

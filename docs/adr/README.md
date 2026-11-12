@@ -71,15 +71,17 @@ Conventions used inside the files:
 
 | # | Title | Status | Q-ids | Ledger IDs |
 |---|---|---|---|---|
-| ADR-001 | Stack pins and licences | Accepted (owner) 2026-09-20 | Q-003, Q-004, Q-009, Q-010, Q-017, Q-027, Q-034 | VZ-FOUND-001, VZ-FOUND-004, VZ-MEDIA-002, VZ-MEDIA-005, VZ-MEDIA-010, VZ-TOPOLOGY-001, VZ-OPS-005 |
+| ADR-001 | Stack pins and licences | Accepted (owner) 2026-09-20; amended by ADR-010 | Q-003, Q-004, Q-009, Q-010, Q-017, Q-027, Q-034 | VZ-FOUND-001, VZ-FOUND-004, VZ-MEDIA-002, VZ-MEDIA-005, VZ-MEDIA-010, VZ-TOPOLOGY-001, VZ-OPS-005 |
 | ADR-002 | Repository, process, release and configuration ownership | Accepted (owner) 2026-09-20 | Q-001, Q-002, Q-008, Q-017, Q-028, Q-032 | VZ-FOUND-001, VZ-FOUND-002, VZ-FOUND-003, VZ-FOUND-005, VZ-FOUND-006, VZ-CI-001, VZ-CI-002, VZ-CI-005, VZ-TOPOLOGY-001, VZ-OPS-001, VZ-OPS-002, VZ-OPS-005, VZ-UPGRADE-001, VZ-UPGRADE-002, VZ-SEARCH-004, VZ-ADMIN-002 |
-| ADR-003 | Identity, sessions, CSRF, authorization | Accepted (owner) 2026-09-20 | Q-032, Q-033, Q-039, Q-040 | VZ-AUTH-001, VZ-AUTH-003, VZ-AUTH-004, VZ-AUTH-008, VZ-AUTH-009, VZ-INSTALL-003, VZ-PRIVACY-001, VZ-SECURITY-003, VZ-UPLOAD-010, VZ-ADMIN-USERS-001 |
+| ADR-003 | Identity, sessions, CSRF, authorization | Accepted (owner) 2026-09-20; amended by ADR-011 | Q-032, Q-033, Q-039, Q-040 | VZ-AUTH-001, VZ-AUTH-003, VZ-AUTH-004, VZ-AUTH-008, VZ-AUTH-009, VZ-INSTALL-003, VZ-PRIVACY-001, VZ-SECURITY-003, VZ-UPLOAD-010, VZ-ADMIN-USERS-001 |
 | ADR-004 | Durable work: transactional outbox and jobs | Accepted (owner) 2026-09-20 | Q-008, Q-028 | VZ-JOBS-001, VZ-FOUND-003, VZ-OPS-002, VZ-OPS-005, VZ-OPS-006, VZ-OPS-007, VZ-SEARCH-004 |
 | ADR-005 | Ingestion, quota, storage | Accepted (owner) 2026-09-20 | Q-007, Q-015, Q-016, Q-025, Q-034 | VZ-UPLOAD-001, VZ-UPLOAD-002, VZ-UPLOAD-008, VZ-UPLOAD-013, VZ-QUOTA-001, VZ-QUOTA-002, VZ-STORAGE-001, VZ-STORAGE-002, VZ-STORAGE-004, VZ-STORAGE-014, VZ-BACKUP-001, VZ-BACKUP-004, VZ-MEDIA-008 |
 | ADR-006 | Derivatives, metadata policy, codec boundary | Accepted (owner) 2026-09-20 | Q-009, Q-010, Q-034, Q-038 | VZ-MEDIA-001, VZ-MEDIA-002, VZ-MEDIA-003, VZ-MEDIA-004, VZ-MEDIA-005, VZ-MEDIA-009, VZ-MEDIA-010, VZ-UPLOAD-013, VZ-GEO-001 |
 | ADR-007 | Domain model: assets, albums, privacy, social, site | Accepted (owner) 2026-09-20 | Q-007, Q-008, Q-018, Q-037, Q-039, Q-040 | VZ-PRIVACY-001, VZ-PRIVACY-002, VZ-PRIVACY-004, VZ-ALBUM-001, VZ-ALBUM-002, VZ-SHARE-001, VZ-FAVORITE-001, VZ-RATING-001, VZ-COMMENT-001, VZ-TAG-001, VZ-CATEGORY-001, VZ-COLLECTION-001, VZ-GALLERY-001, VZ-GROUP-001, VZ-AUTH-004, VZ-TENANT-001, VZ-ADMIN-002, VZ-FOUND-003 |
 | ADR-008 | Federation and protocol boundaries (M6 behaviour, M0 constraints) | Accepted (owner) 2026-09-20 | Q-018, Q-025, Q-036, Q-040 | VZ-AP-001, VZ-AP-002, VZ-AP-003, VZ-AP-004, VZ-AT-001, VZ-AT-002, VZ-IPFS-001, VZ-IPFS-002, VZ-UPLOAD-004, VZ-IMPORT-002, VZ-PRIVACY-001, VZ-REPORT-001, VZ-FOLLOW-002 |
 | ADR-009 | Acceptance platform, fixtures, budgets, rehearsal path | Accepted (owner) 2026-09-20 | Q-027, Q-028 | VZ-FOUND-007, VZ-FOUND-008, VZ-OPS-007, VZ-CI-003, VZ-INSTALL-001, VZ-BACKUP-002, VZ-TOPOLOGY-007 |
+| ADR-010 | AVIF through libheif with AV1 codecs only (amends ADR-001) | Accepted (owner) 2026-11-12, decision #9 | Q-034 | VZ-MEDIA-001, VZ-MEDIA-010 |
+| ADR-011 | CSRF table pre-claim rows and the password version tag (amends ADR-003) | Accepted (owner) 2026-11-12, decision #10 | Q-032, Q-033 | VZ-INSTALL-003, VZ-AUTH-001, VZ-SECURITY-003 |
 
 ADR-001…009 were corrected on 2026-09-15 after an independent verification pass
 found 21 defects; the chair's rulings (D1–D12, S1–S9) were applied while every ADR
