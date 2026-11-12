@@ -25,7 +25,7 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 | Queue 12: `vizra doctor` OK/FAIL/BLOCKED, host checks, real-binary transcript | vizra-core | VZ-OPS-002 | #27 (draft) | `b170e52` | CI pending, then verifier | 0/0/0/2 |
 | 2f leaks F-1/F-2; the hard gate on signing-in specs stays closed until merged | vizra-user | VZ-FOUND-008 | #20 (draft) | `76401de` | builder finishing lanes and body | 1/0/0/8 |
 | Queue 9: boot lane, production stack in CI, migrate one-shots, PostgreSQL stop/recover | vizra | VZ-CI-003 (+ VZ-FOUND-005 transcript) | none yet | branch `feat/ci-003-boot-lane` | building | 0/0/0/1 |
-| Records: VZ-FOUND-001 and VZ-FOUND-006 VERIFIED | vizra | QUEUE-ledger | after this records PR | | evidence lands with this PR | |
+| Record: VZ-FOUND-006 VERIFIED (VZ-FOUND-001 held: inbox 27) | vizra | QUEUE-ledger-VZ-FOUND-006 | after this records PR | | evidence lands with this PR | |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -90,3 +90,4 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | 13 | Coverage gaps: installer, wizard, IPFS topology, QA, security testing, rehearsal, CI repair, VZ-AUDIT-001 |
 | 25 | VZ-FOUND-003 budget for the compatibility-window slice: chair recommends +2 verdicts, +1 fix round |
 | 26 | ADR-001 version rows for VZ-FOUND-004: chair recommends an editorial update to the pinned versions |
+| 27 | VZ-FOUND-001 went one verdict over budget (chair's counting error); recommend a retroactive +1 |

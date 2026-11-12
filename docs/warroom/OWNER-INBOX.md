@@ -90,6 +90,10 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 
 **ADR-001 version rows for VZ-FOUND-004 (new 2026-11-12, tick 285).** VZ-FOUND-004's success case is "Lockfiles committed; versions match ADR". The pin checks now merged (vizra-core #26, vizra-user #19) show ADR-001 has no version for several pinned packages, and one row that disagrees with the reviewed pin: no Node row (repo pins 22.14.0); Next.js says 16.3.x while vizra-user pins 16.4.1 (bumped by user #16 to clear a CVE); React, Tailwind CSS, TypeScript, pgx, golang-migrate, OpenTelemetry, minio-go, x/crypto and echo-contrib carry no version or `[pin at PR time; verify]`; gopkg.in/yaml.v3 (vizra-search tests) has no row. Accepted ADRs change only with you. **Chair's recommendation:** approve an editorial ADR-001 update to the versions actually pinned and verified on main (as decision 2026-11-11 #1 did for Go and Echo), through an independently verified PR. Until then VZ-FOUND-004 stays unrecorded.
 
+### 27
+
+**VZ-FOUND-001 went one verdict over budget (new 2026-11-12, tick 286). Chair's error.** `scripts/warroom-check.py budget` counts a verdict on a PR once for every ID the PR names. vizra-user #19 and vizra-core #26 each named VZ-FOUND-001 and VZ-FOUND-004, so with meta #32 they used 3 of VZ-FOUND-001's 4 verdicts. The chair briefed the vizra-search #8 verifiers as verdicts 3 and 4; they were 4 (FAIL `802776d`) and 5 (PASS `4c0867c`). The 5th verdict was dispatched without a grant, and #8 was merged on it (`dab62ad`). Every merge gate held: an independent PASS with an evidence file, green `ci-required` on the verified SHA, and no head change. Only the budget rule was broken. VZ-FOUND-001 is now BLOCKED, and its ledger record (all cases proven: meta #32, core #26, user #19, search #8) is held. **Chair's recommendation:** grant VZ-FOUND-001 one verdict retroactively for search #8. The chair now counts budgets with the script before every brief instead of by hand. The alternative is to revert search #8 and re-verify it under a fresh grant.
+
 ## Closed
 
 ### 0
