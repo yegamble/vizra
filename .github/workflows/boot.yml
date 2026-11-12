@@ -44,7 +44,6 @@ jobs:
       - name: Boot production shape and probe
         env:
           BOOT_OUT: ${{ runner.temp }}/boot-out
-          BOOT_EXTRA_COMPOSE: tests/boot/migrate-never-exits.yml
         run: |
           docker version --format '{{.Server.Version}}'
           docker compose version
