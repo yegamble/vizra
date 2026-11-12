@@ -100,6 +100,10 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 
 **VZ-FOUND-005: Redis in readiness (new 2026-11-10, tick 260).** The ledger outcome says `/readyz` "fails when DB/Redis/storage unavailable". vizra-core returns 200 with `degraded` when the cache is down and tests that on purpose (`TestReadyzCacheDownIs200Degraded`), following ADR-002. One of the two has to change before the ID can be recorded; changing the ledger text or the ADR is yours. Evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`.
 
+### 18
+
+**Who merges a ledger status record the chair wrote (new 2026-11-12, tick 264).** Meta #19 records VZ-FOUND-002 IMPLEMENTED from vizra-core #18 and vizra-user #12. An independent verifier returned PASS at `5d8d281` and `ci-required` is green on it (`docs/evidence/warroom/2026-11-12-meta-pr19-ledger-found-002-round2-VERIFY.md`). The loop rules have the chair write status records, and the owner said on 2026-11-11 "nobody merges their own work", so the chair has not merged it. Either merge #19, or say the chair may merge status record PRs after an independent PASS, or have a builder write them.
+
 ## Closed
 
 ### 0
