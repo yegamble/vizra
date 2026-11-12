@@ -220,6 +220,65 @@ jobs:
       - name: installer on a clean digest-pinned ubuntu:24.04 (VZ-INSTALL-001)
         run: sh tests/install/clean_target.sh
 
+      # (c3) VZ-FOUND-001: bootstrap.sh against local bare repos (no network),
+      #      every guard red against a controlled mutation, then S1 — a
+      #      clean clone of every component at main through bootstrap.sh and
+      #      each repo's documented build-only command (no services), with
+      #      the pinned toolchain read from the component's own files. The
+      #      log of these steps is the per-repo clean-clone build transcript.
+      - name: bootstrap tests (VZ-FOUND-001)
+        timeout-minutes: 3
+        run: sh tests/bootstrap/bootstrap_test.sh
+      - name: every bootstrap guard still fails against a controlled mutation
+        timeout-minutes: 5
+        run: sh docs/evidence/bootstrap/mutation-demo.sh
+      - name: S1 clean clone of every component via bootstrap.sh (VZ-FOUND-001)
+        timeout-minutes: 3
+        env:
+          VIZRA_DIR: ${{ runner.temp }}/s1
+        run: |
+          set -eu
+          mkdir -p "$VIZRA_DIR"
+          sh ./bootstrap.sh
+          sh ./bootstrap.sh   # R1 against the real remotes: rerun is a no-op
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ runner.temp }}/s1/vizra-core/go.mod
+          cache: false
+      - name: S1 vizra-core clean build (make build)
+        timeout-minutes: 8
+        working-directory: ${{ runner.temp }}/s1/vizra-core
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          set -eu
+          echo "vizra-core SHA: $(git rev-parse HEAD)"; go version
+          make build && ls -l bin/
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ runner.temp }}/s1/vizra-search/go.mod
+          cache: false
+      - name: S1 vizra-search clean build (make build)
+        timeout-minutes: 8
+        working-directory: ${{ runner.temp }}/s1/vizra-search
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          set -eu
+          echo "vizra-search SHA: $(git rev-parse HEAD)"; go version
+          make build && ls -l bin/
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ${{ runner.temp }}/s1/vizra-user/.nvmrc
+      - name: S1 vizra-user clean build (npm ci && npm run build)
+        timeout-minutes: 10
+        working-directory: ${{ runner.temp }}/s1/vizra-user
+        run: |
+          set -eu
+          echo "vizra-user SHA: $(git rev-parse HEAD)"; node --version
+          npm ci --no-audit --no-fund
+          npm run build
+
       # ---------------------------------------------------------------------
       # (d) THE COMPOSE TOPOLOGY (VZ-ISSUE-002: VZ-TOPOLOGY-001/-002/-003/-006/
       #     -007, VZ-CI-002, VZ-OPS-008).

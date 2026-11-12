@@ -32,9 +32,13 @@ if run "$tmp/a" >"$tmp/out" 2>&1 && [ "$(git -C "$tmp/a/vizra-user" symbolic-ref
 
 # S2: VIZRA_REF=<sha> pins every component detached at that sha.
 mkdir "$tmp/b"
-if run "$tmp/b" "$old_sha" >"$tmp/out" 2>&1 && for c in vizra-core vizra-user vizra-search; do
-     [ "$(git -C "$tmp/b/$c" rev-parse HEAD)" = "$old_sha" ] && ! git -C "$tmp/b/$c" symbolic-ref -q HEAD >/dev/null || exit 1
-   done && grep -q "$old_sha" "$tmp/out"; then ok S2-ref-detached; else bad S2-ref-detached; cat "$tmp/out"; fi
+all_detached_at() { # <dir> <sha>
+  for c in vizra-core vizra-user vizra-search; do
+    [ "$(git -C "$1/$c" rev-parse HEAD)" = "$2" ] || return 1
+    if git -C "$1/$c" symbolic-ref -q HEAD >/dev/null; then return 1; fi
+  done
+}
+if run "$tmp/b" "$old_sha" >"$tmp/out" 2>&1 && all_detached_at "$tmp/b" "$old_sha" && grep -q "$old_sha" "$tmp/out"; then ok S2-ref-detached; else bad S2-ref-detached; cat "$tmp/out"; fi
 # a tag pins too
 for c in vizra-core vizra-user vizra-search; do git -C "$tmp/remotes/$c.git" tag v0.0.1 "$old_sha"; done
 mkdir "$tmp/t"
