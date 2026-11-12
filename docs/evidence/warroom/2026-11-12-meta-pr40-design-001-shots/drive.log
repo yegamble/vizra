@@ -1,0 +1,25 @@
+desktop CSP default-src 'self'; script-src 'self' 'nonce-vAhuj3sNgyPLGDX8dwnVTA==' 'strict-dynamic'; style-src 'self' 'nonce-vAhuj3sNgyPLGDX8dwnVTA=='; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+desktop unsafe? false
+desktop wordmark true
+desktop tab 0 {"tag":"A","text":"Skip to content","href":"#content","outline":"solid 2px rgb(0, 91, 180)"}
+desktop tab 1 {"tag":"A","text":"Vizra","href":"/","outline":"solid 2px rgb(0, 91, 180)"}
+desktop tab 2 {"tag":"A","text":"/health","href":"/health","outline":"solid 2px rgb(0, 91, 180)"}
+desktop tab 3 null
+desktop controls ["#content","/","/health"]
+desktop enter 0 http://127.0.0.1:3947/#content MAIN#content
+desktop enter 1 http://127.0.0.1:3947/ BODY#
+desktop enter 2 http://127.0.0.1:3947/health BODY#
+desktop consoleErrors 0 networkErrors 0
+mobile CSP default-src 'self'; script-src 'self' 'nonce-fuu83r6FtmFwCbtUki7zug==' 'strict-dynamic'; style-src 'self' 'nonce-fuu83r6FtmFwCbtUki7zug=='; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+mobile unsafe? false
+mobile wordmark true
+mobile tab 0 {"tag":"A","text":"Skip to content","href":"#content","outline":"solid 2px rgb(0, 91, 180)"}
+mobile tab 1 {"tag":"A","text":"Vizra","href":"/","outline":"solid 2px rgb(0, 91, 180)"}
+mobile tab 2 {"tag":"A","text":"/health","href":"/health","outline":"solid 2px rgb(0, 91, 180)"}
+mobile tab 3 null
+mobile controls ["#content","/","/health"]
+mobile enter 0 http://127.0.0.1:3947/#content MAIN#content
+mobile enter 1 http://127.0.0.1:3947/ BODY#
+mobile enter 2 http://127.0.0.1:3947/health BODY#
+mobile consoleErrors 0 networkErrors 0
+nonces distinct true [ 'vAhuj3sNgyPLGDX8dwnVTA==', 'fuu83r6FtmFwCbtUki7zug==' ]

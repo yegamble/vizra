@@ -10,7 +10,7 @@ Everything else lives in `docs/warroom/`:
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
-**Ledger on `main`: 192 entries, 2 IMPLEMENTED (VZ-FOUND-002 tick 265; VZ-DESIGN-001 meta #37 `83efd6d`, tick 283), 0 VERIFIED.**
+**Ledger on `main`: 192 entries, 3 IMPLEMENTED (VZ-FOUND-002, VZ-CI-001, VZ-OPS-005), 1 VERIFIED (VZ-DESIGN-001, meta #40 `94e9c4b`, tick 285).**
 
 What each other ID still lacks, case by case, is in the queue rows 2, 3 (002, 003, 006), 11 and 14.
 
@@ -22,10 +22,10 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 2 core: `/readyz` schema component, PostgreSQL stop/recover; integration 1911 pass | vizra-core | VZ-FOUND-005 | #24 (draft) | `a02610a` | builder continuing: image-scan red on head | 1/0/0/6 |
-| Queue 2 meta: api/worker healthcheck `vizra healthcheck`, `required-probe` topology rule | vizra | VZ-FOUND-005 | #39 (draft) | `2890020` | builder continuing: demo run, CI | shared |
-| Queue 2f: artifact allowlist; floor gap and D5 cache fixed | vizra-user | VZ-FOUND-008 | #18 (draft) | `b2fd64e` | builder finishing `e2e:demos` | 0/0/0/7 |
-| Records: VZ-CI-001, VZ-OPS-005 IMPLEMENTED | vizra | QUEUE-ledger-VZ-CI-001, -OPS-005 | #38 | `6ea3bf5` | verifier running | 0 verdicts |
+| Queue 12: `vizra doctor` OK/FAIL/BLOCKED, host checks, real-binary transcript | vizra-core | VZ-OPS-002 | #27 (draft) | `b170e52` | CI pending, then verifier | 0/0/0/2 |
+| 2f leaks F-1/F-2; the hard gate on signing-in specs stays closed until merged | vizra-user | VZ-FOUND-008 | #20 (draft) | `76401de` | builder finishing lanes and body | 1/0/0/8 |
+| Queue 9: boot lane, production stack in CI, migrate one-shots, PostgreSQL stop/recover | vizra | VZ-CI-003 (+ VZ-FOUND-005 transcript) | none yet | branch `feat/ci-003-boot-lane` | building | 0/0/0/1 |
+| Record: VZ-FOUND-006 VERIFIED (VZ-FOUND-001 held: inbox 27) | vizra | QUEUE-ledger-VZ-FOUND-006 | after this records PR | | evidence lands with this PR | |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -89,3 +89,5 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | 12 | VZ-FOUND-008 acceptance text against Lane A with pixels off |
 | 13 | Coverage gaps: installer, wizard, IPFS topology, QA, security testing, rehearsal, CI repair, VZ-AUDIT-001 |
 | 25 | VZ-FOUND-003 budget for the compatibility-window slice: chair recommends +2 verdicts, +1 fix round |
+| 26 | ADR-001 version rows for VZ-FOUND-004: chair recommends an editorial update to the pinned versions |
+| 27 | VZ-FOUND-001 went one verdict over budget (chair's counting error); recommend a retroactive +1 |
