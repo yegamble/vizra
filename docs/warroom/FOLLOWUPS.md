@@ -53,9 +53,12 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 meta #35 F-3: ADR-011 ledger IDs (VZ-INSTALL-003, VZ-AUTH-001, VZ-SECURITY-003) were builder-chosen; chair to confirm (evidence: `docs/evidence/warroom/2026-11-12-meta-pr35-amending-adrs-round2-VERIFY.md`)
 - 2026-11-12 meta #33 R2-F1: `snapshot-setup-keys.py --check` validates only at source_commit, so a question added later on vizra-core main stays green until someone re-snapshots; also diff the parse at origin/main (evidence: `docs/evidence/warroom/2026-11-12-meta-pr33-template-keys-round2-VERIFY.md`)
 - 2026-11-12 meta #37 F-1: owner decision 2026-11-12 #5 literally covers IDs no issue lists; VZ-ISSUE-008 already listed VZ-DESIGN-001 without a bullet, so the owner should confirm #5 covers adding verbatim bullets there (evidence: `docs/evidence/warroom/2026-11-12-meta-pr37-design-001-record-round2-VERIFY.md`)
+- 2026-11-12 meta #38 F-1: `check-ledger-status-remote.py` does not require that each record's verified_head has a `PASS — SHA` line in a tracked evidence file, so a record citing untracked evidence passes (evidence: `docs/evidence/warroom/2026-11-12-meta-pr38-records-ci001-ops005-VERIFY.md`)
+- 2026-11-12 meta #36 F-1: board PR heads drift after records are cut (meta #39 1ee80cf vs 2890020, user #18 f8c67d2 vs b2fd64e, core #24 not draft, core #25 unlisted); `warroom-check.py board` does not compare heads with gh (evidence: `docs/evidence/warroom/2026-11-12-meta-pr36-records-VERIFY.md`)
 
 ## vizra-core
 
+- 2026-11-12 core #24 F-1: readyz PG-stop integration test simulates the stop with a TCP proxy; add a real container stop in the boot lane VZ-CI-003 (manual real stop verified 503→200 in 2 s, same PID) (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr24-found-005-VERIFY.md`)
 - 2026-11-10 core #14 S-0002: a re-mint racing a claim can clear `consumed_at`; not redeemable, so below the bar, but it is a broken invariant in auth code: do it first in this batch (about 45 lines, stands alone) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 - 2026-11-10 core #14 S-0003…S-0007, S-0009, S-0010 and commit `e8a8b66`: validator, audit rows, log causes, strict decode, TTL bound, `isOwnCancellation` tests; all on closed branch `fix/m1a-sentinel-followups` `e43d501` (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 - 2026-11-10 queue 2o-1…2o-4: one Makefile-anchor engine in `scripts/makeanchor/`; none meets the bar (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)

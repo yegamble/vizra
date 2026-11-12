@@ -10,7 +10,7 @@ Everything else lives in `docs/warroom/`:
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
-**Ledger on `main`: 192 entries, 2 IMPLEMENTED (VZ-FOUND-002 tick 265; VZ-DESIGN-001 meta #37 `83efd6d`, tick 283), 0 VERIFIED.**
+**Ledger on `main`: 192 entries, 4 IMPLEMENTED (VZ-FOUND-002; VZ-DESIGN-001 #37; VZ-CI-001 and VZ-OPS-005 #38 `fedccbb`, tick 284), 0 VERIFIED.**
 
 What each other ID still lacks, case by case, is in the queue rows 2, 3 (002, 003, 006), 11 and 14.
 
@@ -22,10 +22,11 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 2 core: `/readyz` schema component, PostgreSQL stop/recover; integration 1911 pass | vizra-core | VZ-FOUND-005 | #24 (draft) | `a02610a` | builder continuing: image-scan red on head | 1/0/0/6 |
-| Queue 2 meta: api/worker healthcheck `vizra healthcheck`, `required-probe` topology rule | vizra | VZ-FOUND-005 | #39 (draft) | `2890020` | builder continuing: demo run, CI | shared |
-| Queue 2f: artifact allowlist; floor gap and D5 cache fixed | vizra-user | VZ-FOUND-008 | #18 (draft) | `b2fd64e` | builder finishing `e2e:demos` | 0/0/0/7 |
-| Records: VZ-CI-001, VZ-OPS-005 IMPLEMENTED | vizra | QUEUE-ledger-VZ-CI-001, -OPS-005 | #38 | `6ea3bf5` | verifier running | 0 verdicts |
+| Queue 3 (006): production boot refuses dev/blank secrets; signed URLs in the denylist test | vizra-core | VZ-FOUND-006 | #25 | see PR | finishing, then queue 5 core pins | 2/0/0/4 |
+| Queue 2 meta: api/worker `vizra healthcheck`, `required-probe` topology rule | vizra | VZ-FOUND-005 | #39 (draft) | see PR | finishing; core part #24 merged | 2/0/0/7 |
+| Queue 5 user: lockfile/toolchain/pin checks | vizra-user | VZ-FOUND-001, VZ-FOUND-004 | none yet | branch `feat/found-001-004-pins` | building | 1/4, 0/4 |
+| Queue 2f: artifact allowlist | vizra-user | VZ-FOUND-008 | #18 | `edb70a1` | verifier running | 0/0/0/9 |
+| Record: VZ-DESIGN-001 VERIFIED | vizra | QUEUE-ledger-VZ-DESIGN-001 | #40 | `f255121` | verifier running (re-runs queue 14) | 2 verdicts |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
