@@ -37,3 +37,12 @@ Red transcripts: the mutation demo output above (re-run in CI on every PR). Gree
 
 ## Blockers and handoff
 Not run: clean-target `ubuntu:24.04` container run (Docker not running locally; not added to CI in this PR); real Docker apt install path (needs root on a clean host); busybox sh. Remaining: S1 needs VZ-INSTALL-002 (`vizra setup`) and a published CLI + checksum manifest (VZ-INSTALL-004 / vizra-core release); bundle path needs VZ-INSTALL-004 and should then use `manifest_sha256` + `verify_sha256`; add a digest-pinned ubuntu:24.04 container step with `--yes --git` to CI.
+
+## Session 2 (2026-11-12)
+- CI on 92825bf (validate attempt 2): failed again in "every recorded ledger status is proved against GitHub" (`gh api ... pulls/18: Service Unavailable`, plus fixture lines); installer steps were skipped there. Left to the chair; step untouched.
+- Added `--skip-docker` (documented in `--help`: "for environments that provide Docker otherwise"). The only existing skip was the test-only `VIZRA_INSTALL_SKIP_DOCKER`, refused outside `VIZRA_INSTALL_TESTING=1`.
+- Added `tests/install/clean_target.sh` + validate step "installer on a clean digest-pinned ubuntu:24.04". Image `ubuntu:24.04@sha256:2198e4c65076e9cb0b3d695219df667c0e3b0072da64ca3c2648aca17dcecaf5` (index; amd64 manifest `sha256:77eb101c…57ec`), confirmed with `docker buildx imagetools inspect ubuntu:24.04` on 2026-11-12.
+- Deviation: `--ref main`, not the PR head SHA — `--ref` applies to all four repos and a meta SHA does not exist in vizra-core/user/search.
+- The full run uses a PLACEHOLDER local CLI (a script that implements no command) because no vizra CLI is published; it proves only the hand-off message. S1 stays open.
+- Local (arm64, same index digest): `sh tests/install/clean_target.sh` exit 0 — /bin/sh is /usr/bin/dash; `--help` with --network none exit 0 and nothing written (root and ubuntu); no-CLI run exit 3 with the tree in place; placeholder-CLI run exit 0 naming `vizra setup`; third run gives the same tree-listing + state sha256 (root and ubuntu).
+- Local gates: install_test 15 passed 0 failed; mutation-demo PASS; shellcheck, check-workflows, check-action-pins, check-lane-integrity, check-doc-links all exit 0.
