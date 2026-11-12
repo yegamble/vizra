@@ -116,13 +116,11 @@
       "Q-043"
     ],
     "by_implementation_status": {
-      "IMPLEMENTED": 1,
-      "PLANNED": 190,
-      "VERIFIED": 1
+      "IMPLEMENTED": 2,
+      "PLANNED": 190
     },
     "by_verification_status": {
-      "UNVERIFIED": 191,
-      "VERIFIED_AT_SHA": 1
+      "UNVERIFIED": 192
     }
   },
   "features": [
@@ -323,16 +321,16 @@
       "unresolved": [],
       "decided": [],
       "notes": null,
-      "implementation_status": "VERIFIED",
-      "verification_status": "VERIFIED_AT_SHA",
+      "implementation_status": "IMPLEMENTED",
+      "verification_status": "UNVERIFIED",
       "merge_status": "MERGED",
       "release_status": "NOT_RELEASED",
       "test_ids": [],
       "evidence": [
         {
           "kind": "status_record",
-          "status": "VERIFIED",
-          "rationale": "Every ledger case is on vizra-core main and was reproduced by an independent verifier. S1 (`migrate up` from the release image on an empty DB): vizra-core #19 added a docker-build step that runs `vizra migrate` from the built runtime image against an empty, digest-pinned PostgreSQL twice and checks the ledger reads the head version, not dirty, both times; CI red on a deliberately broken migration (job 131221389383), green on the merged head (job 131223440387). R1 (dirty ledger reported, not auto-fixed): #19's integration test makes a real ledger dirty and asserts refusal with the version named and nothing repaired; red on a mutation (job 131217791460), green ordered and shuffled with no skips in build-test (run 43230273284). N1 (DROP COLUMN fails migrate-lint): vizra-core #18 made migrate-lint catch every column-drop spelling and never accept a file main's earlier script rejected, proven by a differential test; the #19 verifier re-ran the mutation on main. S2 (sqlc-verify passes) and N2 (editing sqlcgen output fails drift check): the #19 verifier ran `make ci` and an sqlcgen edit (exit 2) on the merged head; build-test runs both (`==> migrate-lint`, `==> sqlc-verify`). Outcome reading: no compatibility-window mechanism exists; migrate-lint rejects destructive statements in every up file unless a reviewed `-- allow-destructive:` marker sits on the line before, which the verifier judged a superset of rejecting inside a window. Recorded follow-up: a real window would need to refuse markers inside it.",
+          "status": "IMPLEMENTED",
+          "rationale": "IMPLEMENTED, not VERIFIED: one outcome clause is not delivered. There is no compatibility window: migrate-lint rejects destructive statements in every up file unless the line before carries `-- allow-destructive: <reason>`, and nothing checks the reason, requires a review, or ties the marker to a release boundary, so a marked column drop that breaks the previous release passes (independent verifier, meta #25 round 1, reproduced on vizra-core a6d4792). What owning the window means is owner inbox 21. The five ledger cases are on vizra-core main, each reproduced by an independent verifier. S1 (`migrate up` from the release image on an empty DB): vizra-core #19 runs `vizra migrate` from the built runtime image against an empty, digest-pinned PostgreSQL twice in docker-build and checks the ledger reads the head version, not dirty, both times; CI red on a broken migration (job 131221389383), green on the merged head (job 131223440387). R1 (dirty ledger reported, not auto-fixed): #19's integration test makes a real ledger dirty and asserts refusal naming the version with nothing repaired; red on a mutation (job 131217791460), green ordered and shuffled with no skips (build-test run 43230273284). N1 (an unmarked DROP COLUMN fails migrate-lint): vizra-core #18, with a differential test that the script never accepts what the earlier one rejected. S2 (sqlc-verify) and N2 (editing sqlcgen output fails the drift check): `make ci` and an sqlcgen edit on main, both run by build-test (`==> migrate-lint`, `==> sqlc-verify`).",
           "acceptance": [
             {
               "issue": "docs/issues/VZ-ISSUE-001.md",
@@ -361,18 +359,14 @@
           "repo": "vizra-core",
           "pr": 18,
           "verified_head": "b1c1734f583a46f7abc295dcc55094f9d3f5717e",
-          "merge_commit": "58d658f128ed7dc4be7a218ae0cd5744b87d0601",
-          "evidence_file": "docs/evidence/warroom/2026-11-12-vizra-core-pr18-3a-round3-VERIFY.md",
-          "final_verdict": "FINAL VERDICT: PASS — SHA b1c1734f583a46f7abc295dcc55094f9d3f5717e"
+          "merge_commit": "58d658f128ed7dc4be7a218ae0cd5744b87d0601"
         },
         {
           "kind": "merge",
           "repo": "vizra-core",
           "pr": 19,
           "verified_head": "37a6d55b6e3447902444ee7e5caeb1dd4d8078c9",
-          "merge_commit": "a6d4792914337c4835a0587f6c43138c5502efcc",
-          "evidence_file": "docs/evidence/warroom/2026-11-12-vizra-core-pr19-found-003-VERIFY.md",
-          "final_verdict": "FINAL VERDICT: PASS — SHA 37a6d55b6e3447902444ee7e5caeb1dd4d8078c9"
+          "merge_commit": "a6d4792914337c4835a0587f6c43138c5502efcc"
         }
       ]
     },
