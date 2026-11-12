@@ -54,6 +54,7 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 core #18 R3-F1…F4: a bare drop on a line starting `--` inside an open block comment is missed (main has the same hole); one marker exempts two added hits on its next line; a marker inside a block comment is honoured, as on main; the `E''` limit has no fixture (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr18-3a-round3-VERIFY.md`)
 - 2026-11-12 core #19: anchor the S1 version grep (the exact ledger check already stops a prefix match); a `-- allow-destructive:` marker exempts a statement anywhere, so a real compatibility window would need to refuse markers inside it (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr19-found-003-VERIFY.md`)
 - 2026-11-12 core #20: startup errors in `cmd/api/main.go:36` and the worker go to stderr unredacted (a credentialed OTLP endpoint could print); requests refused before the metrics middleware are not counted; re-probe route ids once a route takes a parameter (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr20-ops-005-VERIFY.md`)
+- 2026-11-12 core #22: F-1 a changed answer without --yes is kept silently (prints 'unchanged') instead of refused; F-2 `--yes-i-know` has no effect; F-4 with external PostgreSQL setup writes no POSTGRES_PASSWORD, but meta `docker-compose.yml:80,149` still requires it, so the external-postgres shapes fail `compose config` from the written file (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr22-vizra-setup-VERIFY.md`)
 
 ## vizra-user
 

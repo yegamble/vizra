@@ -49,4 +49,72 @@
 | P1, no echo; @file, stdin, VIZRA_SETUP_*; 0600 | PASS. Prompt echo in a TTY was not tested. |
 | R1, keeps values; refuses rewrite without --yes | PARTIAL (F-1) |
 
-FINAL VERDICT: BLOCKED — SHA ab6e74d821266bbe546e83f648412ade07e4f1fd
+(SUPERSEDED by the completion section below) verdict line of the first verifier: BLOCKED (time cut-off), SHA ab6e74d821266bbe546e83f648412ade07e4f1fd
+
+---
+
+# Completion by a second independent verifier (2026-11-12)
+This verifier did not write the code. I used a fresh clone of vizra-core at ab6e74d821266bbe546e83f648412ade07e4f1fd; `gh pr view 22` headRefOid matched at the start. The binary was built with `go build -o $D/vizra ./cmd/vizra`. The meta tree is a `git archive origin/main` copy under $D/meta, and compose was never run in the meta checkout. Base flags were `--non-interactive --set domain=photos.example.com --set instance_name=vz --set release=v1.0.0`.
+
+## D: topology
+internal/setup/topology.go:28-37 lists 8 shapes. Each one equals the matching prod shape in compose-shapes.json on origin/main, by file chain and by profiles. All 4 named overlays exist in the meta tree.
+
+| Answers | rc | COMPOSE_FILE (after base `docker-compose.yml:docker-compose.prod.yml`) / COMPOSE_PROFILES | Shape | `docker compose --env-file … config --services` |
+|---|---|---|---|---|
+| defaults | 0 | base / core,frontend,edge | prod-default ✓ | api caddy frontend migrate postgres redis worker |
+| tls=external | 0 | base / core,frontend | prod-external-tls ✓ | – |
+| search,analytics,ipfs=managed | 0 | base / core,frontend,edge,worker,search,analytics,ipfs | prod-all-optional ✓ | adds clickhouse ipfs search |
+| postgres=external + dsn | 0 | +external-postgres / core,frontend,edge | prod-external-postgres ✓ | **fails: POSTGRES_PASSWORD missing** (F-4). With a fake shell POSTGRES_PASSWORD: no postgres service |
+| redis=external + url | 0 | +external-redis / core,frontend,edge | prod-external-redis ✓ | (with fake PG pw) no redis service |
+| both external | 0 | +ext-postgres:+ext-redis / core,frontend,edge | prod-external-both ✓ | (with fake PG pw) neither service |
+| analytics=external | 0 | +external-clickhouse / core,frontend,edge,analytics | prod-external-clickhouse ✓ | no clickhouse container |
+| ipfs=external | 0 | +external-ipfs / core,frontend,edge,ipfs | prod-external-ipfs ✓ | no ipfs container |
+| search=managed only | **1** | refused: "not a supported compose shape", nothing written | – | – |
+| analytics=managed + ipfs=external | **1** | refused, nothing written | – | – |
+
+COMPOSE_FILE is honoured, because the overlays add and remove services. D: PASS, with F-4.
+
+## E: S2 edge file
+- `go test -count=1 -run Edge -v ./internal/setup/`: TestRenderEdgeGolden passed for acme, internal, plain-http and external. TestWriteEdgeOverwriteRules: PASS, ok.
+- Binary run: wrote Caddyfile.local. I then prepended a hand-edited line (sha 96cffb50…). A re-run without --yes exited **1** with "Caddyfile.local was edited by hand; re-run with --yes to replace it". The sha was unchanged (96cffb50…, byte-identical), so the edit is preserved and there is **no data loss**. With --yes it exited 0 and the file was regenerated (sha 19ad4fd2…, GENERATED header).
+- F-3 is resolved. "written" appears only when the file is unedited or --yes is given. E: PASS.
+
+## N1
+`--set postgres=external --set postgres_dsn=` in non-interactive mode: rc 1 ("postgres_dsn: must be a postgres/postgresql URL"). No env file and no deploy dir were written. PASS.
+
+## R1 / F-1
+A re-run with `--set instance_name=changed` and no --yes: rc 0. It printed "p.env: unchanged" and VIZRA_SITE_HANDLE stayed `vz`. The output is truthful: it makes no claim that the change was applied, and nothing is lost. This is still a deviation from "refuses rewrite without --yes", because the changed answer is silently ignored instead of refused. Classification: FOLLOW-UP (not blocking).
+
+## Guard / make ci
+- `./scripts/ci-required-guard.sh`: exit 0, "passed (6 required check(s))".
+- `make ci` (fresh clone, local darwin): EXIT=0, "make ci: all lanes passed".
+
+## Findings (completion)
+- No BLOCKING finding reproduced.
+- F-1 FOLLOW-UP (confirmed as above).
+- F-2 FOLLOW-UP (unchanged).
+- F-3 CLOSED: an edited edge file is refused without --yes and preserved byte-identical.
+- F-4 FOLLOW-UP (new): for postgres=external, setup writes no POSTGRES_PASSWORD. The meta repo's base docker-compose.yml:80,149 still requires it, and docker-compose.external-postgres.yml:37 documents that. So `docker compose config` on the env file setup wrote fails for prod-external-postgres and prod-external-both. It fails loudly, with no data loss, auth or privacy impact and no false gate, but the generated env does not deploy those shapes as-is.
+
+## Per-case table (final)
+| Case / clause | State |
+|---|---|
+| Interview questions present (domain, tls, instance, release, PG/Redis, analytics, IPFS, search) | PASS |
+| Storage/S3, SMTP, registration, import questions | NOT DELIVERED. VZ-INSTALL-002 cannot be recorded yet; this does not block merging this PR. |
+| --web one-time loopback | PASS (first verifier) |
+| --non-interactive | PASS |
+| --check | PASS (first verifier) |
+| Secrets minted / never blank | PASS (first verifier) |
+| --rotate rules | PASS (first verifier) |
+| Topology → COMPOSE_FILE/PROFILES (D) | PASS (F-4 follow-up) |
+| Unsupported topology refused | PASS |
+| S1, CI answer-coverage | NOT VERIFIED here (meta PR #33) |
+| S2, edge goldens + operator-edit protection | PASS |
+| N1, external PG with empty DSN | PASS |
+| N2, s3 default | NOT APPLICABLE |
+| P1, no echo, @file, stdin, env, 0600 | PASS (TTY echo untested) |
+| R1, keep values; refuse rewrite without --yes | PARTIAL (F-1 follow-up) |
+
+Head at the end: ab6e74d821266bbe546e83f648412ade07e4f1fd.
+
+FINAL VERDICT: PASS — SHA ab6e74d821266bbe546e83f648412ade07e4f1fd

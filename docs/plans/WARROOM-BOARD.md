@@ -6,7 +6,7 @@ Everything else lives in `docs/warroom/`:
 
 [tick log](../warroom/TICK-LOG.md) · [owner inbox](../warroom/OWNER-INBOX.md) · [owner decisions](../warroom/OWNER-DECISIONS.md) · [merged](../warroom/MERGED.md) · [follow-ups](../warroom/FOLLOWUPS.md) · [board through tick 257](../warroom/archive/WARROOM-BOARD-through-tick-257.md)
 
-**Loop: RUNNING since tick 258 (2026-11-10), restarted on the owner's word.** Previous tick 257 (2026-09-23). The rework (#11, `82e9529`) and the records (#9, `27be92a`) are on `main`; the after-merge steps are done ([record](../evidence/warroom/2026-11-10-after-merge-TRIAGE.md)).
+**Loop: STOPPED (STALLED) at tick 280, 2026-11-12.** No ledger status moved in ticks 266-280; every finished ID waits on an owner ruling (inbox 24 lists them). Restart after inbox 22 or 23 is answered.
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
@@ -96,3 +96,4 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | 21 | VZ-FOUND-003 compatibility window: build it (chair recommends) or reword the outcome |
 | 22 | VZ-CI-001 budget: 4/4 verdicts spent; chair recommends +2 for the vizra-user N1 slice |
 | 23 | VZ-OPS-005 is IMPLEMENTED by the verifier's reading but no issue lists it, so no record can cite a bullet; chair asks standing permission to add issue bullets verbatim |
+| 24 | Loop stopped: STALLED at tick 280; answer 22 and 23 first |

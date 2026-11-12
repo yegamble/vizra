@@ -118,6 +118,40 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 
 **VZ-OPS-005 has no issue to cite (new 2026-11-12, tick 277).** Core #20 and meta #29 are merged and an independent verifier judged VZ-OPS-005 IMPLEMENTED: every outcome clause has an implementation (`docs/evidence/warroom/2026-11-12-meta-pr29-otel-profile-VERIFY.md`). It cannot be recorded: the status generator requires each record to cite acceptance bullets quoted from a `docs/issues/*.md` file, and no issue lists VZ-OPS-005. The same will hold for other ledger IDs no issue covers. **Chair's recommendation:** give the chair standing permission, like decision 2026-11-11 #1, to add a ledger ID to the `**Ledger IDs:**` line of the issue for its milestone (here VZ-ISSUE-004, M0 operations) and to add its ledger cases verbatim as acceptance bullets, through an independently verified PR, without changing the ledger. Until you answer, VZ-OPS-005 is blocked here.
 
+### 24
+
+**Loop STOPPED: STALLED at tick 280 (new 2026-11-12).** `scripts/warroom-check.py stall` is red: no ledger status changed on `origin/main` in ticks 266-280. Its output:
+
+```
+STALL: no ledger status changed on origin/main in the last 15 ticks (266-280). Slots were held by:
+   6 tick(s)  meta-install-001 [VZ-INSTALL-001]
+   3 tick(s)  core-ops-005 [VZ-OPS-005]
+   3 tick(s)  core-ci-001 [VZ-CI-001]
+   3 tick(s)  core-install-002 [VZ-INSTALL-002]
+   3 tick(s)  meta-install-004-bundle [VZ-INSTALL-004]
+   3 tick(s)  user-2f-artifact-allowlist [VZ-FOUND-008]
+   2 tick(s)  core-found-003-image-migrate-dirty [VZ-FOUND-003]
+   2 tick(s)  user-design-001-remainder [VZ-DESIGN-001]
+   2 tick(s)  search-ci-001-tombstone [VZ-CI-001]
+   2 tick(s)  meta-ci-001 [VZ-CI-001]
+   2 tick(s)  user-design-001-photocard-tabbar [VZ-DESIGN-001]
+   2 tick(s)  meta-ops-005-otel-profile [VZ-OPS-005]
+   2 tick(s)  user-ci-001-n1 [VZ-CI-001]
+   2 tick(s)  meta-found-001-bootstrap [VZ-FOUND-001]
+   1 tick(s)  search-govulncheck-green [VZ-CI-004]
+   1 tick(s)  user-ci-001 [VZ-CI-001]
+   1 tick(s)  meta-ledger-demo-origin-main [QUEUE-ledger-demo]
+   1 tick(s)  user-deps-scan [VZ-CI-004]
+   1 tick(s)  meta-ledger-remote-retry [QUEUE-ci-flake]
+   1 tick(s)  meta-install-002-template-keys [VZ-INSTALL-002]
+   1 tick(s)  core-readyz-probe-race [QUEUE-readyz-flake]
+```
+
+Work merged in those ticks was real (installer, `vizra setup`, observability, tombstone rule in four repos, components, CI repairs), but every ID it touched now waits on an owner ruling or on later features before an honest record is possible:
+- VZ-FOUND-003: inbox 21 (compatibility window). VZ-CI-001: inbox 22 (+2 verdicts for vizra-user #17). VZ-OPS-005: inbox 23 (no issue lists it). VZ-DESIGN-001: inbox 20 (brand mark). VZ-FOUND-005: inbox 15 (Redis). VZ-MEDIA-001: inbox 4a and 8b.
+- VZ-INSTALL-002: the outcome lists storage, SMTP, registration and import questions; none has a reader until M2+ features exist, so it cannot be recorded in M0 as written. VZ-INSTALL-001 and VZ-INSTALL-004 need a published release (CLI, bundle, release record) that no slice can produce without a release process.
+**Chair's recommendation:** answer 22 and 23 first (each unblocks one record immediately: VZ-CI-001 after one verdict on vizra-user #17, VZ-OPS-005 after an issue-bullet PR), then 20 and 21. Restart the loop after any of them; the open PRs below wait for it.
+
 ## Closed
 
 ### 0
