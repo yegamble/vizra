@@ -136,8 +136,8 @@ command -v git >/dev/null 2>&1 || die 3 "git is required for --git"
 
 STATE=$DIR/.vizra-install.state
 done_step() { [ -f "$STATE" ] && grep -qx "$1" "$STATE"; }
-record() {
-	printf '%s\n' "$1" >>"$STATE"
+record() { # STEP [VALUE]
+	printf '%s\n' "$1${2:+ $2}" >>"$STATE"
 	if [ "${VIZRA_INSTALL_TEST_STOP_AFTER:-}" = "$1" ]; then
 		say "test hook: stopping after $1"
 		exit 75
@@ -199,15 +199,26 @@ for r in meta core user search; do
 	else clone_at "$BASE/vizra-$r.git" "$DIR/vizra-$r"; fi
 	record "tree-$r"
 done
-if ! done_step cli; then
-	[ -n "$CLI" ] || die 3 "no checksum-verified vizra CLI is published for $REF; pass --cli PATH --cli-sha256 HEX (tree is in place; a re-run resumes here)"
-	mkdir -p "$DIR/bin"
-	cp "$CLI" "$DIR/bin/vizra.tmp"
-	chmod 0755 "$DIR/bin/vizra.tmp"
-	verify_sha256 "$DIR/bin/vizra.tmp" "$CLI_SHA"
-	mv "$DIR/bin/vizra.tmp" "$DIR/bin/vizra"
-	record cli
+# The state file may skip work, never verification. The only trusted checksum
+# is this run's --cli-sha256 (no checksum file is published yet, VZ-INSTALL-004);
+# without one, no existing bin/vizra is ever executed.
+[ -n "$CLI_SHA" ] || die 3 "no checksum-verified vizra CLI is published for $REF; pass --cli PATH --cli-sha256 HEX (tree is in place; a re-run resumes here)"
+BIN=$DIR/bin/vizra
+rec_sha=$(awk '$1 == "cli" { v = $2 } END { print v }' "$STATE" 2>/dev/null)
+if [ -e "$BIN" ] && { [ -z "$rec_sha" ] || [ "$(sha256_of "$BIN")" != "$rec_sha" ]; }; then
+	die 4 "$BIN does not match the checksum recorded in $STATE; refusing to run or replace it (remove it to reinstall)"
 fi
+if [ "$rec_sha" != "$CLI_SHA" ] || [ ! -e "$BIN" ]; then
+	mkdir -p "$DIR/bin"
+	tmpc=$(mktemp "$DIR/bin/.vizra.XXXXXX")
+	cp "$CLI" "$tmpc"
+	chmod 0755 "$tmpc"
+	verify_sha256 "$tmpc" "$CLI_SHA"
+	mv -f "$tmpc" "$BIN"
+	if [ -f "$STATE" ]; then grep -v '^cli\( \|$\)' "$STATE" >"$STATE.tmp" || true; mv -f "$STATE.tmp" "$STATE"; fi
+	record cli "$CLI_SHA"
+fi
+verify_sha256 "$BIN" "$CLI_SHA"
 
 say "installed into $DIR"
 cd "$DIR"

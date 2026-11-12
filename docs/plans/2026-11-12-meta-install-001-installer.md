@@ -73,3 +73,45 @@ c2f8b866…5b65  - / b389fb50…23a1  .vizra-install.state  -> idempotent ok (ro
 clean target: all checks passed
 ```
 Note: the no-CLI refusal's exit code 3 is asserted inside clean_target.sh, not printed; the log shows the refusal message only.
+
+## Fix round 1
+
+Finding (verifier, 2026-11-12): a state file listing `cli` skipped the checksum and ran an unverified `bin/vizra` as root. Fix: the state file skips work, never verification. Every run needs its own `--cli-sha256`, or it exits 3 without running anything. The state records `cli <sha256>`. If `bin/vizra` is missing the recorded sha or does not match it, the installer refuses (exit 4) and does not run or replace the binary. When the run's sha is new, the CLI is installed atomically (mktemp in `bin/`, verify, rename) and the `cli` line is replaced. `bin/vizra` is checked with `verify_sha256` again right before hand-off.
+
+Reproducer before (a31837f):
+```
+==> installed into $T/F1
+EVIL-UNVERIFIED setup
+exit 0
+```
+After:
+```
+install.sh: $T/F2/bin/vizra does not match the checksum recorded in $T/F2/.vizra-install.state; refusing to run or replace it (remove it to reinstall)
+exit 4
+```
+
+Red first, `sh tests/install/install_test.sh` on a31837f with the new tests:
+```
+FAIL V1-forged-state-refused (rc=0)
+FAIL V2-tampered-cli-refused (rc=0)
+FAIL V2-no-checksum-no-exec (rc=0)
+FAIL V3-upgrade-replaces-cli (rc=0)
+15 passed, 4 failed
+exit 1
+```
+Green:
+```
+```
+`sh docs/evidence/install/mutation-demo.sh`:
+```
+RED as expected: skip-checksum -> FAIL N1-checksum-mismatch
+RED as expected: no-tty-check -> FAIL N2-non-tty-refuses
+RED as expected: rewrite-production-env -> FAIL P1-production-env-untouched
+RED as expected: no-resume -> FAIL R1-resume-after-tree-core
+RED as expected: help-needs-path -> FAIL S2-help
+RED as expected: rerun-touches-state -> FAIL idempotent-second-run
+RED as expected: bundle-pretends -> FAIL bundle-refuses
+RED as expected: state-skips-verification -> FAIL V1-forged-state-refused
+mutations: 8 red of 8
+mut exit 0
+```

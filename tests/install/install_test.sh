@@ -87,6 +87,31 @@ for k in docker tree-meta tree-core tree-user tree-search; do
 		&& [ "$(sha "$d/.vizra-install.state")" = "$s1" ]; then ok "R1-resume-after-$k"; else no "R1-resume-after-$k ($rc/$rc2/$n)"; fi
 done
 
+# V1 (fix round 1): a forged state file listing every step plus an unverified
+# bin/vizra must not make the installer run that binary, even with a valid --cli.
+f="$W/forged"; mkdir -p "$f/bin"
+printf 'docker\ntree-meta\ntree-core\ntree-user\ntree-search\ncli\n' >"$f/.vizra-install.state"
+printf '#!/bin/sh\necho EVIL-UNVERIFIED "$@"\nexit 0\n' >"$f/bin/vizra"; chmod 0755 "$f/bin/vizra"
+full "$f"; rc=$?
+if [ $rc -ne 0 ] && ! grep -q EVIL-UNVERIFIED "$W/out"; then ok V1-forged-state-refused; else no "V1-forged-state-refused (rc=$rc)"; cat "$W/out"; fi
+
+# V2: a correct state file with a tampered bin/vizra is refused, binary never run
+cp -R "$W/a" "$W/tamper"
+printf '#!/bin/sh\necho EVIL-TAMPERED "$@"\nexit 0\n' >"$W/tamper/bin/vizra"
+full "$W/tamper"; rc=$?
+if [ $rc -ne 0 ] && ! grep -q EVIL-TAMPERED "$W/out"; then ok V2-tampered-cli-refused; else no "V2-tampered-cli-refused (rc=$rc)"; cat "$W/out"; fi
+run "$W/tamper" --yes --git; rc=$?
+if [ $rc -eq 3 ] && ! grep -q EVIL-TAMPERED "$W/out"; then ok V2-no-checksum-no-exec; else no "V2-no-checksum-no-exec (rc=$rc)"; fi
+
+# V3: a re-run with a NEW valid --cli/--cli-sha256 replaces the binary and hands over to it
+cp -R "$W/a" "$W/up"
+# shellcheck disable=SC2016 # literal script text
+printf '#!/bin/sh\nif [ "$1 $2" = "setup --help" ]; then exit 0; fi\necho NEW-CLI-RAN "$@"\nexit 0\n' >"$W/cli2"
+run "$W/up" --yes --git --cli "$W/cli2" --cli-sha256 "$(sha "$W/cli2")"; rc=$?
+if [ $rc -eq 0 ] && grep -q 'NEW-CLI-RAN setup' "$W/out" && [ "$(sha "$W/up/bin/vizra")" = "$(sha "$W/cli2")" ] \
+	&& grep -qx "cli $(sha "$W/cli2")" "$W/up/.vizra-install.state" && [ ! -e "$W/up/bin/vizra.tmp" ]; then
+	ok V3-upgrade-replaces-cli; else no "V3-upgrade-replaces-cli (rc=$rc)"; cat "$W/out"; fi
+
 # test hooks are refused outside test mode
 VIZRA_INSTALL_TEST_STOP_AFTER=docker sh "$INSTALL_SH" --yes --git --dir "$W/hook" </dev/null >"$W/out" 2>&1; rc=$?
 if [ $rc -eq 2 ] && [ ! -e "$W/hook" ]; then ok test-hook-refused; else no "test-hook-refused (rc=$rc)"; fi
