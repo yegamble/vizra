@@ -494,19 +494,47 @@ PY
 }
 
 case_header "15 (F3) — a service_healthy gate onto a probe that cannot go red"
+echo "    (api's probe is real since VZ-FOUND-005, so the mutation DECLARES it"
+echo "     known-false; frontend's service_healthy edge onto it must then fail)"
+mutate scripts/compose-shapes.json <<'PY' && {
+import sys, json
+p = sys.argv[1]
+d = json.load(open(p))
+d["known_false_probes"].append({
+    "service": "api",
+    "test": ["CMD", "/usr/local/bin/vizra", "healthcheck", "api"],
+    "why_false": "demo mutation", "real_probe_exists": "demo", "emptied_by": "demo"})
+json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+PY
+  expect "frontend gates on api's known-false probe" 1 "rule=probe-gates-readiness service=frontend"
+  revert scripts/compose-shapes.json
+  expect "restored" 0
+}
+
+case_header "15c (VZ-FOUND-005) — api's probe reverts to \`vizra version\`"
 mutate docker-compose.yml <<'PY' && {
 import sys
 p = sys.argv[1]
 s = open(p).read()
-# Change ONLY the condition. Removing `required: false` as well would make the
-# prod-frontend-only shape fail to render, the run would abort before the
-# topology checker executed, and the case would "fail" for a reason that has
-# nothing to do with the rule it is demonstrating.
-old = "        condition: service_started\n"
-assert old in s, "anchor not found"
-open(p, "w").write(s.replace(old, "        condition: service_healthy\n", 1))
+old = '"/usr/local/bin/vizra", "healthcheck", "api"]'
+assert s.count(old) == 1, "anchor not found"
+open(p, "w").write(s.replace(old, '"/usr/local/bin/vizra", "version"]'))
 PY
-  expect "frontend gates on api's known-false probe" 1 "rule=probe-gates-readiness service=frontend"
+  expect "api probed by vizra version" 1 "rule=required-probe service=api"
+  revert docker-compose.yml
+  expect "restored" 0
+}
+
+case_header "15d (VZ-FOUND-005) — worker's probe reverts to \`vizra version\` (nothing gates on it)"
+mutate docker-compose.yml <<'PY' && {
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = '"/usr/local/bin/vizra", "healthcheck", "worker"]'
+assert s.count(old) == 1, "anchor not found"
+open(p, "w").write(s.replace(old, '"/usr/local/bin/vizra", "version"]'))
+PY
+  expect "worker probed by vizra version" 1 "rule=required-probe service=worker"
   revert docker-compose.yml
   expect "restored" 0
 }
@@ -518,8 +546,8 @@ import sys, json
 p = sys.argv[1]
 d = json.load(open(p))
 for e in d["known_false_probes"]:
-    if e["service"] == "worker":
-        e["test"] = ["CMD", "/usr/local/bin/vizra", "healthcheck"]
+    if e["service"] == "otel-collector":
+        e["test"] = ["CMD", "/otelcol", "--version", "--stale"]
 json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
 PY
   expect "a stale known-false declaration" 1 "rule=stale-known-false-probe"

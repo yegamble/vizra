@@ -1,0 +1,155 @@
+# VZ-FOUND-005 meta red/green, tree 289002074ddecd43adc99238e49887ba37ca21dc
+## MUTATION: api probe -> vizra version
+VIOLATION shape=dev-default rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=dev-default rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=dev-build-from-checkouts rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=dev-build-from-checkouts rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=prod-default rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=prod-default rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=prod-external-tls rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=prod-external-tls rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=prod-all-optional rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=prod-all-optional rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=prod-external-postgres rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=prod-external-postgres rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=prod-external-redis rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=prod-external-redis rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=prod-external-both rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=prod-external-both rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=prod-external-clickhouse rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=prod-external-clickhouse rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=prod-external-ipfs rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=prod-external-ipfs rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=prod-otel-managed rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=prod-otel-managed rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=prod-otel-external rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=prod-otel-external rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+VIOLATION shape=bundle-no-checkouts rule=gated-probe-unrecognised service=api detail=is gated on by frontend with condition service_healthy, but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api']. `vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down. A gate onto a probe that cannot fail is a gate onto nothing file=docker-compose.yml
+VIOLATION shape=bundle-no-checkouts rule=required-probe service=api detail=must be probed by `vizra healthcheck api` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'api'] file=docker-compose.yml
+
+26 violation(s) across 15 shape(s).
+
+KNOWN-FALSE PROBES: 1 service(s) carry a healthcheck that CANNOT GO RED while the service is broken.
+  - otel-collector: CMD /otelcol --version  [present in the rendered model]
+      why it is false: prints the collector version and exits 0 without checking the pipeline or the OTLP listener.
+      emptied by:      a collector image or sidecar that can query health_check (VZ-OPS-005 follow-up)
+  No depends_on service_healthy edge may point at one (rule probe-gates-readiness), and this list must be empty before VZ-ISSUE-004's boot lane lands.
+  The operator-facing half of this admission — `docker compose ps` reports these
+  services healthy whatever their state — is carried by:
+    env/production.env.example
+    README.md
+  Those files and this list are deleted together: rule
+  known-false-undisclosed fails while the list stands and a paragraph is
+  missing, and rule known-false-stale-disclosure fails once the list is
+  empty and a paragraph survives.
+  SCOPE: probe-gates-readiness only refuses a gate onto a probe
+  DECLARED false above. It cannot tell a real probe from a fake one
+  nobody declared; gated-probe-unrecognised is what covers that, by
+  requiring every service_healthy target's RENDERED probe to run a
+  declared command as its own command - one plain CMD or CMD-SHELL
+  invocation, no pipeline, comment, redirection or second statement.
+  It still cannot show that the command can exit NON-ZERO
+  (`pg_isready --version` would pass) or that a binary with the right
+  name is the real one. That needs a running container, which is
+  VZ-ISSUE-004's boot lane.
+
+exit=1
+## RESTORED (api)
+
+KNOWN-FALSE PROBES: 1 service(s) carry a healthcheck that CANNOT GO RED while the service is broken.
+  - otel-collector: CMD /otelcol --version  [present in the rendered model]
+      why it is false: prints the collector version and exits 0 without checking the pipeline or the OTLP listener.
+      emptied by:      a collector image or sidecar that can query health_check (VZ-OPS-005 follow-up)
+  No depends_on service_healthy edge may point at one (rule probe-gates-readiness), and this list must be empty before VZ-ISSUE-004's boot lane lands.
+  The operator-facing half of this admission — `docker compose ps` reports these
+  services healthy whatever their state — is carried by:
+    env/production.env.example
+    README.md
+  Those files and this list are deleted together: rule
+  known-false-undisclosed fails while the list stands and a paragraph is
+  missing, and rule known-false-stale-disclosure fails once the list is
+  empty and a paragraph survives.
+  SCOPE: probe-gates-readiness only refuses a gate onto a probe
+  DECLARED false above. It cannot tell a real probe from a fake one
+  nobody declared; gated-probe-unrecognised is what covers that, by
+  requiring every service_healthy target's RENDERED probe to run a
+  declared command as its own command - one plain CMD or CMD-SHELL
+  invocation, no pipeline, comment, redirection or second statement.
+  It still cannot show that the command can exit NON-ZERO
+  (`pg_isready --version` would pass) or that a binary with the right
+  name is the real one. That needs a running container, which is
+  VZ-ISSUE-004's boot lane.
+
+compose topology: 15 shape(s) asserted from their rendered models; 30 rules, 0 violations; 1 known-false probe(s) named above
+exit=0
+## MUTATION: worker probe -> vizra version
+VIOLATION shape=dev-default rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=dev-build-from-checkouts rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-default rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-external-tls rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-worker-split rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-all-optional rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-external-postgres rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-external-redis rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-external-both rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-external-clickhouse rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-external-ipfs rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-otel-managed rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=prod-otel-external rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+VIOLATION shape=bundle-no-checkouts rule=required-probe service=worker detail=must be probed by `vizra healthcheck worker` (scripts/compose-shapes.json `required_probes`), but its rendered probe runs 'vizra' with arguments ['version'], not starting with ['healthcheck', 'worker'] file=docker-compose.yml
+
+14 violation(s) across 15 shape(s).
+
+KNOWN-FALSE PROBES: 1 service(s) carry a healthcheck that CANNOT GO RED while the service is broken.
+  - otel-collector: CMD /otelcol --version  [present in the rendered model]
+      why it is false: prints the collector version and exits 0 without checking the pipeline or the OTLP listener.
+      emptied by:      a collector image or sidecar that can query health_check (VZ-OPS-005 follow-up)
+  No depends_on service_healthy edge may point at one (rule probe-gates-readiness), and this list must be empty before VZ-ISSUE-004's boot lane lands.
+  The operator-facing half of this admission — `docker compose ps` reports these
+  services healthy whatever their state — is carried by:
+    env/production.env.example
+    README.md
+  Those files and this list are deleted together: rule
+  known-false-undisclosed fails while the list stands and a paragraph is
+  missing, and rule known-false-stale-disclosure fails once the list is
+  empty and a paragraph survives.
+  SCOPE: probe-gates-readiness only refuses a gate onto a probe
+  DECLARED false above. It cannot tell a real probe from a fake one
+  nobody declared; gated-probe-unrecognised is what covers that, by
+  requiring every service_healthy target's RENDERED probe to run a
+  declared command as its own command - one plain CMD or CMD-SHELL
+  invocation, no pipeline, comment, redirection or second statement.
+  It still cannot show that the command can exit NON-ZERO
+  (`pg_isready --version` would pass) or that a binary with the right
+  name is the real one. That needs a running container, which is
+  VZ-ISSUE-004's boot lane.
+
+exit=1
+## RESTORED (worker)
+
+KNOWN-FALSE PROBES: 1 service(s) carry a healthcheck that CANNOT GO RED while the service is broken.
+  - otel-collector: CMD /otelcol --version  [present in the rendered model]
+      why it is false: prints the collector version and exits 0 without checking the pipeline or the OTLP listener.
+      emptied by:      a collector image or sidecar that can query health_check (VZ-OPS-005 follow-up)
+  No depends_on service_healthy edge may point at one (rule probe-gates-readiness), and this list must be empty before VZ-ISSUE-004's boot lane lands.
+  The operator-facing half of this admission — `docker compose ps` reports these
+  services healthy whatever their state — is carried by:
+    env/production.env.example
+    README.md
+  Those files and this list are deleted together: rule
+  known-false-undisclosed fails while the list stands and a paragraph is
+  missing, and rule known-false-stale-disclosure fails once the list is
+  empty and a paragraph survives.
+  SCOPE: probe-gates-readiness only refuses a gate onto a probe
+  DECLARED false above. It cannot tell a real probe from a fake one
+  nobody declared; gated-probe-unrecognised is what covers that, by
+  requiring every service_healthy target's RENDERED probe to run a
+  declared command as its own command - one plain CMD or CMD-SHELL
+  invocation, no pipeline, comment, redirection or second statement.
+  It still cannot show that the command can exit NON-ZERO
+  (`pg_isready --version` would pass) or that a binary with the right
+  name is the real one. That needs a running container, which is
+  VZ-ISSUE-004's boot lane.
+
+compose topology: 15 shape(s) asserted from their rendered models; 30 rules, 0 violations; 1 known-false probe(s) named above
+exit=0
