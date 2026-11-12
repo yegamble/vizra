@@ -6,7 +6,7 @@ Everything else lives in `docs/warroom/`:
 
 [tick log](../warroom/TICK-LOG.md) · [owner inbox](../warroom/OWNER-INBOX.md) · [owner decisions](../warroom/OWNER-DECISIONS.md) · [merged](../warroom/MERGED.md) · [follow-ups](../warroom/FOLLOWUPS.md) · [board through tick 257](../warroom/archive/WARROOM-BOARD-through-tick-257.md)
 
-**Loop: RUNNING again from tick 281, 2026-11-12, on the owner's restart (decision 2026-11-12 #11).** `stall` stays red until a ledger status lands on `main`; if none has by tick 295, the loop stops again.
+**Loop: PAUSED by the chair after tick 289, 2026-11-12 (session capacity, not a governor exit).** Restart with `/warroom`: first verify and merge this records PR, then the VZ-FOUND-005 VERIFIED and VZ-CI-002 records; owner inbox 25, 26 and 27 are open.
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
@@ -24,7 +24,6 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Dev seams refused in production; compose chain always explicit (core part) | vizra-core | VZ-TOPOLOGY-007 | #30 | `6165316` | PASS; reopened after a chair cleanup error; merge waits for CI | 1/0/0/1 |
 | Records: VZ-FOUND-005 VERIFIED; VZ-CI-002 | vizra | QUEUE-ledger | after this records PR | | evidence lands with this PR | |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
