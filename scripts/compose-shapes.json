@@ -13,6 +13,8 @@
     "prod-external-both",
     "prod-external-clickhouse",
     "prod-external-ipfs",
+    "prod-otel-managed",
+    "prod-otel-external",
     "bundle-no-checkouts"
   ],
   "env_file": "env/production.env.example",
@@ -27,7 +29,8 @@
     "VIZRA_MFA_KEY_KEK": "ci-render-only-mfa-kek-not-a-real-value",
     "SEARCH_HMAC_KEY": "ci-render-only-search-hmac-key-not-a-real-value",
     "POSTGRES_PASSWORD": "ci-render-only-postgres-password-not-a-real-value",
-    "CLICKHOUSE_PASSWORD": "ci-render-only-clickhouse-password-not-a-real-value"
+    "CLICKHOUSE_PASSWORD": "ci-render-only-clickhouse-password-not-a-real-value",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://otel.ci.invalid:4318"
   },
   "external_dsn_overrides": {
     "_note": "Deliberately CREDENTIAL-FREE. These only have to satisfy scripts/compose-render.py's DSN validator (scheme + host), and a `user:password@host` placeholder is a credential-shaped string in a tracked file - a secret scanner is right to flag one, and a reviewer should not have to decide whether it is real. `.invalid` is reserved by RFC 2606 and resolves nowhere.",
@@ -660,6 +663,117 @@
       ]
     },
     {
+      "id": "prod-otel-managed",
+      "title": "OTEL_MODE=managed: bundled OpenTelemetry Collector, internal network only, api/worker export to it",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "docker-compose.otel-managed.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "edge"
+      ],
+      "checkouts": "any",
+      "requires_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "caddy",
+        "otel-collector"
+      ],
+      "forbids_services": [
+        "search",
+        "clickhouse",
+        "ipfs"
+      ],
+      "published_allow": [
+        {
+          "service": "caddy",
+          "ports": [
+            80,
+            443
+          ],
+          "public": true,
+          "reason": "the edge. 80/443 are the ports a self-hosted instance exists to answer on."
+        },
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ],
+      "otel": "managed"
+    },
+    {
+      "id": "prod-otel-external",
+      "title": "OTEL_MODE=external: no collector, endpoint required from the operator env",
+      "kind": "production",
+      "files": [
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "docker-compose.otel-external.yml"
+      ],
+      "profiles": [
+        "core",
+        "frontend",
+        "edge"
+      ],
+      "checkouts": "any",
+      "requires_services": [
+        "postgres",
+        "redis",
+        "migrate",
+        "api",
+        "worker",
+        "frontend",
+        "caddy"
+      ],
+      "forbids_services": [
+        "search",
+        "clickhouse",
+        "ipfs",
+        "otel-collector"
+      ],
+      "published_allow": [
+        {
+          "service": "caddy",
+          "ports": [
+            80,
+            443
+          ],
+          "public": true,
+          "reason": "the edge. 80/443 are the ports a self-hosted instance exists to answer on."
+        },
+        {
+          "service": "api",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "service": "frontend",
+          "ports": [
+            3000
+          ]
+        }
+      ],
+      "otel": "external",
+      "otel_endpoint": "https://otel.ci.invalid:4318"
+    },
+    {
       "id": "bundle-no-checkouts",
       "title": "the deployment bundle: the production chain rendered with ./vizra-core, ./vizra-user and ./vizra-search ABSENT",
       "kind": "production",
@@ -753,6 +867,17 @@
       "why_false": "same binary, same reason; the worker additionally has no HTTP listener on the API port at all. Its metrics listener on VIZRA_METRICS_ADDR is the thing a real probe would reach.",
       "real_probe_exists": "none reachable from inside the image today.",
       "emptied_by": "vizra-core `vizra healthcheck` subcommand (queue 2h)"
+    },
+    {
+      "service": "otel-collector",
+      "test": [
+        "CMD",
+        "/otelcol",
+        "--version"
+      ],
+      "why_false": "prints the collector version and exits 0 without checking the pipeline or the OTLP listener.",
+      "real_probe_exists": "the collector's health_check extension, but the image is distroless (no shell, curl or wget) so compose cannot reach it.",
+      "emptied_by": "a collector image or sidecar that can query health_check (VZ-OPS-005 follow-up)"
     }
   ],
   "known_false_disclosure_note": "Where the OPERATOR-facing half of the known-false admission lives. The chair ruled the admission must be standing rather than filed once; printing it on every CI run covers the machine audience, and these files cover the human one - the person running `docker compose ps` at 3am, who is the audience that is not CI. check-compose-topology.py fails (rule known-false-undisclosed) when known_false_probes is non-empty and any file below lacks the marker, so emptying the list without deleting the paragraphs, or deleting a paragraph while the list stands, is a red lane either way.",
@@ -773,5 +898,6 @@
       "must_invoke": "valkey-cli",
       "why": "speaks RESP to the running server rather than checking that a process exists"
     }
-  }
+  },
+  "otel_note": "Per-shape `otel` is off (absent) | managed | external. Rule otel-mode in scripts/check-compose-topology.py: off has no otel-collector and an empty OTEL_EXPORTER_OTLP_ENDPOINT on api/worker/migrate; managed has the collector with no published port and api/worker/migrate pointing at http://otel-collector:4318; external has no collector and the endpoint equal to the operator value (ci_overrides here), which the overlay requires with ${...:?}."
 }

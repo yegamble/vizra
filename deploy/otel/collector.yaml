@@ -1,0 +1,31 @@
+# Vizra — OpenTelemetry Collector config for OTEL_MODE=managed
+# (docker-compose.otel-managed.yml). VZ-OPS-005.
+#
+# Receives OTLP/HTTP on 0.0.0.0:4318 INSIDE the compose network only: the
+# service publishes no host port, so only api and worker can reach it.
+# Exports to the `debug` exporter (the collector's own stdout, capped by the
+# json-file log limits) and nowhere else. There is NO external endpoint and NO
+# credential in this file by default.
+#
+# Sending traces downstream: copy this file, add an `otlphttp` exporter with
+# your endpoint, reference credentials as ${env:NAME} (never inline), and mount
+# your copy over /etc/otelcol/config.yaml in your own overlay.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

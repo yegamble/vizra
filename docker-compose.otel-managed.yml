@@ -1,0 +1,62 @@
+# Vizra — OTEL_MODE=managed (VZ-OPS-005). Add AFTER docker-compose.prod.yml:
+#   -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.otel-managed.yml
+#
+# Adds a bundled OpenTelemetry Collector and points api, worker and migrate at
+# it. OFF (no overlay) is the default in every other shape: the base sets
+# OTEL_EXPORTER_OTLP_ENDPOINT to "" and vizra-core then builds no exporter.
+#
+# Why an overlay and not only a profile (ClickHouse/IPFS are profiles in the
+# base): MANAGED must change the api/worker ENVIRONMENT, and a profile cannot
+# change another service's environment. So the collector lives here, on the
+# core/worker profiles, and selecting the overlay IS selecting MANAGED. This
+# keeps `prod-all-optional` meaningful: it cannot end up with a collector and
+# an empty endpoint. Asserted by rule `otel-mode` in
+# scripts/check-compose-topology.py.
+#
+# NO `ports:`. OTLP/HTTP 4318 is reachable from the compose network only.
+# The config exports to the collector's own debug log; see
+# deploy/otel/collector.yaml for how to add a downstream.
+
+x-otel-managed-env: &otel-managed-env
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+
+services:
+
+  otel-collector:
+    # Apache-2.0. Digest is the multi-arch OCI index, resolved 2026-11-12 with
+    # `docker buildx imagetools inspect otel/opentelemetry-collector:0.139.0`.
+    image: otel/opentelemetry-collector:0.139.0@sha256:8ac5df2a931e9264667b236d65bf7591fa4ba633a7a634e6caa2f0a4fc549c07
+    profiles: ["core", "worker"]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    security_opt:
+      - "no-new-privileges:true"
+    mem_limit: 256m
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - type: bind
+        source: ./deploy/otel/collector.yaml
+        target: /etc/otelcol/config.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      # KNOWN-FALSE (scripts/compose-shapes.json known_false_probes): the image
+      # is distroless with no shell, curl or wget, so nothing can reach the
+      # health_check extension. This proves the binary runs, nothing more.
+      test: ["CMD", "/otelcol", "--version"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  migrate:
+    environment: *otel-managed-env
+  api:
+    environment: *otel-managed-env
+  worker:
+    environment: *otel-managed-env
