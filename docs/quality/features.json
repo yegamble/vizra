@@ -116,11 +116,13 @@
       "Q-043"
     ],
     "by_implementation_status": {
-      "IMPLEMENTED": 4,
-      "PLANNED": 188
+      "IMPLEMENTED": 3,
+      "PLANNED": 188,
+      "VERIFIED": 1
     },
     "by_verification_status": {
-      "UNVERIFIED": 192
+      "UNVERIFIED": 191,
+      "VERIFIED_AT_SHA": 1
     }
   },
   "features": [
@@ -11226,16 +11228,16 @@
       "unresolved": [],
       "decided": [],
       "notes": null,
-      "implementation_status": "IMPLEMENTED",
-      "verification_status": "UNVERIFIED",
+      "implementation_status": "VERIFIED",
+      "verification_status": "VERIFIED_AT_SHA",
       "merge_status": "MERGED",
       "release_status": "NOT_RELEASED",
       "test_ids": [],
       "evidence": [
         {
           "kind": "status_record",
-          "status": "IMPLEMENTED",
-          "rationale": "Every ledger case is delivered on vizra-user main and each part was reproduced by an independent verifier. Tokens (spacing, type, radii, shadows, semantic colours), the typed Lucide icon registry with a test that every registered name is an export of the pinned lucide-react, and the app shell with a nonce CSP: vizra-user #11. Unknown icon name fails typecheck: #11 (the verifier's mutations: an unregistered name is a tsc error, and a non-export fails the registry test). Components with variants and states, and design/HANDOFF.md mirroring the accepted Figma file with node and revision references: #13 (17 components) and #15 (PhotoCard, TabBar Item, TabBar); with #15 every section-5 component of the accepted design has a file. Brand mark: the text wordmark, which owner decision 2026-11-12 #6 rules is the M0 brand mark; the final mark is VZ-BRAND-001 (M5). IMPLEMENTED, not VERIFIED: queue 14 (owner decision 2026-11-11 #4) still owes a production-mode browser pass at desktop and mobile and the CSP mutation, which the #11 verifier did not run locally. Acceptance bullets are the ledger cases copied word for word into VZ-ISSUE-008 under owner decision 2026-11-12 #5.",
+          "status": "VERIFIED",
+          "rationale": "Every ledger case is delivered on vizra-user main and each part was reproduced by an independent verifier. Tokens (spacing, type, radii, shadows, semantic colours), the typed Lucide icon registry with a test that every registered name is an export of the pinned lucide-react, and the app shell with a nonce CSP: vizra-user #11. Unknown icon name fails typecheck: #11 (the verifier's mutations: an unregistered name is a tsc error, and a non-export fails the registry test). Components with variants and states, and design/HANDOFF.md mirroring the accepted Figma file with node and revision references: #13 (17 components) and #15 (PhotoCard, TabBar Item, TabBar); with #15 every section-5 component of the accepted design has a file. Brand mark: the text wordmark, which owner decision 2026-11-12 #6 rules is the M0 brand mark; the final mark is VZ-BRAND-001 (M5). VERIFIED: each merge has an independent PASS evidence file at its verified head, and the queue 14 items the owner required (decision 2026-11-11 #4) were run by an independent verifier on vizra-user main 9f7c639: the production build at 390 and 1440 px with the wordmark visible, 0 console and 0 network errors, keyboard operation of every shell control with visible focus, a fresh nonce CSP on every response, and the CSP mutation ('unsafe-inline' added) turning headers.test.ts red then green on restore (docs/evidence/warroom/2026-11-12-meta-pr37-design-001-record-VERIFY.md, screenshots in 2026-11-12-meta-pr37-design-001-shots/). Acceptance bullets are the ledger cases copied word for word into VZ-ISSUE-008 under owner decision 2026-11-12 #5.",
           "acceptance": [
             {
               "issue": "docs/issues/VZ-ISSUE-008.md",
@@ -11256,21 +11258,27 @@
           "repo": "vizra-user",
           "pr": 11,
           "verified_head": "505fb281cd9fb4dd89f76aae7317a5bf8d9593c6",
-          "merge_commit": "33633d41a6d95da93cba00e6b8dffbe654efa505"
+          "merge_commit": "33633d41a6d95da93cba00e6b8dffbe654efa505",
+          "evidence_file": "docs/evidence/warroom/2026-11-10-vizra-user-pr11-design-001-VERIFY.md",
+          "final_verdict": "FINAL VERDICT: PASS — SHA 505fb281cd9fb4dd89f76aae7317a5bf8d9593c6"
         },
         {
           "kind": "merge",
           "repo": "vizra-user",
           "pr": 13,
           "verified_head": "fa99ca384af1fe7dfc3d2affdefc7d25ead4d0ef",
-          "merge_commit": "0bb8dc6814e40b46d2db17bab39f4b0857dd1eac"
+          "merge_commit": "0bb8dc6814e40b46d2db17bab39f4b0857dd1eac",
+          "evidence_file": "docs/evidence/warroom/2026-11-12-vizra-user-pr13-design-001-VERIFY.md",
+          "final_verdict": "FINAL VERDICT: PASS — SHA fa99ca384af1fe7dfc3d2affdefc7d25ead4d0ef"
         },
         {
           "kind": "merge",
           "repo": "vizra-user",
           "pr": 15,
           "verified_head": "4f9918682eba78afcc6c0187d0d5b447506d13f6",
-          "merge_commit": "77c473846a1b81c346e8b074e06de447c857d9e6"
+          "merge_commit": "77c473846a1b81c346e8b074e06de447c857d9e6",
+          "evidence_file": "docs/evidence/warroom/2026-11-12-vizra-user-pr15-photocard-tabbar-VERIFY.md",
+          "final_verdict": "FINAL VERDICT: PASS — SHA 4f9918682eba78afcc6c0187d0d5b447506d13f6"
         }
       ]
     },
