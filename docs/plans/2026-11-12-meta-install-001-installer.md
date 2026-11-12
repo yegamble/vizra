@@ -101,6 +101,27 @@ exit 1
 ```
 Green:
 ```
+ok   S2-help
+ok   N2-non-tty-refuses
+ok   N1-checksum-mismatch
+ok   bundle-refuses
+ok   git-path-tree-cli-handoff
+ok   no-cli-stops
+ok   idempotent-second-run
+ok   P1-production-env-untouched
+ok   P1-never-creates-production-env
+ok   R1-resume-after-docker
+ok   R1-resume-after-tree-meta
+ok   R1-resume-after-tree-core
+ok   R1-resume-after-tree-user
+ok   R1-resume-after-tree-search
+ok   V1-forged-state-refused
+ok   V2-tampered-cli-refused
+ok   V2-no-checksum-no-exec
+ok   V3-upgrade-replaces-cli
+ok   test-hook-refused
+19 passed, 0 failed
+exit 0
 ```
 `sh docs/evidence/install/mutation-demo.sh`:
 ```
