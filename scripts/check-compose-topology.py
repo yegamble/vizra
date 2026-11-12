@@ -131,6 +131,7 @@ RULES = frozenset({
     "postgres-shm-floor",
     "storage-root-mount",
     "gated-probe-unrecognised",
+    "otel-mode",
 })
 
 # Docker's default /dev/shm. PostgreSQL allocates dynamic shared memory there
@@ -899,6 +900,59 @@ def check_storage_root(shape, model, repo_root):
             )
 
 
+OTEL_COLLECTOR = "otel-collector"
+OTEL_ENDPOINT_KEY = "OTEL_EXPORTER_OTLP_ENDPOINT"
+OTEL_MANAGED_ENDPOINT = "http://otel-collector:4318"
+
+
+def check_otel(shape, model, repo_root):
+    """VZ-OPS-005: the otel mode a shape declares is the one it renders.
+
+    off (default): no collector, and every core service's endpoint is "" so
+    vizra-core builds no exporter. managed: the collector exists, publishes no
+    port, and every core service exports to it. external: no collector, and
+    the endpoint is the operator's value (the shape's `otel_endpoint`, which
+    ci_overrides injects; the overlay requires it with ${...:?}).
+    """
+    sid = shape["id"]
+    mode = shape.get("otel", "off")
+    services = model.get("services") or {}
+    col = services.get(OTEL_COLLECTOR)
+    if mode == "managed":
+        if col is None:
+            violation(sid, "otel-mode", OTEL_COLLECTOR,
+                      "otel=managed but no collector rendered")
+        elif port_entries(col) or col.get("network_mode") == "host":
+            violation(sid, "otel-mode", OTEL_COLLECTOR,
+                      f"the collector must be on the internal network only; "
+                      f"ports={col.get('ports')!r} network_mode="
+                      f"{col.get('network_mode')!r}",
+                      locate_in_sources(shape["files"], OTEL_COLLECTOR, "ports",
+                                        repo_root))
+        want = OTEL_MANAGED_ENDPOINT
+    elif mode == "external":
+        want = shape.get("otel_endpoint")
+        if not want:
+            violation(sid, "otel-mode", "(manifest)",
+                      "otel=external needs `otel_endpoint` (the value "
+                      "ci_overrides injects) in the shape")
+    else:
+        want = ""
+    if mode != "managed" and col is not None:
+        violation(sid, "otel-mode", OTEL_COLLECTOR,
+                  f"otel={mode} but a collector rendered",
+                  locate_in_sources(shape["files"], OTEL_COLLECTOR, "image",
+                                    repo_root))
+    for name in sorted(CORE_SERVICES & set(services)):
+        got = (services[name].get("environment") or {}).get(OTEL_ENDPOINT_KEY)
+        if got != want:
+            violation(sid, "otel-mode", name,
+                      f"otel={mode} needs {OTEL_ENDPOINT_KEY}={want!r}, "
+                      f"rendered {got!r}",
+                      locate_in_sources(shape["files"], name, "environment",
+                                        repo_root))
+
+
 def check_membership(shape, model):
     """A shape must render the services it declares, and none it forbids.
 
@@ -1012,6 +1066,7 @@ def main(argv):
                      gated_probes)
         check_shm(shape, model, repo_root)
         check_storage_root(shape, model, repo_root)
+        check_otel(shape, model, repo_root)
         checked += 1
 
     # A declaration that matches nothing is a declaration nobody can act on, and
