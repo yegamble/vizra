@@ -55,6 +55,7 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 meta #37 F-1: owner decision 2026-11-12 #5 literally covers IDs no issue lists; VZ-ISSUE-008 already listed VZ-DESIGN-001 without a bullet, so the owner should confirm #5 covers adding verbatim bullets there (evidence: `docs/evidence/warroom/2026-11-12-meta-pr37-design-001-record-round2-VERIFY.md`)
 - 2026-11-12 meta #38 F-1: `check-ledger-status-remote.py` does not require that each record's verified_head has a `PASS — SHA` line in a tracked evidence file, so a record citing untracked evidence passes (evidence: `docs/evidence/warroom/2026-11-12-meta-pr38-records-ci001-ops005-VERIFY.md`)
 - 2026-11-12 meta #36 F-1: board PR heads drift after records are cut (meta #39 1ee80cf vs 2890020, user #18 f8c67d2 vs b2fd64e, core #24 not draft, core #25 unlisted); `warroom-check.py board` does not compare heads with gh (evidence: `docs/evidence/warroom/2026-11-12-meta-pr36-records-VERIFY.md`)
+- 2026-11-12 meta #40 F-2: CSP-mutation failure count differs by placement (pr37 run 4 failed, pr40 round-2 run 3 failed); record the exact mutation line in queue-14 evidence (evidence: `docs/evidence/warroom/2026-11-12-meta-pr40-design-001-verified-round2-VERIFY.md`)
 
 ## vizra-core
 
@@ -72,6 +73,10 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 core #19: anchor the S1 version grep (the exact ledger check already stops a prefix match); a `-- allow-destructive:` marker exempts a statement anywhere, so a real compatibility window would need to refuse markers inside it (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr19-found-003-VERIFY.md`)
 - 2026-11-12 core #20: startup errors in `cmd/api/main.go:36` and the worker go to stderr unredacted (a credentialed OTLP endpoint could print); requests refused before the metrics middleware are not counted; re-probe route ids once a route takes a parameter (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr20-ops-005-VERIFY.md`)
 - 2026-11-12 core #22: F-1 a changed answer without --yes is kept silently (prints 'unchanged') instead of refused; F-2 `--yes-i-know` has no effect; F-4 with external PostgreSQL setup writes no POSTGRES_PASSWORD, but meta `docker-compose.yml:80,149` still requires it, so the external-postgres shapes fail `compose config` from the written file (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr22-vizra-setup-VERIFY.md`)
+- 2026-11-12 core #26 F-1: check-stack-pins.py does not enforce the ADR-001 echo-contrib/v5 v5.0.1 satellite pin (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr26-pins-VERIFY.md`)
+- 2026-11-12 core #26 F-2: the PINS table is hand-copied from meta ADR-001 with no cross-repo drift check (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr26-pins-VERIFY.md`)
+- 2026-11-12 core #26 F-3: non-required image-scan is red on the PR head with 60 HIGH/CRITICAL base-image CVEs (pre-existing) (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr26-pins-VERIFY.md`)
+- 2026-11-12 core #25 F-1: TestProductionBootRefusesDevSecrets control subtests wait out the 20 s timeout because the api keeps listening with no DB; shorten the deadline or stop at the `listening` line (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr25-found-006-VERIFY.md`)
 
 ## vizra-user
 
@@ -84,6 +89,12 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 user #13 design seat D1–D5: native Checkbox/Radio without `appearance-none` show browser outlines, not `color/line`; disabled uses `opacity-60` not the disabled tokens; IconButton Danger uses `danger-ink`; Dialog has an arbitrary width; short Tab labels can be under 44px wide. Components have no browser test (no production route)
 - 2026-11-12 user #13: no test fails if Toast gains a default success text (the code has none today); Dialog `showModal` and focus return are not exercised in a browser (no route renders it) (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr13-design-001-VERIFY.md`)
 - 2026-11-12 user #17 F-1: Playwright skip check (VZ-CI-001 N1) is only reached via check-coverage-floor-ran.mjs; add a second enforcer so editing that script cannot drop it (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr17-ci-001-n1-VERIFY.md`)
+- 2026-11-12 user #18 F-1: assertion received values (e.g. a typed password) are staged verbatim in `artifact-upload/` results.json and SUMMARY.txt; stop staging results.json and strip Expected/Received (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr18-2f-VERIFY.md`)
+- 2026-11-12 user #18 F-2: png/jpeg/webm are staged on magic bytes alone and never redacted, so authenticated-page screenshots/video would upload; refuse or disable media for authenticated projects (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr18-2f-VERIFY.md`)
+- 2026-11-12 user #18 F-3: plan items 2ac (job-log `--log` gate not wired into e2e.yml) and V-D (stamp key in process.env) remain open; hard gate on authenticated specs stays closed until done (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr18-2f-VERIFY.md`)
+- 2026-11-12 user #19 F1: ADR-001 needs an owner amendment (no Node row; Next.js 16.3.x vs pinned 16.4.1; no React/Tailwind/TypeScript versions), so VZ-FOUND-004 'versions match ADR' stays open (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr19-pins-VERIFY.md`)
+- 2026-11-12 user #19 F2: check:pins exits 0 while adr_gaps is non-empty; after the ADR amendment make any listed gap fail (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr19-pins-VERIFY.md`)
+- 2026-11-12 meta #40 F-1: `next start` warns it does not work with `output: standalone`; queue 14 browser passes should drive `node .next/standalone/server.js` (evidence: `docs/evidence/warroom/2026-11-12-meta-pr40-design-001-verified-round2-VERIFY.md`)
 
 ## vizra-search
 

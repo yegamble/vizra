@@ -86,6 +86,10 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 
 **VZ-FOUND-003: verdict budget for the compatibility-window slice (new 2026-11-12, tick 281).** Decision 2026-11-12 #7 rules that the window is built. VZ-FOUND-003 has spent its budget: 5 of 5 verdicts (4 plus the grant of 2026-11-12 #1) and 2 of 2 fix rounds, so a new slice for the same ID would go over budget at its first verdict. The record PR is counted separately (`QUEUE-ledger-VZ-FOUND-003`). **Chair's recommendation:** grant VZ-FOUND-003 2 more verdicts and 1 more fix round, for the vizra-core compatibility-window slice only. Until then the slice is not dispatched; vizra-core works on VZ-FOUND-005.
 
+### 26
+
+**ADR-001 version rows for VZ-FOUND-004 (new 2026-11-12, tick 285).** VZ-FOUND-004's success case is "Lockfiles committed; versions match ADR". The pin checks now merged (vizra-core #26, vizra-user #19) show ADR-001 has no version for several pinned packages, and one row that disagrees with the reviewed pin: no Node row (repo pins 22.14.0); Next.js says 16.3.x while vizra-user pins 16.4.1 (bumped by user #16 to clear a CVE); React, Tailwind CSS, TypeScript, pgx, golang-migrate, OpenTelemetry, minio-go, x/crypto and echo-contrib carry no version or `[pin at PR time; verify]`; gopkg.in/yaml.v3 (vizra-search tests) has no row. Accepted ADRs change only with you. **Chair's recommendation:** approve an editorial ADR-001 update to the versions actually pinned and verified on main (as decision 2026-11-11 #1 did for Go and Echo), through an independently verified PR. Until then VZ-FOUND-004 stays unrecorded.
+
 ## Closed
 
 ### 0
