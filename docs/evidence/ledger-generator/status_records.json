@@ -34,6 +34,57 @@
           "merge_commit": "53a39a889ba0f456bbfdd4df7d5f241c12e7a1b5"
         }
       ]
+    },
+    {
+      "id": "VZ-CI-001",
+      "status": "IMPLEMENTED",
+      "rationale": "Every ledger case is delivered in all four repositories and each was reproduced by an independent verifier. S1 (deleting a manifest line without a tombstone fails) and N2 (continue-on-error on a required lane is rejected): vizra-core #21, vizra-search #6, vizra-user #14 and meta #27, with the verifiers' own mutations red in each repo (evidence 2026-11-12-ci-001-core-search-VERIFY.md and 2026-11-12-ci-001-user-meta-VERIFY.md). S2 (a renamed job makes ci-required fail): in core and search the static guard does not catch a rename, but the ci-required fan-in does (a missing lane result exits 1), reproduced by the completing verifier; in vizra-user and meta the guard itself rejects it. N1 (a skipped required test fails the job): core and search through the noskip lanes (third verifier's t.Skip mutation), meta through run-unittest-noskip.py, and vizra-user through #17 (any vitest or Playwright skip fails, evidence 2026-11-12-vizra-user-pr17-ci-001-n1-VERIFY.md; the extra verdicts are owner decision 2026-11-12 #4). R1 (manifest regression tests reject omitted tests, stale SHA, empty selection): the named regression tests in each repo ran and passed under the verifiers. IMPLEMENTED, not VERIFIED: this record does not claim that CI run links of deliberate breakage, red then green, exist for every case in every repo, which the ledger's evidence_required asks for.",
+      "acceptance": [
+        {
+          "issue": "docs/issues/VZ-ISSUE-003.md",
+          "bullet": "Deleting a manifest line without tombstone fails"
+        },
+        {
+          "issue": "docs/issues/VZ-ISSUE-003.md",
+          "bullet": "Renamed job makes ci-required fail"
+        },
+        {
+          "issue": "docs/issues/VZ-ISSUE-003.md",
+          "bullet": "Skipped required test fails"
+        }
+      ],
+      "merges": [
+        {
+          "repo": "vizra-core",
+          "pr": 21,
+          "verified_head": "71a1ff3103e709b91ed93d4fe22e2b722d2d6862",
+          "merge_commit": "3f1def360061b50f2bfb0cd2544b5f7503410fea"
+        },
+        {
+          "repo": "vizra-search",
+          "pr": 6,
+          "verified_head": "0e93164b562a05ad0e591d5d81de2dc7a761d888",
+          "merge_commit": "8d0c293a111277c49f12c6cd641c8c9967e0bbd4"
+        },
+        {
+          "repo": "vizra",
+          "pr": 27,
+          "verified_head": "cb500ae55a455bac7e6ce4fb8d446c976cc467cf",
+          "merge_commit": "791a0207bd032c3b4e5fc9455a05222b4fa7fac4"
+        },
+        {
+          "repo": "vizra-user",
+          "pr": 14,
+          "verified_head": "50b1cd1417aa82a8b6a60285ced123f794ab0ae8",
+          "merge_commit": "9f7c639cf2702ce6a95395a7876f5d51679acff1"
+        },
+        {
+          "repo": "vizra-user",
+          "pr": 17,
+          "verified_head": "e6748c22015368bcaf77e579440febb91af4f0d1",
+          "merge_commit": "72340983d81c586c48c58510f17643206ac29762"
+        }
+      ]
     }
   ]
 }
