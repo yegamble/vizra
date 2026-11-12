@@ -132,6 +132,7 @@ RULES = frozenset({
     "storage-root-mount",
     "gated-probe-unrecognised",
     "otel-mode",
+    "required-probe",
 })
 
 # Docker's default /dev/shm. PostgreSQL allocates dynamic shared memory there
@@ -197,7 +198,7 @@ def probe_state(svc, name, known_false):
 SHELL_CONTROL = (";", "|", "&", "#", "`", "$(", "<", ">", "\n")
 
 
-def probe_invokes(test, must_invoke):
+def probe_invokes(test, must_invoke, must_args=None):
     """Does this RENDERED probe run `must_invoke` as its own command?
 
     Structural, from the rendered model - `${POSTGRES_USER}` is already
@@ -243,6 +244,14 @@ def probe_invokes(test, must_invoke):
                 f"{must_invoke!r}; naming the command in an ARGUMENT is not "
                 f"invoking it"
             )
+        # VZ-FOUND-005: the same binary can be a real probe or a fake one
+        # (`vizra healthcheck api` vs `vizra version`), so the subcommand is
+        # part of what is asserted when the manifest names it.
+        if must_args and argv[1:1 + len(must_args)] != list(must_args):
+            return False, (
+                f"its rendered probe runs {must_invoke!r} with arguments "
+                f"{argv[1:]!r}, not starting with {list(must_args)!r}"
+            )
         return True, ""
     if head == "CMD-SHELL":
         if len(test) != 2 or not isinstance(test[1], str):
@@ -268,6 +277,11 @@ def probe_invokes(test, must_invoke):
             return False, (
                 f"its rendered CMD-SHELL probe starts with {words[0]!r} "
                 f"(basename {actual!r}), not {must_invoke!r}"
+            )
+        if must_args and words[1:1 + len(must_args)] != list(must_args):
+            return False, (
+                f"its rendered CMD-SHELL probe runs {must_invoke!r} with "
+                f"arguments {words[1:]!r}, not starting with {list(must_args)!r}"
             )
         return True, ""
     return False, (
@@ -812,7 +826,8 @@ def check_probes(shape, model, known_false, seen_known_false, repo_root,
                             locate_in_sources(shape["files"], dep, "healthcheck", repo_root),
                         )
                     else:
-                        ok, why = probe_invokes(dep_test, rule["must_invoke"])
+                        ok, why = probe_invokes(dep_test, rule["must_invoke"],
+                                                rule.get("must_args"))
                         if not ok:
                             violation(
                                 sid, "gated-probe-unrecognised", dep,
@@ -831,6 +846,34 @@ def check_probes(shape, model, known_false, seen_known_false, repo_root,
                     f"- so this edge reports satisfied while {dep} is broken",
                     locate_in_sources(shape["files"], name, "depends_on", repo_root),
                 )
+
+
+def check_required_probes(shape, model, repo_root, required_probes):
+    """VZ-FOUND-005. A named service's probe must be the real one, gated or not.
+
+    `gated-probe-unrecognised` only looks at a service something gates on. The
+    worker is gated on by nothing, and `vizra deploy` / the boot lane read
+    `--wait` regardless, so a probe reverting to `vizra version` would be a
+    false green there with every edge-based rule silent. This rule checks the
+    RENDERED healthcheck of every listed service in every shape that has it.
+    """
+    sid = shape["id"]
+    services = model.get("services") or {}
+    for name, rule in sorted(required_probes.items()):
+        if name.startswith("_") or name not in services:
+            continue
+        test = (services[name].get("healthcheck") or {}).get("test") or []
+        if isinstance(test, str):
+            test = [test]
+        ok, why = probe_invokes(test, rule["must_invoke"], rule.get("must_args"))
+        if not ok:
+            want = " ".join([rule["must_invoke"]] + list(rule.get("must_args") or []))
+            violation(
+                sid, "required-probe", name,
+                f"must be probed by `{want}` (scripts/compose-shapes.json "
+                f"`required_probes`), but {why}",
+                locate_in_sources(shape["files"], name, "healthcheck", repo_root),
+            )
 
 
 def check_shm(shape, model, repo_root):
@@ -1016,6 +1059,17 @@ def main(argv):
         e["service"]: e for e in (manifest.get("known_false_probes") or [])
     }
     gated_probes = manifest.get("gated_probes") or {}
+    required_probes = manifest.get("required_probes") or {}
+    if not required_probes:
+        # Fail closed. An empty map makes `required-probe` pass on any model,
+        # which is exactly how this rule was first silently inert: the renderer
+        # did not forward the key into shapes.json.
+        sys.stderr.write(
+            "UNEVALUABLE: the shape manifest declares no `required_probes`, so "
+            "nothing asserts api and worker run `vizra healthcheck`. Re-render "
+            "with scripts/compose-render.py.\n"
+        )
+        return 2
     release_services = set(manifest.get("release_image_services") or [])
     if not release_services:
         sys.stderr.write(
@@ -1064,6 +1118,7 @@ def main(argv):
         check_membership(shape, model)
         check_probes(shape, model, known_false, seen_known_false, repo_root,
                      gated_probes)
+        check_required_probes(shape, model, repo_root, required_probes)
         check_shm(shape, model, repo_root)
         check_storage_root(shape, model, repo_root)
         check_otel(shape, model, repo_root)

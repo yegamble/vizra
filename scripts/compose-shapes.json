@@ -847,28 +847,6 @@
   "known_false_probes_note": "Probes that CANNOT GO RED while the service is broken. Declaring one here is not permission - it is a standing, printed admission. scripts/check-compose-topology.py names every entry on EVERY run, refuses any depends_on service_healthy edge onto one (rule probe-gates-readiness), and refuses an entry that matches no rendered service (rule stale-known-false-probe) so the list cannot rot. THIS LIST MUST BE EMPTY BEFORE VZ-ISSUE-004's BOOT LANE LANDS: that lane and `vizra deploy` are both written against `--wait` / `ps --status healthy`, and a green that cannot go red is how a false gate becomes permanent. What empties it: a `vizra healthcheck` subcommand in vizra-core, mirroring the one vizra-search already ships (queue 2h). The /dev/tcp shell bridge was considered and REJECTED by the chair - it would bake a bash dependency into a runtime image a queued core slice rebuilds from a clean base.",
   "known_false_probes": [
     {
-      "service": "api",
-      "test": [
-        "CMD",
-        "/usr/local/bin/vizra",
-        "version"
-      ],
-      "why_false": "a CLI that prints build info and exits 0 without opening a socket or touching PostgreSQL. An api wedged with PostgreSQL unreachable, or listening but deadlocked, still reports healthy.",
-      "real_probe_exists": "vizra-core serves /healthz (liveness) and /readyz (503 only on PostgreSQL, otherwise 200 `degraded` with the component named). The image carries no curl and no wget, so compose cannot reach them.",
-      "emptied_by": "vizra-core `vizra healthcheck` subcommand (queue 2h), mirroring vizra-search's"
-    },
-    {
-      "service": "worker",
-      "test": [
-        "CMD",
-        "/usr/local/bin/vizra",
-        "version"
-      ],
-      "why_false": "same binary, same reason; the worker additionally has no HTTP listener on the API port at all. Its metrics listener on VIZRA_METRICS_ADDR is the thing a real probe would reach.",
-      "real_probe_exists": "none reachable from inside the image today.",
-      "emptied_by": "vizra-core `vizra healthcheck` subcommand (queue 2h)"
-    },
-    {
       "service": "otel-collector",
       "test": [
         "CMD",
@@ -897,7 +875,32 @@
     "redis": {
       "must_invoke": "valkey-cli",
       "why": "speaks RESP to the running server rather than checking that a process exists"
+    },
+    "api": {
+      "must_invoke": "vizra",
+      "must_args": [
+        "healthcheck",
+        "api"
+      ],
+      "why": "`vizra healthcheck api` reads the api's own /readyz over loopback and exits 1 on refused, timeout or non-2xx; `vizra version` exits 0 with PostgreSQL down"
     }
   },
-  "otel_note": "Per-shape `otel` is off (absent) | managed | external. Rule otel-mode in scripts/check-compose-topology.py: off has no otel-collector and an empty OTEL_EXPORTER_OTLP_ENDPOINT on api/worker/migrate; managed has the collector with no published port and api/worker/migrate pointing at http://otel-collector:4318; external has no collector and the endpoint equal to the operator value (ci_overrides here), which the overlay requires with ${...:?}."
+  "otel_note": "Per-shape `otel` is off (absent) | managed | external. Rule otel-mode in scripts/check-compose-topology.py: off has no otel-collector and an empty OTEL_EXPORTER_OTLP_ENDPOINT on api/worker/migrate; managed has the collector with no published port and api/worker/migrate pointing at http://otel-collector:4318; external has no collector and the endpoint equal to the operator value (ci_overrides here), which the overlay requires with ${...:?}.",
+  "required_probes_note": "VZ-FOUND-005. Services whose RENDERED probe must run a specific command in EVERY shape that contains them, whether or not anything gates on them today: `vizra deploy` and the boot lane read `--wait` / `ps --status healthy`, so a probe reverting to `vizra version` is a false green even with no depends_on edge. Matched as basename(argv[0]) == must_invoke and argv[1:] starting with must_args, so `vizra version` and `vizra healthcheck worker` on api are both refused.",
+  "required_probes": {
+    "api": {
+      "must_invoke": "vizra",
+      "must_args": [
+        "healthcheck",
+        "api"
+      ]
+    },
+    "worker": {
+      "must_invoke": "vizra",
+      "must_args": [
+        "healthcheck",
+        "worker"
+      ]
+    }
+  }
 }

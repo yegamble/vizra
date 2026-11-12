@@ -259,14 +259,16 @@ services:
         # running image does not know.
         condition: service_completed_successfully
     healthcheck:
-      # HONEST LIMIT, recorded here rather than in a report nobody reads:
-      # this proves the vizra-core binary runs. It does NOT prove /readyz is
-      # 200, because the runtime image (debian:13-slim + libvips) ships no
-      # curl and no wget, and vizra-core has no `healthcheck` subcommand — the
-      # vizra-search image has exactly that, and core needs the same before a
-      # compose healthcheck can gate readiness. Requested from the core owner;
-      # not made here (component repositories are out of scope for VZ-ISSUE-002).
-      test: ["CMD", "/usr/local/bin/vizra", "version"]
+      # The real readiness probe (VZ-FOUND-005). `vizra healthcheck api`
+      # (vizra-core internal/healthcheck) dials this container's own
+      # VIZRA_LISTEN_ADDR on loopback and GETs /readyz: exit 0 on any 2xx
+      # (including `degraded` — a down cache must not pull the api from
+      # rotation), exit 1 on refused / timed out / non-2xx (503 = PostgreSQL
+      # unreachable). Its own deadline is 2s, under the 3s timeout below, so a
+      # slow answer is reported rather than killed. It does not retry; Docker's
+      # interval/retries do. scripts/check-compose-topology.py
+      # (`required-probe`) asserts this argv in every rendered shape.
+      test: ["CMD", "/usr/local/bin/vizra", "healthcheck", "api"]
       interval: 15s
       timeout: 3s
       retries: 3
@@ -302,8 +304,11 @@ services:
         # IS selected, Compose still waits for it to complete.
         required: false
     healthcheck:
-      # Same honest limit as api's.
-      test: ["CMD", "/usr/local/bin/vizra", "version"]
+      # `vizra healthcheck worker`: GETs /readyz on the worker's metrics
+      # listener (VIZRA_METRICS_ADDR, loopback by default), which reports the
+      # claim loop's progress and PostgreSQL reachability. Same exit codes and
+      # 2s deadline as api's. Asserted by `required-probe`.
+      test: ["CMD", "/usr/local/bin/vizra", "healthcheck", "worker"]
       interval: 15s
       timeout: 3s
       retries: 3
@@ -336,29 +341,17 @@ services:
       HOSTNAME: "0.0.0.0"
     depends_on:
       api:
-        # `service_started`, NOT `service_healthy`, and deliberately.
-        #
-        # api's probe is `vizra version` — a CLI that prints build info and
-        # exits 0 without opening a socket or touching PostgreSQL. Gating on it
-        # would mean an api wedged with PostgreSQL unreachable still reports
-        # healthy, frontend starts anyway, and `vizra deploy`'s probe step and
-        # VZ-ISSUE-004's boot lane both read the same green. A gate on a probe
-        # that cannot go red is worse than no gate, because it looks like one.
-        # `scripts/check-compose-topology.py`'s `probe-gates-readiness` rule
-        # refuses any `service_healthy` edge onto a probe declared known-false
-        # in scripts/compose-shapes.json, so this cannot silently come back.
+        # `service_healthy`: api's probe is `vizra healthcheck api`, which
+        # reads the api's own /readyz, so frontend does not start against an
+        # api that cannot reach PostgreSQL. `gated-probe-unrecognised` in
+        # scripts/check-compose-topology.py refuses this edge if api's rendered
+        # probe stops being that command.
         #
         # `required: false` for the same reason caddy's edges carry it: a
         # frontend-only host (VZ-TOPOLOGY-008) must render, and Compose refuses
         # a project whose depends_on names a service outside the selected
         # profiles. Asserted by the `prod-frontend-only` shape.
-        #
-        # The gate returns when vizra-core grows a `vizra healthcheck`
-        # subcommand like vizra-search's — requested from the core owner and on
-        # its queue 2h, NOT implemented anywhere today. Until it lands, api and
-        # worker are declared known-false probes in scripts/compose-shapes.json
-        # and named by the topology checker on every run.
-        condition: service_started
+        condition: service_healthy
         required: false
     healthcheck:
       # Matches the image's own probe (vizra-user/Dockerfile). Liveness only:
