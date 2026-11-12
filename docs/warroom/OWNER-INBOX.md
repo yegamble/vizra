@@ -100,6 +100,10 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 
 **VZ-FOUND-005: Redis in readiness (new 2026-11-10, tick 260).** The ledger outcome says `/readyz` "fails when DB/Redis/storage unavailable". vizra-core returns 200 with `degraded` when the cache is down and tests that on purpose (`TestReadyzCacheDownIs200Degraded`), following ADR-002. One of the two has to change before the ID can be recorded; changing the ledger text or the ADR is yours. Evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`.
 
+### 19
+
+**Budget for VZ-FOUND-003 (new 2026-11-12, tick 266; not blocking yet).** VZ-FOUND-003 has spent 4 of its 5 verdicts and both fix rounds on vizra-core #18 (migrate-lint), which is merged. The next slice for it (queue 3 (003): `migrate up` from the release image in CI, and a real dirty-ledger test) is different code and different ledger cases, and was dispatched at tick 266 on the one verdict left. If that verdict is FAIL, the ID becomes BLOCKED with no fix round. **Chair's recommendation:** grant VZ-FOUND-003 two more verdicts and one more fix round, for queue 3 (003) only. Until you answer, the slice runs on its last verdict; if it fails, it is marked BLOCKED here and the loop moves on.
+
 ## Closed
 
 ### 0

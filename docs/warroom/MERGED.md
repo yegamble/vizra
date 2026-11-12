@@ -4,6 +4,7 @@ Append new rows at the top of the table. A merge is not a ledger status: the sta
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-11-12 | vizra (meta) | #22 #21 verifier evidence and merged row | `b7a2e96` → `a6e5219` (squash, `--match-head-commit`) | PASS `b7a2e96` (`docs/evidence/warroom/2026-11-12-meta-pr22-records-VERIFY.md`); `ci-required` green | no ledger ID (QUEUE-records) |
 | 2026-11-12 | vizra (meta) | #21 chair records, ticks 262–265, owner decisions 2026-11-12 #2 and #3 | `44d80e1` → `4a53e88` (squash, `--match-head-commit`) | PASS `44d80e1` (`docs/evidence/warroom/2026-11-12-meta-pr21-records-VERIFY.md`); `ci-required` green | no ledger ID (QUEUE-records) |
 | 2026-11-12 | vizra (meta) | #19 status record: VZ-FOUND-002 IMPLEMENTED | `5d8d281` → `0a204e8` (squash, `--match-head-commit`; chair merge by owner decision 2026-11-12 #3) | FAIL `4eb6249` (CI: demo D11), PASS `5d8d281` (`docs/evidence/warroom/2026-11-12-meta-pr19-ledger-found-002-round2-VERIFY.md`); `ci-required` green | **VZ-FOUND-002 IMPLEMENTED, recorded on `main`**; not VERIFIED |
 | 2026-11-12 | vizra (meta) | #20 ledger-status demo D11 derives its counts from the ledger (it hard-coded the zero-record state) | `ccacb50` → `449818f` (squash, `--match-head-commit`) | PASS `ccacb50` (`docs/evidence/warroom/2026-11-12-meta-pr20-demo-counts-VERIFY.md`): 61 cases pass with and without a record, D11 fails when the checker is disabled | no ledger ID (QUEUE-ledger-demo-counts) |

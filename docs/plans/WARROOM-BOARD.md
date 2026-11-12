@@ -22,7 +22,9 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| none | | | | | all three builder slots are free after tick 265 | |
+| Queue 3 (003): `migrate up` from the release image in CI; real dirty-ledger test | vizra-core | VZ-FOUND-003 | none yet | branch `feat/release-image-migrate-lane` from `58d658f` | building since tick 266; ONE verdict, no fix round left (inbox 19) | 4/2/0/5 of 5/2/1/12 |
+| Queue 6: installer, `--git` path, checksum, resume, idempotence | vizra | VZ-INSTALL-001 | none yet | branch `feat/installer` from `4a53e88` | building since tick 266 | 0/0/0/1 |
+| Queue 14: HANDOFF.md, components, brand mark, browser pass, CSP mutation | vizra-user | VZ-DESIGN-001 | none yet | branch `feat/design-001-components` from `53a39a8` | building since tick 266 | 1/0/0/3 |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -90,3 +92,4 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | 12 | VZ-FOUND-008 acceptance text against Lane A with pixels off |
 | 13 | Coverage gaps: installer, wizard, IPFS topology, QA, security testing, rehearsal, CI repair, VZ-AUDIT-001 |
 | 15 | VZ-FOUND-005: Redis carries rate-limit counters, not only cache, so the ledger text was not amended; `/readyz` 503 or 200 `degraded` when it is down? |
+| 19 | Budget for VZ-FOUND-003: 1 verdict and 0 fix rounds left for queue 3 (003); chair recommends +2 verdicts, +1 fix round. Not blocking yet |
