@@ -21,3 +21,7 @@ Base origin/main d1988f9. Branch feat/ci-003-boot-lane, worktree .claude/worktre
 
 ## Progress and evidence
 (append run URLs and outcomes)
+- run 43281816529 FAIL: `--pull never` blocked digest-pinned postgres/redis → fixed 2301730 (compose pull postgres redis).
+- run 43282655493 FAIL: postgres:18 refuses a volume at /var/lib/postgresql/data (PG18 image layout, docker-library/postgres#1259) — real product defect in docker-compose.yml, found by this lane. Fixed f349bc8: mount /var/lib/postgresql.
+- f349bc8 also replaces the openssl env generator with `vizra setup --non-interactive` run from the built core image (tag v0.0.0 because setup refuses floating tags); setup stdout is kept in the artifact and covered by the secret scan.
+- run 43283400771 (f349bc8): pending
