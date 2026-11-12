@@ -216,6 +216,8 @@ jobs:
         run: sh tests/install/install_test.sh
       - name: every installer guard still fails against a controlled mutation
         run: sh docs/evidence/install/mutation-demo.sh
+      - name: installer on a clean digest-pinned ubuntu:24.04 (VZ-INSTALL-001)
+        run: sh tests/install/clean_target.sh
 
       # ---------------------------------------------------------------------
       # (d) THE COMPOSE TOPOLOGY (VZ-ISSUE-002: VZ-TOPOLOGY-001/-002/-003/-006/

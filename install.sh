@@ -46,6 +46,8 @@ usage() {
 		'                     instead of unpacking the release bundle' \
 		'  --cli PATH         use this local vizra CLI binary ...' \
 		'  --cli-sha256 HEX   ... which must match this sha256 (required with --cli)' \
+		'  --skip-docker      do not probe or install Docker; for environments that' \
+		'                     provide Docker otherwise (the stack still needs it)' \
 		'  -h, --help         show this help and exit' \
 		'' \
 		'Never writes env/production.env or any secret; never runs docker compose up.' \
@@ -55,12 +57,13 @@ usage() {
 die() { code=$1; shift; printf 'install.sh: %s\n' "$*" >&2; exit "$code"; }
 say() { printf '==> %s\n' "$*"; }
 
-YES=0 REF=main DIR=/opt/vizra OWNER=yegamble GIT=0 CLI='' CLI_SHA=''
+YES=0 REF=main DIR=/opt/vizra OWNER=yegamble GIT=0 CLI='' CLI_SHA='' SKIP_DOCKER=0
 while [ $# -gt 0 ]; do
 	case $1 in
 	-h|--help) usage; exit 0 ;;
 	--yes|-y) YES=1 ;;
 	--git) GIT=1 ;;
+	--skip-docker) SKIP_DOCKER=1 ;;
 	--ref|--dir|--owner|--cli|--cli-sha256)
 		[ $# -ge 2 ] || die 2 "$1 needs a value"
 		case $1 in
@@ -182,7 +185,9 @@ BASE=${VIZRA_INSTALL_REPO_BASE:-https://github.com/$OWNER}
 mkdir -p "$DIR"
 
 if ! done_step docker; then
-	if [ "${VIZRA_INSTALL_SKIP_DOCKER:-}" != 1 ]; then
+	if [ "$SKIP_DOCKER" = 1 ]; then
+		say "--skip-docker: Docker not probed; the stack needs Docker + Compose >= 2.24"
+	elif [ "${VIZRA_INSTALL_SKIP_DOCKER:-}" != 1 ]; then
 		{ command -v docker >/dev/null 2>&1 && compose_ok; } || install_docker
 		compose_ok || die 3 "docker compose >= 2.24 is required"
 	fi
