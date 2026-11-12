@@ -47,7 +47,7 @@ C
 		out=$(run_as $u sh /src/install.sh --yes --git --skip-docker --ref "$REF" --dir $D --cli /tmp/cli --cli-sha256 $SUM 2>&1)
 		echo "$out"
 		echo "$out" | grep -q "next: cd $D && $D/bin/vizra setup" || exit 1
-		snap() { (cd $D && find . -path "*/.git" -prune -o -print | LC_ALL=C sort | sha256sum; sha256sum .vizra-install.state; git -C $D rev-parse HEAD); }
+		snap() { (cd $D && find . -path "*/.git" -prune -o -print | LC_ALL=C sort | sha256sum; sha256sum .vizra-install.state; git -c safe.directory="*" -C $D rev-parse HEAD); }
 		a=$(snap)
 		run_as $u sh /src/install.sh --yes --git --skip-docker --ref "$REF" --dir $D --cli /tmp/cli --cli-sha256 $SUM >/dev/null 2>&1
 		b=$(snap)
