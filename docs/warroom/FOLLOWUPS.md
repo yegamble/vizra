@@ -39,6 +39,13 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 `scripts/check-ledger-status-remote.py` has no retry: a GitHub 503 on `pulls/<n>` turned `validate` red on meta #24 (run 43228973389, re-run). A required lane that fails on a transient upstream error should retry a bounded number of times and stay fail-closed after that
 - 2026-11-12 meta #24: no test fails if the final `verify_sha256 "$BIN"` before hand-off is removed (earlier checks cover it today); refuse a group- or world-writable `--dir`/`bin`; `git init` runs inside an operator's existing `--dir`; `tree-*` state entries are trusted without checking HEAD equals `--ref` (evidence: `docs/evidence/warroom/2026-11-12-meta-pr24-installer-round2-VERIFY.md`)
 - 2026-11-12 meta: `demo.sh` and `check-generated-ledger.sh` write to the same tree, so running them together gives false failures; `check-ledger-status-remote.py` failed on GitHub 503s three times today (no retry)
+- 2026-11-12 meta #33 F-1: production.env.example 'not yet carried' comment must be re-worded once setup.json is re-snapshotted from core main (evidence: `docs/evidence/warroom/2026-11-12-meta-pr33-template-keys-VERIFY.md`)
+- 2026-11-12 meta #33 F-2: external-postgres shapes lack POSTGRES_PASSWORD (carried from core #22) (evidence: `docs/evidence/warroom/2026-11-12-meta-pr33-template-keys-VERIFY.md`)
+- 2026-11-12 meta #32 F-1: S1 builds vizra-search with go1.26.0 (setup-go read the `go` directive, not `toolchain go1.27.4`); assert the pinned toolchain (evidence: `docs/evidence/warroom/2026-11-12-meta-pr32-bootstrap-VERIFY.md`)
+- 2026-11-12 meta #32 F-2: no bootstrap test covers diverged-branch refusal; mutation ff-only→reset --hard stays green (evidence: `docs/evidence/warroom/2026-11-12-meta-pr32-bootstrap-VERIFY.md`)
+- 2026-11-12 meta #31 F-1: bundle check accepts an added file whose sha256 is also added to MANIFEST.json; compare manifest keys to the include list (evidence: `docs/evidence/warroom/2026-11-12-meta-pr31-bundle-VERIFY.md`)
+- 2026-11-12 meta #31 F-2: broken compose YAML surfaces as a Python traceback from bind_sources, not a `bundle: FAIL:` line (evidence: `docs/evidence/warroom/2026-11-12-meta-pr31-bundle-VERIFY.md`)
+- 2026-11-12 meta #31 F-3: bundle schema_version is proven only against fixtures; prove it against a pinned vizra-core tag (evidence: `docs/evidence/warroom/2026-11-12-meta-pr31-bundle-VERIFY.md`)
 
 ## vizra-core
 

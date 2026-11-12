@@ -22,11 +22,11 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 2 remainder: `/readyz` schema-behind component, DB-recovery test, compose transcript; Redis down is `degraded` (decision #8) | vizra-core | VZ-FOUND-005 | none yet | branch `feat/found-005-readyz-remainder` | builder dispatched tick 281 | 1/0/0/2 |
-| Rulings into docs: OPS-005 issue bullets (#5), FOUND-005 ledger text (#8); then ADR-010 AV1-only libheif (#9), ADR-011 (#10) | vizra | VZ-OPS-005, VZ-FOUND-005, VZ-MEDIA-001 | none yet | branch `docs/owner-rulings-2026-11-12` | builder dispatched tick 281 | see `budget` |
-| Queue 2f: artifact allowlist; 4 `e2e:demos` halves failed, diagnose | vizra-user | VZ-FOUND-008 | #18 (draft) | `b1fe3cd` | builder dispatched tick 281 | 0/0/0/4 |
-| Verify: bundle #31, bootstrap #32, template keys #33, records #28 | vizra | VZ-INSTALL-004, VZ-FOUND-001, VZ-INSTALL-002 | #31 #32 #33 #28 | `b7761b3` `4506e81` `3b34e55` `b5eb7d6` | verifiers dispatched tick 281 | per ID |
-| Queue 4 remainder (N1) | vizra-user | VZ-CI-001 | #17 | `e6748c2` | ready; verifier after #28 puts grant #4 on `main` | 4/0/0/8 (cap 6) |
+| Queue 2 remainder: `/readyz` schema component, PostgreSQL stop/recover test done; compose transcript and rendered-model assertion left | vizra-core | VZ-FOUND-005 | #24 (draft) | `4cf61dd` | builder continuing, tick 282 | 1/0/0/3 |
+| Queue 7 meta: setup key snapshot from merged core, COMPOSE_FILE/PROFILES templated | vizra | VZ-INSTALL-002 | #33 | `3b34e55` | FAIL, fix round 1 building | 3/1/0/5 |
+| Queue 2f: artifact allowlist; floor 9 was below today's 20 tests per project | vizra-user | VZ-FOUND-008 | #18 (draft) | `b1fe3cd` | builder continuing, tick 282 | 0/0/0/5 |
+| Rulings into docs: OPS-005 issue bullets, FOUND-005 ledger text (#34); ADR-010, ADR-011 (#35) | vizra | QUEUE-owner-rulings | #34 #35 | `e29477f` `71d8a55` | verifiers running | 0 verdicts |
+| Queue 4 remainder (N1) | vizra-user | VZ-CI-001 | #17 | `e6748c2` | ready; grant #4 on `main`, verifier next | 4/0/0/8 (cap 6) |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
