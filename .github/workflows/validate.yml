@@ -180,8 +180,9 @@ jobs:
       - name: the ledger-status rules hold (unit tests)
         run: |
           set -euo pipefail
-          (cd docs/evidence/ledger-generator && python3 -m unittest -v test_status)
-          python3 scripts/test_ledger_status_remote.py -v
+          (cd docs/evidence/ledger-generator && python3 ../../../scripts/run-unittest-noskip.py test_status)
+          (cd scripts && python3 run-unittest-noskip.py test_ledger_status_remote)
+          bash tests/ci/test_run_unittest_noskip.sh
 
       - name: every recorded ledger status is proved against GitHub
         env:
