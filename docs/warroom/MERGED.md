@@ -4,6 +4,9 @@ Append new rows at the top of the table. A merge is not a ledger status: the sta
 
 | Date | Repo | PR | Verified SHA → merge commit | Evidence | Ledger state |
 |---|---|---|---|---|---|
+| 2026-11-12 | vizra | #41 war-room records, ticks 284-286, inbox 26 and 27 | `6a28a35` → `e66b85d` | PASS `6a28a35` (`docs/evidence/warroom/2026-11-12-meta-pr41-records-VERIFY.md`) | records only |
+| 2026-11-12 | vizra-user | #20 staged artifacts withhold assertion values; media default-deny, never for @authenticated (QUEUE-2f F-1/F-2, VZ-FOUND-008) | `76401de` → `56a4500` | PASS `76401de` (`docs/evidence/warroom/2026-11-12-vizra-user-pr20-2f-leaks-VERIFY.md`) | sign-in gate stays closed: F-A, job log (user #21) |
+| 2026-11-12 | vizra-core | #27 `vizra doctor`: host checks, OK/FAIL/BLOCKED, exit 0/1/3 (VZ-OPS-002, first slice) | `b170e52` → `33a7187` | PASS `b170e52` (`docs/evidence/warroom/2026-11-12-vizra-core-pr27-doctor-VERIFY.md`) | DNS/TLS, closed ports, backup freshness open |
 | 2026-11-12 | vizra-search | #8 stack pin test: go.sum, go/toolchain lines, every setup-go, Docker build stage tag+digest, ADR-001 rows (VZ-FOUND-001, VZ-FOUND-004, search) | `4c0867c` → `dab62ad` | FAIL `802776d` (Dockerfile check matched a comment), fix round 1, PASS `4c0867c` (`docs/evidence/warroom/2026-11-12-vizra-search-pr8-pins-round2-VERIFY.md`) | VZ-FOUND-001 record next |
 | 2026-11-12 | vizra | #39 api/worker healthchecks run `vizra healthcheck`; frontend gates on api `service_healthy`; `required-probe` topology rule fails closed (VZ-FOUND-005, meta) | `1ee80cf` → `d1988f9` | PASS `1ee80cf` (`docs/evidence/warroom/2026-11-12-meta-pr39-found-005-VERIFY.md`) | clean-target transcript: boot lane |
 | 2026-11-12 | vizra | #40 ledger record VZ-DESIGN-001 VERIFIED | `f255121` → `94e9c4b` | BLOCKED (CI pending) then PASS `f255121` (`docs/evidence/warroom/2026-11-12-meta-pr40-design-001-verified-round2-VERIFY.md`) | **VZ-DESIGN-001 VERIFIED** |

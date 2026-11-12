@@ -22,10 +22,12 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 12: `vizra doctor` OK/FAIL/BLOCKED, host checks, real-binary transcript | vizra-core | VZ-OPS-002 | #27 (draft) | `b170e52` | CI pending, then verifier | 0/0/0/2 |
-| 2f leaks F-1/F-2; the hard gate on signing-in specs stays closed until merged | vizra-user | VZ-FOUND-008 | #20 (draft) | `76401de` | builder finishing lanes and body | 1/0/0/8 |
-| Queue 9: boot lane, production stack in CI, migrate one-shots, PostgreSQL stop/recover | vizra | VZ-CI-003 (+ VZ-FOUND-005 transcript) | none yet | branch `feat/ci-003-boot-lane` | building | 0/0/0/1 |
-| Record: VZ-FOUND-006 VERIFIED (VZ-FOUND-001 held: inbox 27) | vizra | QUEUE-ledger-VZ-FOUND-006 | after this records PR | | evidence lands with this PR | |
+| Queue 12: `vizra status/logs/restart/update` on the env-derived compose chain | vizra-core | VZ-OPS-003 | #28 | `d83f143` | verifier finished | 1/0/0/1 |
+| Fixture corpus with manifest and provenance check | vizra-core | VZ-FOUND-007 | none yet | branch `feat/found-007-fixture-corpus` | building | 0/0/0/1 |
+| 2f final: Playwright-exact timeout lines, scrubbed locators, filtered job log; then the sign-in gate can open | vizra-user | VZ-FOUND-008 | #21 (draft) | see PR | building | 2/0/0/10 |
+| Queue 9: boot lane green on GitHub (red demo shown); postgres:18 volume fix | vizra | VZ-CI-003 | #42 (draft) | `d7627d7` | CI pending, then verifier | 0/0/0/4 |
+| Model assertions: ports, pins, non-root, no-new-privileges, log caps, no docker.sock | vizra | VZ-CI-002, VZ-OPS-008 | none yet | branch `feat/ci-002-ops-008-model-asserts` | building | 0/4, 0/4 |
+| Record: VZ-FOUND-006 VERIFIED | vizra | QUEUE-ledger-VZ-FOUND-006 | #43 | `457df28` | CI pending, then verifier | 0 verdicts |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 

@@ -58,6 +58,7 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 meta #40 F-2: CSP-mutation failure count differs by placement (pr37 run 4 failed, pr40 round-2 run 3 failed); record the exact mutation line in queue-14 evidence (evidence: `docs/evidence/warroom/2026-11-12-meta-pr40-design-001-verified-round2-VERIFY.md`)
 - 2026-11-12 meta #39 F1: no rule asserts frontend→api `service_healthy`; reverting to `service_started` stays green — add a required-gate rule + demo case (evidence: `docs/evidence/warroom/2026-11-12-meta-pr39-found-005-VERIFY.md`)
 - 2026-11-12 meta #39 F2: README.md:114, env/production.env.example:195 and META_REPO.md:156-160 still describe api/worker as known-false / not yet landed (evidence: `docs/evidence/warroom/2026-11-12-meta-pr39-found-005-VERIFY.md`)
+- 2026-11-12 meta #41 R-1: board at `6a28a35` lists core #27 and user #20 as open drafts and the boot lane as 'none yet'; since cut, #27 merged `33a7187`, #20 merged `56a4500`, boot lane is meta #42 — refresh next records PR (evidence: `docs/evidence/warroom/2026-11-12-meta-pr41-records-VERIFY.md`)
 
 ## vizra-core
 
@@ -79,6 +80,11 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 core #26 F-2: the PINS table is hand-copied from meta ADR-001 with no cross-repo drift check (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr26-pins-VERIFY.md`)
 - 2026-11-12 core #26 F-3: non-required image-scan is red on the PR head with 60 HIGH/CRITICAL base-image CVEs (pre-existing) (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr26-pins-VERIFY.md`)
 - 2026-11-12 core #25 F-1: TestProductionBootRefusesDevSecrets control subtests wait out the 20 s timeout because the api keeps listening with no DB; shorten the deadline or stop at the `listening` line (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr25-found-006-VERIFY.md`)
+- 2026-11-12 core #27 F-1: `--project-dir` resolves a relative `--env` file under the project dir, so topology FAILs spuriously; absolutise the path (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr27-doctor-VERIFY.md`)
+- 2026-11-12 core #27 F-2: topology FAIL echoes 300 chars of `docker compose config` stderr, which may quote env values; redact (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr27-doctor-VERIFY.md`)
+- 2026-11-12 core #27 F-3: disk free silently measures `.` when the storage root is missing; say so or report BLOCKED (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr27-doctor-VERIFY.md`)
+- 2026-11-12 core #27 F-4: schema is BLOCKED on an unmigrated database; report FAIL with `vizra migrate` (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr27-doctor-VERIFY.md`)
+- 2026-11-12 core #27 F-5: builder transcript uses REDIS_URL instead of VIZRA_CACHE_URL and is from aae8309; regenerate at final SHA (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr27-doctor-VERIFY.md`)
 
 ## vizra-user
 
@@ -97,6 +103,9 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 user #19 F1: ADR-001 needs an owner amendment (no Node row; Next.js 16.3.x vs pinned 16.4.1; no React/Tailwind/TypeScript versions), so VZ-FOUND-004 'versions match ADR' stays open (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr19-pins-VERIFY.md`)
 - 2026-11-12 user #19 F2: check:pins exits 0 while adr_gaps is non-empty; after the ADR amendment make any listed gap fail (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr19-pins-VERIFY.md`)
 - 2026-11-12 meta #40 F-1: `next start` warns it does not work with `output: standalone`; queue 14 browser passes should drive `node .next/standalone/server.js` (evidence: `docs/evidence/warroom/2026-11-12-meta-pr40-design-001-verified-round2-VERIFY.md`)
+- 2026-11-12 user #20 F-A: SUMMARY line allowlist admits any `Timed out…`/`Timeout…` free text verbatim (sentinel reproduced); anchor to Playwright's exact shapes (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr20-2f-leaks-VERIFY.md`)
+- 2026-11-12 user #20 F-B: `Locator:` lines pass verbatim; a value-derived selector would upload the value (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr20-2f-leaks-VERIFY.md`)
+- 2026-11-12 user #20 F-C: job-log gate (`--log`) still not wired into e2e.yml and V-D stamp key open (= #18 F-3); both precede lifting the signing-in hard gate (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr20-2f-leaks-VERIFY.md`)
 
 ## vizra-search
 
