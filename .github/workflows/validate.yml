@@ -232,10 +232,12 @@ jobs:
       - name: every bootstrap guard still fails against a controlled mutation
         timeout-minutes: 5
         run: sh docs/evidence/bootstrap/mutation-demo.sh
+      # S1 checkouts live INSIDE the workspace (.s1/, git-ignored): setup-go
+      # and setup-node resolve *-version-file relative to the workspace.
       - name: S1 clean clone of every component via bootstrap.sh (VZ-FOUND-001)
         timeout-minutes: 3
         env:
-          VIZRA_DIR: ${{ runner.temp }}/s1
+          VIZRA_DIR: ${{ github.workspace }}/.s1
         run: |
           set -eu
           mkdir -p "$VIZRA_DIR"
@@ -243,11 +245,11 @@ jobs:
           sh ./bootstrap.sh   # R1 against the real remotes: rerun is a no-op
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: ${{ runner.temp }}/s1/vizra-core/go.mod
+          go-version-file: .s1/vizra-core/go.mod
           cache: false
       - name: S1 vizra-core clean build (make build)
         timeout-minutes: 8
-        working-directory: ${{ runner.temp }}/s1/vizra-core
+        working-directory: .s1/vizra-core
         env:
           GOTOOLCHAIN: local
         run: |
@@ -256,11 +258,11 @@ jobs:
           make build && ls -l bin/
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: ${{ runner.temp }}/s1/vizra-search/go.mod
+          go-version-file: .s1/vizra-search/go.mod
           cache: false
       - name: S1 vizra-search clean build (make build)
         timeout-minutes: 8
-        working-directory: ${{ runner.temp }}/s1/vizra-search
+        working-directory: .s1/vizra-search
         env:
           GOTOOLCHAIN: local
         run: |
@@ -269,10 +271,17 @@ jobs:
           make build && ls -l bin/
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version-file: ${{ runner.temp }}/s1/vizra-user/.nvmrc
+          node-version-file: .s1/vizra-user/.nvmrc
       - name: S1 vizra-user clean build (npm ci && npm run build)
         timeout-minutes: 10
-        working-directory: ${{ runner.temp }}/s1/vizra-user
+        working-directory: .s1/vizra-user
+        # Exactly the build env vizra-user's own frontend-ci sets (sentinel
+        # values, no secrets).
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          INTERNAL_API_BASE_URL: http://api.sentinel.invalid:8080
+          PUBLIC_ORIGIN: https://origin.sentinel.invalid
+          API_TIMEOUT_MS: "4242"
         run: |
           set -eu
           echo "vizra-user SHA: $(git rev-parse HEAD)"; node --version

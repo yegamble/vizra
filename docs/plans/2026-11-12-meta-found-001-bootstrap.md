@@ -34,3 +34,8 @@ The first test run itself found a real defect: the dirty check ran per component
 | `python3 scripts/check-doc-links.py` | see PR |
 
 S1 not run locally (CI ubuntu-24.04 is the clean target).
+
+## Session 2
+- CI validate run 43246332988 failed: setup-node prefixed the absolute `runner.temp` `.nvmrc` path with the workspace. Fix: S1 checkouts now go to `${{ github.workspace }}/.s1` (git-ignored `/.s1/`) and both setup-go `go-version-file` and setup-node `node-version-file` take relative `.s1/...` paths; the toolchain still comes from each component's own pin; `GOTOOLCHAIN=local` kept. All S1 `working-directory` values are relative too.
+- vizra-user build env set to exactly what vizra-user `frontend-ci.yml` sets for its build (NEXT_TELEMETRY_DISABLED, INTERNAL_API_BASE_URL, PUBLIC_ORIGIN, API_TIMEOUT_MS sentinels; no secrets).
+- Local gates (quiet.sh): check-workflows PASS, check-action-pins PASS, check-lane-integrity PASS, bootstrap_test 11 passed / 0 failed.
