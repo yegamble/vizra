@@ -35,6 +35,7 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 user #11 D-7: the design docs under `docs/design/figma/` still say PROPOSED after the acceptance of 2026-11-10 (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`)
 - 2026-11-11 meta #17: `check-config-coverage.py --drift` is all or nothing, so a core-only drift check cannot run alone; meta CI sees only the snapshot of core keys; `env/registry/search.json` is behind the search checkout (evidence: `docs/evidence/warroom/2026-11-11-meta-pr17-3c-VERIFY.md`)
 - 2026-11-11 meta #16: ADR-001 states Echo as a floor (≥ v5.4.4) while `go.mod` pins it exactly; the VZ-ISSUE-001 Outcome paragraph still says Echo ≥ 5.3.1 (evidence: `docs/evidence/warroom/2026-11-11-meta-pr17-3c-VERIFY.md`)
+- 2026-11-12 meta #19, #20: the VZ-FOUND-002 rationale omits the API's own metrics listener (`cmd/api/main.go:146`) from its known limits; no rule orders a record after its dependency (VZ-FOUND-001 is PLANNED); `by_verification_status` has no demo case; the D11 missing-PLANNED failure prints an empty reason (evidence: `docs/evidence/warroom/2026-11-12-meta-pr19-ledger-found-002-round2-VERIFY.md`)
 
 ## vizra-core
 
@@ -47,6 +48,7 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 core #17 F-1…F-4: `busy` cleared after the result is sent (false 503 only with a fake clock); `healthcheck.go:30` text says PostgreSQL is the only 503; no test for the absolute-path rule; a timed-out probe is cached as 503 for 2 s (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`)
 - 2026-11-11 core #18: a marker exempts every statement on the next line (same on main); a marker is honoured inside a block comment or mid-statement; drops inside `DO $$…$$` and after an `E'…'` string are not parsed; split-line `DROP CONSTRAINT` passes; `shellcheck` SC2207 at `migrate-lint.sh:59` predates the PR (evidence: `docs/evidence/warroom/2026-11-11-vizra-core-pr18-3a-VERIFY.md`)
 - 2026-11-11 core #18 F002-M4: the worker mux serves the Prometheus handler on every path but its probes, outside what the contract test walks (evidence: `docs/evidence/warroom/2026-11-11-vizra-core-pr18-3a-VERIFY.md`)
+- 2026-11-12 core #18 R3-F1…F4: a bare drop on a line starting `--` inside an open block comment is missed (main has the same hole); one marker exempts two added hits on its next line; a marker inside a block comment is honoured, as on main; the `E''` limit has no fixture (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr18-3a-round3-VERIFY.md`)
 
 ## vizra-user
 

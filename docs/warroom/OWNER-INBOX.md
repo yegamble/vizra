@@ -155,3 +155,9 @@ Free disk space — 19 GiB free limits Docker and Playwright work.
 > CLOSED 2026-11-12 by owner decision 2026-11-12 #1: 2 more verdicts for VZ-FOUND-002 and 1 more for VZ-FOUND-003, for vizra-core #18 and vizra-user #12 only.
 
 **Budget grant for VZ-FOUND-002 (new 2026-11-11, tick 261).** VZ-FOUND-002 has used its 4 verifier verdicts: the audit PASS (meta #15), a FAIL on vizra-core #18 at `a627e1f` (one `-- allow-destructive:` marker exempted a later statement on the same line; main's script rejected the file, the PR accepted it), a BLOCKED on vizra-user #12 caused only by an apt failure in the e2e runner, and the PASS that completed #12. vizra-core #18 now has its fix (`84f8ad1`, fix round 1, `ci-required` green) and is not re-verified: that would be a fifth verdict for VZ-FOUND-002 (VZ-FOUND-003 is at 2 of 4). The PR stays open and nothing more is dispatched for it. Reproducer and finding: `docs/evidence/warroom/2026-11-11-vizra-core-pr18-3a-VERIFY.md`. To continue, a numbered decision naming VZ-FOUND-002 and the number of extra verdicts.
+
+### 18
+
+> CLOSED 2026-11-12 by owner decision 2026-11-12 #3: the chair merges status record PRs after an independent PASS. Meta #19 merged as `0a204e8`.
+
+**Who merges a ledger status record the chair wrote (new 2026-11-12, tick 264).** Meta #19 records VZ-FOUND-002 IMPLEMENTED from vizra-core #18 and vizra-user #12. An independent verifier returned PASS at `5d8d281` and `ci-required` is green on it (`docs/evidence/warroom/2026-11-12-meta-pr19-ledger-found-002-round2-VERIFY.md`). The loop rules have the chair write status records, and the owner said on 2026-11-11 "nobody merges their own work", so the chair has not merged it. Either merge #19, or say the chair may merge status record PRs after an independent PASS, or have a builder write them.

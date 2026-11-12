@@ -230,3 +230,52 @@ repro exit=1
 ```
 
 Lanes at 84f8ad1: `go test -count=1 ./scripts/ -run TestMigrateLint -v` exit 0 (52 subtests pass, 0 fail, 0 skip); `make migrate-lint` exit 0; `make ci` exit 0; `./scripts/ci-required-guard.sh` exit 0.
+
+## Fix round 2 (R2-F1)
+
+Design: section 4 of scripts/migrate-lint.sh is main's loop (5f615d7) again; section 4b (statement parser) only adds column-drop failures, exempt only by a marker on the line directly before the DROP token. The marker-before-the-statement extension is removed; fixtures allow-destructive-split and allow-destructive-split-alone now carry the marker directly above the DROP line.
+
+RED at 84f8ad1 (new TestMigrateLintNeverAcceptsWhatMainRejects, script unchanged), `go test -count=1 ./scripts/ -run TestMigrateLintNeverAccepts`:
+
+```
+--- FAIL: TestMigrateLintNeverAcceptsWhatMainRejects (4.36s)
+    --- FAIL: TestMigrateLintNeverAcceptsWhatMainRejects/differential/d06 (0.09s)
+    --- FAIL: TestMigrateLintNeverAcceptsWhatMainRejects/differential/d09 (0.10s)
+    --- FAIL: TestMigrateLintNeverAcceptsWhatMainRejects/differential/d16 (0.10s)
+    --- FAIL: TestMigrateLintNeverAcceptsWhatMainRejects/differential/d17 (0.10s)
+    --- FAIL: TestMigrateLintNeverAcceptsWhatMainRejects/differential/d18 (0.10s)
+    --- FAIL: TestMigrateLintNeverAcceptsWhatMainRejects/differential/d19 (0.11s)
+    --- FAIL: TestMigrateLintNeverAcceptsWhatMainRejects/differential/d22 (0.10s)
+    --- FAIL: TestMigrateLintNeverAcceptsWhatMainRejects/differential/d23 (0.09s)
+    --- FAIL: TestMigrateLintNeverAcceptsWhatMainRejects/differential/d24 (0.10s)
+FAIL
+FAIL	github.com/yegamble/vizra-core/scripts	4.690s
+FAIL
+```
+
+GREEN at b1c1734 (via quiet.sh):
+
+```
+PASS r2-test (6s) log: /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T//vizra-gate-logs/r2-test-20261112-062237-50835.log
+--- PASS: TestMigrateLintPassesOnTheRealMigrations (0.14s)
+PASS
+ok  	github.com/yegamble/vizra-core/scripts	6.241s
+exit 0
+PASS r2-lint (0s) log: /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T//vizra-gate-logs/r2-lint-20261112-062244-56070.log
+  ok    0005_users_credentials_owner_claim.up.sql:210 destructive statement with a stated reason
+  ok    append-only manifest matches (10 migrations)
+migrate-lint: passed
+exit 0
+PASS r2-ci (57s) log: /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T//vizra-gate-logs/r2-ci-20261112-062244-56225.log
+ok  	github.com/yegamble/vizra-core/scripts	37.523s
+
+make ci: all lanes passed
+exit 0
+PASS r2-guard (0s) log: /var/folders/f0/7491x4mn6r90h50q54n7bs440000gn/T//vizra-gate-logs/r2-guard-20261112-062244-56207.log
+  ok    every job runs on GitHub-hosted ubuntu-24.04
+  ok    every third-party action is pinned to a commit SHA
+ci-required-guard: passed (6 required check(s))
+exit 0
+```
+
+TestMigrateLint: 4 tests, 102 subtests PASS, 0 skip. d16 reproducer (`./scripts/migrate-lint.sh --dir scripts/testdata/migratelint/differential/d16`): exit 1.

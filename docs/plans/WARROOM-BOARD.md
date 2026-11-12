@@ -10,9 +10,9 @@ Everything else lives in `docs/warroom/`:
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
-**Ledger on `main`: 192 entries, 0 IMPLEMENTED, 0 VERIFIED.** 16 candidates were tried on 2026-11-10 and none is honestly recordable ([why, per ID](../evidence/warroom/2026-11-10-ledger-status-candidates.md)). Live state in September terms: [reconcile](../warroom/RECONCILE-2026-11-10.md).
+**Ledger on `main`: 192 entries, 1 IMPLEMENTED (VZ-FOUND-002, meta #19 `0a204e8`, tick 265), 0 VERIFIED.**
 
-Ticks 258–261 merged seven milestone PRs and recorded no status. What each ID still lacks, case by case, is in the queue rows 2, 3 (002, 003, 006), 11 and 14.
+What each other ID still lacks, case by case, is in the queue rows 2, 3 (002, 003, 006), 11 and 14.
 
 Rulesets (`ci-required` required, linear history, no force-push, no deletion) are active on all four repos (vizra-core `26972947` since tick 259).
 
@@ -22,7 +22,7 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 3a: contract test walks wildcard routes; migrate-lint column drops | vizra-core | VZ-FOUND-002, VZ-FOUND-003 | #18 | `84f8ad1` | FAIL at `a627e1f`, fix round 1 pushed, CI green; re-verify under owner grant 2026-11-12 #1 | 002: 4/1/0/3, cap 6 verdicts; 003: 2/1/0/3, cap 5 |
+| none | | | | | all three builder slots are free after tick 265 | |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -40,8 +40,8 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 | # | Slice | Repo | IDs | Depends on |
 |---|---|---|---|---|
 | 2 | `/readyz`: storage merged (core #17). Left: schema-behind is not a `/readyz` component; no DB-recovery test; transcript on a compose stack and rendered-model assertion; Redis-down is 200 `degraded` against the ledger text (inbox 15) | vizra-core | VZ-FOUND-005 | inbox 15 for the Redis part |
-| 3 (002) | VZ-FOUND-002 lacks: S1 until core #18 is re-verified and merged; `evidence_required` (the drift mutation red then green as CI job output, not local). S2 and N1 proven (user #12) | vizra-core | VZ-FOUND-002 | core #18 |
-| 3 (003) | VZ-FOUND-003 lacks: N1 until core #18 merges; S1 (no lane runs `migrate up` from the release image); R1 (no test sets a ledger dirty); the outcome's "compatibility window" does not exist. S2, N2 proven | vizra-core | VZ-FOUND-003 | core #18 for N1 |
+| 3 (002) | VZ-FOUND-002 is IMPLEMENTED on `main`. VERIFIED lacks `evidence_required`: the both-direction drift mutation red then green as CI job output (only local transcripts exist) | vizra-core + vizra-user | VZ-FOUND-002 | nothing |
+| 3 (003) | VZ-FOUND-003 lacks: S1 (no lane runs `migrate up` from the release image); R1 (no test sets a ledger dirty); the outcome's "compatibility window" does not exist. S2, N1, N2 proven (core #18) | vizra-core | VZ-FOUND-003 | nothing |
 | 3 (006) | VZ-FOUND-006 lacks: S2 (`vizra setup` does not exist, queue 7); N1 boot-refusal transcript; P1 (two integration tests not run); N2 limit: meta CI checks a snapshot of core's keys. S1 and N2 proven on the meta side (meta #17) | vizra + vizra-core | VZ-FOUND-006 | queue 7 for S2 |
 | 4 | Tombstone rule in all four `ci-required` guards; vizra-user's two "required only if it ran" lanes | all four | VZ-CI-001 | 1 for core |
 | 5 | `bootstrap.sh`; pin the libvips binding and Lucide | vizra + vizra-core + vizra-user | VZ-FOUND-001, VZ-FOUND-004 | 1 |
