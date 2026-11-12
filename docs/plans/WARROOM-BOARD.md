@@ -43,7 +43,7 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 |---|---|---|---|---|
 | 2 | `/readyz`: storage merged (core #17). Left: schema-behind is not a `/readyz` component; no DB-recovery test; transcript on a compose stack and rendered-model assertion; Redis-down is 200 `degraded` against the ledger text (inbox 15) | vizra-core | VZ-FOUND-005 | inbox 15 for the Redis part |
 | 3 (002) | VZ-FOUND-002 is IMPLEMENTED on `main`. VERIFIED lacks `evidence_required`: the both-direction drift mutation red then green as CI job output (only local transcripts exist) | vizra-core + vizra-user | VZ-FOUND-002 | nothing |
-| 3 (003) | VZ-FOUND-003: IMPLEMENTED record in meta #25 (VERIFIED was refused: no compatibility window). VERIFIED waits on inbox 21 | vizra | VZ-FOUND-003 | inbox 21 |
+| 3 (003) | VZ-FOUND-003 BLOCKED on inbox 21: two verifiers refused VERIFIED and then IMPLEMENTED (no compatibility window); meta #25 closed unmerged, branch kept. All five ledger cases are proven on `main` | vizra-core | VZ-FOUND-003 | inbox 21 |
 | 3 (006) | VZ-FOUND-006 lacks: S2 (`vizra setup` does not exist, queue 7); N1 boot-refusal transcript; P1 (two integration tests not run); N2 limit: meta CI checks a snapshot of core's keys. S1 and N2 proven on the meta side (meta #17) | vizra + vizra-core | VZ-FOUND-006 | queue 7 for S2 |
 | 4 | Tombstone rule in all four `ci-required` guards; vizra-user's two "required only if it ran" lanes | all four | VZ-CI-001 | 1 for core |
 | 5 | `bootstrap.sh`; pin the libvips binding and Lucide | vizra + vizra-core + vizra-user | VZ-FOUND-001, VZ-FOUND-004 | 1 |

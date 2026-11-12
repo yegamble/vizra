@@ -1,0 +1,3 @@
+# VERIFY vizra-user PR15 (in progress)
+
+FINAL VERDICT: BLOCKED — SHA 4f9918682eba78afcc6c0187d0d5b447506d13f6

@@ -278,3 +278,4 @@ Append-only. One line per tick. A wake-up where nothing happened is not a tick a
 - Tick 271 (2026-11-12) — installer fix round 1 at `f52faf1`. Ledger-status demo fix #26 PASS, merged `68d6977` (needed by the first VERIFIED record). User VZ-CI-001 part 3 dispatched.
 - Tick 272 (2026-11-12) — installer #24 PASS at `f52faf1`, merged `206d739`. Core #20 (VZ-OPS-005 core half) PASS, merged `7f64b6d`. Dispatched VZ-CI-001 meta part and the PhotoCard/TabBar remainder.
 - Tick 273 (2026-11-12) — meta #25 (VZ-FOUND-003 VERIFIED) FAIL at `bd93f36`: no compatibility window exists, so VERIFIED overclaims. Record changed to IMPLEMENTED with the gap stated (`a02ef82`); inbox 21 filed for the window.
+- Tick 274 (2026-11-12) — meta #25 round 2 FAIL at `a02ef82`: IMPLEMENTED is a partial status when an outcome clause is missing. #25 closed unmerged; VZ-FOUND-003 blocked on inbox 21. Dispatched the VZ-OPS-005 meta otel profile; user #15 (PhotoCard, TabBar) under verification.
