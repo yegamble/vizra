@@ -6,11 +6,13 @@ Everything else lives in `docs/warroom/`:
 
 [tick log](../warroom/TICK-LOG.md) · [owner inbox](../warroom/OWNER-INBOX.md) · [owner decisions](../warroom/OWNER-DECISIONS.md) · [merged](../warroom/MERGED.md) · [follow-ups](../warroom/FOLLOWUPS.md) · [board through tick 257](../warroom/archive/WARROOM-BOARD-through-tick-257.md)
 
-**Loop: RUNNING again from tick 281, 2026-11-12, on the owner's restart (decision 2026-11-12 #11).** `stall` stays red until a ledger status lands on `main`; if none has by tick 295, the loop stops again.
+**Loop: PAUSED by the chair after tick 289, 2026-11-12 (session capacity, not a governor exit).** Restart with `/warroom`: first verify and merge this records PR, then the VZ-FOUND-005 VERIFIED and VZ-CI-002 records; owner inbox 25, 26 and 27 are open.
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
-**Ledger on `main`: 192 entries, 3 IMPLEMENTED (VZ-FOUND-002, VZ-CI-001, VZ-OPS-005), 1 VERIFIED (VZ-DESIGN-001, meta #40 `94e9c4b`, tick 285).**
+**Sign-in gate (queue 2f): may open for M1** (user #21 verifier, tick 289) on two conditions until follow-up F-C lands: test titles carry no runtime values; no new `::error::` line prints a value.
+
+**Ledger on `main`: 192 entries, 3 IMPLEMENTED (VZ-FOUND-002, VZ-CI-001, VZ-OPS-005), 2 VERIFIED (VZ-DESIGN-001; VZ-FOUND-006, meta #43 `3dc179b`, tick 288).**
 
 What each other ID still lacks, case by case, is in the queue rows 2, 3 (002, 003, 006), 11 and 14.
 
@@ -22,10 +24,7 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 12: `vizra doctor` OK/FAIL/BLOCKED, host checks, real-binary transcript | vizra-core | VZ-OPS-002 | #27 (draft) | `b170e52` | CI pending, then verifier | 0/0/0/2 |
-| 2f leaks F-1/F-2; the hard gate on signing-in specs stays closed until merged | vizra-user | VZ-FOUND-008 | #20 (draft) | `76401de` | builder finishing lanes and body | 1/0/0/8 |
-| Queue 9: boot lane, production stack in CI, migrate one-shots, PostgreSQL stop/recover | vizra | VZ-CI-003 (+ VZ-FOUND-005 transcript) | none yet | branch `feat/ci-003-boot-lane` | building | 0/0/0/1 |
-| Record: VZ-FOUND-006 VERIFIED (VZ-FOUND-001 held: inbox 27) | vizra | QUEUE-ledger-VZ-FOUND-006 | after this records PR | | evidence lands with this PR | |
+| Records: VZ-FOUND-005 VERIFIED; VZ-CI-002 | vizra | QUEUE-ledger | after this records PR | | evidence lands with this PR | |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
