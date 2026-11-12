@@ -100,12 +100,6 @@ Still open from 2026-09-15: Q-008 tenancy, Q-041 notes/people, Q-042 messages; a
 
 **VZ-FOUND-005: Redis in readiness (new 2026-11-10, tick 260).** The ledger outcome says `/readyz` "fails when DB/Redis/storage unavailable". vizra-core returns 200 with `degraded` when the cache is down and tests that on purpose (`TestReadyzCacheDownIs200Degraded`), following ADR-002. One of the two has to change before the ID can be recorded; changing the ledger text or the ADR is yours. Evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`.
 
-### 16
-
-> DECIDED 2026-11-11 #1: add the bullets and make the editorial ADR-001 update. Closes when that PR is on `main`.
-
-**Acceptance bullets and ADR-001 (new 2026-11-10, tick 260).** (a) These ledger cases have no acceptance bullet in `docs/issues/VZ-ISSUE-001.md`, and adding one changes the acceptance target: VZ-FOUND-002 both generated-client cases; VZ-FOUND-003 migrate up from the image, sqlc-verify, DROP COLUMN, dirty ledger; VZ-FOUND-006 key delivery, `vizra setup` keys, key without consumer, log denylist (`docs/evidence/warroom/2026-11-10-found-002-003-006-AUDIT.md`). (b) ADR-001 lines 18, 93, 94 still say Go 1.27.1 and Echo ≥ v5.3.1 after core #16 raised both; its bump policy wants them in step, and editing an Accepted ADR is yours.
-
 ## Closed
 
 ### 0
@@ -149,3 +143,15 @@ Free disk space — 19 GiB free limits Docker and Playwright work.
 > CLOSED 2026-11-10 by the owner's answer "Chair does it: stash the 14 files, reset local main to origin/main, switch to main": the 14 record files are in `stash@{0}` of the main checkout (kept), local `main` is `e5a5715` = `origin/main`, the checkout is on `main`. The owner also answered "Remove the local worktrees and branches; keep them on GitHub only" for the four parked branches; done after checking each local head is on its origin branch.
 
 **The main checkout is not on `main` (new 2026-11-10).** `/Users/yosefgamble/github/vizra` is on `chore/warroom-records-2026-09-21` with 5 modified and 9 untracked record files. All of that content is on `main` since meta #9 (12 files byte-identical, 2 landed from the working tree; verifier claim B in `docs/evidence/warroom/2026-11-10-meta-pr9-records-VERIFY.md`). Local `main` is `bf25303`, stale and unrelated to `origin/main`. Until the checkout is on current `main`, `/warroom` there is the September command file and no Stop hook runs. The chair has not touched the checkout or the local `main`. Either do it yourself (`git stash -u`, `git branch -f main origin/main`, `git switch main`) or tell the chair to.
+
+### 16
+
+> CLOSED 2026-11-11 by owner decision 2026-11-11 #1: meta #16 (`f990008`) added the ten bullets verbatim from the ledger and updated ADR-001 to Go 1.27.4 and Echo v5.4.4; verifier PASS at `7912353`.
+
+**Acceptance bullets and ADR-001 (new 2026-11-10, tick 260).** (a) These ledger cases have no acceptance bullet in `docs/issues/VZ-ISSUE-001.md`, and adding one changes the acceptance target: VZ-FOUND-002 both generated-client cases; VZ-FOUND-003 migrate up from the image, sqlc-verify, DROP COLUMN, dirty ledger; VZ-FOUND-006 key delivery, `vizra setup` keys, key without consumer, log denylist (`docs/evidence/warroom/2026-11-10-found-002-003-006-AUDIT.md`). (b) ADR-001 lines 18, 93, 94 still say Go 1.27.1 and Echo ≥ v5.3.1 after core #16 raised both; its bump policy wants them in step, and editing an Accepted ADR is yours.
+
+### 17
+
+> CLOSED 2026-11-12 by owner decision 2026-11-12 #1: 2 more verdicts for VZ-FOUND-002 and 1 more for VZ-FOUND-003, for vizra-core #18 and vizra-user #12 only.
+
+**Budget grant for VZ-FOUND-002 (new 2026-11-11, tick 261).** VZ-FOUND-002 has used its 4 verifier verdicts: the audit PASS (meta #15), a FAIL on vizra-core #18 at `a627e1f` (one `-- allow-destructive:` marker exempted a later statement on the same line; main's script rejected the file, the PR accepted it), a BLOCKED on vizra-user #12 caused only by an apt failure in the e2e runner, and the PASS that completed #12. vizra-core #18 now has its fix (`84f8ad1`, fix round 1, `ci-required` green) and is not re-verified: that would be a fifth verdict for VZ-FOUND-002 (VZ-FOUND-003 is at 2 of 4). The PR stays open and nothing more is dispatched for it. Reproducer and finding: `docs/evidence/warroom/2026-11-11-vizra-core-pr18-3a-VERIFY.md`. To continue, a numbered decision naming VZ-FOUND-002 and the number of extra verdicts.

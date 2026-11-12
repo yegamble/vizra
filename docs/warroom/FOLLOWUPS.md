@@ -33,6 +33,8 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 core #16 F-1: ADR-001 lines 18, 93, 94 still say Go 1.27.1 and Echo ≥ v5.3.1; its bump policy wants the same diff. Editing an Accepted ADR is owner-only (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
 - 2026-11-10 core #17 F-5: compose never sets `VIZRA_STORAGE_ROOT`; the `media_data` mount matches the default only because two literals agree (queue 3c) (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`)
 - 2026-11-10 user #11 D-7: the design docs under `docs/design/figma/` still say PROPOSED after the acceptance of 2026-11-10 (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`)
+- 2026-11-11 meta #17: `check-config-coverage.py --drift` is all or nothing, so a core-only drift check cannot run alone; meta CI sees only the snapshot of core keys; `env/registry/search.json` is behind the search checkout (evidence: `docs/evidence/warroom/2026-11-11-meta-pr17-3c-VERIFY.md`)
+- 2026-11-11 meta #16: ADR-001 states Echo as a floor (≥ v5.4.4) while `go.mod` pins it exactly; the VZ-ISSUE-001 Outcome paragraph still says Echo ≥ 5.3.1 (evidence: `docs/evidence/warroom/2026-11-11-meta-pr17-3c-VERIFY.md`)
 
 ## vizra-core
 
@@ -43,6 +45,8 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 core #16 F-3: the `govulncheck` recipe does not scan test or integration-tagged code (same on main before the PR) (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
 - 2026-11-10 core #16 F-4: GO-2026-5932 (`x/crypto/openpgp`) is reported at module level only, not called; keep it visible (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr16-govulncheck-VERIFY.md`)
 - 2026-11-10 core #17 F-1…F-4: `busy` cleared after the result is sent (false 503 only with a fake clock); `healthcheck.go:30` text says PostgreSQL is the only 503; no test for the absolute-path rule; a timed-out probe is cached as 503 for 2 s (evidence: `docs/evidence/warroom/2026-11-10-vizra-core-pr17-readyz-storage-VERIFY.md`)
+- 2026-11-11 core #18: a marker exempts every statement on the next line (same on main); a marker is honoured inside a block comment or mid-statement; drops inside `DO $$…$$` and after an `E'…'` string are not parsed; split-line `DROP CONSTRAINT` passes; `shellcheck` SC2207 at `migrate-lint.sh:59` predates the PR (evidence: `docs/evidence/warroom/2026-11-11-vizra-core-pr18-3a-VERIFY.md`)
+- 2026-11-11 core #18 F002-M4: the worker mux serves the Prometheus handler on every path but its probes, outside what the contract test walks (evidence: `docs/evidence/warroom/2026-11-11-vizra-core-pr18-3a-VERIFY.md`)
 
 ## vizra-user
 
@@ -51,6 +55,7 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-10 user #11: `next` 16.3.5 (critical), `sharp` and dev-chain advisories turn `deps-scan` and `image-scan` red; `next` and `sharp` ship in the image: bump PR (queue 11) (evidence: `docs/evidence/warroom/2026-11-10-vizra-user-pr11-design-001-VERIFY.md`)
 - 2026-11-10 user #11: plain `<a>` with an eslint-disable instead of `next/link`, because the router cancels its own `?_rsc=` fetch and the harness counts it; `design/HANDOFF.md` is cited and absent; local Turbopack build fails on macOS arm64 (`@tailwindcss/oxide`), CI is green (evidence: `docs/evidence/warroom/2026-11-10-vizra-user-pr11-design-001-VERIFY.md`)
 - 2026-11-10 user #11 D-1…D-6: skip link hidden at 1440; CATALOG counts 133 declarations, 97 names; light `accent` on `bg-tint` is 4.40:1 (unused pair); `main` may show a focus ring after the skip link; top bar border against `elevation/1` (evidence: `docs/evidence/warroom/2026-11-10-vizra-user-pr11-design-001-VERIFY.md`)
+- 2026-11-11 user #12: no CI checks the vendored contract against core main; the expected-operations list must change with every re-vendor and `AGENTS.md` does not say so; the manifest comment on the `ci-guard` path filter does not match the workflow (evidence: `docs/evidence/warroom/2026-11-11-vizra-user-pr12-3b-VERIFY.md`)
 
 ## vizra-search
 
