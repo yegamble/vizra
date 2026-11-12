@@ -6,7 +6,7 @@ Everything else lives in `docs/warroom/`:
 
 [tick log](../warroom/TICK-LOG.md) · [owner inbox](../warroom/OWNER-INBOX.md) · [owner decisions](../warroom/OWNER-DECISIONS.md) · [merged](../warroom/MERGED.md) · [follow-ups](../warroom/FOLLOWUPS.md) · [board through tick 257](../warroom/archive/WARROOM-BOARD-through-tick-257.md)
 
-**Loop: RUNNING since tick 258 (2026-11-10), restarted on the owner's word.** Previous tick 257 (2026-09-23). The rework (#11, `82e9529`) and the records (#9, `27be92a`) are on `main`; the after-merge steps are done ([record](../evidence/warroom/2026-11-10-after-merge-TRIAGE.md)).
+**Loop: RUNNING again from tick 281, 2026-11-12, on the owner's restart (decision 2026-11-12 #11).** `stall` stays red until a ledger status lands on `main`; if none has by tick 295, the loop stops again.
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
@@ -22,9 +22,11 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Queue 13: JSON logs, denylist, request metrics, OTLP traces | vizra-core | VZ-OPS-005 | #20 (draft) | `5ce752f` | building since tick 267; denylist and metrics done, OTLP export in progress | 0/0/0/1 |
-| Queue 6: installer, `--git` path, checksum, resume, idempotence, clean ubuntu:24.04 step | vizra | VZ-INSTALL-001 | #24 (draft) | `abd9df2` | finishing: PR body and CI | 0/0/0/2 |
-| Queue 4: tombstone rule, part 1 (four-repo audit + vizra-search) | vizra-search | VZ-CI-001 | none yet | branch `feat/ci-001-tombstone` from `4810048` | building since tick 267 | 0/0/0/1 |
+| Queue 2 remainder: `/readyz` schema-behind component, DB-recovery test, compose transcript; Redis down is `degraded` (decision #8) | vizra-core | VZ-FOUND-005 | none yet | branch `feat/found-005-readyz-remainder` | builder dispatched tick 281 | 1/0/0/2 |
+| Rulings into docs: OPS-005 issue bullets (#5), FOUND-005 ledger text (#8); then ADR-010 AV1-only libheif (#9), ADR-011 (#10) | vizra | VZ-OPS-005, VZ-FOUND-005, VZ-MEDIA-001 | none yet | branch `docs/owner-rulings-2026-11-12` | builder dispatched tick 281 | see `budget` |
+| Queue 2f: artifact allowlist; 4 `e2e:demos` halves failed, diagnose | vizra-user | VZ-FOUND-008 | #18 (draft) | `b1fe3cd` | builder dispatched tick 281 | 0/0/0/4 |
+| Verify: bundle #31, bootstrap #32, template keys #33, records #28 | vizra | VZ-INSTALL-004, VZ-FOUND-001, VZ-INSTALL-002 | #31 #32 #33 #28 | `b7761b3` `4506e81` `3b34e55` `b5eb7d6` | verifiers dispatched tick 281 | per ID |
+| Queue 4 remainder (N1) | vizra-user | VZ-CI-001 | #17 | `e6748c2` | ready; verifier after #28 puts grant #4 on `main` | 4/0/0/8 (cap 6) |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
@@ -41,9 +43,9 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 
 | # | Slice | Repo | IDs | Depends on |
 |---|---|---|---|---|
-| 2 | `/readyz`: storage merged (core #17). Left: schema-behind is not a `/readyz` component; no DB-recovery test; transcript on a compose stack and rendered-model assertion; Redis-down is 200 `degraded` against the ledger text (inbox 15) | vizra-core | VZ-FOUND-005 | inbox 15 for the Redis part |
+| 2 | In flight (see above) | vizra-core | VZ-FOUND-005 | ledger text change (decision #8) |
 | 3 (002) | VZ-FOUND-002 is IMPLEMENTED on `main`. VERIFIED lacks `evidence_required`: the both-direction drift mutation red then green as CI job output (only local transcripts exist) | vizra-core + vizra-user | VZ-FOUND-002 | nothing |
-| 3 (003) | VZ-FOUND-003: every case proven on `main` (core #18, #19; verifier PASS at `37a6d55`). Status record next, after this records PR lands the evidence | vizra | VZ-FOUND-003 | this records PR |
+| 3 (003) | Build the compatibility window (decision #7): destructive statements need a checked-in record that the previous release no longer uses the object. Budget spent 5/5 | vizra-core | VZ-FOUND-003 | inbox 25 (budget) |
 | 3 (006) | VZ-FOUND-006 lacks: S2 (`vizra setup` does not exist, queue 7); N1 boot-refusal transcript; P1 (two integration tests not run); N2 limit: meta CI checks a snapshot of core's keys. S1 and N2 proven on the meta side (meta #17) | vizra + vizra-core | VZ-FOUND-006 | queue 7 for S2 |
 | 4 | Tombstone rule in all four `ci-required` guards; vizra-user's two "required only if it ran" lanes | all four | VZ-CI-001 | 1 for core |
 | 5 | `bootstrap.sh`; pin the libvips binding and Lucide | vizra + vizra-core + vizra-user | VZ-FOUND-001, VZ-FOUND-004 | 1 |
@@ -55,8 +57,7 @@ Every row names what is missing for the ID to be recorded, from the candidates r
 | 11 | Scan lanes required and green; secret-scan lane | vizra-core + vizra-user | VZ-CI-004 | 1; inbox 9 for the image CVEs |
 | 12 | `vizra doctor`, status, logs, restart, update | vizra-core | VZ-OPS-002, VZ-OPS-003 | 7 |
 | 13 | Logs, metrics, tracing with privacy-safe fields | vizra-core | VZ-OPS-005 | none |
-| 14 | VZ-DESIGN-001 BLOCKED on inbox 20 (brand mark). Merged: tokens, icons, shell, CSP (user #11); HANDOFF.md and 17 of 21 components (user #13). Left, unblocked: presentational PhotoCard and TabBar with caller-supplied props | vizra-user | VZ-DESIGN-001 | inbox 20 |
-| 15 | Host and image security posture | vizra + vizra-core | VZ-OPS-008 | inbox 9 |
+| 14 | VZ-DESIGN-001: brand mark is the text wordmark (decision #6). Built on `main` (user #11, #13, #15). Left: record PR whose verifier runs the production browser pass at 390/1440 px and the CSP mutation | vizra + vizra-user | VZ-DESIGN-001 | #28 merged |
 | 16 | M1, not blocked by 4a or 8b: registration and sessions, roles, the claim page | vizra-core + vizra-user | VZ-AUTH-001, VZ-AUTH-004, VZ-INSTALL-003 | M0 boot |
 | 17 | M1: durable jobs, local storage, quota, JPEG/PNG upload, the rest of the fixture corpus | vizra-core | VZ-JOBS-001, VZ-STORAGE-001, VZ-QUOTA-001, VZ-UPLOAD-001, VZ-FOUND-007 | 16 |
 | 18 | M1: backup and restore on a clean target (reference: vidra deploy order) | vizra-core + vizra | VZ-BACKUP-001, VZ-BACKUP-002, VZ-OPS-001 | 17; rehearsal host |
@@ -67,8 +68,9 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 
 | Item | Waiting on |
 |---|---|
-| VZ-MEDIA-001 (derivatives) and what depends on it: VZ-MEDIA-003/004, VZ-VIEWER-001 | owner ruling on inbox 4a |
-| M1-B (rest of the owner-claim issue) | owner ruling on inbox 8b |
+| VZ-MEDIA-001 (derivatives) and what depends on it: VZ-MEDIA-003/004, VZ-VIEWER-001 | ADR-010 on `main` (decision #9), then M1 order |
+| M1-B (rest of the owner-claim issue) | ADR-011 on `main` (decision #10), then M1 order |
+| VZ-FOUND-003 compatibility window | budget, inbox 25 |
 | Deploy rehearsal, VZ-BACKUP-002 on a separate host | the disposable rehearsal host (inbox 7) |
 | Q-016, Q-021, Q-022, Q-036 | provider credentials and the owner's domain |
 
@@ -77,13 +79,11 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | # | One line |
 |---|---|
 | 3 | Mockup controls with no ledger ID: add, mark unavailable, or drop |
-| 4a | ADR-001 AVIF/HEIC split is not implementable as written. Blocks VZ-MEDIA-001 |
 | 4b | ADR-009 fixture tooling and ADR-004 / ADR-002 wording, for the same amending ADR |
 | 5 | Fork-PR workflow approval setting (`all_external_contributors`?). Rulesets applied on three repos |
 | 6 | Cross-repo contract freshness: token or meta fan-in lane |
 | 7 | Q-008, Q-041, Q-042; the rehearsal host; Q-036 domain before M6 |
 | 8a | Ledger wording for the VZ-INSTALL-003 recovery case |
-| 8b | ADR-003 CSRF-table reading and one-line amending ADR. Blocks M1-B |
 | 8c | User erasure against the audit trail (before M2) |
 | 8d | ADR-003 "owner is single" against owner transfer |
 | 8e | Owner-claim lockout residual until M1-B |
@@ -91,5 +91,4 @@ Rows are a starting order, not briefs. The chair writes each brief from the ledg
 | 11 | Scrub local paths from committed evidence on the public repos? |
 | 12 | VZ-FOUND-008 acceptance text against Lane A with pixels off |
 | 13 | Coverage gaps: installer, wizard, IPFS topology, QA, security testing, rehearsal, CI repair, VZ-AUDIT-001 |
-| 15 | VZ-FOUND-005: Redis carries rate-limit counters, not only cache, so the ledger text was not amended; `/readyz` 503 or 200 `degraded` when it is down? |
-| 20 | VZ-DESIGN-001 brand mark: the accepted design defines none; chair recommends the text wordmark as the M0 mark, final mark under Q-002 |
+| 25 | VZ-FOUND-003 budget for the compatibility-window slice: chair recommends +2 verdicts, +1 fix round |
