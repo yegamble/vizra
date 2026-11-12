@@ -1,0 +1,156 @@
+{
+  "component": "vizra-core `vizra setup` interview (VZ-INSTALL-002)",
+  "note": "Snapshot of the setup interview's question id -> env template keys, read from vizra-core internal/setup/questions.go at source_commit. Refresh: `python3 -I scripts/snapshot-setup-keys.py <vizra-core checkout>` and paste source_commit + questions in one edit. Checked by scripts/check-config-coverage.py rules setup-key-untemplated and template-key-unasked. Like core.json, a green validate proves consistency with this snapshot, not that the snapshot is current.",
+  "source_file": "internal/setup/questions.go",
+  "source_commit": "2c557ac62b04f6d6069e0ef04da0c2e2d2bf1e9b",
+  "questions": {
+    "domain": [
+      "VIZRA_DOMAIN"
+    ],
+    "tls": [
+      "VIZRA_TLS_MODE",
+      "VIZRA_PUBLIC_ORIGIN",
+      "VIZRA_ALLOW_INSECURE_PUBLIC_ORIGIN"
+    ],
+    "instance_name": [
+      "VIZRA_SITE_HANDLE"
+    ],
+    "release": [
+      "VIZRA_CORE_TAG",
+      "VIZRA_USER_TAG",
+      "VIZRA_SEARCH_TAG"
+    ],
+    "s3_endpoint": [
+      "VIZRA_S3_ENDPOINT"
+    ],
+    "s3_bucket": [
+      "VIZRA_S3_BUCKET"
+    ],
+    "s3_access_key": [
+      "VIZRA_S3_ACCESS_KEY_ID"
+    ],
+    "s3_secret_key": [
+      "VIZRA_S3_SECRET_ACCESS_KEY"
+    ],
+    "storage": [
+      "VIZRA_STORAGE_BACKEND"
+    ],
+    "postgres": [
+      "VIZRA_POSTGRES_MODE"
+    ],
+    "postgres_dsn": [
+      "DATABASE_URL"
+    ],
+    "postgres_password": [
+      "POSTGRES_PASSWORD"
+    ],
+    "redis": [
+      "VIZRA_REDIS_MODE"
+    ],
+    "redis_url": [
+      "VIZRA_CACHE_URL"
+    ],
+    "analytics": [
+      "VIZRA_ANALYTICS_MODE"
+    ],
+    "clickhouse_password": [
+      "CLICKHOUSE_PASSWORD"
+    ],
+    "ipfs": [
+      "VIZRA_IPFS_MODE"
+    ],
+    "search": [
+      "VIZRA_SEARCH_MODE"
+    ],
+    "smtp": [
+      "VIZRA_SMTP_MODE"
+    ],
+    "smtp_url": [
+      "VIZRA_SMTP_URL"
+    ],
+    "smtp_from": [
+      "VIZRA_SMTP_FROM"
+    ],
+    "registration": [
+      "VIZRA_REGISTRATION_MODE"
+    ],
+    "import": [
+      "VIZRA_IMPORT_MODE"
+    ],
+    "session_secret": [
+      "VIZRA_SESSION_SECRET"
+    ],
+    "mfa_kek": [
+      "VIZRA_MFA_KEY_KEK"
+    ],
+    "search_hmac": [
+      "SEARCH_HMAC_KEY"
+    ]
+  },
+  "setup_reads": {
+    "VIZRA_DOMAIN": "internal/setup/edge.go RenderEdge (edge/Caddy site address)",
+    "VIZRA_TLS_MODE": "internal/setup/edge.go RenderEdge (which edge file is rendered; external = no edge profile)"
+  },
+  "setup_reads_note": "Keys no compose file interpolates but `vizra setup` itself reads at the commit above. They count as consumed for template-key-unused. Do not add a key here without a file:function in vizra-core that reads it.",
+  "unread_keys": [
+    "VIZRA_STORAGE_BACKEND",
+    "VIZRA_S3_ENDPOINT",
+    "VIZRA_S3_BUCKET",
+    "VIZRA_S3_ACCESS_KEY_ID",
+    "VIZRA_S3_SECRET_ACCESS_KEY",
+    "VIZRA_POSTGRES_MODE",
+    "VIZRA_REDIS_MODE",
+    "VIZRA_ANALYTICS_MODE",
+    "VIZRA_IPFS_MODE",
+    "VIZRA_SMTP_MODE",
+    "VIZRA_SMTP_URL",
+    "VIZRA_SMTP_FROM",
+    "VIZRA_REGISTRATION_MODE",
+    "VIZRA_IMPORT_MODE"
+  ],
+  "unread_keys_note": "FINDING for vizra-core: the interview writes these but nothing reads them at source_commit (no compose interpolation, no core registry key, no setup code path). They are deliberately NOT in the template - a key nobody reads is a lie an operator can act on. Each leaves this list when its reader lands (storage, mail, registration, import, ClickHouse/IPFS and managed/external selection slices); setup-key-untemplated fails on any written key that is in neither the template nor this list.",
+  "not_asked": {
+    "VIZRA_IMAGE_REGISTRY": "artefact source; fixed by the release, not an install-time choice",
+    "VIZRA_IMAGE_OWNER": "artefact source; fixed by the release, not an install-time choice",
+    "POSTGRES_USER": "bundled-service identity; the default is correct for the bundled service",
+    "POSTGRES_DB": "bundled-service identity; the default is correct for the bundled service",
+    "VALKEY_MAXMEMORY": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_CACHE_NAMESPACE": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_HTTP_PORT": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_FRONTEND_PORT": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_STORAGE_PREFIX": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_SEARCH_URL": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_SEARCH_TIMEOUT": "tuning knob with a safe default; operators edit env/production.env directly",
+    "MAX_INTERNAL_BODY_BYTES": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_SEARCH_MAX_CLOCK_SKEW": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_SEARCH_REQUEST_TIMEOUT": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_SEARCH_SHUTDOWN_GRACE": "tuning knob with a safe default; operators edit env/production.env directly",
+    "API_TIMEOUT_MS": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_CORS_ALLOWED_ORIGINS": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_QUEUE_AGE_THRESHOLD": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_WORKER_CONCURRENCY": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_JOB_LEASE": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_JOB_TIMEOUT": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_SHUTDOWN_GRACE": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_OWNER_CLAIM_ANNOUNCE": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_OWNER_CLAIM_TTL": "tuning knob with a safe default; operators edit env/production.env directly",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "tracing; selected by the VZ-OPS-005 otel overlay, not the interview",
+    "OTEL_SERVICE_NAME": "tracing; selected by the VZ-OPS-005 otel overlay, not the interview",
+    "VIZRA_MIGRATE_LOCK_TIMEOUT": "tuning knob with a safe default; operators edit env/production.env directly",
+    "VIZRA_POSTGRES_MEM_LIMIT": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_REDIS_MEM_LIMIT": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_API_MEM_LIMIT": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_WORKER_MEM_LIMIT": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_FRONTEND_MEM_LIMIT": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_CADDY_MEM_LIMIT": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_MIGRATE_MEM_LIMIT": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_SEARCH_MEM_LIMIT": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_CLICKHOUSE_MEM_LIMIT": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_IPFS_MEM_LIMIT": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "VIZRA_POSTGRES_SHM_SIZE": "resource cap; the shipped default fits the documented host size, tuned by hand",
+    "CLICKHOUSE_USER": "bundled-service identity; the default is correct for the bundled service",
+    "CLICKHOUSE_DB": "bundled-service identity; the default is correct for the bundled service",
+    "IPFS_PROFILE": "tuning knob with a safe default; operators edit env/production.env directly"
+  },
+  "not_asked_note": "Template keys the interview deliberately does not ask, with the reason. template-key-unasked fails on a production-template key that is neither written by a question nor listed here."
+}

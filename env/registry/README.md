@@ -21,3 +21,12 @@ a checkout is missing.
 
 `source_commit` is the component commit the keys were read from. Update the
 snapshot and the commit in the same edit, or the drift check will say so.
+
+## `setup.json` — the `vizra setup` interview
+
+A snapshot of vizra-core's `internal/setup/questions.go` (question id → the env
+template keys it writes) at `source_commit`. Refresh with
+`python3 -I scripts/snapshot-setup-keys.py <vizra-core checkout>` and paste
+`source_commit` + `questions` in one edit. `check-config-coverage.py` asserts
+answer coverage from it (`setup-key-untemplated`, `template-key-unasked`);
+`setup_reads`, `unread_keys` and `not_asked` are hand-maintained and reviewed.
