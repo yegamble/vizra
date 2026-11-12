@@ -1,0 +1,18 @@
+# Vizra — OTEL_MODE=external (VZ-OPS-005). Add AFTER docker-compose.prod.yml.
+#
+# No collector container. api, worker and migrate export OTLP/HTTP traces to
+# the operator's own collector, named by OTEL_EXPORTER_OTLP_ENDPOINT in the env
+# file. Required when this overlay is selected: an empty value would silently
+# mean OFF while the operator believes traces are flowing. Put credentials in
+# the collector, not in this URL.
+
+x-otel-external-env: &otel-external-env
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:?OTEL_EXPORTER_OTLP_ENDPOINT must be your collector's OTLP/HTTP base URL, e.g. https://otel.example.org:4318, when docker-compose.otel-external.yml is selected}
+
+services:
+  migrate:
+    environment: *otel-external-env
+  api:
+    environment: *otel-external-env
+  worker:
+    environment: *otel-external-env

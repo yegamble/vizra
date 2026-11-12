@@ -15,6 +15,14 @@
 # because this manifest is read from the checkout under test, so a PR could
 # otherwise stop gating itself by deleting a line. The floor lives in
 # scripts/ci-required-guard.sh, not here.
+# RETIRING A LANE (VZ-CI-001). A lane the base commit lists may leave this file
+# only if this file then carries a line of exactly this form, kept forever:
+#     # tombstone: <lane> retired <YYYY-MM-DD> because <reason>
+# scripts/check-required-tombstones.sh (run by `ci-required`) compares against
+# the base manifest from git and fails on a removal or commented-out lane with
+# no tombstone, a tombstone missing its date or reason, one for a lane the base
+# never had, one for a lane still listed or for the floor, and on deleting an
+# earlier tombstone. It fails closed when the base manifest cannot be read.
 # Entries must be bare job names: no trailing comment, no "optional" marker.
 #
 # docs/META_REPO.md §7 names three target lanes for this repo — `validate`,
