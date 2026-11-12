@@ -119,6 +119,11 @@ x-core-env: &core-env
   # reaches no log unless the operator opts in, and it lives for one hour.
   VIZRA_OWNER_CLAIM_ANNOUNCE: ${VIZRA_OWNER_CLAIM_ANNOUNCE:-off}
   VIZRA_OWNER_CLAIM_TTL: ${VIZRA_OWNER_CLAIM_TTL:-1h}
+  # VZ-OPS-005 traces. OFF here, as a literal: the base is OTEL_MODE=off and
+  # vizra-core builds no exporter for an empty endpoint. MANAGED and EXTERNAL
+  # are docker-compose.otel-managed.yml / docker-compose.otel-external.yml.
+  OTEL_EXPORTER_OTLP_ENDPOINT: ""
+  OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-vizra-core}
 
 x-core-image: &core-image
   image: ${VIZRA_IMAGE_REGISTRY:-ghcr.io}/${VIZRA_IMAGE_OWNER:-yegamble}/vizra-core:${VIZRA_CORE_TAG:-dev}

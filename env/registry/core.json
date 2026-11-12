@@ -1,6 +1,6 @@
 {
   "component": "vizra-core",
-  "source_commit": "5f615d74e840b23d2201b1d78dd89abfef07701b",
+  "source_commit": "7f64b6de5dbc08b3dccc64ba8a4a4057eb5dc1f0",
   "source_files": [
     "internal/config/keys.go",
     "internal/config/config.go",
@@ -188,6 +188,22 @@
       "secret": false,
       "delivered_by": "template",
       "default": "1h"
+    },
+    {
+      "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": "",
+      "reason": "OTLP/HTTP base URL for traces. Empty disables export (otel OFF). The MANAGED overlay sets http://otel-collector:4318; the EXTERNAL overlay requires the operator's value."
+    },
+    {
+      "name": "OTEL_SERVICE_NAME",
+      "required": "optional",
+      "secret": false,
+      "delivered_by": "compose",
+      "default": "vizra-core",
+      "reason": "service.name resource attribute on exported spans."
     }
   ],
   "escape_hatches": [
@@ -242,5 +258,6 @@
     "vizra restart": "VZ-ISSUE-004"
   },
   "future_commands_note": "Commands docs/META_REPO.md \u00a75 names as targets, mapped to the MARKER that must appear in the comment block of any operator-facing file that names them. scripts/check-template-claims.py enforces it, so 'marked as future' is mechanical rather than a judgement about tone: either the sentence names the slice that will deliver the command, or it does not get to promise it.",
-  "source_commit_rule": "Names a commit on this component's `main`. Confirmed at re-stamp time with `git -C <checkout> merge-base --is-ancestor <sha> origin/main`."
+  "source_commit_rule": "Names a commit on this component's `main`. Confirmed at re-stamp time with `git -C <checkout> merge-base --is-ancestor <sha> origin/main`.",
+  "read_2026_11_12_by": "VZ-OPS-005 meta (re-snapshotted from keys.go at core main 7f64b6d: +OTEL_EXPORTER_OTLP_ENDPOINT, +OTEL_SERVICE_NAME)"
 }
