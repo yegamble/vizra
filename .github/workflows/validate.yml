@@ -367,6 +367,15 @@ jobs:
       - name: the rendered topology is closed, capped and pinned
         run: ./scripts/check-compose-topology.py build/compose-models
 
+      # VZ-CI-002 / VZ-OPS-008 negatives on a throwaway copy of the tree:
+      # docker.sock on api, no-new-privileges dropped, log cap dropped, a new
+      # optional service publishing 0.0.0.0 - each must go red by rule id.
+      - name: model-assert negatives go red (docker.sock, 0.0.0.0, hardening)
+        run: bash tests/ci/test_compose_model_asserts.sh
+
+      - name: no environment file holding secrets is tracked
+        run: ./scripts/check-secrets-untracked.sh
+
       # Both directions: a key a component reads with nothing delivering it,
       # and a template key nothing consumes. Also refuses a key a component has
       # RETIRED: core rejects a retired name in production ON PRESENCE, so a
