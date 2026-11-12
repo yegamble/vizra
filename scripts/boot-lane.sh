@@ -91,6 +91,9 @@ fi
 } >"$ENV_FILE"
 
 compose config --quiet || die "production shape does not render"
+# Third-party images (digest-pinned) are pulled; Vizra images are the local builds,
+# so every later step runs with --pull never.
+compose pull --quiet postgres redis
 
 # --- 1/2. migrate one-shot bounded ------------------------------------------
 run_migrate() { # $1 label; returns the bounded run's exit status
