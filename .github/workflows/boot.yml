@@ -1,0 +1,58 @@
+# The `boot` lane for the vizra META repo (docs/META_REPO.md §7; VZ-CI-003,
+# VZ-ISSUE-004; clean-target transcripts for VZ-FOUND-005).
+#
+# Boots the production compose shape from source on a clean ubuntu-24.04
+# runner with dummy secrets; all logic lives in scripts/boot-lane.sh so it can
+# be run and reviewed outside Actions. NOT in .github/required-checks.txt yet:
+# making it required is a separate, owner-visible change.
+# Open on VZ-CI-003: fixture JPEG upload + decoded thumbnail hash (needs M1 upload).
+
+name: boot
+
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+    inputs:
+      vizra_ref:
+        description: "Component ref (tag/branch/sha) for bootstrap.sh; empty = each default branch"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boot:
+    name: boot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Bootstrap component checkouts
+        env:
+          VIZRA_REF: ${{ inputs.vizra_ref }}
+        run: ./bootstrap.sh
+      - name: Boot production shape and probe
+        env:
+          BOOT_OUT: ${{ runner.temp }}/boot-out
+        run: |
+          docker version --format '{{.Server.Version}}'
+          docker compose version
+          ./scripts/boot-lane.sh
+      - name: Upload boot lane logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: boot-lane-logs
+          path: ${{ runner.temp }}/boot-out
+          if-no-files-found: error
+          retention-days: 14
