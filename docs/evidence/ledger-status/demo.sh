@@ -164,7 +164,8 @@ copy="$SCRATCH/copy"; mkdir -p "$copy"
 cp "$SCRATCH/records.orig" "$ROOT/$REC"; rm -f "$ROOT/$FIX_EVID"
 git ls-files -z | (cd "$ROOT" && xargs -0 tar -cf -) | tar -xf - -C "$copy"
 (
-  cd "$copy" && git init -q && git add -A && git -c user.name=demo -c user.email=demo@invalid commit -qm base
+  cd "$copy" && git init -q && git add -A && git -c user.name=demo -c user.email=demo@invalid commit -qm base \
+    && git update-ref refs/remotes/origin/main HEAD
 ) || { echo "  FAIL  could not make the scratch copy"; FAILED=$((FAILED + 1)); }
 mutate "$copy/docs/quality/features.json" 'import sys; p=sys.argv[1]; s=open(p,encoding="utf-8").read(); i=s.index("\"id\": \"VZ-FOUND-008\""); j=s.index("\"implementation_status\": \"PLANNED\"", i); s=s[:j]+"\"implementation_status\": \"VERIFIED\""+s[j+len("\"implementation_status\": \"PLANNED\""):]; open(p,"w",encoding="utf-8").write(s)' \
   && (cd "$copy" && git -c user.name=demo -c user.email=demo@invalid commit -qam "hand-assert VERIFIED") \
@@ -243,6 +244,10 @@ escape() {  # escape NAME BUILD_EXPECT(0|1) BUILD_NEEDLE OUTPUT_NEEDLE ; section
   green "$name restored" -- bash -c "cd '$copy' && ./scripts/check-ledger-status-output.py"
 }
 (cd "$copy" && git tag -f base-commit >/dev/null)
+# Like a real checkout, the copy carries refs/remotes/origin/main (set when the
+# copy was made, at this same base commit): its tree holds the real evidence
+# files, so a real VERIFIED record's evidence is on the copy's origin/main and
+# the restored cases stay green. D10a moves the ref and puts it back here.
 
 export ESCAPE_CODE='REQS[-1]["status"] = "VERIFIED"
 REQS[-1]["verified"] = True'
@@ -311,7 +316,7 @@ if ( cd "$copy/$GEN" && python3 build.py ../../quality/features.json >/dev/null 
 else
   echo "  FAIL  D10a could not build the scratch state"; FAILED=$((FAILED + 1))
 fi
-(cd "$copy" && git update-ref -d refs/remotes/origin/main; git reset -q --hard base-commit)
+(cd "$copy" && git update-ref refs/remotes/origin/main base-commit; git reset -q --hard base-commit)
 if command -v gh >/dev/null 2>&1; then
   red "D10b online: the fixture evidence is not on yegamble/vizra main" "EVIDENCE NOT ON META MAIN" -- ./scripts/check-ledger-status-remote.py --records "$ROOT/$REC"
   cp "$SCRATCH/records.orig" "$ROOT/$REC"
