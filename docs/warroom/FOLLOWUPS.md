@@ -62,6 +62,11 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 meta #41 R-1: board at `6a28a35` lists core #27 and user #20 as open drafts and the boot lane as 'none yet'; since cut, #27 merged `33a7187`, #20 merged `56a4500`, boot lane is meta #42 — refresh next records PR (evidence: `docs/evidence/warroom/2026-11-12-meta-pr41-records-VERIFY.md`)
 - 2026-11-12 meta #42 F-1: boot-lane secret scan only checks values of keys named *SECRET*/*KEK*/*HMAC*/*PASSWORD* and not the job stdout; scan all credential-bearing values incl. URL userinfo (evidence: `docs/evidence/warroom/2026-11-12-meta-pr42-boot-lane-VERIFY.md`)
 - 2026-11-12 meta #42 F-2: boot lane exercises only postgres-down for VZ-FOUND-005; add redis-down stays 200 (degraded), storage-unreachable and stale-schema non-200 (evidence: `docs/evidence/warroom/2026-11-12-meta-pr42-boot-lane-VERIFY.md`)
+- 2026-11-12 meta #45 F-1: the clause→rule map in docs/plans/2026-11-12-meta-ci002-ops008.md leaves out VZ-CI-002 "wizard answer coverage" (it is asserted by check-config-coverage.py §3c); add the row (evidence: `docs/evidence/warroom/2026-11-12-meta-pr45-model-asserts-VERIFY.md`)
+- 2026-11-12 meta #45 F-2: VZ-OPS-008 "non-root containers" is asserted nowhere; add `user:` in compose or a per-image USER inspect lane, and the rule that checks it (evidence: `docs/evidence/warroom/2026-11-12-meta-pr45-model-asserts-VERIFY.md`)
+- 2026-11-12 meta #45 F-3: both baselines in test_compose_model_asserts.sh run the same --all render, so the "bundle-no-checkouts" label proves nothing extra; run it from a bundle tree or drop it (evidence: `docs/evidence/warroom/2026-11-12-meta-pr45-model-asserts-VERIFY.md`)
+- 2026-11-12 meta #45 F-4: check-secrets-untracked.sh only matches .env files; also catch tracked *.pem/*.key/credential files (evidence: `docs/evidence/warroom/2026-11-12-meta-pr45-model-asserts-VERIFY.md`)
+- 2026-11-12 meta #45 F-5: VZ-OPS-008 "(digest records)" is unasserted and deferred to VZ-UPGRADE-002; link the two or add the assertion (evidence: `docs/evidence/warroom/2026-11-12-meta-pr45-model-asserts-VERIFY.md`)
 
 ## vizra-core
 
@@ -93,9 +98,14 @@ Line format: `- <date> <PR or sweep> <finding id>: <one sentence> (evidence: <pa
 - 2026-11-12 core #28 F-3: `vizra status` queue depth is always BLOCKED on a `vizra setup` env (no DATABASE_URL, postgres not reachable from the host); measure it via the compose network or `exec` (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr28-ops-003-VERIFY.md`)
 - 2026-11-12 core #28 F-4: `vizra status` versions come from image refs, not OCI labels or running digests (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr28-ops-003-VERIFY.md`)
 - 2026-11-12 core #28 F-5: `vizra update` prints the detected Compose version without comparing it to the 2.24.4 floor (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr28-ops-003-VERIFY.md`)
+- 2026-11-12 core #29 FU-1: non-required `image-scan` lane is red on PR head and last 3 main SHAs (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr29-found-007-VERIFY.md`)
+- 2026-11-12 core #29 FU-2: fixtures.yml URL-guard allowlist is an unanchored substring (e.g. `ns.adobe.com/xap/1.0/` path prefix would admit a fetch URL); anchor to xmlns literals (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr29-found-007-VERIFY.md`)
+- 2026-11-12 core #30 F-1: test floors lag the formula on 6165316 (cmd/vizra 18→23, internal/setup 14→24, internal/ops 4→5); regenerate so the VZ-TOPOLOGY-007 tests cannot be deleted floor-green (evidence: `docs/evidence/warroom/2026-11-12-vizra-core-pr30-topology-007-VERIFY.md`)
+
 
 ## vizra-user
 
+- 2026-11-12 user #21 F-C: `--filter-log` passes free text in unquoted Locator/expect( arguments, progress-line title tails and any `::error::` line (reproduced: PWSECRET13/14/16/20/22/24); not emitted with values today — scrub unquoted args, restrict `::error::`, and use a counts-only profile for docker logs (evidence: `docs/evidence/warroom/2026-11-12-vizra-user-pr21-2f-final-VERIFY.md`)
 - 2026-11-10 user #10 parts A–F: recorders off, lane guard, runtime recorder check, upload gate; superseded by the allowlist re-plan on branch `allowlist/pr10-work` `7fb1365` (UNVERIFIED). Must land before any spec authenticates (queue 2f) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 - 2026-11-10 user #10: `e2e.yml:231-233` says the repo is private; it is public (queue 2q) (evidence: `docs/evidence/warroom/2026-11-10-after-merge-TRIAGE.md`)
 - 2026-11-10 user #11: `next` 16.3.5 (critical), `sharp` and dev-chain advisories turn `deps-scan` and `image-scan` red; `next` and `sharp` ship in the image: bump PR (queue 11) (evidence: `docs/evidence/warroom/2026-11-10-vizra-user-pr11-design-001-VERIFY.md`)

@@ -10,6 +10,8 @@ Everything else lives in `docs/warroom/`:
 
 The main checkout is on `main` since 2026-11-10 (inbox 14, closed), so `/warroom` there is the reworked command and the Stop hook runs.
 
+**Sign-in gate (queue 2f): may open for M1** (user #21 verifier, tick 289) on two conditions until follow-up F-C lands: test titles carry no runtime values; no new `::error::` line prints a value.
+
 **Ledger on `main`: 192 entries, 3 IMPLEMENTED (VZ-FOUND-002, VZ-CI-001, VZ-OPS-005), 2 VERIFIED (VZ-DESIGN-001; VZ-FOUND-006, meta #43 `3dc179b`, tick 288).**
 
 What each other ID still lacks, case by case, is in the queue rows 2, 3 (002, 003, 006), 11 and 14.
@@ -22,10 +24,8 @@ Budget is verdicts/fix rounds/re-plans/ticks against 4/2/1/12, counted per ID fr
 
 | Slice | Repo | IDs | PR | Head | State | Budget |
 |---|---|---|---|---|---|---|
-| Fixture corpus: 17 of 18 categories, manifest provenance check; animated AVIF open | vizra-core | VZ-FOUND-007 | #29 | `3ac120e` | verifier running | 0/0/0/2 |
-| 2f final: Playwright-exact timeout lines, scrubbed locators, filtered job log; then the sign-in gate can open | vizra-user | VZ-FOUND-008 | #21 (draft) | `8a83933` | last builder session: digests, CI sentinel proof | 2/0/0/10 |
-| Model assertions: secrets untracked added; non-root is a disclosed gap | vizra | VZ-CI-002, VZ-OPS-008 | #45 (draft) | `6ebb99c` | CI pending | 0/4, 0/4 |
-| Record: VZ-FOUND-005 (core #17, #24; meta #39, #42) | vizra | QUEUE-ledger-VZ-FOUND-005 | after this records PR | | evidence lands with this PR | |
+| Dev seams refused in production; compose chain always explicit (core part) | vizra-core | VZ-TOPOLOGY-007 | #30 | `6165316` | PASS; reopened after a chair cleanup error; merge waits for CI | 1/0/0/1 |
+| Records: VZ-FOUND-005 VERIFIED; VZ-CI-002 | vizra | QUEUE-ledger | after this records PR | | evidence lands with this PR | |
 
 ## Parked (closed by the triage of 2026-11-10; on GitHub only since the owner's answer of 2026-11-10, not merged, not in flight)
 
