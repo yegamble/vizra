@@ -117,12 +117,12 @@
     ],
     "by_implementation_status": {
       "IMPLEMENTED": 3,
-      "PLANNED": 188,
-      "VERIFIED": 1
+      "PLANNED": 187,
+      "VERIFIED": 2
     },
     "by_verification_status": {
-      "UNVERIFIED": 191,
-      "VERIFIED_AT_SHA": 1
+      "UNVERIFIED": 190,
+      "VERIFIED_AT_SHA": 2
     }
   },
   "features": [
@@ -488,12 +488,76 @@
       "unresolved": [],
       "decided": [],
       "notes": null,
-      "implementation_status": "PLANNED",
-      "verification_status": "UNVERIFIED",
-      "merge_status": "NOT_STARTED",
+      "implementation_status": "VERIFIED",
+      "verification_status": "VERIFIED_AT_SHA",
+      "merge_status": "MERGED",
       "release_status": "NOT_RELEASED",
       "test_ids": [],
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "status_record",
+          "status": "VERIFIED",
+          "rationale": "Every ledger case is delivered and was reproduced by an independent verifier at the merged head. S1 (every key config.Load reads reaches the api and worker containers, asserted from the rendered compose model) and N2 (a key added to config without a template or compose consumer fails CI): meta #17, checked against a recorded snapshot of core's key list. S2 (every key `vizra setup` writes exists in the template): meta #33, whose snapshot of core's setup questions is checked against vizra-core main and must name a commit on it. N1 (production boot with a dev or blank session secret fails; the evidence_required boot-refusal transcript): vizra-core #25, where the verifier built the real vizra-api and vizra-worker binaries and saw each refuse a dev session secret, a blank session secret, a blank MFA KEK and a plain-http origin with a named error that never echoes the value, and saw the integration test go red when the fail-secure block was disabled. Core has no separate JWT secret. P1 (log denylist proves tokens, passwords and signed URLs never appear): vizra-core #20 (tokens and passwords on the real logger) and #25 (AWS SigV4, GCS V4 and CloudFront signed URLs, red when the signature patterns are removed). Known limit, in docs/warroom/FOLLOWUPS.md: N2 compares against a snapshot of core's keys, refreshed by hand.",
+          "acceptance": [
+            {
+              "issue": "docs/issues/VZ-ISSUE-001.md",
+              "bullet": "(VZ-FOUND-006) Production boot refuses dev secrets (demonstrated)"
+            },
+            {
+              "issue": "docs/issues/VZ-ISSUE-001.md",
+              "bullet": "(VZ-FOUND-006) Every key read by config.Load reaches api and worker containers (asserted from rendered compose)"
+            },
+            {
+              "issue": "docs/issues/VZ-ISSUE-001.md",
+              "bullet": "(VZ-FOUND-006) Every key `vizra setup` writes exists in the template"
+            },
+            {
+              "issue": "docs/issues/VZ-ISSUE-001.md",
+              "bullet": "(VZ-FOUND-006) A key added to config without template/compose consumer fails CI"
+            },
+            {
+              "issue": "docs/issues/VZ-ISSUE-001.md",
+              "bullet": "(VZ-FOUND-006) Log denylist test proves tokens/passwords/signed URLs never appear"
+            }
+          ]
+        },
+        {
+          "kind": "merge",
+          "repo": "vizra",
+          "pr": 17,
+          "verified_head": "ad86e2436a94fd137cd9b30e51bc6f4a7cc8d92c",
+          "merge_commit": "6dfcb22189b443468e5167c5f25c97b0b9cadf9d",
+          "evidence_file": "docs/evidence/warroom/2026-11-11-meta-pr17-3c-VERIFY.md",
+          "final_verdict": "FINAL VERDICT: PASS — SHA ad86e2436a94fd137cd9b30e51bc6f4a7cc8d92c"
+        },
+        {
+          "kind": "merge",
+          "repo": "vizra",
+          "pr": 33,
+          "verified_head": "e5316a9f08f9718d2c3f33dcbbfd8e3d8e19cbc8",
+          "merge_commit": "5124be5f79bff3db9685cc9b35762455c211d3ff",
+          "evidence_file": "docs/evidence/warroom/2026-11-12-meta-pr33-template-keys-round2-VERIFY.md",
+          "final_verdict": "FINAL VERDICT: PASS — SHA e5316a9f08f9718d2c3f33dcbbfd8e3d8e19cbc8"
+        },
+        {
+          "kind": "merge",
+          "repo": "vizra-core",
+          "pr": 20,
+          "verified_head": "030a13fc4c52e9dca89ca761603b8a8924a1985c",
+          "merge_commit": "7f64b6de5dbc08b3dccc64ba8a4a4057eb5dc1f0",
+          "evidence_file": "docs/evidence/warroom/2026-11-12-vizra-core-pr20-ops-005-VERIFY.md",
+          "final_verdict": "FINAL VERDICT: PASS — SHA 030a13fc4c52e9dca89ca761603b8a8924a1985c"
+        },
+        {
+          "kind": "merge",
+          "repo": "vizra-core",
+          "pr": 25,
+          "verified_head": "52b4326b7d1ed4d20919ceca3a64501d024b6516",
+          "merge_commit": "99e74317d9c9910be6ad76fc37262c350e8fcde0",
+          "evidence_file": "docs/evidence/warroom/2026-11-12-vizra-core-pr25-found-006-VERIFY.md",
+          "final_verdict": "FINAL VERDICT: PASS — SHA 52b4326b7d1ed4d20919ceca3a64501d024b6516"
+        }
+      ]
     },
     {
       "id": "VZ-FOUND-007",
